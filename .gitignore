@@ -10,3 +10,5 @@ playwright-report/
 # Generated per run; summaries worth keeping are committed under reports/archive/
 reports/*-latest.*
 .claude/settings.local.json
+# Agent worktrees (Agent isolation "worktree")
+.claude/worktrees/
