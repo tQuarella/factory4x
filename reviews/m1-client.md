@@ -85,3 +85,66 @@ However, the moment H1 is about, the fight and the capture, is hidden behind the
 This is round 1.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-06
+
+I reviewed `git diff c235c82..7e7a4c6` and the touched files in full: `session.ts`, `persist.ts`, `panels.ts`, `sheet.ts`, `main.ts`, `fit.ts`, `style.css`, `index.html`, `env.d.ts`, the new unit and smoke tests, `packages/sim/src/step.ts`, `packages/sim/test/inputs.test.ts` and the new `DECISIONS.md` entries. I checked them against the Director's two rulings (New run keeps live tuning; same-tick attack orders count as one wave) and did not re-argue either.
+
+I played through a repelled wave and a capture again at 375×667, 375×812 and 812×375. Each run went: tuned economy, built a network, attacked from the Probe, staged at A5, then "Attack with all" to capture, reloaded and sent feedback. The screenshots are `crit-r2-*.png` in the session scratchpad: `-02b-banner-live`, `-03-toast-repelled`, `-05-result-panel` and `-06-capture-toast` for each of `p667`, `p812` and `land`.
+
+**Gates.** I ran them on 7e7a4c6 myself:
+- `npm run gates -- --base main`: all six passed. Determinism final hash is still 35d8f54c, so the sim change doesn't move the reference replay. Protected-files: 23 files changed, none protected.
+- `npm run build`: passed.
+- `npm run smoke`: run twice, 26/26 passed both times, including the new 375×667 project.
+
+**Bots on the merged tree.** The branch was cut before m1-bots merged, so the bot gate here only runs stubs. To test the sim change against the real strategies, I merged main and this branch in a throwaway worktree, which I have since removed:
+- **Bots:** PASS. turtle captures at 9.8 min with 1 wave and 11 lost; rush captures at 25.3 min with 5 waves, 4 repelled and 72 lost. "None: every target is met."
+- **Tests:** 117/117 passed, and determinism still ends at 35d8f54c.
+- **Merge conflict:** the merge conflicts in `DECISIONS.md` (both sides appended entries). Whoever runs `merge-task` must keep both blocks.
+
+### Round 1 items
+
+1. **Overlays over the Bloom: fixed.** The banner now has its own strip above the map, and the toast sits at the bottom of the map. The Bloom, its thorn ring, the ship badge and the withered grey capture state are all visible at every size (for example `crit-r2-p667-02b-banner-live.png` and `crit-r2-p667-06-capture-toast.png`). A smoke test checks this at both phone sizes. Side effects are under "Not blocking" below.
+2. **Retreat mistap: fixed.** The battle section is always present, with a disabled "Retreat to Probe · 0". The gap from Retreat to "Attack from Probe" stayed at 78 px before and during a battle at every size, so nothing moves under the finger. It is logged in `DECISIONS.md`.
+3. **Feedback "blocked" message: fixed.** The tab is opened without the `noopener` feature, and `opener` is cut by hand. The status now reads "Opened a prefilled GitHub issue in a new tab…" at all three sizes.
+4. **startStock and New run: fixed per the Director's ruling.**
+   - `dataWithDefaults` builds the new run from the current tuning, and `startTunables` goes into both the replay and the save.
+   - A unit test covers stock 150 and cap 5 after New run, the replay hash and the save round trip. The smoke test covers New run and `replayMatchesLive`.
+   - The confirmation dialog and the tuning panel both say that tuning is kept.
+5. **Reset all: fixed.** It sends only the values that differ from the default. The smoke test asserts exactly +1 input.
+6. **`DECISIONS.md`: fixed.** It now logs:
+   - paused inputs stepping a tick;
+   - the save format;
+   - `shipsEngaged`;
+   - the 7500-character URL limit;
+   - the Retreat button;
+   - New run keeping tuning;
+   - the notice layout;
+   - the wave-per-tick sim change.
+7. **375 px smoke coverage: fixed.** It is a `test.describe` block with load/overflow checks, 44 px targets with the probe, A1 and rich sheets open, and the overlay check.
+8. **`.confirm` CSS: removed.**
+
+### Sim change
+
+`step` caps the `wavesSent` increase from one tick's inputs at 1. It is minimal and integer-only, and a unit test covers it: two sources in one tick count 1, and a later tick counts 2. Unpaused, I confirmed in play that "Attack with all" from Probe + A5 now shows "Waves sent 2" for two attacks; in round 1 it showed 3.
+
+### Required change
+
+1. **"Attack with all" still counts several waves when the game is paused.**
+   - **The cause.** `Session.send` steps one tick per input while paused. "All" calls `send` once per source, so each order lands on its own tick, and the new sim rule counts each as a wave.
+   - **What I saw.** I checked it with a throwaway vitest (not committed): ships at Probe and A5, two `send` calls. Unpaused gives `wavesSent` 1. Paused gives `wavesSent` 2.
+   - **Why it matters.** Pausing to plan an attack and then pressing "All" is exactly the puzzle behaviour H1 wants. On that path the result panel's "Waves sent", one of the numbers fun question 3 asks the owner about, is wrong again. This is the defect the sim change was brought into this task to fix, and it is only half fixed.
+   - **Fix.** Make one "All" press land in one tick in every state. For example, give `Session` a way to send several inputs and step once while paused, and use it in the "All" handler.
+   - **Check.** Add a unit test: paused, two sources, one "All" press, `wavesSent` is 1, and `replay()` still matches the live hash.
+
+### Not blocking (Director: add to the backlog or Designer notes)
+
+- **The toast now covers the probe.** At all three sizes the toast's box contains the probe's centre: at 375×667 the toast spans y 298–359 and the probe sits at y 335. Tapping the probe while a toast is up only dismisses the toast. This costs an extra tap after every battle, but no wrong action ever fires.
+- **The map jumps when the banner appears and disappears.** At 375×667 the Bloom moves 29 px and the probe 5 px when the banner appears, and they move back when it goes. Every node stays within its tap radius, but the jolt is visible at the start and end of every fight. Reserving the banner strip permanently, or overlaying it on the reserved top margin `fitMap` now leaves, would remove it.
+- **The banner text is shorter than the spec.** It reads "BATTLE · strip 1.3/s · regrow 0.5/s · 0 lost". It drops "thorns" and "you"; the sheet still has the full sentence. This is readable, but the Designer should confirm it.
+- **Designer: "All" doesn't arrive as one wave.** From Probe + A5, the A5 ships arrive about 330 su earlier and fight alone until the Probe ships arrive. In my first try the A5 group died before the Probe group reached the Bloom. Players will likely read "Attack with all" as one simultaneous wave. That matters for claim 2 and is worth a Designer note before the handoff.
+- **Test hooks with fake text.** `debugShowNotices` puts fake banner and toast text into the production `refreshUi` path through `forceBanner`. It is a test hook in the existing `__factory4x` style and is acceptable, but keep such hooks out of gameplay code paths where possible.
+
+This is round 2 on m1-client. Under the deadlock rule in `PROCESS.md`, this second rejection moves the task to the Core Engineer. The only remaining work is the one required change above.
+
+VERDICT: REJECT
