@@ -32,7 +32,7 @@ Expected launches: designer 1 + 4 builders + 4 critics = 9, leaving 3 for rework
 
 ## Usage budget (this iteration)
 
-Subagent launches: 10 / 12 (designer, core-engineer ×2, art-direction, critic ×4, engineer ×2). Resumes (designer after a stall; art fix round; critic round 2) are not counted as new launches.
+Subagent launches: 11 / 12 (designer, core-engineer ×2, art-direction, critic ×4, engineer ×2, retrospective). Resumes were not counted, and there were about 8 (see the M1 retro in DECISIONS.md). Next iteration: keep the per-run ledger PROCESS.md now asks for.
 
 ## Next step
 
