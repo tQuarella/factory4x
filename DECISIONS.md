@@ -83,6 +83,7 @@ Not changed: the usage budget. With 0 launches there's no evidence to tune it ye
 - **Renderer for M1: Canvas 2D.** The plan let the Engineers pick Pixi or Phaser, but the art and client tasks run in parallel, and they need one fixed draw-function contract (the signatures are in `m1-art`). M1 draws at most a few hundred sprites, which Canvas 2D handles on a phone. Revisit if `cw-bench` or a later milestone needs more.
 - **`m1-art` starts alongside `m1-sim`:** it depends only on the draw contract, not on the sim API. `m1-client` and `m1-bots` start when `m1-sim` merges.
 - **Bot softlock rule redesigned in `m1-bots`:** constant probe mining changes the state hash every tick, so "hash unchanged" can never trigger. The new rule: no delivery and no ship for 5 game-minutes before capture.
+- **Agent worktrees live in `.claude/worktrees/`, inside the repo** (that's where Agent isolation puts them). Added to `.gitignore`. ESLint doesn't read `.gitignore`, so `eslint .` on `main` was also linting 49 files from in-progress task branches, and one broken branch could fail `main`'s lint gate during a merge. The `lint` script now names the project's own paths (`packages scripts tests` plus the three root configs): the same 24 files as before, minus the worktree copies. This doesn't weaken the gate. The protected `eslint.config.js` would be the cleaner place (`ignores: ['.claude/**']`); proposed in QUESTIONS.md Q12.
 
 ## 2026-11-06: m1-art palette additions and gallery build entry (Art Direction)
 

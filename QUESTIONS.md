@@ -114,3 +114,9 @@ The site is static, so feedback needs somewhere to go. Default plan: a prefilled
 Today, protected files are guarded by Claude Code deny rules plus a CI tripwire. Stronger: GitHub branch protection on `main` with CODEOWNERS on the protected paths, so only you can merge changes to them. Want that once the repo is on GitHub?
 
 **Answer:**
+
+### Q12. Ignore agent worktrees in eslint.config.js (2026-11-06, Director)
+
+Agent worktrees live in `.claude/worktrees/` inside the repo. I scoped the `lint` script in `package.json` so they aren't linted, which works. The cleaner fix is adding `'.claude/**'` to the `ignores` list in `eslint.config.js`, which is protected. Approve with `APPROVED-PROTECTED: eslint.config.js` and I'll make that one-line edit (you'll also get the edit prompt).
+
+**Answer:**

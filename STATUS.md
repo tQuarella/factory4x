@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 1 — First playable (iteration 1, hypothesis H1)
-**State:** Plan/Spec step. The Designer is writing the H1 spec in `DESIGN.md`.
+**State:** Build step. The H1 spec is done (`DESIGN.md`) and split into four tasks (`BACKLOG.md`). `m1-sim` and `m1-art` are being built in parallel.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261106-1 (Milestone 0 placeholder); owner feedback received.
@@ -23,12 +23,16 @@ Expected launches: designer 1 + 4 builders + 4 critics = 9, leaving 3 for rework
 
 | Task | Agent | Branch / worktree | State |
 | --- | --- | --- | --- |
-| H1 spec | designer | main working tree (`DESIGN.md`) | In progress |
+| H1 spec | designer | main (`DESIGN.md`) | Done, committed 2e0614e |
+| m1-sim | core-engineer | `task/m1-sim` (agent worktree) | Building |
+| m1-art | art-direction | `task/m1-art` (agent worktree) | Building |
+| m1-client | engineer | — | Waits for m1-sim to merge |
+| m1-bots | engineer | — | Waits for m1-sim to merge |
 
 ## Usage budget (this iteration)
 
-Subagent launches: 1 / 12 (designer)
+Subagent launches: 3 / 12 (designer, core-engineer, art-direction). The designer was resumed once after a stall, which doesn't count as a new launch.
 
 ## Next step
 
-When the Designer reports: review the spec, write the four tasks into `BACKLOG.md`, commit, then launch `core-engineer` on `m1-sim`.
+When each builder reports green: launch the `critic` on that branch; on approval, `npm run merge-task -- <id>`. After m1-sim merges, launch `m1-client` and `m1-bots` in parallel.
