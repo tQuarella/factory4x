@@ -83,3 +83,31 @@ Not changed: the usage budget. With 0 launches there's no evidence to tune it ye
 - **Renderer for M1: Canvas 2D.** The plan let the Engineers pick Pixi or Phaser, but the art and client tasks run in parallel, and they need one fixed draw-function contract (the signatures are in `m1-art`). M1 draws at most a few hundred sprites, which Canvas 2D handles on a phone. Revisit if `cw-bench` or a later milestone needs more.
 - **`m1-art` starts alongside `m1-sim`:** it depends only on the draw contract, not on the sim API. `m1-client` and `m1-bots` start when `m1-sim` merges.
 - **Bot softlock rule redesigned in `m1-bots`:** constant probe mining changes the state hash every tick, so "hash unchanged" can never trigger. The new rule: no delivery and no ship for 5 game-minutes before capture.
+
+## 2026-11-06 · Core Engineer · m1-sim architecture
+
+- **Entity storage: dense arrays of plain records, kept in ascending id order** (`ships`, `routes`, `guardian.thorns`, pods per route), with one id counter (`nextId`). New entities are appended; dead ones go with an order-preserving filter. Nodes are indexed by map position. Every system loops over these arrays, so iteration order is always id order. Rejected: struct-of-arrays with typed arrays (typed arrays aren't plain JSON, so autosave and the hash would need a conversion layer, and M1 has at most a few hundred ships); a generic ECS with component maps keyed by entity id (object-key iteration risk and indirection with no M1 benefit). Measured: a scripted 30-minute game that captures and ends with 352 ships has tick p95 0.0016 ms against the 2.0 ms budget. Revisit with cw-bench at 10k entities.
+- **Live tunables live in the world (`world.tun`, keyed by dotted name)**, start from data defaults, and change only through the `setTunable` input. So they are hashed, saved by autosave, and in the replay input log, which keeps the spec's mechanism: a replay reproduces a tuned session. Rejected: data snapshots in the replay, because they need a second channel and lose the tick at which a change was made.
+- **`data/sim.json` schema:** `tunables` maps each dotted key to `{default, min, max}`. The ranges are tuning numbers too, so they live in data, not code. `map.nodes` holds the map. `parseSimData` validates all of it (no missing or unknown keys, integer defaults within range, the probe at index 0, exactly one rich node), and `defaultData` goes through it.
+- **`step(world, data, inputs)` keeps its `data` argument.** `data` is the static rule book (tunable ranges for `setTunable` validation); `world` is the mutable state. `step` and `replayHashes` throw when the data version doesn't match. Rejected: copying the ranges into the world (static metadata in every hash and save) and a module-level registry (hidden global state).
+- **Saves:** `serializeWorld` wraps the world in `{format, dataVersion, world}`. `deserializeWorld` returns a `LoadResult` (`ok`, or `reason: 'dataVersion' | 'corrupt'`) instead of throwing, so the client can show the mismatch toast without parsing exceptions.
+- **Selectors return integers:** rates that need a decimal place come in tenths (`shipsPerMinX10`, `killPerSecX10`), so the sim stays integer-only and the client formats them.
+
+## 2026-11-06 · Core Engineer · m1-sim spec readings (H1)
+
+Places where DESIGN.md H1 was ambiguous or slightly inconsistent. Each one follows the reading closest to the intent.
+
+- **a1 route length is 247, not 248.** floor(sqrt(170² + 180²)) = floor(247.59). The rule (floor) wins over the table; the cost is 9 either way.
+- **Throughput buckets:** rule 10 says to zero "the bucket being entered", but rule 4 of the same tick has already delivered into the current bucket. Reading: at the end of the last tick of each game second, update `peakPerMin` from the full 60 s window, then clear the bucket the next tick will write to. Zeroing the current bucket would delete that tick's deliveries.
+- **Battle end** is checked every tick after combat, not only on round ticks. It is `repelled` if this tick's round killed the last ships present; otherwise (they were ordered out) it is `withdrew`.
+- **`wavesSent` counts `sendShips` orders to the guarded rich node only.** Ships that fly there on their own because the rally point is `rich` (a trickle) are not counted as waves.
+- **`setTunable` takes effect in the tick it is logged in.** From the player's view, that is "from the next tick on".
+- **"Queued" counts work under construction too.** `buildRoute` is invalid while a route from that node is active, and `upgradeRoute` counts active and queued upgrades toward `route.maxLevel`. Upgrade costs follow the target level.
+- **`sendShips` with a count above the ships available sends them all.** It is valid as long as at least one ship is there.
+- **`setTunable` rejects `client.*`** (client settings, not sim state; the client handles `client.autosaveSec` itself) **and `stats.*`.** It accepts `economy.startStock`, which only affects new worlds; the metadata marks it `newRunOnly`.
+- **Live-tuning edge cases:** if `route.maxLevel` is lowered below a queued upgrade, the order is dropped unpaid when it reaches the head of the queue. Thorn repair never lowers a thorn above a reduced `guardian.thornHp`. Thorns above a reduced `guardian.cap` stay, and regrowth pauses until they fall below it.
+- **Capture with no fought round:** if both sides wipe out in the same round and a ship then arrives before regrowth, the capture still records a `lastBattle` (outcome `captured`).
+- **Travel times:** pods and ships are decremented on the tick they launch (rule 4 and rule 6 come after the launch), so a trip takes exactly ceil(length / speed) ticks, counting the launch tick.
+- **`serializeWorld` doesn't check the version** (a world can't mismatch itself). The refusal happens on load (`deserializeWorld`), and also in `step` and `replayHashes`.
+- **Kill-rate selector:** ships × damage / thornHp per round, converted to thorns per second. It ignores overkill waste and repair. It is the planning number for "you strip 2.4 thorns/s".
+- **`stats.throughputWindowSec` is not in `world.tun`.** It sets the ring buffer length when the world is created, and `setTunable` rejects it.
