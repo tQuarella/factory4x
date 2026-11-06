@@ -50,7 +50,7 @@ npm run merge-task -- <task-id>    # Critic-approved, gate-checked merge into ma
 
 ## Rules that never bend
 
-- Never edit protected files: `VISION.md`, `.claude/agents/critic.md`, `.claude/settings.json`, `scripts/gates/*`, `.github/workflows/*`, `eslint.config.js`. Ask in `QUESTIONS.md` instead. Exception: the Director may edit `VISION.md` in a live session after the owner approves the change, through the per-edit permission prompt.
+- Never edit protected files: `VISION.md`, `.claude/agents/critic.md`, `.claude/settings.json`, `scripts/gates/*`, `.github/workflows/*`, `eslint.config.js`. Ask in `QUESTIONS.md` instead. Exception: in a live session with the owner, the Director may edit any of these except `.claude/settings.json` once the owner has approved the change in `QUESTIONS.md`; each edit raises a permission prompt the owner accepts.
 - Never merge without Critic approval and passing gates. Use `npm run merge-task`.
 - Never weaken a gate, skip a gate, or trade quality for activity. Pausing is fine.
 - Broken `main` is the top priority and halts other merges.

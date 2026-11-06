@@ -32,7 +32,9 @@ You asked to act only when it must be you. Today, changing a protected file othe
 
 You have to apply this one yourself, because agents can't change their own permissions. The Director prepared the file; applying it is one command (given in chat).
 
-**Answer:**
+**Answer (owner, 2026-11-06, in chat):** applied the prepared settings file, then: "Done, fix the gate"
+
+APPROVED-PROTECTED: scripts/gates/protected-files.mjs
 
 ## Answered
 

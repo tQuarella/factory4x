@@ -34,3 +34,8 @@ Dated log of decisions and why. Newest at the bottom. Every prompt or process ch
 ## 2026-11-06 · Director · Owner involvement
 
 - **Owner acts only when it must be them (owner):** "i don't want to do anything myself unless i have to or am the only decision maker." Added to `CLAUDE.md` so every session sees it. Consequence: protected-file approvals should be a prompt the owner accepts, not an edit the owner makes. Proposed moving the remaining protected-path `Edit` rules from `deny` to `ask` (Q9); the owner applies that once, because agents can't change their own permissions.
+
+## 2026-11-06 · Director · Protected-file prompts and gate fix
+
+- **Protected files except settings.json are now ask, not deny (owner, Q9):** the owner applied the prepared `.claude/settings.json`. The Director edits a protected file only in a live session after the owner approves in `QUESTIONS.md`, and the owner accepts each edit at the prompt. `CLAUDE.md` updated. The `PROCESS.md` Guardrails line still describes the VISION.md-only exception, because another session was editing `PROCESS.md` at the time; widen it on the next pass.
+- **cw-gate-windows fixed:** `protected-files.mjs` uses `execFileSync('git', args)`. Through cmd.exe, `^{commit}` lost its `^`, so the gate never found a base ref on Windows and skipped. Tested on Windows: it passes on approved changes (`--base 00c150c`), and in a throwaway repo it fails on an unapproved `VISION.md` change and passes once the approval line is added.

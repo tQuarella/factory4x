@@ -11,7 +11,7 @@
 // Usage: node scripts/gates/protected-files.mjs [--base <git-ref>]
 // Without --base it checks against origin/main, then main; if neither exists
 // (first commit) it passes.
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 
 export const PROTECTED = [
@@ -23,13 +23,14 @@ export const PROTECTED = [
   'eslint.config.js',
 ];
 
-function git(cmd) {
-  return execSync(`git ${cmd}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+// No shell: cmd.exe on Windows treats ^ as an escape and would mangle "<ref>^{commit}".
+function git(...args) {
+  return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 }
 
 function refExists(ref) {
   try {
-    git(`rev-parse --verify --quiet ${ref}^{commit}`);
+    git('rev-parse', '--verify', '--quiet', `${ref}^{commit}`);
     return true;
   } catch {
     return false;
@@ -48,8 +49,8 @@ if (!base || !refExists(base)) {
 // Committed changes since base, plus anything staged (e.g. an in-progress merge in merge-task).
 const changed = [
   ...new Set([
-    ...git(`diff --name-only ${base}...HEAD`).split('\n'),
-    ...git('diff --name-only --cached HEAD').split('\n'),
+    ...git('diff', '--name-only', `${base}...HEAD`).split('\n'),
+    ...git('diff', '--name-only', '--cached', 'HEAD').split('\n'),
   ]),
 ].filter(Boolean);
 const hits = changed.filter((f) => PROTECTED.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)));

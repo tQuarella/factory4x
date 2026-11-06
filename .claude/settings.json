@@ -34,11 +34,7 @@
       "Bash(gh pr list*)"
     ],
     "deny": [
-      "Edit(/.claude/agents/critic.md)",
       "Edit(/.claude/settings.json)",
-      "Edit(/scripts/gates/**)",
-      "Edit(/.github/workflows/**)",
-      "Edit(/eslint.config.js)",
       "Read(/.env)",
       "Read(/.env.*)",
       "Bash(git push --force*)",
@@ -52,7 +48,11 @@
       "Bash(gh repo delete*)"
     ],
     "ask": [
-      "Edit(/VISION.md)"
+      "Edit(/VISION.md)",
+      "Edit(/.claude/agents/critic.md)",
+      "Edit(/scripts/gates/**)",
+      "Edit(/.github/workflows/**)",
+      "Edit(/eslint.config.js)"
     ]
   }
 }
