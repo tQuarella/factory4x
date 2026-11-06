@@ -1,0 +1,36 @@
+{
+  "name": "factory4x",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p packages/sim && tsc -p packages/bots && tsc -p packages/client && tsc -p tests",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "determinism": "tsx packages/bots/src/determinism-cli.ts",
+    "bots": "tsx packages/bots/src/cli.ts",
+    "protected": "node scripts/gates/protected-files.mjs",
+    "gates": "node scripts/gates/run-all.mjs",
+    "dev": "npm run dev -w @factory4x/client",
+    "build": "npm run build -w @factory4x/client",
+    "smoke": "playwright test",
+    "release-gates": "npm run gates && npm run build && npm run smoke",
+    "changelog": "node scripts/changelog.mjs",
+    "worktree": "node scripts/worktree.mjs",
+    "merge-task": "node scripts/merge-task.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}

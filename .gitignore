@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vite/
+test-results/
+playwright-report/
+*.log
+.env
+.env.*
+!.env.example
+# Generated per run; summaries worth keeping are committed under reports/archive/
+reports/*-latest.*
+.claude/settings.local.json

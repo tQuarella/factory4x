@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#05070d" />
+    <title>Von Neumann Probe</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #05070d; color: #cfe8ff; overflow: hidden; touch-action: none; }
+      body { font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; }
+      #hud { position: fixed; left: max(12px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); pointer-events: none; }
+      #hud h1 { margin: 0 0 4px; font-size: 16px; font-weight: 600; letter-spacing: 0.08em; color: #ffd27a; }
+      #hud p { margin: 0; opacity: 0.8; }
+    </style>
+  </head>
+  <body>
+    <canvas id="view" aria-label="Game view"></canvas>
+    <div id="hud">
+      <h1>VON NEUMANN PROBE</h1>
+      <p>Milestone 0 placeholder · build <span id="version"></span></p>
+      <p>tick <span id="tick">0</span> · stock <span id="stock">0</span> · state <span id="hash">—</span></p>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

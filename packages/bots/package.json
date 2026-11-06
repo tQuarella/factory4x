@@ -1,0 +1,9 @@
+{
+  "name": "@factory4x/bots",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@factory4x/sim": "*"
+  }
+}

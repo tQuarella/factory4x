@@ -1,0 +1,7 @@
+{
+  "_comment": "Protected gate thresholds. Changing these needs owner approval (see PROCESS.md Guardrails).",
+  "tickBudgetMsP95": 2.0,
+  "botGameTicks": 54000,
+  "determinismTicks": 9000,
+  "determinismHashEvery": 300
+}
