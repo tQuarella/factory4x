@@ -20,6 +20,7 @@ Four tasks, sized to fit the 12-launch budget. `m1-sim` goes first, because the 
 | m1-client | Playable phone client: map, sheets, HUD, controls, tuning, feedback, autosave | engineer | Building |
 | m1-bots | rush and turtle strategies plus the capture-based report | engineer | **Merged** 4afda2f (approved round 2) |
 | m1-art | Draw functions and style for every M1 entity, including the Bloom | art-direction | **Merged** 7205468 (approved round 2) |
+| m1-toast-fix | Broken main: battle toast covered the Bloom on Linux CI (font metrics) | core-engineer | Building |
 
 ### m1-sim (core-engineer)
 
@@ -82,6 +83,18 @@ Four tasks, sized to fit the 12-launch budget. `m1-sim` goes first, because the 
 2. The Bloom and thorns follow the Designer's flavor text and `ART_STYLE.md`. Every entity is distinguishable at 24 px on the space background. `ART_STYLE.md` gets a section for the M1 entities.
 3. A static gallery page at `packages/client/gallery.html` (not linked from the game) draws every function at 24, 48 and 96 px, so the owner and the Critic can check readability.
 4. `npm run gates` and `npm run build` pass.
+
+### m1-toast-fix (core-engineer)
+
+Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait › banner and toast never cover the rich node" on desktop and phone, with "#toast overlaps the Bloom". Linux's fallback monospace wraps the toast to more lines, so it grows up into the Bloom. It passes on Windows.
+
+**Files:** `packages/client/index.html`, `packages/client/src/style.css`, `packages/client/src/main.ts`, `tests/smoke/boot.spec.ts`.
+
+**Acceptance:**
+1. Where the toast and banner sit doesn't depend on text metrics: with any font, wrap or text length, neither covers the Bloom or any other part of the map.
+2. Controls stay at least 44 px. The toast is still dismissed with one tap.
+3. The smoke test forces a wide font on the notices, so the check fails on Windows when the layout is wrong, matching Linux CI. It passes after the fix.
+4. Gates, build and smoke (twice) are green.
 
 ## Can wait (allowed while waiting on the owner)
 
