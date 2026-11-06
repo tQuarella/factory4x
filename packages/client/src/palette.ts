@@ -11,4 +11,14 @@ export const palette = {
   mob: '#ff5d73',
   mobGlow: 'rgba(255, 93, 115, 0.25)',
   route: 'rgba(79, 209, 197, 0.6)',
+  // M1 additions
+  bloom: '#ff4f8b',
+  bloomHi: '#ffb3cc',
+  bloomGlow: 'rgba(255, 79, 139, 0.28)',
+  withered: '#7a7f8a',
+  witheredDark: '#4a4e58',
+  thorn: '#ff5d73',
+  thornCore: '#ffd0d6',
+  routeBackedUp: '#ffd27a',
+  flash: '#ffffff',
 } as const;

@@ -70,7 +70,7 @@ function render(t: number): void {
     draw();
     ctx.restore();
   };
-  at(asteroid.x, asteroid.y, () => drawAsteroid(ctx, s * 0.07, 3));
+  at(asteroid.x, asteroid.y, () => drawAsteroid(ctx, s * 0.07, 3, 1, 2));
   at(mob.x, mob.y, () => drawMob(ctx, s * 0.05, t));
   const orbit = t * 0.6;
   at(cx + Math.cos(orbit) * s * 0.14, cy + Math.sin(orbit) * s * 0.14, () => drawShip(ctx, s * 0.025, orbit + Math.PI / 2));

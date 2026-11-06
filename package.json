@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "typecheck": "tsc -p packages/sim && tsc -p packages/bots && tsc -p packages/client && tsc -p tests",
-    "lint": "eslint .",
+    "lint": "eslint packages scripts tests eslint.config.js playwright.config.ts vitest.config.ts",
     "test": "vitest run",
     "determinism": "tsx packages/bots/src/determinism-cli.ts",
     "bots": "tsx packages/bots/src/cli.ts",
