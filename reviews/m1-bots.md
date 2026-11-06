@@ -27,3 +27,37 @@ Required changes:
 - [ ] Re-run the gates and paste the new bot summary table into the hand-back so the Director can see the corrected numbers.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-06
+
+This round reviews 013a21d against the round 1 required changes. I re-ran every check myself.
+
+Pillar fit: No change from round 1. The strategies still follow the spec, and no tuning was changed. At-capture numbers at defaults: turtle captures at 9.8 min with 1 wave, 34 built, 11 lost, ore 525 on ships and 446 on economy. Rush captures at 25.3 min after 5 waves (4 repelled), 90 built, 72 lost, ore 1365 on ships and 139 on economy. Rush loses 6.5× the ships turtle does. No flags.
+
+Required changes from round 1:
+- [x] **Seed copying removed.** `runSeeds` now runs every seed, and `cli.ts` checks crash and softlock on every result. In `reports/bots-latest.json` each seed has its own `finalHash` (rush `f13f6c3f`, `dcd36992`, `1cbe24f5`, for example). A test asserts that the 3 hashes are distinct and that seed 2 matches a separate run. The whole suite takes 0.6 s.
+- [x] **The softlock is exact.** Progress is now an increase in the per-second delivery bucket for the tick just run, or a ship built, checked every tick. I confirmed the indexing against `step.ts`: `stats()` runs before `world.tick += 1` and clears the next bucket before it is written. I repeated my stall experiment in a scratch script:
+  - stall at tick 9000 → softlock 299.8 s later;
+  - stall at 9017 → 299.2 s;
+  - stall at 12345 → 299.3 s;
+  - with pods left in flight, the last delivery was at tick 9083 and the softlock came at 18083, exactly 300 s later.
+
+  Round 1 measured 358 s for the same stall.
+- [x] **Mid-game stall test added.** The new runner test bounds the softlock tick between `STALL − 90 + limit` and `STALL + limit + 1`. The old 60-second window would fail that bound by 1800 ticks, so the test can actually fail. The never-started test is still there.
+- [x] **`nodeFinished` waits for built extractors.** It now requires `extractors === extractorsCommitted`. A hand-built test (a5's last extractor active, then queued) shows turtle doesn't turn the yard on or rally. A full-game test asserts exactly two `setShipyard` inputs. My own 30-minute trace shows `0: off`, `11836: on`, `11836: rally a5`, and nothing else. Rush sends no toggles: the yard starts on and the rally starts at the probe.
+- [x] **Figures are now at capture.** I took my own snapshot on the capture tick:
+  - turtle (tick 17550): 34 built, 11 lost, 1 wave, 525 / 446;
+  - rush (tick 45510): 90 built, 72 lost, 5 waves, 1365 / 139.
+
+  Both match the report exactly. The 525 is 35 × 15, because the yard pays for a ship when it starts building it, so one ship was under construction at capture. That is consistent with the sim. `wavesRepelled` at capture is taken after the battle counter updates on the same tick. Whole-run totals are under `wholeRun` in the JSON, and the Markdown says so.
+- [x] **Gates re-run.** The new summary table is above.
+
+Regressions: none found. All of `npm run gates -- --base main` passes on 013a21d: typecheck, lint, test, determinism (`35d8f54c`, unchanged), bots (PASS, no flags) and protected-files (7 files, none protected). The stubs still time out without a softlock, because the default yard builds 25 ships from probe mining, and that counts as progress under the spec. Tick p95 is 0.0014 ms or less.
+
+Housekeeping I did myself: the new `DECISIONS.md` entry heading had two raw Latin-1 `0xB7` bytes, which is invalid UTF-8 and shows as `�`. I rewrote them as UTF-8 `·`, matching the other headings. No wording changed. The entry also records the "rising at minute 10" reading I asked for.
+
+Non-blocking notes for the Director (new backlog items if wanted, not conditions of this approval):
+- "Peak ore/min" in the Markdown table is a whole-run figure: turtle 250, but 150 at capture. The JSON comment says so, but the column header doesn't.
+- The Designer should confirm the "throughput still rising at minute 10" reading (see `DECISIONS.md`). Read strictly as the asteroid economy alone, turtle misses the target at defaults.
+
+VERDICT: APPROVE
