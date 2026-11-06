@@ -116,3 +116,6 @@ Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait 
   - The map shifts when the banner appears and disappears (the Bloom moves 29 px at 375x667). Every node stays inside its tap radius.
   - The battle banner text was shortened to "BATTLE · strip 1.3/s · regrow 0.5/s · N lost"; the Designer should confirm the wording.
   - The `debugShowNotices` test hook adds a test-only branch to the production `refreshUi`.
+- cw-toast-a11y (Engineer; Critic note in reviews/m1-toast-fix.md): drop the toast's fixed `aria-label` so screen readers read the battle report itself, and consider `aria-live="polite"` on the notices strip.
+- cw-map-jump (Designer decision after the M1 playtest): the map shrinks while a battle toast is shown (−25% height at 375x667, the Bloom moves 53 px) until it's tapped. Options: keep it; reserve a fixed notices strip; or auto-dismiss the report (this changes the spec's "stays until tapped").
+- cw-bloom-label-clip (Engineer): on a short map (375x667 with a sheet open) the BLOOM label is clipped at the top edge. The map-fit margin doesn't count the label.

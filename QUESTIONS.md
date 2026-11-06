@@ -4,29 +4,34 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
-## Build build-20261106-1 is ready (2026-11-06)
+## Build build-20261106-2 is ready (2026-11-06): Milestone 1, first playable
 
-Play: https://factory4x.pages.dev (open it on your phone)
+Play: https://factory4x.pages.dev (on your phone, portrait). Give it one ~20 minute session.
 
 What changed:
-- Placeholder page: the probe, an asteroid, a delivery route and a mob, drawn as procedural shapes.
-- The simulation runs live in the page at 30 ticks per second.
-- Build version shown in the corner so feedback can name the build.
+- Build extractors and ore routes on five asteroids. Delivered ore per minute is the big number at the top, and your shipyard speeds up with it.
+- The richest rock is guarded by the Bloom, a hive that regrows its thorns. Take it with one big enough wave, and your ore per minute jumps.
+- Pause, 1x/2x/4x, a tuning panel for every number, a feedback button, and autosave so a closed tab loses nothing.
 
-Try this: open it on your phone in portrait, then rotate to landscape. Leave it running for a minute and watch the tick and stock counters climb.
+Try this: tap an asteroid and build an extractor, then a route. Grow the network until ore/min stops climbing, and upgrade the routes that show "!". Then try the Bloom: send an early wave and read the battle report, then come back with a bigger one. Pausing to plan an attack is fine. The bots take it in about 10 minutes with ~32 ships massed at A5.
 
-This is the pipeline proof, not gameplay. Milestone 1 is the first build with something to play. So the questions are about look and feel only:
+Fun questions (the H1 hypothesis):
+1. Watching ore/min climb and ships come faster: was that satisfying in itself, or did you only care about the attack?
+2. When you took the Bloom, did it feel like you worked out what it needed (how many ships, how much network), or like you just waited until you had a pile of ships?
+3. Did the result panel after capture (time, ships lost, waves) make you want to replay and beat it, or did it feel like a clock you did not want? (This is also Q11; it can be switched off in the tuning panel.)
+4. "Attack with all" from two places arrives staggered, so the closer group fights first. Did you expect one combined wave?
 
-1. Does the visual direction (warm amber geometry for you, hot-pink spiky guardians, flat vector shapes on deep space) feel like the right starting point for this game?
-2. On your phone, is everything readable at a glance: can you tell the probe, the asteroid, your ship and the guardian apart without thinking?
+Feedback: the speech-bubble button opens a prefilled GitHub issue with a replay of your session. Plain answers here or in chat work too.
 
-**Answer (owner, 2026-11-06, in chat):** "Visual direction is good. Everything is readable"
+Also open: Q11 (result panel, covered by question 3), Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
 
-Also open: Q3 (image service), Q4 (feedback button delivery), Q5 (GitHub branch protection), Q10 (list secret names).
-
-Protected files changed this build: `PROCESS.md` Guardrails section (Q8, approved). Since this build, on `main`: `VISION.md` (Q7, approved) and `.claude/settings.json` (Q8, approved).
+Protected files changed this build: none. Every merge passed the protected-files gate.
 
 ## Blocking
+
+None.
+
+## Answered
 
 ### Q9. Ask instead of block for all protected files (2026-11-06, Director)
 
@@ -38,7 +43,9 @@ You have to apply this one yourself, because agents can't change their own permi
 
 APPROVED-PROTECTED: scripts/gates/protected-files.mjs
 
-## Answered
+### build-20261106-1 handoff (Milestone 0 placeholder)
+
+**Answer (owner, 2026-11-06, in chat):** "Visual direction is good. Everything is readable"
 
 ### Q6. Connect GitHub and Cloudflare (2026-11-06, Director)
 
