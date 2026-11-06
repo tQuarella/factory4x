@@ -1,7 +1,47 @@
 {
-  "dataVersion": 1,
+  "dataVersion": 2,
   "tickRate": 30,
-  "placeholder": {
-    "trickleMax": 3
+  "tunables": {
+    "economy.startStock": { "default": 30, "min": 0, "max": 200 },
+    "economy.probeOrePerMin": { "default": 12, "min": 0, "max": 60 },
+    "extractor.cost": { "default": 20, "min": 5, "max": 100 },
+    "extractor.buildTicks": { "default": 300, "min": 30, "max": 1800 },
+    "extractor.orePerMin": { "default": 10, "min": 2, "max": 40 },
+    "node.bufferCap": { "default": 40, "min": 10, "max": 200 },
+    "route.costBase": { "default": 5, "min": 0, "max": 50 },
+    "route.costPer100Su": { "default": 2, "min": 0, "max": 20 },
+    "route.buildTicks": { "default": 300, "min": 30, "max": 1800 },
+    "route.podIntervalTicks": { "default": 90, "min": 15, "max": 300 },
+    "route.podOrePerLevel": { "default": 1, "min": 1, "max": 10 },
+    "route.podSpeedSu": { "default": 6, "min": 1, "max": 30 },
+    "route.upgradeCostPerLevel": { "default": 20, "min": 5, "max": 100 },
+    "route.maxLevel": { "default": 5, "min": 1, "max": 10 },
+    "build.queueMax": { "default": 4, "min": 1, "max": 8 },
+    "ship.cost": { "default": 15, "min": 5, "max": 60 },
+    "ship.buildTicks": { "default": 90, "min": 15, "max": 900 },
+    "ship.hp": { "default": 10, "min": 1, "max": 100 },
+    "ship.damage": { "default": 2, "min": 1, "max": 20 },
+    "ship.speedSu": { "default": 4, "min": 1, "max": 20 },
+    "guardian.cap": { "default": 12, "min": 1, "max": 40 },
+    "guardian.thornHp": { "default": 20, "min": 1, "max": 200 },
+    "guardian.thornDamage": { "default": 3, "min": 0, "max": 30 },
+    "guardian.regrowTicks": { "default": 60, "min": 15, "max": 1800 },
+    "guardian.repairPerRound": { "default": 2, "min": 0, "max": 20 },
+    "combat.roundTicks": { "default": 30, "min": 10, "max": 90 },
+    "rich.orePerMin": { "default": 25, "min": 10, "max": 80 },
+    "rich.freeExtractors": { "default": 1, "min": 0, "max": 4 },
+    "stats.throughputWindowSec": { "default": 60, "min": 60, "max": 60 },
+    "client.autosaveSec": { "default": 5, "min": 2, "max": 60 }
+  },
+  "map": {
+    "nodes": [
+      { "id": "probe", "kind": "probe", "x": 500, "y": 1180, "r": 70, "slots": 0 },
+      { "id": "a1", "kind": "asteroid", "x": 330, "y": 1000, "r": 45, "slots": 2 },
+      { "id": "a2", "kind": "asteroid", "x": 700, "y": 1010, "r": 50, "slots": 3 },
+      { "id": "a3", "kind": "asteroid", "x": 220, "y": 760, "r": 50, "slots": 3 },
+      { "id": "a4", "kind": "asteroid", "x": 790, "y": 720, "r": 55, "slots": 3 },
+      { "id": "a5", "kind": "asteroid", "x": 480, "y": 560, "r": 60, "slots": 4 },
+      { "id": "rich", "kind": "rich", "x": 500, "y": 230, "r": 90, "slots": 4 }
+    ]
   }
 }

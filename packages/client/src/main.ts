@@ -89,7 +89,7 @@ function frame(now: number): void {
   }
   render(now / 1000);
   $('tick').textContent = String(world.tick);
-  $('stock').textContent = String(world.probe.stock);
+  $('stock').textContent = String(world.stock);
   if (world.tick % 30 === 0) $('hash').textContent = worldHash(world);
   requestAnimationFrame(frame);
 }
