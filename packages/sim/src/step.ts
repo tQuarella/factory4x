@@ -274,7 +274,10 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
   if (world.dataVersion !== data.dataVersion) {
     throw new Error(`World is data version ${world.dataVersion}, data is ${data.dataVersion}`);
   }
+  const wavesBefore = world.stats.wavesSent;
   for (const input of inputs) applyInput(world, data, input);
+  // Several attack orders applied in the same tick are one wave ("All" sends one order per source node).
+  if (world.stats.wavesSent > wavesBefore + 1) world.stats.wavesSent = wavesBefore + 1;
   construction(world);
   extraction(world);
   routes(world);

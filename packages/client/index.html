@@ -38,12 +38,16 @@
       </header>
 
       <main id="map">
-        <canvas id="view" aria-label="Game map"></canvas>
-        <div id="banner" hidden></div>
-        <div id="hint" hidden><span>Tap an asteroid to build an extractor</span><button type="button" id="hint-x" aria-label="Dismiss hint">✕</button></div>
-        <button type="button" id="toast" hidden></button>
-        <div id="paused" hidden>PAUSED</div>
-        <div id="hud-version" data-hud="cw-hud-version"><span id="version"></span></div>
+        <div id="notices">
+          <div id="banner" hidden></div>
+        </div>
+        <div id="stage">
+          <canvas id="view" aria-label="Game map"></canvas>
+          <div id="hint" hidden><span>Tap an asteroid to build an extractor</span><button type="button" id="hint-x" aria-label="Dismiss hint">✕</button></div>
+          <button type="button" id="toast" hidden></button>
+          <div id="paused" hidden>PAUSED</div>
+          <div id="hud-version" data-hud="cw-hud-version"><span id="version"></span></div>
+        </div>
       </main>
 
       <aside id="sheet" hidden></aside>

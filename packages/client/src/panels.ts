@@ -101,17 +101,17 @@ export class TuningPanel {
       this.update();
     });
     btn(top, 'Reset all', () => {
-      for (const r of this.rows) this.setValue(r.meta, r.meta.default);
+      for (const r of this.rows) if (this.value(r.meta) !== r.meta.default) this.setValue(r.meta, r.meta.default);
     });
     btn(top, 'New run…', () => {
-      void confirmModal('Start over? This run is discarded and a new one begins.', 'Yes, new run', 'Keep playing').then((yes) => {
+      void confirmModal('Start over? This run is discarded and a new one begins. Your current tuning is kept; use Reset all in the tuning panel to restore the defaults.', 'Yes, new run', 'Keep playing').then((yes) => {
         if (yes) {
           this.close();
           host.newRun();
         }
       });
     }, 'danger');
-    h('div', 'note', `Build ${shortVersion(host.fullVersion)} · data v${host.data.dataVersion}. Changes apply live and are recorded in the replay.`, this.root);
+    h('div', 'note', `Build ${shortVersion(host.fullVersion)} · data v${host.data.dataVersion}. Changes apply live and are recorded in the replay. New run keeps your tuning.`, this.root);
 
     let section = '';
     for (const meta of tunableMeta(host.data)) {
@@ -123,7 +123,7 @@ export class TuningPanel {
       const row = h('div', 't-row', '', this.root);
       const name = h('div', 't-name', meta.key.slice(meta.section.length + 1), row);
       const info = h('small', '', `${meta.min}–${meta.max} · default ${meta.default}`, name);
-      if (meta.newRunOnly) h('span', 'tag', ' · new run only', info);
+      if (meta.newRunOnly) h('span', 'tag', ' · applies on New run', info);
       if (meta.scope === 'client') h('span', 'tag', ' · this device', info);
       const step = stepFor(meta.min, meta.max);
       const minus = btn(row, '−', () => this.setValue(meta, this.value(meta) - step));
@@ -213,7 +213,8 @@ export class FeedbackPanel {
     btn(row, 'Send', () => void this.send(), 'primary');
     btn(row, 'Copy note', () => void this.copy(this.note().text, 'Copied the note to the clipboard.'));
     this.openIssue = btn(row, 'Open issue page', () => {
-      window.open(this.issueUrl, '_blank', 'noopener');
+      const win = window.open(this.issueUrl, '_blank');
+      if (win) win.opener = null;
     });
     this.openIssue.set('Open issue page, then paste');
     this.openIssue.el.hidden = true;
@@ -236,7 +237,9 @@ export class FeedbackPanel {
   private async send(): Promise<void> {
     const note = this.note();
     if (note.url !== null) {
-      const win = window.open(note.url, '_blank', 'noopener');
+      // No 'noopener' feature: it makes window.open return null even when the tab opens. Cut the link by hand instead.
+      const win = window.open(note.url, '_blank');
+      if (win) win.opener = null;
       this.status.textContent = win
         ? 'Opened a prefilled GitHub issue in a new tab. Nothing is sent until you submit it there.'
         : 'Your browser blocked the new tab. Use "Copy note" and paste it into an issue.';
@@ -274,7 +277,7 @@ export function showResult(root: HTMLElement, session: Session, onKeep: () => vo
     onKeep();
   }, 'primary');
   btn(row, 'New run', () => {
-    void confirmModal('Start over? This run is discarded and a new one begins.', 'Yes, new run', 'Keep playing').then((yes) => {
+    void confirmModal('Start over? This run is discarded and a new one begins. Your current tuning is kept; use Reset all in the tuning panel to restore the defaults.', 'Yes, new run', 'Keep playing').then((yes) => {
       if (yes) {
         root.hidden = true;
         onNewRun();

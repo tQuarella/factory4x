@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultData, replayHashes, worldHash, type Input } from '@factory4x/sim';
-import { Session } from '../src/session.ts';
+import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
 import { battleReport } from '../src/report.ts';
@@ -120,6 +120,27 @@ describe('autosave', () => {
     expect(writeSave(new Session(defaultData, { seed: 1 }), bad)).toBe(false);
     expect(loadSettings(defaultData, bad).autosaveSec).toBe(defaultData.tunables['client.autosaveSec'].default);
     expect(decodeSave('not json', defaultData).kind).toBe('discarded');
+  });
+});
+
+describe('New run keeps tuning', () => {
+  it('applies tuned values (startStock) and the replay and save still reproduce the world', () => {
+    const old = new Session(defaultData, { seed: 1 });
+    old.send({ type: 'setTunable', key: 'economy.startStock', value: 150 });
+    old.send({ type: 'setTunable', key: 'guardian.cap', value: 5 });
+    old.stepOnce();
+    const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2 });
+    expect(s.world.stock).toBe(150);
+    expect(s.world.guardian.thorns.length).toBe(5);
+    play(s, 800, script);
+    const r = s.replay();
+    expect(r.startTunables).toEqual({ 'economy.startStock': 150, 'guardian.cap': 5 });
+    expect(replayHashes(r, replayData(r), s.world.tick, s.world.tick)[0]).toBe(worldHash(s.world));
+    const out = decodeSave(encodeSave(s), defaultData);
+    expect(out.kind).toBe('resumed');
+    if (out.kind !== 'resumed') return;
+    expect(out.session.replay()).toEqual(r);
+    expect(worldHash(out.session.world)).toBe(worldHash(s.world));
   });
 });
 

@@ -2,13 +2,15 @@
  * One play session: the world, the fixed-step clock, the input log and the
  * client-only time controls. No DOM here, so it is unit-testable in Node.
  *
- * Replay invariant: `replay()` (seed + dataVersion + input log) re-run from
+ * Replay invariant: `replay()` (seed + dataVersion + optional startTunables + input log) re-run from
  * tick 0 up to `world.tick` reproduces `worldHash(world)`. Every input is
  * logged with the tick of the step that applied it. Inputs sent but not yet
  * stepped sit in `pending` and are saved with the world (see persist.ts).
  */
 import {
   createWorld,
+  defaultData,
+  tunableMeta,
   isValidInput,
   step,
   throughputPerMin,
@@ -17,6 +19,34 @@ import {
   type SimData,
   type World,
 } from '@factory4x/sim';
+
+/** Sim tunable values a run started with, where they differ from the data defaults (New run keeps live tuning). */
+export type StartTunables = Record<string, number>;
+
+/** Data whose sim-tunable defaults are replaced by `values` (clamped to range); other keys are ignored. */
+export function dataWithDefaults(base: SimData, values: Readonly<Record<string, number>>): SimData {
+  const tunables = { ...base.tunables };
+  for (const m of tunableMeta(base)) {
+    const v = values[m.key];
+    if (m.scope !== 'sim' || v === undefined || !Number.isInteger(v)) continue;
+    tunables[m.key] = { ...tunables[m.key], default: Math.min(m.max, Math.max(m.min, v)) };
+  }
+  return { ...base, tunables };
+}
+
+/** Sim tunable defaults of `data` that differ from the shipped defaults. */
+export function defaultsDiff(data: SimData): StartTunables {
+  const out: StartTunables = {};
+  for (const m of tunableMeta(defaultData)) {
+    if (m.scope === 'sim' && data.tunables[m.key].default !== m.default) out[m.key] = data.tunables[m.key].default;
+  }
+  return out;
+}
+
+/** The data a replay ran on: shipped data plus its start tunables. */
+export function replayData(replay: Replay & { startTunables?: StartTunables }): SimData {
+  return dataWithDefaults(defaultData, replay.startTunables ?? {});
+}
 
 export type Speed = 1 | 2 | 4;
 
@@ -120,7 +150,14 @@ export class Session {
   }
 
   /** Seed + data version + input log: reproduces this session's world at `world.tick`. */
-  replay(): Replay {
-    return { seed: this.seed, dataVersion: this.data.dataVersion, inputs: this.log.map((l) => ({ tick: l.tick, input: l.input })) };
+  replay(): Replay & { startTunables?: StartTunables } {
+    const r: Replay & { startTunables?: StartTunables } = {
+      seed: this.seed,
+      dataVersion: this.data.dataVersion,
+      inputs: this.log.map((l) => ({ tick: l.tick, input: l.input })),
+    };
+    const diff = defaultsDiff(this.data);
+    if (Object.keys(diff).length > 0) r.startTunables = diff;
+    return r;
   }
 }

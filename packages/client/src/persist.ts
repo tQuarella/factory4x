@@ -5,6 +5,7 @@
  * Save layout (one slot, key `fvn.save`), JSON:
  *   { format: 2, seed, dataVersion, world: <serializeWorld text>,
  *     log: [{tick, input}...]   the full input log since tick 0,
+ *     startTunables: {key: value}  sim tunables the run started with (New run keeps tuning),
  *     pending: [input...]       inputs sent but not yet stepped,
  *     history: [ore/min...]     sparkline samples, flags: {...} }
  * The seed and the whole log are saved next to the world, so after a resume
@@ -12,7 +13,7 @@
  * sent after a resume carries a replay of the entire session.
  */
 import { deserializeWorld, serializeWorld, type Input, type SimData } from '@factory4x/sim';
-import { Session, type LoggedInput, type RunFlags } from './session.ts';
+import { Session, dataWithDefaults, defaultsDiff, type LoggedInput, type RunFlags } from './session.ts';
 
 export const SAVE_KEY = 'fvn.save';
 export const SETTINGS_KEY = 'fvn.settings';
@@ -42,6 +43,7 @@ export function encodeSave(session: Session): string {
   return JSON.stringify({
     format: SAVE_FORMAT,
     seed: session.seed,
+    startTunables: defaultsDiff(session.data),
     dataVersion: session.world.dataVersion,
     world: serializeWorld(session.world),
     log: session.log,
@@ -85,7 +87,8 @@ export function decodeSave(text: string, data: SimData): LoadOutcome {
     seenBattleEnd: isInt(f.seenBattleEnd) ? f.seenBattleEnd : -1,
     resultShown: f.resultShown === true,
   };
-  const session = new Session(data, {
+  const start = isObj(parsed.startTunables) ? (parsed.startTunables as Record<string, number>) : {};
+  const session = new Session(dataWithDefaults(data, start), {
     seed: parsed.seed,
     world: loaded.world,
     log,

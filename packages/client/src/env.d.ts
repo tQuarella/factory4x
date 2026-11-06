@@ -20,5 +20,9 @@ interface Window {
     saveNow(): boolean;
     /** Does the session's replay (seed + input log) reproduce the live world hash at the current tick? */
     replayMatchesLive(): boolean;
+    /** Shows the battle banner and a sample toast (or hides them), to check layout. */
+    debugShowNotices(on: boolean): void;
+    debugShowResult(): void;
+    newRun(): void;
   };
 }

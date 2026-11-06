@@ -19,7 +19,7 @@ import { fmt10, shortVersion } from './format.ts';
 import { FeedbackPanel, TuningPanel, showResult, type PanelHost } from './panels.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
 import { battleReport } from './report.ts';
-import { Session, type Speed } from './session.ts';
+import { Session, dataWithDefaults, replayData, type Speed } from './session.ts';
 import { Sheet } from './sheet.ts';
 import { MapView } from './view.ts';
 
@@ -66,7 +66,7 @@ function closeSheet(): void {
   sheet.close();
 }
 
-new ResizeObserver(() => view.resize()).observe($('map'));
+new ResizeObserver(() => view.resize()).observe($('stage'));
 window.addEventListener('resize', () => view.resize());
 
 canvas.addEventListener('click', (ev) => {
@@ -89,8 +89,9 @@ const panelHost: PanelHost = {
 const tuning = new TuningPanel($('tuning'), panelHost);
 const feedback = new FeedbackPanel($('feedback'), panelHost);
 
+/** New run keeps the live tuning: the world is built from default data with the current tuned values as its defaults (so startStock and guardian.cap apply). See DECISIONS.md. */
 function newRun(): void {
-  app.session = new Session(data, { seed: newSeed() });
+  app.session = new Session(dataWithDefaults(data, app.session.world.tun), { seed: newSeed() });
   sheet.close();
   toast.hide();
   writeSave(app.session);
@@ -147,6 +148,8 @@ const el = {
   banner: $('banner'),
 };
 
+let forceBanner = false;
+
 function refreshUi(): void {
   const s = app.session;
   const w = s.world;
@@ -166,8 +169,9 @@ function refreshUi(): void {
   for (const b of document.querySelectorAll<HTMLElement>('.speed')) toggleClass(b, 'on', Number(b.dataset.speed) === s.speed);
 
   const b = battleStatus(w);
-  setHidden(el.banner, !b);
-  if (b) setText(el.banner, `BATTLE · you strip ${fmt10(b.killPerSecX10)} thorns/s · Bloom regrows ${fmt10(b.regrowPerSecX10)}/s · ${b.shipsLost} lost`);
+  setHidden(el.banner, !b && !forceBanner);
+  if (!b && forceBanner) setText(el.banner, 'BATTLE · strip 0.8/s · regrow 0.5/s · 6 lost');
+  if (b) setText(el.banner, `BATTLE · strip ${fmt10(b.killPerSecX10)}/s · regrow ${fmt10(b.regrowPerSecX10)}/s · ${b.shipsLost} lost`);
 
   const lb = lastBattle(w);
   if (lb && lb.endTick !== s.flags.seenBattleEnd) {
@@ -243,6 +247,15 @@ window.__factory4x = {
   replayMatchesLive: () => {
     const s = app.session;
     if (s.world.tick === 0) return true;
-    return replayHashes(s.replay(), data, s.world.tick, s.world.tick)[0] === worldHash(s.world);
+    const r = s.replay();
+    return replayHashes(r, replayData(r), s.world.tick, s.world.tick)[0] === worldHash(s.world);
   },
+  debugShowNotices: (on) => {
+    forceBanner = on;
+    if (on) toast.show('Wave repelled: 18 sent, 18 lost, 5 thorns stripped\nRegrowth outpaced the wave. 18 ships strip 1.2 thorns/s; the Bloom regrows 0.5/s.');
+    else toast.hide();
+    refreshUi();
+  },
+  debugShowResult: () => showResult($('result'), app.session, () => undefined, newRun),
+  newRun,
 };

@@ -24,7 +24,7 @@ export function fitMap(nodes: readonly Box[], w: number, h: number): Fit {
   for (const n of nodes) {
     minX = Math.min(minX, n.x - n.r - MARGIN_SU);
     maxX = Math.max(maxX, n.x + n.r + MARGIN_SU);
-    minY = Math.min(minY, n.y - n.r * 1.4 - MARGIN_SU - 40);
+    minY = Math.min(minY, n.y - n.r * 1.4 - MARGIN_SU - 70);
     maxY = Math.max(maxY, n.y + n.r + MARGIN_SU);
   }
   const bw = Math.max(1, maxX - minX);

@@ -116,3 +116,17 @@ Places where DESIGN.md H1 was ambiguous or slightly inconsistent. Each one follo
 - **`serializeWorld` doesn't check the version** (a world can't mismatch itself). The refusal happens on load (`deserializeWorld`), and also in `step` and `replayHashes`.
 - **Kill-rate selector:** ships × damage / thornHp per round, converted to thorns per second. It ignores overkill waste and repair. It is the planning number for "you strip 2.4 thorns/s".
 - **`stats.throughputWindowSec` is not in `world.tun`.** It sets the ring buffer length when the world is created, and `setTunable` rejects it.
+
+## 2026-11-06 · Engineer · m1-client decisions
+
+- **Inputs sent while paused step one tick.** `Session.send` while paused applies the input by stepping exactly one tick, so the screen reflects the tap and the log records it like any other input. Rejected: holding the input until unpause (taps seem to do nothing) and letting the client mutate the world (breaks replay).
+- **Save format (format 2, key `fvn.save`).** JSON `{format, seed, dataVersion, startTunables, world (serializeWorld text), log, pending, history, flags}`. The seed and the whole input log are saved with the world, so after a resume `seed + log` still replays to the live hash, and a feedback note sent after a resume carries the whole session. `pending` (inputs sent but not stepped yet) is saved so none are lost. Client settings (result toggle, hint dismissed, `client.autosaveSec`) live in a separate key, `fvn.settings`, and survive New run. A save from another dataVersion, or an unreadable one, is discarded with a toast.
+- **Battle report "sent" is `shipsEngaged`** (distinct ships that fought at least one round), not ships dispatched. It matches what the wave actually did, which is the lesson the report teaches.
+- **Feedback URL limit is 7500 characters.** Longer notes (replay included) go to the clipboard, and an "Open issue page, then paste" button opens a short prefilled issue. GitHub rejects very long URLs, and phones differ. The note is never sent automatically.
+- **Retreat button on the rich sheet** ("Retreat to Probe · N"). The spec has retreat only via the probe or A5 sheet ("From Rich"). This is a one-tap shortcut for the same `sendShips` input. Its space is always reserved (disabled with 0 ships here), so it never appears under a finger where "Attack from …" was.
+- **New run keeps the live tuning.** The Director's ruling: the new world is built from the shipped data with the current tuned values as its defaults (`dataWithDefaults`), so `economy.startStock` and `guardian.cap` apply. The replay and the save record these as `startTunables`, so the replay (`replayData(replay)`) still reproduces the session. The confirm dialog says tuning is kept, and "Reset all" restores defaults (it sends `setTunable` only for values that differ).
+- **Notice layout.** The battle banner has its own strip above the map and the battle-report toast sits at the bottom of the map, so neither covers the Bloom at the top. A smoke test checks this at 375x667 and at the default phone size.
+
+## 2026-11-06 · Engineer · wavesSent counts one wave per tick (m1-client scope, Director)
+
+- **Several attack orders to the guarded rich node applied in the same tick count as one wave.** The client's "All" button sends one `sendShips` per source node, so each press used to inflate the wave count. `step` caps the `wavesSent` increase from one tick's inputs at 1. Orders on separate ticks still count separately. Bots send from one source, so rush and turtle behavior is unchanged.

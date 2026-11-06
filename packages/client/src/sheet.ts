@@ -307,9 +307,11 @@ export class Sheet {
     const ships = this.row(sec, 'Ships here / en route');
     const hint = h('div', 'note', '', sec);
 
+    // Always shown, with its space reserved, so Retreat never appears where "Attack from" was.
     const battle = h('section', 'battle', '', this.root);
-    const bLine = h('div', '', '', battle);
-    const bLost = h('div', '', '', battle);
+    const lines = h('div', 'lines', '', battle);
+    const bLine = h('div', '', '', lines);
+    const bLost = h('div', '', '', lines);
     const retreat = btn(battle, '', () => this.host.send({ type: 'sendShips', from: n.index, to: 0, count: 0 }), 'danger');
 
     this.ups.push(() => {
@@ -335,7 +337,6 @@ export class Sheet {
           : `All ${total} ships together: strip ${fmt10(r.killPerSecX10)} thorns/s vs Bloom regrows ${fmt10(r.regrowPerSecX10)}/s.`,
       );
       const b = battleStatus(w);
-      setHidden(battle, !b && c.at[n.index] === 0);
       if (b) {
         setText(bLine, `Battle: you strip ${fmt10(b.killPerSecX10)} thorns/s · Bloom regrows ${fmt10(b.regrowPerSecX10)}/s`);
         setText(bLost, `Ships lost so far: ${b.shipsLost} · thorns stripped: ${b.thornsKilled}`);
@@ -344,8 +345,7 @@ export class Sheet {
         setText(bLost, '');
       }
       const here = c.at[n.index]!;
-      retreat.set(`Retreat ${here} to Probe`, here > 0);
-      setHidden(retreat.el, here === 0);
+      retreat.set(`Retreat to Probe · ${here}`, here > 0);
     });
   }
 
