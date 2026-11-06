@@ -26,12 +26,12 @@ Expected launches: designer 1 + 4 builders + 4 critics = 9, leaving 3 for rework
 | H1 spec | designer | main (`DESIGN.md`) | Done, committed 2e0614e |
 | m1-sim | core-engineer | `task/m1-sim` | Merged 277e237 (Critic approved round 1) |
 | m1-art | art-direction | `task/m1-art` | Merged 7205468 after Critic round 2 (round 1 rejected: flag bounds, thorn ring, palette table, gallery width) |
-| m1-client | engineer | `task/m1-client` (agent worktree) | Building |
+| m1-client | engineer → core-engineer | `task/m1-client` | Rejected twice (round 1: eight items, all fixed; round 2: paused "All" counts two waves). Escalated to core-engineer per the deadlock rule. |
 | m1-bots | engineer | `task/m1-bots` | Merged 4afda2f after Critic round 2 (round 1 rejected: seed copying, softlock timing, early shipyard, whole-run spend) |
 
 ## Usage budget (this iteration)
 
-Subagent launches: 8 / 12 (designer, core-engineer, art-direction, critic ×3, engineer ×2). Resumes (designer after a stall; art fix round; critic round 2) are not counted as new launches.
+Subagent launches: 10 / 12 (designer, core-engineer ×2, art-direction, critic ×4, engineer ×2). Resumes (designer after a stall; art fix round; critic round 2) are not counted as new launches.
 
 ## Next step
 

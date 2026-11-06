@@ -97,3 +97,9 @@ Four tasks, sized to fit the 12-launch budget. `m1-sim` goes first, because the 
   - The tuning panel shows raw ticks instead of seconds.
   - The first-run hint covers the probe.
   - The "2 taps from the map" success criterion conflicts with the spec's own confirm tap for Cancel (3 taps); reword it.
+- cw-m1-client-notes (from the Critic's round 2 of m1-client):
+  - **Staggered "All" (ask the owner in the M1 handoff):** "Attack with all" from Probe and A5 arrives about 330 su apart, so the A5 group fights alone first. Players will probably read "All" as one simultaneous wave. Options: sources converge (closer groups wait), or a rally-then-attack flow. This is game feel, so it's the owner's call.
+  - The battle-report toast covers the probe at all sizes. Tapping the probe only dismisses the toast: one extra tap, never a wrong action.
+  - The map shifts when the banner appears and disappears (the Bloom moves 29 px at 375x667). Every node stays inside its tap radius.
+  - The battle banner text was shortened to "BATTLE · strip 1.3/s · regrow 0.5/s · N lost"; the Designer should confirm the wording.
+  - The `debugShowNotices` test hook adds a test-only branch to the production `refreshUi`.
