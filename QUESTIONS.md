@@ -16,6 +16,14 @@ Blocks finishing Milestone 0. Owner-only steps, because they involve your accoun
 
 **Answer (owner, 2026-11-06):** Done. Private repo tQuarella/factory4x; secrets set; live at https://factory4x.pages.dev. (Director: move to Answered on next tidy.)
 
+### Q9. Ask instead of block for all protected files (2026-11-06, Director)
+
+You asked to act only when it must be you. Today, changing a protected file other than `VISION.md` needs you to edit it by hand. Proposed: move the `Edit` rules for `.claude/agents/critic.md`, `scripts/gates/**`, `.github/workflows/**` and `eslint.config.js` from `deny` to `ask`, as was done for `VISION.md`. After that, every protected change is a prompt you accept or reject, and the Director makes the edit. `.claude/settings.json` stays blocked. First uses: cw-gate-windows and cw-ci-hardening.
+
+You have to apply this one yourself, because agents can't change their own permissions. The Director prepared the file; applying it is one command (given in chat).
+
+**Answer:**
+
 ## Answered
 
 ### Q8. Let the Director apply approved VISION.md edits (2026-11-06, owner)

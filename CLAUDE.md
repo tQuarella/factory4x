@@ -2,6 +2,8 @@
 
 A real-time 4X/factory game built by an autonomous Claude Code agent team. The owner (Tony) holds the vision and judges fun; the team makes every technical decision. The full charter is [docs/HANDOFF_PLAN.md](docs/HANDOFF_PLAN.md).
 
+**Owner's time is the scarcest resource.** Ask the owner to do something only when it has to be them (their accounts, credentials, or a permission prompt) or the decision is theirs alone (vision, fun, approving a protected change). Everything else, the team does. When the owner must act, make it one step: a yes/no, a prompt to accept, or a single command to run.
+
 ## Every session starts here
 
 1. Read this file, then [STATUS.md](STATUS.md). Continue from what STATUS says is in flight.

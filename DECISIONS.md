@@ -30,3 +30,7 @@ Dated log of decisions and why. Newest at the bottom. Every prompt or process ch
 - **Tick budget check:** the 2.0 ms p95 budget was sized for a 30-minute game, which still matches a 20–40 minute run. No change.
 - **Pillars signed off (owner, in chat):** Q7 approved as written, with `APPROVED-PROTECTED: VISION.md` recorded in QUESTIONS.md. The agent edit to `VISION.md` was blocked by the protected-file guard, as intended, so the owner applies the prepared text. Milestone 1 spec (H1) can start once `VISION.md` is updated.
 - **VISION.md guard changed from deny to ask (owner request and approval, Q8):** the Director may apply owner-approved changes to `VISION.md`, and each edit prompts the owner for permission. Subagents still can't edit it, because they have no live owner to answer the prompt. Updated the Guardrails section of `PROCESS.md` (protected section; owner approved in chat) and `CLAUDE.md`. Auto mode blocked the agent from editing `.claude/settings.json` itself, so the owner applies that one-line change.
+
+## 2026-11-06 · Director · Owner involvement
+
+- **Owner acts only when it must be them (owner):** "i don't want to do anything myself unless i have to or am the only decision maker." Added to `CLAUDE.md` so every session sees it. Consequence: protected-file approvals should be a prompt the owner accepts, not an edit the owner makes. Proposed moving the remaining protected-path `Edit` rules from `deny` to `ask` (Q9); the owner applies that once, because agents can't change their own permissions.
