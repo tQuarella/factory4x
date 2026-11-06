@@ -117,6 +117,9 @@ Places where DESIGN.md H1 was ambiguous or slightly inconsistent. Each one follo
 - **Kill-rate selector:** ships × damage / thornHp per round, converted to thorns per second. It ignores overkill waste and repair. It is the planning number for "you strip 2.4 thorns/s".
 - **`stats.throughputWindowSec` is not in `world.tun`.** It sets the ring buffer length when the world is created, and `setTunable` rejects it.
 
+## 2026-11-06 · Engineer · m1-bots: reading "throughput still rising at minute 10"
+
+The bot tuning target says turtle's throughput should still be rising at minute 10. The report checks throughput at 12 min > throughput at 10 min. At defaults turtle's a1-a5 asteroid network plateaus at about 148 ore/min by about 6.5 min, so it is not rising at minute 10 by itself. The target passes (148 at 10 min, 231 at 12 min) only because turtle captures the rich node at about 9.7 min and the rich build-out adds ore afterwards. If the Designer meant the asteroid economy itself, the target is missed at defaults; this is a reading for the Designer to confirm, not a tuning change. Other bot decisions: softlock is 5 game minutes since the last route delivery or ship built (measured every tick from the per-second delivery buckets); ships built/lost and ore spent are reported as of capture, with whole-run totals labelled `wholeRun` in the JSON.
 ## 2026-11-06 · Engineer · m1-client decisions
 
 - **Inputs sent while paused step one tick.** `Session.send` while paused applies the input by stepping exactly one tick, so the screen reflects the tap and the log records it like any other input. Rejected: holding the input until unpause (taps seem to do nothing) and letting the client mutate the world (breaks replay).

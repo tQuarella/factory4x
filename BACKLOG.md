@@ -18,7 +18,7 @@ Four tasks, sized to fit the 12-launch budget. `m1-sim` goes first, because the 
 | --- | --- | --- | --- |
 | m1-sim | All H1 sim rules, inputs, data and the sim API | core-engineer | **Merged** 277e237 (approved round 1) |
 | m1-client | Playable phone client: map, sheets, HUD, controls, tuning, feedback, autosave | engineer | Building |
-| m1-bots | rush and turtle strategies plus the capture-based report | engineer | Building |
+| m1-bots | rush and turtle strategies plus the capture-based report | engineer | **Merged** 4afda2f (approved round 2) |
 | m1-art | Draw functions and style for every M1 entity, including the Bloom | art-direction | **Merged** 7205468 (approved round 2) |
 
 ### m1-sim (core-engineer)
@@ -90,3 +90,16 @@ Four tasks, sized to fit the 12-launch budget. `m1-sim` goes first, because the 
 - cw-bench: benchmark scenario with 10k entities for the tick budget once ECS lands
 - cw-hud-version (Engineer; added by the Retrospective, 2026-11-06): the HUD shows `BUILD_VERSION` as `main-<run>-<40-char sha>` (set in `ci.yml`), which is long enough to wrap on a 375 px phone. Shorten the displayed version in the client to `<ref>-<run>-<first 7 of sha>` (`packages/client/src/main.ts`, no protected file needed). Keep the full version in the feedback/replay metadata. Acceptance: the smoke test at phone size shows the version on one line, and the full sha is still recoverable from the build.
 - cw-upgrade-cost-lock (Designer to judge; noted by the Critic in reviews/m1-sim.md): upgrade costs lock when queued, as the spec says. So if you queue L2 and L3 and then cancel the L2 order, the remaining order upgrades to L2 at the L3 price (40 instead of 20). This only matters if players notice it; decide after the M1 playtest.
+- cw-bots-peak-label (Engineer; Critic note in reviews/m1-bots.md): the "Peak ore/min" column in the bot Markdown report covers the whole run (turtle 250, vs 150 at capture) and its header doesn't say so. Label it, or add a peak-at-capture column.
+- cw-m1-design-notes (Designer, after the M1 playtest; from the Critic's review of m1-client):
+  - The shipyard starts on and spends 15 of the 30 starting ore at once, so the first extractor waits about 25 s.
+  - Thorns are drawn outside the Bloom's tap area.
+  - The tuning panel shows raw ticks instead of seconds.
+  - The first-run hint covers the probe.
+  - The "2 taps from the map" success criterion conflicts with the spec's own confirm tap for Cancel (3 taps); reword it.
+- cw-m1-client-notes (from the Critic's round 2 of m1-client):
+  - **Staggered "All" (ask the owner in the M1 handoff):** "Attack with all" from Probe and A5 arrives about 330 su apart, so the A5 group fights alone first. Players will probably read "All" as one simultaneous wave. Options: sources converge (closer groups wait), or a rally-then-attack flow. This is game feel, so it's the owner's call.
+  - The battle-report toast covers the probe at all sizes. Tapping the probe only dismisses the toast: one extra tap, never a wrong action.
+  - The map shifts when the banner appears and disappears (the Bloom moves 29 px at 375x667). Every node stays inside its tap radius.
+  - The battle banner text was shortened to "BATTLE · strip 1.3/s · regrow 0.5/s · N lost"; the Designer should confirm the wording.
+  - The `debugShowNotices` test hook adds a test-only branch to the production `refreshUi`.
