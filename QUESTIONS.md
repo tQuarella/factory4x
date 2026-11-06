@@ -20,7 +20,9 @@ This is the pipeline proof, not gameplay. Milestone 1 is the first build with so
 1. Does the visual direction (warm amber geometry for you, hot-pink spiky guardians, flat vector shapes on deep space) feel like the right starting point for this game?
 2. On your phone, is everything readable at a glance: can you tell the probe, the asteroid, your ship and the guardian apart without thinking?
 
-Also open: Q9 (ask instead of block for protected files; Blocking for cw-gate-windows and cw-ci-hardening), Q3 (image service), Q4 (feedback button delivery), Q5 (GitHub branch protection).
+**Answer (owner, 2026-11-06, in chat):** "Visual direction is good. Everything is readable"
+
+Also open: Q3 (image service), Q4 (feedback button delivery), Q5 (GitHub branch protection), Q10 (list secret names).
 
 Protected files changed this build: `PROCESS.md` Guardrails section (Q8, approved). Since this build, on `main`: `VISION.md` (Q7, approved) and `.claude/settings.json` (Q8, approved).
 
