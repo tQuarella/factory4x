@@ -12,6 +12,8 @@ export interface PanelHost {
   settings: Settings;
   fullVersion: string;
   send(input: Input): void;
+  /** Applies all inputs of one press in the same tick (Session.sendAll). */
+  sendAll(inputs: readonly Input[]): void;
   settingsChanged(): void;
   newRun(): void;
 }
@@ -100,8 +102,16 @@ export class TuningPanel {
       host.settingsChanged();
       this.update();
     });
+    // One press, one tick: every changed sim tunable is reset in a single batch (see Session.sendAll).
     btn(top, 'Reset all', () => {
-      for (const r of this.rows) if (this.value(r.meta) !== r.meta.default) this.setValue(r.meta, r.meta.default);
+      const resets: Input[] = [];
+      for (const r of this.rows) {
+        if (this.value(r.meta) === r.meta.default) continue;
+        if (r.meta.scope === 'client') this.setValue(r.meta, r.meta.default);
+        else resets.push({ type: 'setTunable', key: r.meta.key, value: r.meta.default });
+      }
+      host.sendAll(resets);
+      this.update();
     });
     btn(top, 'New run…', () => {
       void confirmModal('Start over? This run is discarded and a new one begins. Your current tuning is kept; use Reset all in the tuning panel to restore the defaults.', 'Yes, new run', 'Keep playing').then((yes) => {

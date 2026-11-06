@@ -178,6 +178,39 @@ test('Reset all sends only changed tunables; New run keeps tuning and applies st
   expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
 });
 
+test('paused "Attack with all" from two sources is one press, one tick, one wave', async ({ page }) => {
+  const errors = watchErrors(page);
+  await ready(page);
+  // Cheap, fast ships so two groups stage quickly.
+  await page.locator('#b-tune').click();
+  for (const [key, value] of [['ship.cost', '5'], ['ship.buildTicks', '15']] as const) {
+    const field = page.getByLabel(key, { exact: true });
+    await field.fill(value);
+    await field.dispatchEvent('change');
+  }
+  await page.locator('#tuning button[aria-label="Close"]').click();
+  await page.locator('#b-s4').click();
+
+  // Stage ships at A5 (node 5), then let more gather at the Probe (node 0).
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+  await tapNode(page, 5);
+  await page.locator('#sheet button', { hasText: /^From Probe/ }).click();
+  await expect
+    .poll(() => page.evaluate(() => [window.__factory4x!.shipsAt(5) > 0, window.__factory4x!.shipsAt(0) > 0].join()), { timeout: 30_000 })
+    .toBe('true,true');
+
+  await page.locator('#b-pause').click();
+  await expect(page.locator('#paused')).toBeVisible();
+  await tapNode(page, 6);
+  const t0 = await page.evaluate(() => window.__factory4x!.tick());
+  expect(await page.evaluate(() => window.__factory4x!.wavesSent())).toBe(0);
+  await page.locator('#sheet button', { hasText: /^Attack with all/ }).click();
+  expect(await page.evaluate(() => window.__factory4x!.tick())).toBe(t0 + 1);
+  expect(await page.evaluate(() => window.__factory4x!.wavesSent())).toBe(1);
+  expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test.describe('375x667 portrait', () => {
   test.use({ viewport: { width: 375, height: 667 } });
 

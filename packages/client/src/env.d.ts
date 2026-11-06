@@ -16,6 +16,10 @@ interface Window {
     stock(): number;
     paused(): boolean;
     inputCount(): number;
+    /** Idle ships at a node. */
+    shipsAt(node: number): number;
+    /** Run stat: attack waves sent at the guarded Bloom. */
+    wavesSent(): number;
     /** Writes the autosave now. */
     saveNow(): boolean;
     /** Does the session's replay (seed + input log) reproduce the live world hash at the current tick? */

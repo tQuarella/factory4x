@@ -26,6 +26,8 @@ import type { Session } from './session.ts';
 export interface SheetHost {
   session: Session;
   send(input: Input): void;
+  /** Applies all inputs of one press in the same tick (Session.sendAll). */
+  sendAll(inputs: readonly Input[]): void;
   close(): void;
 }
 
@@ -362,10 +364,12 @@ export class Sheet {
       const b = btn(sec, '', () => this.host.send({ type: 'sendShips', from: m.index, to: n.index, count: 0 }), 'send-btn');
       sources.push({ node: m.index, b });
     }
+    // One press, one tick: every source's order goes in a single batch (see Session.sendAll).
     const all = btn(sec, '', () => {
-      for (const s of sources) {
-        if (shipCounts(this.world).at[s.node]! > 0) this.host.send({ type: 'sendShips', from: s.node, to: n.index, count: 0 });
-      }
+      const at = shipCounts(this.world).at;
+      const orders: Input[] = [];
+      for (const s of sources) if (at[s.node]! > 0) orders.push({ type: 'sendShips', from: s.node, to: n.index, count: 0 });
+      this.host.sendAll(orders);
     }, 'send-btn all');
     this.ups.push(() => {
       const c = shipCounts(this.world);

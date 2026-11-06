@@ -9,6 +9,7 @@ import {
   isCaptured,
   lastBattle,
   replayHashes,
+  shipCounts,
   shipsPerMinX10,
   throughputPerMin,
   worldHash,
@@ -53,12 +54,18 @@ const sheet = new Sheet($('sheet'), {
     return app.session;
   },
   send,
+  sendAll,
   close: () => closeSheet(),
 });
 
 function send(input: Input): void {
-  app.session.send(input);
-  if (input.type === 'buildExtractor' && !settings.hintDismissed) dismissHint();
+  sendAll([input]);
+}
+
+/** All inputs of one press, applied in the same tick even while paused. */
+function sendAll(inputs: readonly Input[]): void {
+  app.session.sendAll(inputs);
+  if (inputs.some((i) => i.type === 'buildExtractor') && !settings.hintDismissed) dismissHint();
   refreshUi();
 }
 
@@ -83,6 +90,7 @@ const panelHost: PanelHost = {
   settings,
   fullVersion,
   send,
+  sendAll,
   settingsChanged: () => saveSettings(settings),
   newRun,
 };
@@ -243,6 +251,8 @@ window.__factory4x = {
   stock: () => app.session.world.stock,
   paused: () => app.session.paused,
   inputCount: () => app.session.log.length,
+  shipsAt: (node) => shipCounts(app.session.world).at[node] ?? 0,
+  wavesSent: () => app.session.world.stats.wavesSent,
   saveNow,
   replayMatchesLive: () => {
     const s = app.session;

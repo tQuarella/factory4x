@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultData, replayHashes, worldHash, type Input } from '@factory4x/sim';
+import { defaultData, replayHashes, shipCounts, worldHash, type Input } from '@factory4x/sim';
 import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
@@ -68,6 +68,73 @@ describe('session replay log', () => {
     t.advance(200);
     expect(one).toBeGreaterThanOrEqual(5);
     expect(t.world.tick).toBeGreaterThanOrEqual(one * 4 - 4);
+  });
+});
+
+/** A session with idle ships at both the Probe (0) and A5 (5), reached by play only, so the replay is valid. */
+function stagedAtProbeAndA5(): Session {
+  const s = new Session(defaultData, { seed: 11 });
+  s.send({ type: 'setTunable', key: 'ship.cost', value: 5 });
+  s.send({ type: 'setTunable', key: 'ship.buildTicks', value: 15 });
+  let staged = false;
+  for (let i = 0; i < 6000; i++) {
+    const at = shipCounts(s.world).at;
+    if (!staged && at[0]! >= 2) staged = s.send({ type: 'sendShips', from: 0, to: 5, count: 0 });
+    if (staged && at[5]! >= 2 && at[0]! >= 1) return s;
+    s.stepOnce();
+  }
+  throw new Error('ships never staged at Probe and A5');
+}
+
+const attackAll: Input[] = [
+  { type: 'sendShips', from: 0, to: 6, count: 0 },
+  { type: 'sendShips', from: 5, to: 6, count: 0 },
+];
+
+function replayMatches(s: Session): boolean {
+  return replayHashes(s.replay(), defaultData, s.world.tick, s.world.tick)[0] === worldHash(s.world);
+}
+
+describe('one press, one tick (sendAll)', () => {
+  it('paused: a two-source attack applies in one tick and counts one wave', () => {
+    const s = stagedAtProbeAndA5();
+    s.paused = true;
+    const t0 = s.world.tick;
+    expect(s.world.stats.wavesSent).toBe(0);
+    expect(s.sendAll(attackAll)).toBe(2);
+    expect(s.world.tick).toBe(t0 + 1);
+    expect(s.world.stats.wavesSent).toBe(1);
+    expect(s.log.slice(-2).map((l) => l.tick)).toEqual([t0, t0]);
+    expect(replayMatches(s)).toBe(true);
+  });
+
+  it('running: a two-source attack applies on the next tick and counts one wave', () => {
+    const s = stagedAtProbeAndA5();
+    const t0 = s.world.tick;
+    expect(s.sendAll(attackAll)).toBe(2);
+    expect(s.world.tick).toBe(t0);
+    s.advance(s.tickMs);
+    expect(s.world.tick).toBe(t0 + 1);
+    expect(s.world.stats.wavesSent).toBe(1);
+    expect(s.log.slice(-2).map((l) => l.tick)).toEqual([t0, t0]);
+    expect(replayMatches(s)).toBe(true);
+  });
+
+  it('paused: drops invalid inputs, and steps nothing when none is valid', () => {
+    const s = new Session(defaultData, { seed: 3 });
+    s.paused = true;
+    expect(s.sendAll([{ type: 'buildExtractor', node: 6 }])).toBe(0);
+    expect(s.world.tick).toBe(0);
+    expect(
+      s.sendAll([
+        { type: 'setTunable', key: 'ship.cost', value: 20 },
+        { type: 'buildExtractor', node: 6 },
+        { type: 'setTunable', key: 'ship.hp', value: 12 },
+      ]),
+    ).toBe(2);
+    expect(s.world.tick).toBe(1);
+    expect(s.log.map((l) => l.tick)).toEqual([0, 0]);
+    expect(replayMatches(s)).toBe(true);
   });
 });
 

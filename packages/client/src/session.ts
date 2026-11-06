@@ -116,10 +116,28 @@ export class Session {
    * tick, so the screen reflects it; the log records it like any other.
    */
   send(input: Input): boolean {
-    if (!isValidInput(this.world, this.data, input)) return false;
-    this.pending.push(input);
-    if (this.paused) this.stepOnce();
-    return true;
+    return this.sendAll([input]) > 0;
+  }
+
+  /**
+   * Sends every input of one user action (one button press) so they all
+   * apply in the same tick, paused or running: the valid ones are queued
+   * together and, while paused, exactly one tick is stepped. Multi-input
+   * actions ("Attack with all", "Reset all") must use this, never repeated
+   * `send` calls, or a paused press spreads over several ticks (and, for
+   * attacks, counts as several waves). Each input is validated against the
+   * current world; invalid ones are dropped and not logged. Returns how many
+   * were queued.
+   */
+  sendAll(inputs: readonly Input[]): number {
+    let n = 0;
+    for (const input of inputs) {
+      if (!isValidInput(this.world, this.data, input)) continue;
+      this.pending.push(input);
+      n++;
+    }
+    if (n > 0 && this.paused) this.stepOnce();
+    return n;
   }
 
   /** Advances the fixed-step clock by wall time `dtMs` at the current speed. No-op while paused. Returns ticks stepped. */
