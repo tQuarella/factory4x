@@ -21,3 +21,22 @@ Required changes:
 Not required (noted only): the old "Placeholders" paragraph in ART_STYLE.md still lists only the pre-M1 entities, and `drawMob` survives only for the current `main.ts` demo scene. m1-client will replace that scene; clean up `drawMob` then.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-06
+
+Pillar fit: Unchanged and good. Dropping the thorn ring makes a ring of 12 thorns read as pink spikes around the coral, which is what the flavor text and ART_STYLE ("spikes mean thorns") ask for. Thorn health is now shown only by shrinking and dimming, which fits DESIGN.md: thorn hp goes on the rich-node sheet, and the map shows one spike per thorn.
+
+Quality: Fix commit e9326f7 touches only `ART_STYLE.md`, `gallery.ts` and `placeholders.ts`. The thorn's leftover un-rotate and alpha reset were removed along with the arc, so no dead code is left. All nine signatures match AC1 exactly (`drawProbe` and `drawShip` are unchanged from main).
+
+Round 1 items:
+- [x] Rally flag is centered: the pole runs from (-0.3r, +0.9r) to (-0.3r, -0.9r) and the pennant tip is at (0.75r, -0.5r). The farthest point is the pole end, about 0.95r, plus a round cap of 0.07r, which is within r to the pixel. The ART_STYLE row is updated.
+- [x] Thorn: the arc is gone. The body is r × (0.5 + 0.5·hp), so it is at most r, with alpha 0.5–1. At 24 px "thorn hp 1" is a pink four-point star and no longer looks like "hit 0.5" (a grey ring with a dot). The ART_STYLE row is updated.
+- [x] Palette table: all nine new `palette.ts` entries are listed with roles, and the values match. The low-contrast outline (2.4:1) is labelled outline-only, which is acceptable because no entity fill uses it.
+- [x] Gallery at 375 px: labels sit above each row, the columns total 344 px, and the measured `scrollWidth` is 375 at a 375 px viewport (no sideways scroll), with no console errors. The rows are 190 px, and the largest extent (96 px pod halo, 1.7r ≈ 82 px) fits inside the 166 px drawing band, so no sprite overlaps its neighbour (checked in a fresh full-page 375 px screenshot and on Pixel 7).
+
+Gates: I ran `npm run gates -- --base main` on e9326f7: all PASS (typecheck, lint, test, determinism, bots, protected-files: 9 changed files, none protected). `npm run build` passes and emits `dist/gallery.html`. The preview server is stopped.
+
+Required changes:
+- None.
+
+VERDICT: APPROVE
