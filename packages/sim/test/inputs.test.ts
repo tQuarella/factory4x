@@ -222,6 +222,19 @@ describe('sendShips', () => {
     step(w, data, [{ type: 'sendShips', from: N.probe, to: N.rich, count: 1 }]);
     expect(w.stats.wavesSent).toBe(1);
   });
+  it('counts several attack orders applied in one tick as one wave, but separate ticks separately', () => {
+    const w = idle();
+    addShips(w, N.probe, 3);
+    addShips(w, N.a5, 3);
+    step(w, data, [
+      { type: 'sendShips', from: N.probe, to: N.rich, count: 0 },
+      { type: 'sendShips', from: N.a5, to: N.rich, count: 0 },
+    ]);
+    expect(w.stats.wavesSent).toBe(1);
+    addShips(w, N.probe, 1);
+    step(w, data, [{ type: 'sendShips', from: N.probe, to: N.rich, count: 0 }]);
+    expect(w.stats.wavesSent).toBe(2);
+  });
   it('is invalid with from = to, no ships at from, or a bad count', () => {
     const w = idle();
     expectIgnored(w, { type: 'sendShips', from: N.probe, to: N.rich, count: 0 });

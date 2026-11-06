@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 function buildVersion(): string {
   if (process.env.BUILD_VERSION) return process.env.BUILD_VERSION;
   try {
-    return `dev-${execSync('git rev-parse --short HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()}`;
+    return `dev-${execSync('git rev-parse HEAD', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()}`;
   } catch {
     return 'dev';
   }
