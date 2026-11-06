@@ -37,10 +37,10 @@ const entries: Entry[] = [
 ];
 
 const sizes = [24, 48, 96];
-const cellW = [64, 96, 160];
-const rowH = 130;
-const labelW = 100;
-const width = labelW + cellW.reduce((a, b) => a + b, 0);
+// Columns sum to 344 px so all three fit a 375 px screen with no sideways scroll.
+const cellW = [60, 104, 180];
+const rowH = 190;
+const width = cellW.reduce((a, b) => a + b, 0);
 const height = entries.length * rowH;
 const canvas = document.getElementById('g') as HTMLCanvasElement;
 const dpr = window.devicePixelRatio || 1;
@@ -54,16 +54,18 @@ ctx.fillStyle = palette.space;
 ctx.fillRect(0, 0, width, height);
 ctx.font = '12px system-ui, sans-serif';
 entries.forEach((e, row) => {
-  const y = row * rowH + rowH / 2;
+  const top = row * rowH;
   ctx.fillStyle = palette.starBright;
-  ctx.fillText(e.label, 4, y + 4);
-  let x = labelW;
+  ctx.fillText(`${e.label}  (24 / 48 / 96)`, 2, top + 14);
+  const y = top + 24 + (rowH - 24) / 2;
+  let x = 0;
   sizes.forEach((s, i) => {
+    const w = cellW[i] ?? 0;
     ctx.save();
-    ctx.translate(x + (cellW[i] ?? 0) / 2, y);
+    ctx.translate(x + w / 2, y);
     // Sizes are the entity diameter in px, so r is half of it.
     e.draw(ctx, s / 2);
     ctx.restore();
-    x += cellW[i] ?? 0;
+    x += w;
   });
 });

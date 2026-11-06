@@ -24,6 +24,15 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Ore / resources / routes | `#4fd1c5` |
 | Player ships | `#7ab8ff` |
 | Mobs | `#ff5d73` |
+| Bloom body (alive) | `#ff4f8b` |
+| Bloom highlight / core | `#ffb3cc` |
+| Bloom glow | `rgba(255, 79, 139, 0.28)` |
+| Withered Bloom rock (captured) | `#7a7f8a` |
+| Withered Bloom outline (outline only, low contrast) | `#4a4e58` |
+| Thorn | `#ff5d73` |
+| Thorn core | `#ffd0d6` |
+| Backed-up route | `#ffd27a` |
+| Hit flash | `#ffffff` |
 
 Contrast check: every entity color must read against `#05070d` at 4.5:1 or better.
 
@@ -54,11 +63,11 @@ Draw functions live in `packages/client/src/placeholders.ts`; `packages/client/g
 | Asteroid | grey-brown seeded rock, one teal ore dot; pips below the rock, filled teal = extractor, hollow = free slot | rock with a row of dots |
 | Bloom (alive) | hot-pink `#ff4f8b` coral: round body, 8 stubby arms, pale core, pink glow, slow breathing | pink round gear, big glow |
 | Bloom (captured) | grey `#7a7f8a` rock, no glow, teal ore veins | grey with a teal Y |
-| Thorn | red-pink 4-spike seed-pod, spins; health arc sweeps clockwise from 12 o'clock; low hp shrinks and dims it | spiky star, never a disc |
+| Thorn | red-pink 4-spike seed-pod, spins, stays within r; low hp shrinks and dims it (no ring, so 12 of them stay quiet) | spiky star, never a disc |
 | Ship | blue arrowhead | unchanged |
 | Pod | teal dot with halo | dot, rounder than a thorn |
 | Route | teal line, 1.5 + 1.5 x level px; backed up = dashed amber | thin line vs dashes |
-| Rally flag | amber pennant on a pale pole, base at the origin | flag |
+| Rally flag | amber pennant on a pale pole, centered within radius r (pole spans +0.9r to -0.9r) | flag |
 | Hit flash | white ring plus core, fades with frac | ring |
 
 Rules: pink glow and round coral mean the Bloom, spikes mean thorns (shape, not only color). Amber is reserved for the player's probe, rally flag and backed-up routes.

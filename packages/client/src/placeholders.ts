@@ -134,14 +134,15 @@ export function drawRichNode(ctx: Ctx, r: number, t: number, captured: boolean):
 
 /**
  * One orbiting thorn: a four-spike seed-pod, drawn once per thorn around the
- * rich node. hpFrac 0..1 shrinks and dims it and sweeps a health arc around it.
+ * rich node. Stays within r. hpFrac 0..1 shrinks and dims it; there is no
+ * ring, so a full ring of thorns stays quiet.
  */
 export function drawThorn(ctx: Ctx, r: number, t: number, hpFrac: number): void {
   const f = Math.min(1, Math.max(0, hpFrac));
   ctx.save();
-  ctx.globalAlpha = 0.55 + 0.45 * f;
+  ctx.globalAlpha = 0.5 + 0.5 * f;
   ctx.rotate(t * 0.8);
-  const body = r * (0.7 + 0.3 * f);
+  const body = r * (0.5 + 0.5 * f);
   ctx.beginPath();
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
@@ -154,15 +155,6 @@ export function drawThorn(ctx: Ctx, r: number, t: number, hpFrac: number): void 
   ctx.fillStyle = palette.thornCore;
   disc(ctx, 0, 0, body * 0.2);
   ctx.fill();
-  ctx.rotate(-t * 0.8);
-  ctx.globalAlpha = 1;
-  if (f > 0) {
-    ctx.strokeStyle = palette.thornCore;
-    ctx.lineWidth = Math.max(1.2, r * 0.14);
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 1.15, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2);
-    ctx.stroke();
-  }
   ctx.restore();
 }
 
@@ -223,21 +215,21 @@ export function drawRoute(
   ctx.restore();
 }
 
-/** Rally flag: amber pennant on a pole. Base at the origin, flies up and right. */
+/** Rally flag: amber pennant on a pale pole, centered, within radius r (pole spans y = +0.9r to -0.9r). */
 export function drawRallyFlag(ctx: Ctx, r: number): void {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.strokeStyle = palette.starBright;
   ctx.lineWidth = Math.max(1.5, r * 0.14);
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(0, -r * 2);
+  ctx.moveTo(-r * 0.3, r * 0.9);
+  ctx.lineTo(-r * 0.3, -r * 0.9);
   ctx.stroke();
   ctx.fillStyle = palette.probe;
   ctx.beginPath();
-  ctx.moveTo(0, -r * 2);
-  ctx.lineTo(r * 1.4, -r * 1.55);
-  ctx.lineTo(0, -r * 1.05);
+  ctx.moveTo(-r * 0.3, -r * 0.9);
+  ctx.lineTo(r * 0.75, -r * 0.5);
+  ctx.lineTo(-r * 0.3, -r * 0.1);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
