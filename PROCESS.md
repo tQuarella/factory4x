@@ -46,6 +46,16 @@ Slash commands: `/resume`, `/iterate`, `/handoff`, `/retro`.
 - `/resume` reads `CLAUDE.md`, `STATUS.md`, `QUESTIONS.md`, checks `git worktree list` and open `task/*` branches, and continues.
 - For overnight runs the owner schedules `/resume` (Claude Code scheduled task or routine) at an interval longer than the usage-limit reset.
 
+## Concurrent sessions in one working tree
+
+Sometimes two main sessions share the same checkout, for example the Director and a design session with the owner. The shared files (`STATUS.md`, `QUESTIONS.md`, `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`) then have more than one writer.
+
+- At session start, run `git status`. Uncommitted changes you did not make belong to another session. Never revert, reformat or commit them.
+- Commit your own shared-file edits soon after making them, in small commits. Stage paths explicitly (`git add <path>`), never `git add -A` or `commit -a`. If a file holds both your edits and another session's, leave it for that session or ask the owner. Don't commit someone else's half-finished text.
+- Make targeted insertions, not rewrites. `DECISIONS.md` is append-only. In `STATUS.md`, change only the lines you own.
+- `STATUS.md` reports what the source files show. A "signed off", "approved" or "done" claim needs the evidence in place first: the owner's answer and any `APPROVED-PROTECTED` line in `QUESTIONS.md`, and for vision changes the edit applied to `VISION.md`.
+- Commit with the repo's configured git identity. Never pass `--author` or `-c user.name`/`user.email`.
+
 ## Waiting for the owner
 
 While a build awaits feedback, only Can wait work is allowed: tech debt, test coverage, performance, tooling, art. No new fun hypothesis until feedback arrives.
