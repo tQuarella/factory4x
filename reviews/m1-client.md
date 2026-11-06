@@ -148,3 +148,63 @@ I played through a repelled wave and a capture again at 375×667, 375×812 and 8
 This is round 2 on m1-client. Under the deadlock rule in `PROCESS.md`, this second rejection moves the task to the Core Engineer. The only remaining work is the one required change above.
 
 VERDICT: REJECT
+
+## Round 3 · 2026-11-06
+
+This is the third and final round under the deadlock rule. I reviewed `git diff baed07b..358b53f`, which is the Core Engineer's fix for the one round-2 required change, together with the touched files: `session.ts`, `sheet.ts`, `panels.ts`, `main.ts`, `env.d.ts`, the new unit and smoke tests, and the `DECISIONS.md` entry.
+
+**The fix.**
+- `Session.sendAll(inputs)` validates each input against the current world. It queues the valid ones together and drops the invalid ones without logging them. While paused it steps exactly one tick, and only if at least one input was valid.
+- `send(input)` is now `sendAll([input])`, so single taps behave exactly as before.
+- "Attack with all" builds its orders from one `shipCounts` snapshot and makes a single `sendAll` call. "Reset all" batches the sim tunables into one `sendAll`, and the client-scope `autosaveSec` goes through settings as before.
+- The sim rule is unchanged.
+
+**Batch validation and log semantics (the engineer's flag).** Every input in a batch is validated against the world before the batch, not after earlier inputs have applied. `step` then revalidates each input as it applies it. So a batch input that an earlier one makes invalid is logged but ignored by the sim. The replay ignores it the same way, so determinism holds, and the result matches the running path exactly (several taps in one frame behave the same). The logged ticks are correct: every input in one press records the same tick. I accept this, and it is logged in `DECISIONS.md` with the alternatives that were rejected.
+
+**My own repro.** I wrote a throwaway vitest, not committed and since deleted. It stages ships at the Probe and A5 by play, then sends "All" as two valid orders plus one invalid order from A3, which has no ships:
+
+| | Running | Paused |
+| --- | --- | --- |
+| Inputs queued | 2 | 2 |
+| Ticks advanced | 1 | 1 |
+| `wavesSent` | +1 | +1 |
+| Inputs logged | 2 | 2 |
+| Distinct log ticks | 1 | 1 |
+| Replay matches live hash | yes | yes |
+
+An empty batch while paused steps nothing. Round 2's paused case gave `wavesSent` +2; it now gives +1.
+
+**Gates.** I ran them on 358b53f myself:
+- `npm run gates -- --base main`: all six passed. Determinism final hash is 35d8f54c, unchanged. Protected-files: 23 files changed, none protected.
+- `npm run build`: passed.
+- `npm run smoke`: run twice, 28/28 passed both times. That includes the new smoke test "paused Attack with all from two sources is one press, one tick, one wave", which drives the real UI.
+
+**Tests.** The new unit tests reach a two-source staging by play only, so their replays are valid. They cover:
+- a paused batch: one tick, one wave, same log tick, replay matches;
+- a running batch: applies on the next tick, one wave;
+- invalid inputs dropped from a paused batch, and no step when none is valid.
+
+These are meaningful tests.
+
+**Regression check of the round-1 fixes.** I replayed the full scenario from round 2 at 375×667, 375×812 and 812×375 (repelled wave, A5 staging, "Attack with all", capture, reload, feedback). The screenshots are `crit-r3-*.png` in the session scratchpad.
+- **Item 1:** the Bloom, its thorn ring and the badge stay clear of the banner and the toast. The withered Bloom is visible at capture.
+- **Item 2:** Retreat sits 78 px above "Attack from Probe" both before and during a battle at every size, so nothing shifts under the finger.
+- **Item 3:** Feedback reads "Opened a prefilled GitHub issue in a new tab…".
+- **Items 4 and 5:** the smoke tests for New run keeping tuning, startStock and Reset all (+1 input) pass.
+- **Items 6–8:** the `DECISIONS.md` entries are present, the 375×667 smoke project passes, and `.confirm` stays removed.
+- **Result panel:** "Waves sent 2" for two attacks.
+- **Reload:** resumes, and the replay matches.
+- **Console:** no errors.
+- **Nothing regressed.**
+
+**Pillar fit.** This is unchanged from round 2. H1's loop is playable by touch at 375 px: throughput visibly climbs, the bottleneck shows on screen, a failed wave reads as a lesson, and capture pays off with a visible Bloom withering and a result panel. Nothing here changes how the game plays beyond the spec, apart from the Director's two logged rulings and the logged Retreat shortcut. I would be comfortable with the owner playing this tonight.
+
+**Carried over from round 2, not blocking (Director: backlog or Designer notes).**
+- **Toast covers the probe.** The bottom toast covers the probe until it is tapped. A tap there only dismisses the toast.
+- **Map jumps.** The map shifts by about 29 px when the battle banner appears and disappears.
+- **Shorter banner text.** The banner wording is shorter than the spec's ("strip 1.3/s · regrow 0.5/s"). The Designer should confirm it.
+- **Staggered "All".** Ships sent with "All" from Probe + A5 arrive about 330 su apart, so A5's group fights alone first. This is for the Designer before the handoff.
+- **Debug hook in a gameplay path.** The `debugShowNotices` test hook adds a branch to `refreshUi`.
+- **Merge conflict.** Merging into main conflicts in `DECISIONS.md` (both sides appended). Keep both blocks when running `merge-task`.
+
+VERDICT: APPROVE
