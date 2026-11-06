@@ -16,6 +16,9 @@ export default defineConfig({
   define: {
     __BUILD_VERSION__: JSON.stringify(buildVersion()),
   },
+  build: {
+    rollupOptions: { input: { main: 'index.html', gallery: 'gallery.html' } },
+  },
   server: { host: true },
   preview: { host: true },
 });

@@ -83,3 +83,7 @@ Not changed: the usage budget. With 0 launches there's no evidence to tune it ye
 - **Renderer for M1: Canvas 2D.** The plan let the Engineers pick Pixi or Phaser, but the art and client tasks run in parallel, and they need one fixed draw-function contract (the signatures are in `m1-art`). M1 draws at most a few hundred sprites, which Canvas 2D handles on a phone. Revisit if `cw-bench` or a later milestone needs more.
 - **`m1-art` starts alongside `m1-sim`:** it depends only on the draw contract, not on the sim API. `m1-client` and `m1-bots` start when `m1-sim` merges.
 - **Bot softlock rule redesigned in `m1-bots`:** constant probe mining changes the state hash every tick, so "hash unchanged" can never trigger. The new rule: no delivery and no ship for 5 game-minutes before capture.
+
+## 2026-11-06: m1-art palette additions and gallery build entry (Art Direction)
+
+Added Bloom pink (`#ff4f8b`, `#ffb3cc`), withered grey (`#7a7f8a`, `#4a4e58`), thorn core, backed-up route amber and flash white to `palette.ts`. Adds `gallery.html` as a second Vite build input in `vite.config.ts` so it ships in `dist` for `vite preview`. Small refinements within the approved direction.

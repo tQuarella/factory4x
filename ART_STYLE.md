@@ -43,3 +43,22 @@ transparent background, no text, no shadow, no perspective, readable at 24px.
 - `faction_palette` (mob): "hot pink #ff5d73 with soft glow, organic spiked forms"
 
 Generated assets go in `assets/<entity>/<name>.png` at 128×128 and 256×256, with the prompt and seed in `assets/<entity>/<name>.json` so they can be regenerated.
+
+## M1 entities
+
+Draw functions live in `packages/client/src/placeholders.ts`; `packages/client/gallery.html` (built, not linked from the game) shows each at 24, 48 and 96 px on the space background.
+
+| Entity | Look | 24 px read |
+| --- | --- | --- |
+| Probe | amber double hexagon, soft glow | glowing amber hex |
+| Asteroid | grey-brown seeded rock, one teal ore dot; pips below the rock, filled teal = extractor, hollow = free slot | rock with a row of dots |
+| Bloom (alive) | hot-pink `#ff4f8b` coral: round body, 8 stubby arms, pale core, pink glow, slow breathing | pink round gear, big glow |
+| Bloom (captured) | grey `#7a7f8a` rock, no glow, teal ore veins | grey with a teal Y |
+| Thorn | red-pink 4-spike seed-pod, spins; health arc sweeps clockwise from 12 o'clock; low hp shrinks and dims it | spiky star, never a disc |
+| Ship | blue arrowhead | unchanged |
+| Pod | teal dot with halo | dot, rounder than a thorn |
+| Route | teal line, 1.5 + 1.5 x level px; backed up = dashed amber | thin line vs dashes |
+| Rally flag | amber pennant on a pale pole, base at the origin | flag |
+| Hit flash | white ring plus core, fades with frac | ring |
+
+Rules: pink glow and round coral mean the Bloom, spikes mean thorns (shape, not only color). Amber is reserved for the player's probe, rally flag and backed-up routes.
