@@ -34,7 +34,6 @@
       "Bash(gh pr list*)"
     ],
     "deny": [
-      "Edit(/VISION.md)",
       "Edit(/.claude/agents/critic.md)",
       "Edit(/.claude/settings.json)",
       "Edit(/scripts/gates/**)",
@@ -51,6 +50,9 @@
       "Bash(rm -rf *)",
       "Bash(gh secret *)",
       "Bash(gh repo delete*)"
+    ],
+    "ask": [
+      "Edit(/VISION.md)"
     ]
   }
 }

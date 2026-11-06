@@ -1,6 +1,6 @@
 # Vision
 
-> **Status: first draft, awaiting owner sign-off.** Written by the Director in Milestone 0 from the owner's notes in `docs/HANDOFF_PLAN.md`. This is the one sanctioned agent edit. From here on, only the owner edits this file; agents propose changes in `QUESTIONS.md`.
+> **Status: signed off by the owner, 2026-11-06** (QUESTIONS.md Q7). First drafted by the Director from the owner's notes in `docs/HANDOFF_PLAN.md`, then revised in a design session with the owner. Agents propose changes in `QUESTIONS.md`; the Director applies a change only after the owner approves it, through a per-edit permission prompt.
 
 ## The fantasy
 
@@ -21,14 +21,21 @@ You are a von Neumann probe arriving in a new star system. Everything you will e
 - A fun prototype for the owner and close friends, shared by a public link. Not a commercial release.
 - Playable on a phone browser. Logistics are abstract routes between nodes, not tile-by-tile belts.
 - Generated art, coherent with a style guide.
+- A roguelite campaign: each star system is one 20–40 minute run; the campaign spans many sessions.
+- No fail state. You can lose ships and time, never the run.
+- Ships take orders at nodes (attack, guard, escort); no unit micro.
+- Autosave, so a run survives a closed tab.
 
-## Design pillars (candidates, to revisit with the owner after Milestone 0)
+## Design pillars
 
 1. **Throughput is the throttle.** Delivery rate to the probe gates everything else.
-2. **Risk scales with reward.** The best resources are the best guarded.
-3. **Rivals have economies.** Mobs build too, and their supply can be attacked.
-4. **Every run ends in a new probe** and carries something forward.
+2. **Risk scales with reward.** The best resources are the best guarded; taking them costs ships, and a bad commitment wastes production.
+3. **Guardians have factories.** Mobs only defend, but they repair and replace up to a cap. Win a node by out-producing their replacement, or cut their supply first.
+4. **A puzzle, not a race.** No clock and no pressure. The challenge is building an efficient network.
+5. **Every system makes the next one stronger.** Research and probe design carry forward, and each new system is richer and harder.
 
 ## Approved protected changes
 
 <!-- The owner adds lines here or in QUESTIONS.md of the form: APPROVED-PROTECTED: <path> -->
+
+- 2026-11-06: revised fixed decisions and pillars (QUESTIONS.md Q7). APPROVED-PROTECTED: VISION.md

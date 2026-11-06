@@ -20,4 +20,4 @@ Subagent launches: 0 / 12
 
 ## Next step
 
-Run `/handoff` for the Milestone 0 placeholder. Pillars were signed off on 2026-11-06 (QUESTIONS.md Q7; direction in DESIGN.md). Once the owner has applied them to `VISION.md`, the Designer specs H1 for Milestone 1. Image generation (Q3) is still open.
+Run `/handoff` for the Milestone 0 placeholder. Pillars were signed off on 2026-11-06 (QUESTIONS.md Q7; direction in DESIGN.md). They are now in `VISION.md`, so the Designer can spec H1 for Milestone 1. Image generation (Q3) is still open.
