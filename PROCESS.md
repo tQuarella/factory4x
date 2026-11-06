@@ -14,7 +14,7 @@ One iteration takes one fun hypothesis to one playable build, then the team impr
 | 4. Build | Engineers in parallel | One worktree and branch `task/<id>` per task; tests alongside code |
 | 5. Verify | Engineer runs `npm run gates` | `reports/` on the branch |
 | 6. Review | Critic | `reviews/<id>.md` ending in `VERDICT: APPROVE` or `VERDICT: REJECT` |
-| 7. Merge | Director | `npm run merge-task -- <id>` (re-runs gates on the merged result) |
+| 7. Merge | Director | Browser-facing tasks: green Linux CI on the pushed task branch first (see "Before merging"). Then `npm run merge-task -- <id>` (re-runs gates on the merged result) |
 | 8. Release | CI | Deploy on green `main`; Director writes `CHANGELOG.md` lines |
 | 9. Hand off | Director | `QUESTIONS.md` handoff block; then stop |
 | 10. Retro | Retrospective | Prompt and process changes, each logged in `DECISIONS.md` |
@@ -35,10 +35,16 @@ Slash commands: `/resume`, `/iterate`, `/handoff`, `/retro`.
 2. Second rejection → Director reassigns the task to the Core Engineer (Opus).
 3. Third rejection → task is parked. Director writes a Blocking question in `QUESTIONS.md` summarizing the disagreement and moves on.
 
+## Before merging
+
+- **Browser-facing tasks** (any change under `packages/client/`, including its Vite config, or under `tests/smoke/`, or to `playwright.config.ts`): after Critic approval, merge `main` into the task branch if `main` has moved, push `task/<id>`, and wait for the CI run on that exact commit to pass. Only then run `merge-task`. CI runs the smoke test on Linux, whose fallback fonts differ from Windows. A local pass on Windows doesn't prove the layout holds there: m1-client passed every local check and still turned `main` red. The push also deploys a branch preview. Pushing a task branch never deploys production.
+- **DECISIONS.md conflicts:** `.gitattributes` merges it with git's union driver, so entries appended on both sides are both kept with no conflict. A task branch cut before that line existed gets it the first time it merges `main`. Check the merged file once for an entry that lost its blank line, and keep the file append-only, because union merging would silently keep both versions of a line edited in place.
+
 ## Usage budget
 
-- Per iteration: at most 12 subagent launches. Per task: at most 2 Critic reviews before escalation per the deadlock rule.
-- Track spend in `STATUS.md`. When the budget or a usage limit is hit: checkpoint (commit WIP to the task branch with a `WIP:` prefix, update `STATUS.md`), then stop. Never rush a gate to fit the budget.
+- Per iteration: at most 12 subagent launches. The Retrospective counts as one. Plan for the Designer, one builder and one Critic per task, the Retrospective, and 2 spare for rework or a broken-`main` fix. Per task: at most 2 Critic reviews before escalation per the deadlock rule.
+- A launch is a new agent (the Agent tool). A resume is any later turn sent to a running or finished agent with SendMessage (a stall nudge, a fix round, a later review round). Resumes are not launches, but they still use usage, so count them too. Resuming is preferred over a fresh launch for fix rounds and later review rounds, because the agent keeps its context.
+- Track spend in `STATUS.md` as a ledger with one line per run (agent, task, launch or resume, and why), plus the totals. Updating the totals alone hid runs in M1. When the budget or a usage limit is hit: checkpoint (commit WIP to the task branch with a `WIP:` prefix, update `STATUS.md`), then stop. Never rush a gate to fit the budget.
 
 ## Pausing and resuming
 

@@ -1,3 +1,9 @@
 * text=auto eol=lf
 *.png binary
 *.jpg binary
+# Append-only log: every task branch appends at the end, so plain merges always
+# conflicted there. git's built-in union driver keeps both sides' lines instead.
+# Safe only because DECISIONS.md is append-only (PROCESS.md): an in-place edit of
+# the same line on both sides would keep both versions with no conflict marker.
+# Do not add files that are edited in place (STATUS.md, BACKLOG.md, QUESTIONS.md).
+DECISIONS.md merge=union

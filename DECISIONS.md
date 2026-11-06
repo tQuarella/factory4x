@@ -149,3 +149,52 @@ The bot tuning target says turtle's throughput should still be rising at minute 
   - Measuring the Bloom's screen rect in JS and setting the toast's `max-height` from it: it is more code on the resize path, it still overlays the probe, and it ties layout to node positions.
   - A line clamp with no scroll: it would hide the second half of the battle lesson ("Regrowth outpaced the wave…"), which is the point of the toast.
   - Bundling a webfont so metrics match everywhere: it treats the symptom, players can still zoom text, and it adds weight to the build.
+
+## 2026-11-06 · Retrospective · build-20261106-2 (Milestone 1, first playable)
+
+Scope: `git log build-20261106-1..build-20261106-2` (b86ac34..c11124b), the five reviews in `reviews/m1-*.md`, `STATUS.md`, `BACKLOG.md` and `PROCESS.md`. This was the first iteration with every role.
+
+**Went well**
+- **Splitting M1 into four tasks fit the budget.** The plan needed 9 launches. The iteration used 10, plus this retro, even with an escalation and an unplanned broken-`main` fix. m1-sim passed on its first review.
+- **The Critic's play-throughs caught real defects** that gates and the engineer's own screenshots missed: the banner over the Bloom, Retreat appearing under the Attack finger, the false "blocked tab" message, and paused "All" counting two waves. It also caught a gate weakening in m1-bots (copied seeds skipped the crash and softlock checks) and a softlock timer that fired at 6 minutes instead of 5. All of these review checks stay.
+- **The deadlock rule worked as written.** m1-client went to the Core Engineer after its second rejection, and the Core Engineer fixed the root cause with one tick per user action, rather than widening the sim rule.
+- **The broken-`main` fix was well done.** m1-toast-fix took the layout out of font metrics. The Critic then reproduced the Linux failure on Windows by restoring the old files and running the new wide-font tests: they failed against the old layout and passed against the fix.
+
+**Didn't go well**
+- **Every merge of `main` into a task branch conflicted in `DECISIONS.md`** (c7777ca, e4d37b7, 20d59f3), because both sides append at the end. The Director resolved each one by hand. One resolution lost the blank line before "m1-client decisions".
+- **`main` went red after m1-client merged.** The cause is the platform, not the review. Every check (gates, build, three Critic smoke runs) ran on Windows, whose Consolas fit the toast. Linux CI uses a wider fallback monospace, so the toast wrapped onto more lines and covered the Bloom. No task branch was ever pushed (`git branch -r` lists only `main`), so the Linux CI that runs on every pushed branch, with gates, build and smoke, never saw m1-client before the merge. Answer to "what local gate would have caught it": no Windows-only run catches platform font differences in general. The wide-font stress test catches this class of bug, but today it covers only the notices. The check that catches the whole category is the existing branch CI, which was never used.
+- **Two agents stalled for 10 minutes**: the Designer during calibration, and the client engineer at its last step. A `vite preview` server from an earlier worktree was still listening and blocked deleting that folder. One related risk: `playwright.config.ts` reuses any server already on port 4173 for local runs, so a stale server can make a smoke run test another worktree's build.
+- **The launch ledger lost track.** `STATUS.md` says 10 launches, itemized as core-engineer ×2 and critic ×4. But the Core Engineer ran three jobs (m1-sim, the m1-client escalation, m1-toast-fix), and five tasks were reviewed. The resume note still lists the first three resumes. The commits show at least five more: art round 2 review, bots fix and round 2, client fix round 2, client reviews in rounds 2 and 3. It may also have missed m1-toast-fix. Real agent runs were about 18, against a reported 10. Counting launches only, as the Director did, matches `PROCESS.md`'s wording. Resumes are the cheaper and better choice for fix rounds, because the agent keeps its context. But they used more usage than the reported number shows.
+- **Rejection root causes.**
+  - m1-art: the first rejection was about the contract and the palette, both already stated in the acceptance criteria and in `art-direction.md`. The agent hadn't checked its own gallery against them. A prompt change wouldn't have helped.
+  - m1-bots: the rejection was about an untested boundary and a gate weakening the prompt already forbids.
+  - m1-client round 1: mostly UX found by playing. That is the gap addressed below.
+  - m1-client round 2: a sim fix ruled mid-task missed the paused path.
+- **Owner questions.** Q11 and the staggered "All" are fun calls, correctly sent to the owner. Q12 (eslint ignore) is a protected-file change, so it correctly goes to the owner too. No owner question was one the team should have decided itself.
+
+**Changes made**
+1. **`.gitattributes`: `DECISIONS.md merge=union`.** This uses git's built-in union driver, so no config is needed on any machine or in CI. Evidence: the three conflicts above. I tested it in a throwaway repo. Two branches appending different entries merge cleanly, with both entries kept. Two caveats, both noted in the file and in `PROCESS.md`:
+   - The blank line between the two appended entries can collapse. That is cosmetic.
+   - If the same existing line is edited on both sides, both versions are kept, with no conflict marker. That is acceptable only because `DECISIONS.md` is append-only.
+
+   `STATUS.md`, `BACKLOG.md` and `QUESTIONS.md` are edited in place, so they are deliberately not included. No gate changes: `merge-task` still re-runs every gate on the merged result.
+2. **`PROCESS.md`: new "Before merging" section and Merge step.** A browser-facing task (client, smoke tests, Playwright config) has its branch pushed after approval and merges only when the Linux CI run on that exact commit is green. Evidence: m1-client. This adds a check and weakens nothing. Making it automatic is backlog item cw-merge-ci-check.
+3. **`.claude/agents/engineer.md`** (inherited by core-engineer; art-direction follows it in worktrees):
+   - A "Long-running commands" section: no hand-started servers; check port 4173 before `smoke`; time limits and no prompts; stop everything you started before reporting.
+   - The Finish step now requires `npm run smoke` when the client or smoke tests changed.
+   - Layout assertions must force a wide font.
+   - UI tasks must be played through by touch at 375x667, at the spec's key moment.
+
+   Evidence: the two stalls, the leftover server, m1-client's red `main`, and m1-client round 1. `.claude/agents/designer.md` gets one line: bound and print progress in calibration runs (the Designer stall).
+4. **`PROCESS.md` usage budget accounting.** The budget stays 12 launches. M1 used 10, plus the retro, with an escalation and an unplanned fix, so 12 is right for a four-to-five-task iteration. The section now says:
+   - the retro counts as a launch;
+   - planning reserves 2 spare launches;
+   - resumes are defined, preferred for fix rounds, and counted;
+   - `STATUS.md` keeps a one-line-per-run ledger, because updating only the totals lost about 8 runs.
+
+   I didn't add a resume cap: there is one iteration of data, and the counts above are reconstructed from commits. Revisit next retro with a real ledger.
+5. **`BACKLOG.md` (Can wait):**
+   - cw-smoke-isolation: no reuse of stale preview servers in local runs, and a shared wide-font fixture for every layout assertion.
+   - cw-merge-ci-check: `merge-task` checks for green branch CI on browser-facing tasks.
+
+**Not changed:** no gate, guardrail or protected file. A Linux smoke run in a container would be a stronger local gate, but it needs Docker or WSL on the owner's machine. Branch CI gives the same Linux check with no setup. Q12 stays open with the owner.

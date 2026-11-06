@@ -19,7 +19,7 @@ Read `CLAUDE.md`, `STATUS.md`, `PROCESS.md`, `VISION.md`, `DESIGN.md`, `BACKLOG.
 3. **Split.** Write tasks into `BACKLOG.md`: id, owner agent, acceptance criteria, files likely touched. Sim architecture and determinism-sensitive work goes to `core-engineer`.
 4. **Build.** Launch up to three `engineer` / `core-engineer` / `art-direction` agents in parallel, each with `isolation: "worktree"`, on tasks with no file overlap. Brief each with the task id, acceptance criteria, and the instruction to work on branch `task/<id>` and finish with green gates. Record assignments in `STATUS.md`.
 5. **Review.** For each task reported green, launch the `critic` with only the task id and branch name.
-   - Approved: from `main`, run `npm run merge-task -- <id>`. If gates fail on the merged result, send it back to the engineer.
+   - Approved: follow "Before merging" in `PROCESS.md`. For a browser-facing task (`packages/client/`, `tests/smoke/`, `playwright.config.ts`), merge `main` into the task branch, push `task/<id>`, and wait for green CI on that exact commit. Then, from `main`, run `npm run merge-task -- <id>`. If gates fail on the merged result, send it back to the engineer.
    - Rejected: send it back per the deadlock rule in `PROCESS.md` (same engineer → `core-engineer` → park as a Blocking question).
 6. **Release check.** When the slice is complete on `main`, run `npm run release-gates`. If it passes, push `main` (CI deploys) and continue with `/handoff`.
 
