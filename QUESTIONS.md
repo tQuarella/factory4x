@@ -4,17 +4,27 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
+## Build build-20261106-1 is ready (2026-11-06)
+
+Play: https://factory4x.pages.dev (open it on your phone)
+
+What changed:
+- Placeholder page: the probe, an asteroid, a delivery route and a mob, drawn as procedural shapes.
+- The simulation runs live in the page at 30 ticks per second.
+- Build version shown in the corner so feedback can name the build.
+
+Try this: open it on your phone in portrait, then rotate to landscape. Leave it running for a minute and watch the tick and stock counters climb.
+
+This is the pipeline proof, not gameplay. Milestone 1 is the first build with something to play. So the questions are about look and feel only:
+
+1. Does the visual direction (warm amber geometry for you, hot-pink spiky guardians, flat vector shapes on deep space) feel like the right starting point for this game?
+2. On your phone, is everything readable at a glance: can you tell the probe, the asteroid, your ship and the guardian apart without thinking?
+
+Also open: Q9 (ask instead of block for protected files; Blocking for cw-gate-windows and cw-ci-hardening), Q3 (image service), Q4 (feedback button delivery), Q5 (GitHub branch protection).
+
+Protected files changed this build: `PROCESS.md` Guardrails section (Q8, approved). Since this build, on `main`: `VISION.md` (Q7, approved) and `.claude/settings.json` (Q8, approved).
+
 ## Blocking
-
-### Q6. Connect GitHub and Cloudflare (2026-11-06, Director)
-
-Blocks finishing Milestone 0. Owner-only steps, because they involve your accounts and credentials:
-
-1. Run `gh auth login` and tell the Director whether the GitHub repo should be private (recommended) and under your personal account or an org. The Director creates and pushes it.
-2. In the Cloudflare dashboard, create an API token with the **Cloudflare Pages: Edit** permission, and copy your Account ID.
-3. Add both as repo secrets: `gh secret set CLOUDFLARE_API_TOKEN` and `gh secret set CLOUDFLARE_ACCOUNT_ID` (each prompts for the value, so it never lands in a file or chat).
-
-**Answer (owner, 2026-11-06):** Done. Private repo tQuarella/factory4x; secrets set; live at https://factory4x.pages.dev. (Director: move to Answered on next tidy.)
 
 ### Q9. Ask instead of block for all protected files (2026-11-06, Director)
 
@@ -25,6 +35,10 @@ You have to apply this one yourself, because agents can't change their own permi
 **Answer:**
 
 ## Answered
+
+### Q6. Connect GitHub and Cloudflare (2026-11-06, Director)
+
+**Answer (owner, 2026-11-06):** Done. Private repo tQuarella/factory4x; secrets set; live at https://factory4x.pages.dev.
 
 ### Q8. Let the Director apply approved VISION.md edits (2026-11-06, owner)
 
