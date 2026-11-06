@@ -85,6 +85,12 @@ APPROVED-PROTECTED: VISION.md
 
 ## Can wait
 
+### Q11. A result panel when you take the guarded node? (2026-11-06, Designer)
+
+The first playable has no clock while you play. When you take the guarded node, it shows a small panel with game time to capture, peak ore per minute, ships built and lost, and waves sent. Then you can keep playing. The idea is a score to beat on a replay without any pressure during the run. `DESIGN.md` said to check with you before building a result screen. It ships on by default with an off switch in the tuning panel, and the handoff will ask how it felt. Answer here only if you already know you don't want it.
+
+**Answer:**
+
 ### Q10. Let agents list secret names (2026-11-06, Retrospective)
 
 The deny rule `Bash(gh secret *)` in `.claude/settings.json` blocks every `gh secret` command, including `gh secret list`, which shows only secret names and never values. The Director wanted to run it to confirm the Cloudflare secrets existed before the first deploy. The first deploy was then skipped because the secrets were added after the CI job started. Proposed: replace the rule with `Bash(gh secret set *)`, `Bash(gh secret delete *)` and `Bash(gh secret remove *)`, so agents still can't write or delete secrets but can check that they exist. `.claude/settings.json` is protected and agents can't change their own permissions, so you'd apply this yourself. It could go in with the Q9 change.
