@@ -35,6 +35,30 @@ Dated log of decisions and why. Newest at the bottom. Every prompt or process ch
 
 - **Owner acts only when it must be them (owner):** "i don't want to do anything myself unless i have to or am the only decision maker." Added to `CLAUDE.md` so every session sees it. Consequence: protected-file approvals should be a prompt the owner accepts, not an edit the owner makes. Proposed moving the remaining protected-path `Edit` rules from `deny` to `ask` (Q9); the owner applies that once, because agents can't change their own permissions.
 
+## 2026-11-06 · Retrospective · build-20261106-1 (Milestone 0)
+
+Scope: commits 95baa06..00c150c (tagged), plus ea50f8c and its parents on `main`. No engineer or Critic agents ran. The Director built Milestone 0 directly with the owner present, so there are no reviews, rejections or escalations to analyze, and subagent launches were 0 / 12.
+
+**Went well**
+- The pipeline works end to end on day one: gates, CI, Cloudflare Pages deploy, and a live smoke test at desktop and phone sizes against https://factory4x.pages.dev.
+- The guardrails held. The protected-file deny rule blocked an agent edit to `VISION.md` as intended, and the owner's approval was recorded (Q7 `APPROVED-PROTECTED: VISION.md`) before the edit was applied.
+- The live smoke test caught a real problem: the new subdomain's TLS cert wasn't ready yet. That gate stays. The fix is in the workflow, not the gate (cw-ci-hardening).
+- Owner questions were mostly ones only the owner could answer (host, accounts, pillars, protected changes). The team made the stack, determinism, tick budget and renderer calls itself.
+
+**Didn't go well**
+- **Two sessions wrote the same shared files in one working tree, uncommitted.** The Director session and the design session both edited `STATUS.md`, `QUESTIONS.md`, `DECISIONS.md`, `CLAUDE.md` and `BACKLOG.md`. Once, `STATUS.md` said the pillars were signed off before `QUESTIONS.md` and `VISION.md` showed it. Nothing in `PROCESS.md` covered this case. This retro also ran while another session had uncommitted edits (`.claude/settings.json`, `scripts/gates/protected-files.mjs`), so it keeps happening.
+- **A gate passed without checking anything.** On Windows, `protected-files.mjs` skipped silently (cmd.exe strips the `^` in `<ref>^{commit}`), and `reports/gates-latest.json` recorded `"ok": true`. CI on Linux was unaffected, but every local "PASS" on this machine meant nothing. The fix is cw-gate-windows, which another session is applying now. Lesson for the gates' owner: a skip should show up as a skip in the report, not as a pass. That needs a protected-file change, so it is not made here.
+- **Deploy needed two re-runs.** First, the Cloudflare secrets were added after the CI job had already started, so the deploy step skipped. The Director couldn't check beforehand, because `Bash(gh secret *)` also denies `gh secret list`, which shows names only. Second, the TLS cert wasn't ready (see above).
+- **Wrong commit author.** The first commit was made with a hand-set author name instead of the owner's git identity. It was fixed by amend before push.
+- **HUD version too long for phones.** `main-<run>-<40-char sha>` wraps at 375 px.
+
+**Changes made**
+1. `PROCESS.md`: new section "Concurrent sessions in one working tree". It covers: treat uncommitted changes you didn't make as someone else's; commit your own shared-file edits promptly and stage paths explicitly; make targeted, append-only edits; `STATUS.md` claims need evidence in `QUESTIONS.md`/`VISION.md` first; commit with the configured git identity, never `--author` or `-c user.*`. Evidence: the STATUS/QUESTIONS mismatch, the concurrent uncommitted edits, and the hand-set author. Nothing about any gate or guardrail changes.
+2. `BACKLOG.md`: Can wait item cw-hud-version, to shorten the displayed version to a 7-char sha in the client. No protected file needed.
+3. `QUESTIONS.md`: Q10 (Can wait). Narrow the `gh secret` deny rule to `set`/`delete`/`remove` so agents can list secret names. It's a settings.json change, so the owner applies it, possibly together with Q9.
+
+Not changed: the usage budget. With 0 launches there's no evidence to tune it yet. Revisit after the first iteration with engineers and the Critic.
+
 ## 2026-11-06 · Director · Protected-file prompts and gate fix
 
 - **Protected files except settings.json are now ask, not deny (owner, Q9):** the owner applied the prepared `.claude/settings.json`. The Director edits a protected file only in a live session after the owner approves in `QUESTIONS.md`, and the owner accepts each edit at the prompt. `CLAUDE.md` updated. The `PROCESS.md` Guardrails line still describes the VISION.md-only exception, because another session was editing `PROCESS.md` at the time; widen it on the next pass.

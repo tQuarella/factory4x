@@ -83,6 +83,12 @@ APPROVED-PROTECTED: VISION.md
 
 ## Can wait
 
+### Q10. Let agents list secret names (2026-11-06, Retrospective)
+
+The deny rule `Bash(gh secret *)` in `.claude/settings.json` blocks every `gh secret` command, including `gh secret list`, which shows only secret names and never values. The Director wanted to run it to confirm the Cloudflare secrets existed before the first deploy. The first deploy was then skipped because the secrets were added after the CI job started. Proposed: replace the rule with `Bash(gh secret set *)`, `Bash(gh secret delete *)` and `Bash(gh secret remove *)`, so agents still can't write or delete secrets but can check that they exist. `.claude/settings.json` is protected and agents can't change their own permissions, so you'd apply this yourself. It could go in with the Q9 change.
+
+**Answer:**
+
 ### Q3. Image generation service (2026-11-06, Art Direction)
 
 Procedural placeholders are in place, so nothing is waiting on this. When you're ready: which service, and add its API key as a CI secret and a local environment variable (never in the repo).
