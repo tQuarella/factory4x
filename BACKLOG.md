@@ -6,7 +6,7 @@ Owned by the Director. Highest priority first. Each task has an id (used for its
 
 | Id | Task | Owner | Status |
 | --- | --- | --- | --- |
-| m0-deploy | Auto-deploy `main` to a public URL (Cloudflare Pages) | Director | Workflow written; **blocked on owner: Q6 (GitHub + Cloudflare secrets)** |
+| m0-deploy | Auto-deploy `main` to a public URL (Cloudflare Pages) | Director | **Done** 2026-11-06: https://factory4x.pages.dev |
 
 Acceptance for m0-deploy: a push to `main` that passes all gates publishes `packages/client/dist` to a public URL; the URL is in `STATUS.md`; the smoke test passes against it at desktop and phone sizes.
 
@@ -27,4 +27,5 @@ Not split yet. The Designer specs H1 in `DESIGN.md` first, then the Director spl
 
 ## Can wait (allowed while waiting on the owner)
 
+- cw-ci-hardening (needs owner approval: `.github/workflows/` is protected): bump `actions/*` to versions that run on Node 24 (GitHub warns Node 20 is deprecated), and have the live smoke step wait for the deployment URL to answer over HTTPS before testing. A new Pages subdomain's TLS certificate took about a minute on the first deploy and failed the first live smoke run.
 - cw-bench: benchmark scenario with 10k entities for the tick budget once ECS lands

@@ -185,15 +185,15 @@ Milestone 0 builds the team and pipeline with no gameplay; Milestone 1 is the fi
 
 **Milestone 0: Bootstrap** (done when a placeholder page deploys through the full pipeline)
 
-- [ ] Create the repo, monorepo structure and all shared files, with `VISION.md` drafted from the Game concept section.
-- [ ] Write `CLAUDE.md` and `PROCESS.md` from this doc, including permission settings and usage budgets.
-- [ ] Define the active agents in `.claude/agents/` (and the dormant ones, marked dormant), each with role, model, tools, files it owns and handoff rules.
-- [ ] Set up the run loop as slash commands (`/iterate`, `/resume`, `/handoff`, `/retro`).
-- [ ] Set up worktree tooling for parallel engineers.
-- [ ] Set up the gate scripts and CI (stubs where there's no game yet), including the protected-files check.
-- [ ] Set up auto-deploy to a public URL. *Needs the owner's deploy host and a GitHub repo.*
-- [ ] Write `ART_STYLE.md` and procedural placeholder art.
-- [ ] Add the first Can wait questions to `QUESTIONS.md`.
+- [x] Create the repo, monorepo structure and all shared files, with `VISION.md` drafted from the Game concept section.
+- [x] Write `CLAUDE.md` and `PROCESS.md` from this doc, including permission settings and usage budgets.
+- [x] Define the active agents in `.claude/agents/` (and the dormant ones, marked dormant), each with role, model, tools, files it owns and handoff rules.
+- [x] Set up the run loop as slash commands (`/iterate`, `/resume`, `/handoff`, `/retro`).
+- [x] Set up worktree tooling for parallel engineers.
+- [x] Set up the gate scripts and CI (stubs where there's no game yet), including the protected-files check.
+- [x] Set up auto-deploy to a public URL. *Needs the owner's deploy host and a GitHub repo.*
+- [x] Write `ART_STYLE.md` and procedural placeholder art.
+- [x] Add the first Can wait questions to `QUESTIONS.md`.
 
 **Milestone 1: First playable** (done when the owner can play it on a phone)
 
@@ -213,7 +213,7 @@ The handoff should ask whether growing throughput feels satisfying and whether t
 
 - [x] How friends get access: **public link**.
 - [x] Choose a deploy host: **Cloudflare Pages**.
-- [ ] Connect GitHub and Cloudflare (repo secrets). Blocks finishing Milestone 0.
+- [x] Connect GitHub and Cloudflare: private repo tQuarella/factory4x, live at https://factory4x.pages.dev.
 - [ ] Revisit and confirm the design pillars. After Milestone 0, before Milestone 1.
 - [ ] Choose an image generation service and supply an API key. After Milestone 0.
 

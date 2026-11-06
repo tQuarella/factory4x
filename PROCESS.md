@@ -67,7 +67,7 @@ Thresholds live in `scripts/gates/budgets.json` (protected).
 
 ## Guardrails (protected: changes need owner approval)
 
-- No agent edits `VISION.md`. Proposed changes go to `QUESTIONS.md`.
+- No agent edits `VISION.md` on its own. Proposed changes go to `QUESTIONS.md`. Only the Director, in a live session with the owner, may apply a change the owner has approved there: the edit triggers a permission prompt (`ask` rule in `.claude/settings.json`) that the owner must accept each time.
 - Protected files: `VISION.md`, `.claude/agents/critic.md`, `.claude/settings.json`, `scripts/gates/*`, `.github/workflows/*`, `eslint.config.js`, and this Guardrails section. No agent may change them without `APPROVED-PROTECTED: <path>` from the owner.
 - The Retrospective may edit other agent prompts and the rest of this file, logging each change with a reason in `DECISIONS.md`. It may never weaken a gate or remove a guardrail.
 - `main` is always deployable. Broken `main` is the top priority and halts other merges.

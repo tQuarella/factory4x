@@ -3,8 +3,9 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 0 — Bootstrap
-**State:** Repo, agents, process, gates, CI, Cloudflare Pages deploy workflow and placeholder client are in place; all gates pass locally. Waiting on the owner to connect GitHub and Cloudflare (QUESTIONS.md Q6) to finish m0-deploy.
-**Public URL:** none yet
+**State:** Milestone 0 complete. The placeholder deployed through the full pipeline (gates → build → smoke → Cloudflare Pages → live smoke at desktop and phone sizes) on CI run 42261344841.
+**Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
+**Repo:** https://github.com/tQuarella/factory4x (private)
 **Last updated:** 2026-11-06
 
 ## In flight
@@ -19,4 +20,4 @@ Subagent launches: 0 / 12
 
 ## Next step
 
-When Q6 is done: create the GitHub repo, push `main`, confirm CI deploys and the live smoke test passes, record the URL here, then run `/handoff` for the Milestone 0 placeholder. After that, revisit the pillars and image generation with the owner before Milestone 1.
+Run `/handoff` for the Milestone 0 placeholder. Pillars were signed off on 2026-11-06 (QUESTIONS.md Q7; direction in DESIGN.md). Once the owner has applied them to `VISION.md`, the Designer specs H1 for Milestone 1. Image generation (Q3) is still open.
