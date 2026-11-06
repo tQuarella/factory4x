@@ -118,6 +118,12 @@ const toast = {
   },
 };
 toastEl.addEventListener('click', () => toast.hide());
+toastEl.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter' || ev.key === ' ') {
+    ev.preventDefault();
+    toast.hide();
+  }
+});
 if (startToast) toast.show(startToast);
 
 // --- hint ---------------------------------------------------------------------------

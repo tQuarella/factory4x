@@ -131,8 +131,16 @@ test('browser sim matches Node sim (cross-engine determinism)', async ({ page })
   expect(browser).toEqual(replayHashes(referenceReplay, defaultData, ticks, every));
 });
 
-async function noticesClearOfBloom(page: Page): Promise<void> {
+/**
+ * Wide, tall text in the notices, so the check doesn't depend on which monospace
+ * the OS falls back to (CI's Linux font wrapped the toast into the Bloom while
+ * Windows' Consolas didn't).
+ */
+const WIDE_NOTICE_FONT = '#banner, #toast, #toast::after { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.25em !important; line-height: 1.6 !important; }';
+
+async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
   await ready(page);
+  if (stress) await page.addStyleTag({ content: WIDE_NOTICE_FONT });
   await tapNode(page, 6);
   await expect(page.locator('#sheet')).toBeVisible();
   await page.evaluate(() => window.__factory4x!.debugShowNotices(true));
@@ -142,17 +150,26 @@ async function noticesClearOfBloom(page: Page): Promise<void> {
   // Generous box around the Bloom: thorn ring, label above it, badges.
   const view = (await page.locator('#view').boundingBox())!;
   // Only the part inside the canvas is ever drawn on.
+  // The notices strip is capped, so the map keeps most of its height with both notices up, whatever the font.
+  const map = (await page.locator('#map').boundingBox())!;
+  expect(view.height, 'map height with both notices').toBeGreaterThanOrEqual(map.height * 0.55 - 1);
+  expect((await page.locator('#toast').boundingBox())!.height, 'toast stays tappable').toBeGreaterThanOrEqual(43.5);
   const bloom = { l: pos.x - 50, r: pos.x + 50, t: Math.max(view.y, pos.y - 62), b: pos.y + 50 };
   for (const sel of ['#banner', '#toast']) {
     const r = (await page.locator(sel).boundingBox())!;
     const hit = r.x < bloom.r && r.x + r.width > bloom.l && r.y < bloom.b && r.y + r.height > bloom.t;
     expect(hit, `${sel} overlaps the Bloom`).toBe(false);
-    if (sel === '#banner') expect(r.y + r.height, 'banner sits above the map').toBeLessThanOrEqual(view.y + 1);
+    // Notices live in the strip above the canvas, so no text metric can push one onto the map.
+    expect(r.y + r.height, `${sel} sits above the map`).toBeLessThanOrEqual(view.y + 1);
   }
 }
 
 test('battle banner and toast never cover the rich node', async ({ page }) => {
   await noticesClearOfBloom(page);
+});
+
+test('battle banner and toast never cover the rich node, even with a wide font', async ({ page }) => {
+  await noticesClearOfBloom(page, true);
 });
 
 test('Reset all sends only changed tunables; New run keeps tuning and applies startStock', async ({ page }) => {
@@ -240,5 +257,9 @@ test.describe('375x667 portrait', () => {
 
   test('banner and toast never cover the rich node', async ({ page }) => {
     await noticesClearOfBloom(page);
+  });
+
+  test('banner and toast never cover the rich node, even with a wide font', async ({ page }) => {
+    await noticesClearOfBloom(page, true);
   });
 });
