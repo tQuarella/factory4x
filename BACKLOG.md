@@ -19,7 +19,7 @@ Four tasks, sized to fit the 12-launch budget. `m1-sim` goes first, because the 
 | m1-sim | All H1 sim rules, inputs, data and the sim API | core-engineer | Ready |
 | m1-client | Playable phone client: map, sheets, HUD, controls, tuning, feedback, autosave | engineer | Blocked on m1-sim |
 | m1-bots | rush and turtle strategies plus the capture-based report | engineer | Blocked on m1-sim |
-| m1-art | Draw functions and style for every M1 entity, including the Bloom | art-direction | Ready (no sim dependency; runs alongside m1-sim) |
+| m1-art | Draw functions and style for every M1 entity, including the Bloom | art-direction | **Merged** 7205468 (approved round 2) |
 
 ### m1-sim (core-engineer)
 
