@@ -55,10 +55,10 @@ export function nextEconomyOrder(world: Readonly<World>, node: number): Input | 
   return null;
 }
 
-/** All slots committed, and the route (with queued upgrades) carries the extraction or is at max level. */
+/** All slots committed and built (none queued or under construction), and the route (with queued upgrades) carries the extraction or is at max level. */
 export function nodeFinished(world: Readonly<World>, node: number): boolean {
   const s = nodeStatus(world, node);
-  if (s.extractorsCommitted < s.slots || s.routePending || s.route === null) return false;
+  if (s.extractorsCommitted < s.slots || s.extractors < s.extractorsCommitted || s.routePending || s.route === null) return false;
   const target = s.route.level + s.route.pendingUpgrades;
   return s.extractPerMin <= routeCapacityPerMin(world, target) || target >= s.route.maxLevel;
 }

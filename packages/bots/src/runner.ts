@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import { createWorld, runSummary, step, throughputPerMin, worldHash, type BattleOutcome, type SimData } from '@factory4x/sim';
+import { createWorld, runSummary, type RunSummary, step, throughputPerMin, worldHash, type BattleOutcome, type SimData } from '@factory4x/sim';
 import type { Strategy } from './strategies.ts';
 
 /** won = the rich node was captured; timeout = still uncaptured at the tick cap. */
@@ -19,20 +19,23 @@ export interface GameResult {
   firstShipSec: number | null;
   /** throughputPerMin at each sample minute, keyed by minute; null if the run ended first. */
   throughputAtMin: Record<string, number | null>;
+  /** Peak ore/min over the whole run. */
   peakPerMin: number;
+  /** Ships built, ships lost and ore spent, as of capture (end of the run if never captured). */
   shipsBuilt: number;
   shipsLost: number;
+  oreSpentShips: number;
+  oreSpentEconomy: number;
+  /** Waves sent and repelled as of capture (end of the run if never captured). */
   wavesSent: number;
   wavesRepelled: number;
   /** Outcome of the first wave's battle, or null if no battle finished. */
   firstWaveOutcome: BattleOutcome | null;
-  oreSpentShips: number;
-  oreSpentEconomy: number;
+  /** Whole-run totals (all ticks, including the post-capture build-out up to the tick cap). */
+  wholeRun: { shipsBuilt: number; shipsLost: number; oreSpentShips: number; oreSpentEconomy: number };
   tickMsP50: number;
   tickMsP95: number;
   finalHash: string;
-  /** Set when this result was copied from the first seed because the sim never consumed randomness. */
-  duplicateOfSeed?: number;
   error?: string;
 }
 
@@ -44,23 +47,19 @@ function percentile(sorted: Float64Array, p: number): number {
 
 /** Softlock: this many game seconds without a route delivery or a ship built, before capture. */
 export const SOFTLOCK_SEC = 60 * 5;
-/** How often (ticks) progress is sampled; throughput is a 60-game-second sum, so this is cheap. */
-const CHECK_EVERY = 30;
 
-export interface RunResult {
-  result: GameResult;
-  /** True if the simulation consumed its rng (so other seeds would play differently). */
-  usedRandomness: boolean;
-}
-
-export function runGameDetailed(strategy: Strategy, seed: number, data: SimData, maxTicks: number): RunResult {
+export function runGame(strategy: Strategy, seed: number, data: SimData, maxTicks: number): GameResult {
   const world = createWorld(seed, data);
-  const initialRng = world.rng;
   const times = new Float64Array(maxTicks);
   let outcome: Outcome = 'timeout';
   let error: string | undefined;
   let lastProgressTick = 0;
   let lastShipsBuilt = 0;
+  let prevBucketIdx = -1;
+  let prevBucketVal = 0;
+  let atCapture: RunSummary | null = null;
+  let wavesSentAtCapture = 0;
+  let repelledAtCapture = 0;
   let wavesRepelled = 0;
   let firstWaveOutcome: BattleOutcome | null = null;
   let lastBattleEnd = -1;
@@ -85,18 +84,28 @@ export function runGameDetailed(strategy: Strategy, seed: number, data: SimData,
       const minute = sampleTicks.get(world.tick);
       if (minute !== undefined) throughputAtMin[String(minute)] = throughputPerMin(world);
 
-      if (world.tick % CHECK_EVERY === 0) {
-        // Probe mining changes the state hash every tick, so progress is measured
-        // by what matters: ore arriving by route, or ships being built.
-        const built = world.stats.shipsBuilt;
-        if (built !== lastShipsBuilt || throughputPerMin(world) > 0) {
-          lastShipsBuilt = built;
-          lastProgressTick = world.tick;
-        }
-        if (world.capturedTick === null && world.tick - lastProgressTick >= SOFTLOCK_SEC * data.tickRate) {
-          outcome = 'softlock';
-          break;
-        }
+      if (atCapture === null && world.capturedTick !== null) {
+        atCapture = runSummary(world);
+        wavesSentAtCapture = atCapture.wavesSent;
+        repelledAtCapture = wavesRepelled;
+      }
+
+      // Probe mining changes the state hash every tick, so progress is what matters:
+      // ore arriving by route (the per-second delivery bucket of the tick just run grew)
+      // or a ship being built. Checked every tick, so the 5 minutes are exact.
+      const buckets = world.stats.deliveredBuckets;
+      const idx = Math.floor((world.tick - 1) / data.tickRate) % buckets.length;
+      const val = buckets[idx]!;
+      if (val > (idx === prevBucketIdx ? prevBucketVal : 0)) lastProgressTick = world.tick;
+      prevBucketIdx = idx;
+      prevBucketVal = val;
+      if (world.stats.shipsBuilt !== lastShipsBuilt) {
+        lastShipsBuilt = world.stats.shipsBuilt;
+        lastProgressTick = world.tick;
+      }
+      if (world.capturedTick === null && world.tick - lastProgressTick >= SOFTLOCK_SEC * data.tickRate) {
+        outcome = 'softlock';
+        break;
       }
     }
     if (outcome === 'timeout' && world.capturedTick !== null) outcome = 'won';
@@ -106,47 +115,36 @@ export function runGameDetailed(strategy: Strategy, seed: number, data: SimData,
   }
 
   const measured = times.slice(0, world.tick).sort();
-  const s = runSummary(world);
+  const end = runSummary(world);
+  const s = atCapture ?? end;
   const result: GameResult = {
     strategy: strategy.name,
     seed,
     outcome,
     ticks: world.tick,
-    captureSec: outcome === 'won' ? s.captureSec : null,
-    firstShipSec: s.firstShipTick === null ? null : Math.floor(s.firstShipTick / data.tickRate),
+    captureSec: outcome === 'won' ? end.captureSec : null,
+    firstShipSec: end.firstShipTick === null ? null : Math.floor(end.firstShipTick / data.tickRate),
     throughputAtMin,
-    peakPerMin: s.peakPerMin,
+    peakPerMin: end.peakPerMin,
     shipsBuilt: s.shipsBuilt,
     shipsLost: s.shipsLost,
-    wavesSent: s.wavesSent,
-    wavesRepelled,
+    wavesSent: atCapture ? wavesSentAtCapture : s.wavesSent,
+    wavesRepelled: atCapture ? repelledAtCapture : wavesRepelled,
     firstWaveOutcome,
     oreSpentShips: s.oreSpentShips,
     oreSpentEconomy: s.oreSpentEconomy,
+    wholeRun: { shipsBuilt: end.shipsBuilt, shipsLost: end.shipsLost, oreSpentShips: end.oreSpentShips, oreSpentEconomy: end.oreSpentEconomy },
     tickMsP50: percentile(measured, 50),
     tickMsP95: percentile(measured, 95),
     finalHash: worldHash(world),
   };
   if (error !== undefined) result.error = error;
-  return { result, usedRandomness: world.rng !== initialRng };
+  return result;
 }
 
-export function runGame(strategy: Strategy, seed: number, data: SimData, maxTicks: number): GameResult {
-  return runGameDetailed(strategy, seed, data, maxTicks).result;
-}
-
-/**
- * Play a strategy over several seeds. M1 has no randomness, so if the first
- * seed's game never touched the rng, the remaining seeds would repeat it
- * exactly: they are copied (marked `duplicateOfSeed`) instead of re-run. As
- * soon as the sim uses randomness this falls back to running every seed.
- */
+/** Play a strategy over several seeds. Every seed runs its own game and gets every check. */
 export function runSeeds(strategy: Strategy, seeds: number, data: SimData, maxTicks: number): GameResult[] {
-  const first = runGameDetailed(strategy, 1, data, maxTicks);
-  const out: GameResult[] = [first.result];
-  for (let seed = 2; seed <= seeds; seed++) {
-    if (first.usedRandomness) out.push(runGame(strategy, seed, data, maxTicks));
-    else out.push({ ...first.result, seed, duplicateOfSeed: 1 });
-  }
+  const out: GameResult[] = [];
+  for (let seed = 1; seed <= seeds; seed++) out.push(runGame(strategy, seed, data, maxTicks));
   return out;
 }

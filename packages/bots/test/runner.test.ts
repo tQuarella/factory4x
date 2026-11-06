@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultData } from '@factory4x/sim';
+import { defaultData, type World } from '@factory4x/sim';
 import { SOFTLOCK_SEC, runGame, runSeeds } from '../src/runner.ts';
 import { rushDecide, turtleDecide, type Strategy } from '../src/strategies.ts';
 
@@ -19,6 +19,34 @@ describe('runner', () => {
     expect(r.outcome).toBe('softlock');
     expect(r.ticks).toBeGreaterThanOrEqual(SOFTLOCK_SEC * defaultData.tickRate);
     expect(r.ticks).toBeLessThan(SOFTLOCK_SEC * defaultData.tickRate + 120);
+  });
+
+  it('fires at exactly 5 game minutes after the last delivery when an economy stalls mid-game', () => {
+    const STALL = 9000;
+    // Turtle's yard is off and its network is delivering at the stall tick. Then the economy dies
+    // (extractors, buffers and pods vanish) while probe mining continues and no ship is built.
+    const stalls: Strategy = {
+      name: 'stalls',
+      description: '',
+      decide: (w) => {
+        if (w.tick < STALL) return turtleDecide(w);
+        const m = w as World;
+        for (const n of m.nodes) {
+          n.extractors = 0;
+          n.buffer = 0;
+        }
+        for (const r of m.routes) r.pods.length = 0;
+        m.queue.length = 0;
+        m.activeBuild = null;
+        return m.shipyard.on ? [{ type: 'setShipyard', on: false }] : [];
+      },
+    };
+    const r = runGame(stalls, 1, defaultData, TICKS_30_MIN);
+    expect(r.outcome).toBe('softlock');
+    // Last delivery was within one pod interval (90 ticks) before the stall; the old 60 s window added 1800 ticks.
+    const limit = SOFTLOCK_SEC * defaultData.tickRate;
+    expect(r.ticks).toBeGreaterThanOrEqual(STALL - 90 + limit);
+    expect(r.ticks).toBeLessThanOrEqual(STALL + limit + 1);
   });
 
   it('does not call a ship-building game a softlock even with no routes', () => {
@@ -53,16 +81,18 @@ describe('runner', () => {
     expect(r.tickMsP95).toBeGreaterThanOrEqual(r.tickMsP50);
   });
 
-  it('copies duplicate seeds instead of replaying them, and the copy matches a real replay', () => {
+  it('runs every seed as its own game (hashes differ because the seed is in the state)', () => {
     const rs = runSeeds(turtle, 3, defaultData, TICKS_30_MIN);
     expect(rs.map((r) => r.seed)).toEqual([1, 2, 3]);
-    expect(rs[0]!.duplicateOfSeed).toBeUndefined();
-    expect(rs[1]!.duplicateOfSeed).toBe(1);
-    expect(rs[2]!.captureSec).toBe(rs[0]!.captureSec);
-    // The shortcut is only valid while the sim ignores the seed.
-    const real = runGame(turtle, 2, defaultData, TICKS_30_MIN);
-    expect(real.captureSec).toBe(rs[0]!.captureSec);
-    expect(real.shipsLost).toBe(rs[0]!.shipsLost);
+    expect(new Set(rs.map((r) => r.finalHash)).size).toBe(3);
+    expect(rs[1]!.finalHash).toBe(runGame(turtle, 2, defaultData, TICKS_30_MIN).finalHash);
+  });
+
+  it('reports ships and ore as of capture, with whole-run totals labelled separately', () => {
+    const r = runGame(turtle, 1, defaultData, TICKS_30_MIN);
+    expect(r.oreSpentShips).toBeLessThan(r.wholeRun.oreSpentShips);
+    expect(r.shipsBuilt).toBeLessThan(r.wholeRun.shipsBuilt);
+    expect(r.shipsLost).toBe(11);
   });
 
   it('plays rush and turtle to capture: turtle first, rush losing at least 3x the ships', () => {

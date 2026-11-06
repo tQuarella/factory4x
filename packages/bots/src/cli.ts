@@ -34,7 +34,6 @@ const fmtMin = (sec: number | null): string => (sec === null ? 'never' : `${(sec
 for (const s of strategies) {
   const rs = results.filter((r) => r.strategy === s.name);
   for (const r of rs) {
-    if (r.duplicateOfSeed !== undefined) continue;
     if (r.outcome === 'crash') failures.push(`${s.name} seed ${r.seed}: crash (${(r.error ?? '').split('\n')[0]})`);
     if (r.outcome === 'softlock') failures.push(`${s.name} seed ${r.seed}: softlock (no delivery and no ship built for ${SOFTLOCK_SEC / 60} game minutes before capture, at ${fmtMin(r.ticks / defaultData.tickRate)})`);
   }
@@ -74,7 +73,6 @@ const rows = strategies.map((s) => {
     strategy: s.name,
     stub: s.stub === true,
     games: rs.length,
-    gamesPlayed: rs.filter((r) => r.duplicateOfSeed === undefined).length,
     captured: rs.filter((r) => r.outcome === 'won').length,
     captureSec: rs[0]?.captureSec ?? null,
     tickMsP95: Math.max(...rs.map((r) => r.tickMsP95)),
@@ -103,9 +101,9 @@ const md = [
   `# Bot suite: ${failures.length ? 'FAIL' : 'PASS'}`,
   '',
   `Data version ${defaultData.dataVersion}, ${seeds} seeds × ${ticks} ticks (${fmtMin(ticks / defaultData.tickRate)}), tick budget p95 ≤ ${budgets.tickBudgetMsP95} ms. Bots run time ${runSec.toFixed(1)} s.`,
-  'M1 has no randomness, so seeds repeat the same game; later seeds are copied from seed 1 (`duplicateOfSeed`) instead of re-run.',
+  'Every seed runs its own game. Ships built/lost, waves and ore spent are as of capture; the whole-run totals (to the tick cap) are in the JSON under `wholeRun`.',
   '',
-  '| Strategy | Captured | Capture time | First ship | Built | Lost | Waves sent | Repelled | Peak ore/min | Ore on ships | Ore on economy | Tick p50 / p95 (ms) |',
+  '| Strategy | Captured | Capture time | First ship | Built (at capture) | Lost (at capture) | Waves sent | Repelled | Peak ore/min | Ore on ships (at capture) | Ore on economy (at capture) | Tick p50 / p95 (ms) |',
   '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ...real.flatMap((s) => {
     const r = first(s.name);

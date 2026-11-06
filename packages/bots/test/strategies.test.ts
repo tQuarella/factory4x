@@ -148,6 +148,38 @@ describe('turtle', () => {
   });
 });
 
+describe('turtle yard timing', () => {
+  it('does not turn the yard on while the last extractor of a5 is still queued or under construction', () => {
+    const w = fresh();
+    playUntil(w, turtleDecide, networkDone, 30 * 60 * 15);
+    // Hand-build the state just before a5's last extractor completes.
+    w.nodes[N.a5]!.extractors -= 1;
+    w.shipyard.on = false;
+    w.rally = N.probe;
+    w.activeBuild = { kind: 'extractor', node: N.a5, ticksLeft: 50 };
+    expect(nodeFinished(w, N.a5)).toBe(false);
+    const inputs = turtleDecide(w);
+    expect(inputs.some((i) => i.type === 'setShipyard' && i.on)).toBe(false);
+    expect(inputs.some((i) => i.type === 'setRally')).toBe(false);
+    w.activeBuild = null;
+    w.queue.push({ kind: 'extractor', node: N.a5, cost: 20 });
+    expect(nodeFinished(w, N.a5)).toBe(false);
+  });
+
+  it('a full turtle game turns the yard off once at tick 0 and on exactly once', () => {
+    const w = fresh();
+    const log: { tick: number; on: boolean }[] = [];
+    for (let i = 0; i < 30 * 60 * 15; i++) {
+      const inputs = turtleDecide(w);
+      for (const input of inputs) if (input.type === 'setShipyard') log.push({ tick: w.tick, on: input.on });
+      step(w, defaultData, inputs);
+    }
+    expect(log.length).toBe(2);
+    expect(log[0]).toEqual({ tick: 0, on: false });
+    expect(log[1]!.on).toBe(true);
+  });
+});
+
 describe('stubs', () => {
   it('greedy-expansion and raid-supply are labelled stubs that issue nothing', () => {
     const stubs = strategies.filter((s) => s.stub);
