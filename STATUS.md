@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 1 — First playable (iteration 2, hypothesis H2: decision depth)
-**State:** Owner chose "Depth first" for H2. H2 specced (DESIGN.md → H2: cut the Root vs overwhelm the Bloom, three variants). h2-art and h2-sim merged. Building h2-client and h2-bots in parallel.
+**State:** Owner chose "Depth first" for H2. H2 specced (DESIGN.md → H2: cut the Root vs overwhelm the Bloom, three variants). h2-art, h2-sim and h2-bots merged (all six H2 depth flags met). h2-client is building.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261106-2 (M1 first playable), live and passing the live smoke test at desktop and phone sizes.
@@ -19,7 +19,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 5 | critic | h2-sim | launch | Review round 1: APPROVE; merged dfdf62a after green branch CI |
 | 6 | engineer | h2-client | launch | Build |
 | 7 | engineer | h2-bots | launch | Build (green; all six H2 depth flags met) |
-| 8 | critic | h2-bots | launch | Review round 1 |
+| 8 | critic | h2-bots | launch | Review round 1: APPROVE; merged 3f5d5d1 |
 | r4 | critic | h2-bots | resume | Stalled 600 s waiting on background gates; told to run in foreground |
 | r5 | engineer | h2-client | resume | Stalled 600 s at "Now tests"; told to WIP-commit and continue with time limits |
 | 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
