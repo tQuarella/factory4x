@@ -96,6 +96,108 @@ Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait 
 3. The smoke test forces a wide font on the notices, so the check fails on Windows when the layout is wrong, matching Linux CI. It passes after the fix.
 4. Gates, build and smoke (twice) are green.
 
+## Milestone 1, iteration 2: H2 decision depth (spec in `DESIGN.md` → H2)
+
+`h2-sim` and `h2-art` start together (art works only from the draw contract in DESIGN.md H2 "Flavor"). `h2-client` and `h2-bots` start once `h2-sim` merges, in parallel. If the bots miss the H2 targets, the Designer retunes the variants and starved defaults; engineers report numbers and do not retune.
+
+| Id | Task | Owner | Status |
+| --- | --- | --- | --- |
+| h2-sim | Root node, supply link and wilt, starved Bloom, three variants, new tunables, data v3 | core-engineer | Building |
+| h2-art | Root, vine and wilting-thorn draw functions; gallery; ART_STYLE | art-direction | Building |
+| h2-client | Root sheet, vine and wilt on the map, banner and toasts, result panel, tuning, H1 carry-overs | engineer | Waiting on h2-sim |
+| h2-bots | raid-supply strategy, per-variant report and depth flags | engineer | Waiting on h2-sim |
+
+### h2-sim (core-engineer)
+
+**Files:** `packages/sim/**`, `data/sim.json`, `packages/bots/src/reference-replay.ts`. It may make the minimal edits needed to keep `packages/client/src/*` and `packages/bots/src/*` compiling, and nothing more there.
+
+**Acceptance:**
+1. Every rule in DESIGN.md H2 "Rules per tick: changes from H1" is implemented in integer math. The Root is node index 7 and uses the H1 combat, capture and regrowth rules. Capturing it wilts the Bloom to `bloom.starvedCap` (newest first, counted as withered, not killed). After that the Bloom regrows and repairs at the starved values.
+2. Variant selection: `((seed mod 3)+3) mod 3` unless `system.variant` forces one. `map.variants` and the `root` node entry are in `data/sim.json`, together with every new tunable from the H2 table, under its dotted key with its range. `dataVersion` is 3, and `root.capBonus` is clamped to 0–40.
+3. Selectors exist for everything in H2 "Observable values" that comes from the sim:
+   - Root status, fed or starved state, and the fed and starved Bloom values;
+   - the variant id and name, and the Root cut tick;
+   - per-node battle status and last battle, with the wilt count;
+   - `runSummary` additions.
+
+   Existing selectors keep working for the Bloom.
+4. Unit tests cover:
+   - the variant choice by seed and when forced;
+   - the wilt on capture, newest first;
+   - starved regrowth and repair;
+   - Root regrowth while it is uncut;
+   - fed behaviour identical to H1 when the Root is never touched;
+   - the serialize round trip with the new state;
+   - refusing a data-version-2 save.
+5. A scripted test on Thin does three things: a 15-ship wave takes the Root, the Bloom wilts to 8, then 18 ships take the Bloom. A further check shows 18 ships against a fed Bloom are repelled. Report the real numbers; do not retune.
+6. The reference replay cuts the Root and then captures the Bloom, so the determinism gate and the browser cross-engine check cover the wilt and starvation.
+7. `npm run gates -- --base main` passes. The existing turtle bot still captures; report its time against H1's 9.8 min.
+
+### h2-art (art-direction)
+
+**Files:** `packages/client/src/palette.ts`, `packages/client/src/placeholders.ts`, `packages/client/gallery.html` (and gallery source if separate), `ART_STYLE.md`.
+
+**Acceptance:**
+1. Implements the H2 draw contract exactly:
+   - `drawRoot(ctx, r, t, cut)`;
+   - `drawVine(ctx, x1, y1, x2, y2, t, cut)`, with pulses travelling toward the Bloom while it is alive, and slack and grey once cut;
+   - `drawWiltingThorn(ctx, r, frac)`.
+
+   The Root reuses `drawThorn` for its thorns.
+2. The Root reads as distinct from the Bloom at 24 px: smaller, upright and stalk-like. Its cut state is grey. Everything follows `ART_STYLE.md`, and new colours go in the palette with their roles documented.
+3. The gallery shows the Root (alive and cut), the vine (alive and cut) and a wilting-thorn sequence, at map and sheet sizes, at 375 px wide.
+4. Gates pass, along with `npm run build` and `npm run smoke`.
+
+### h2-client (engineer, after h2-sim)
+
+**Files:** `packages/client/**` except `palette.ts`, `placeholders.ts` and the gallery, plus `tests/smoke/**`.
+
+**Acceptance:**
+1. Everything in H2 "Observable values: additions" and "Touch interactions":
+   - map: the Root, its thorn ring, the vine, and the roughly 1 s wilt animation;
+   - the Root sheet with the "Feeds the Bloom" box, built from live tunables;
+   - the rich sheet's fed or starved line;
+   - the name-prefixed battle banner, with two lines when two battles run;
+   - the Root toasts;
+   - result panel additions, and the system name on the probe sheet;
+   - the new tuning keys, with `system.variant` applying on New run.
+2. New run uses `seed + 1`.
+3. The H1 carry-overs in H2:
+   - guarded-node hit areas cover the thorn rings and are at least 44 px;
+   - tick values also show seconds;
+   - the first-run hint moves into the notices strip;
+   - labels near the top edge don't clip (includes cw-bloom-label-clip).
+4. Touch at 375x667: tap the Root, attack it, see the wilt toast and the grey vine, then take the Bloom. Nothing covers the key moment.
+5. The smoke tests are extended:
+   - the Root sheet opens;
+   - variant names show;
+   - the wide-font layout check covers the new banner and toasts.
+
+   The browser-vs-Node replay check still passes.
+6. Gates, `npm run build` and `npm run smoke` pass, and green Linux CI on the pushed branch is required before merge.
+
+### h2-bots (engineer, after h2-sim)
+
+**Files:** `packages/bots/src/strategies.ts`, `runner.ts`, `cli.ts`, `packages/bots/test/**`. Not the reference replay.
+
+**Acceptance:**
+1. `raid-supply` replaces the stub, per DESIGN.md H2 "Bot strategies":
+   - root wave `ceil(rootThorns*5/2)+5`;
+   - stage at a5 after the cut;
+   - Bloom wave `ceil(bloomThorns*9/4)`.
+
+   rush and turtle are unchanged.
+2. The report shows each strategy for each variant (seeds 1–3 cover knotted, deep and thin), with capture time, ships lost, and Root cut time.
+3. It also prints the H2 depth flags as report lines, not gates:
+   - both strategies capture in every variant within 8–13 min;
+   - raid-supply is at least 30 s faster on Thin;
+   - turtle is at least 30 s faster on Deep;
+   - Knotted is within 45 s;
+   - no strategy dominates on both time and losses in all three variants;
+   - turtle matches H1 at 9.8 min ± 10 s.
+4. Tests cover the raid-supply decision logic and the flag computation.
+5. Gates pass. Report the actual numbers against the flags; do not retune data.
+
 ## Can wait (allowed while waiting on the owner)
 
 - cw-ci-hardening (needs owner approval: `.github/workflows/` is protected): bump `actions/*` to versions that run on Node 24 (GitHub warns Node 20 is deprecated), and have the live smoke step wait for the deployment URL to answer over HTTPS before testing. A new Pages subdomain's TLS certificate took about a minute on the first deploy and failed the first live smoke run.

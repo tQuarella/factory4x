@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 1 — First playable (iteration 2, hypothesis H2: decision depth)
-**State:** Owner chose "Depth first" for H2. Iteration 2 started: Designer is triaging the M1 feedback and specifying H2.
+**State:** Owner chose "Depth first" for H2. H2 specced (DESIGN.md → H2: cut the Root vs overwhelm the Bloom, three variants). Building h2-sim and h2-art; h2-client and h2-bots follow h2-sim.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261106-2 (M1 first playable), live and passing the live smoke test at desktop and phone sizes.
@@ -13,9 +13,11 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
-| 1 | designer | H2 triage + spec | launch | Plan + Spec |
+| 1 | designer | H2 triage + spec | launch | Plan + Spec (done) |
+| 2 | core-engineer | h2-sim | launch | Build |
+| 3 | art-direction | h2-art | launch | Build |
 
-Launches: 1 / 12. Resumes: 0.
+Launches: 3 / 12. Resumes: 0.
 
 ## Iteration 1 (H1) plan, closed
 
@@ -44,4 +46,4 @@ Subagent launches: 11 / 12 (designer, core-engineer ×2, art-direction, critic �
 
 ## Next step
 
-Designer specs H2 in DESIGN.md; then the Director splits it into BACKLOG.md tasks and launches builders.
+When h2-sim merges, launch h2-client and h2-bots in parallel. Review each task with the Critic as it reports green.

@@ -25,7 +25,7 @@ Fun questions (the H1 hypothesis):
 
 Feedback: the speech-bubble button opens a prefilled GitHub issue with a replay of your session. Plain answers here or in chat work too.
 
-Also open: Q11 (result panel, covered by question 3), Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
+Also open: Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
 
 Protected files changed this build: none. Every merge passed the protected-files gate.
 
@@ -34,6 +34,12 @@ Protected files changed this build: none. Every merge passed the protected-files
 None.
 
 ## Answered
+
+### Q11. A result panel when you take the guarded node? (2026-11-06, Designer)
+
+The first playable has no clock while you play. When you take the guarded node, it shows a small panel with game time to capture, peak ore per minute, ships built and lost, and waves sent. Then you can keep playing. The idea is a score to beat on a replay without any pressure during the run. `DESIGN.md` said to check with you before building a result screen. It ships on by default with an off switch in the tuning panel, and the handoff will ask how it felt. Answer here only if you already know you don't want it.
+
+**Answer (owner, 2026-11-06, via build-20261106-2 feedback):** "I wanted to replay". Keep the result panel.
 
 ### Q9. Ask instead of block for all protected files (2026-11-06, Director)
 
@@ -93,12 +99,6 @@ APPROVED-PROTECTED: VISION.md
 **Answer (owner, 2026-11-06):** Cloudflare Pages.
 
 ## Can wait
-
-### Q11. A result panel when you take the guarded node? (2026-11-06, Designer)
-
-The first playable has no clock while you play. When you take the guarded node, it shows a small panel with game time to capture, peak ore per minute, ships built and lost, and waves sent. Then you can keep playing. The idea is a score to beat on a replay without any pressure during the run. `DESIGN.md` said to check with you before building a result screen. It ships on by default with an off switch in the tuning panel, and the handoff will ask how it felt. Answer here only if you already know you don't want it.
-
-**Answer:**
 
 ### Q10. Let agents list secret names (2026-11-06, Retrospective)
 

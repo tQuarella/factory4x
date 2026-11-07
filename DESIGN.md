@@ -35,7 +35,7 @@ Answers from the owner, in their words where possible. These shape everything be
 
 ## Current mechanics
 
-Nothing playable is built yet. Milestone 0 ships a placeholder page only. Milestone 1 (spec below, H1) will add:
+Built in Milestone 1 (build-20261106-2, spec H1 below):
 
 - One star system with a probe, five asteroids and one rich node guarded by a guardian hive (the Bloom).
 - Extractors on asteroids, ore routes to the probe with pods you can see moving, and route upgrades.
@@ -45,9 +45,223 @@ Nothing playable is built yet. Milestone 0 ships a placeholder page only. Milest
 - Capture of the rich node, a result panel, then free play.
 - Pause, 1x/2x/4x, a tuning panel, a feedback button, and autosave.
 
+H2 (spec below) adds the Root, a second guarded node that feeds the Bloom, and three system variants that differ only in the Root.
+
 ## Hypotheses
 
-### H1 (Milestone 1, spec ready): growing throughput is satisfying, and taking a guarded node is a puzzle
+### H2 (Milestone 1, iteration 2, spec ready): cutting supply vs overwhelming is a real choice
+
+Owner's pick after the H1 playtest: "Depth first" (PLAYTEST_LOG.md, 2026-11-06). H1's single line was: build everything, mass ships, attack once. H2 tests whether a second, competing line turns the Bloom into a decision.
+
+#### Claim
+
+When a guardian can be beaten in two ways, by **overwhelming** it (one big wave against its full regrowth) or by **starving** it (taking the node that feeds it first, then a smaller wave), and the better way depends on the system, the player weighs the options. Taking the Bloom then feels like a choice, not the obvious line H1 had. This is VISION pillar 3 as written: "win a node by out-producing their replacement, or cut their supply first."
+
+What would disprove it: the owner always takes the same line without looking at the numbers, or calls the Root "a chore on the way to the real fight."
+
+#### The smallest mechanics that test it
+
+Everything from H1 stays: map, economy, shipyard, inputs, combat round, regrowth and HUD. H2 adds four things and **no new input type**:
+
+1. **The Root:** a second guarded node (`root`, map index 7) with its own thorns and regrowth. It uses the H1 combat, capture and regrowth rules. It has no ore and no extractor slots. Once taken, it is only a place where ships can stand.
+2. **Supply link:** while the Root lives, the Bloom is **fed** and behaves exactly as in H1. When the Root is captured ("cut"), the Bloom is **starved**:
+   - it **wilts** at once to `bloom.starvedCap` thorns, losing its newest thorns first;
+   - from then on it regrows at `bloom.starvedRegrowTicks` and repairs `bloom.starvedRepairPerRound`.
+3. **Three system variants**, chosen by the seed. They differ only in the Root's position and thorn count, so the best line changes from system to system. The Bloom and the economy are the same in every variant.
+4. **Readouts that make the choice weighable:** the Root's sheet and the Bloom's sheet each show what cutting the Root does to the Bloom ("12 thorns, regrows 1 / 2 s → 8 thorns, 1 / 10 s, no repair"). The vine drawn from the Root to the Bloom goes grey when the Root is cut. The result panel names the system and when the Root was cut. **Ships needed is never shown**: estimating it is the puzzle.
+
+Why these and nothing more:
+- A permanent cut by capture needs no new input, since `sendShips` to the Root is already an attack. It is readable on a phone, and it reuses the H1 combat code.
+- A garrison or siege rule (supply is cut only while your ships stand on the Root) has more depth, but it adds a hold rule and a split-fleet readout. It is the follow-up if H2 says the choice is still obvious.
+- The wilt (cap drop) is what makes starving worth it. In the model, slower regrowth and no repair alone only cut the winning wave from about 27 ships to 22, which is too small to notice. With the wilt to 8 thorns, it drops to about 15.
+- Starving does **not** make trickling viable. Waves of 6–12 ships every 30–60 s never beat a starved Bloom in the model. H1's lesson, commit enough at once, still holds for both lines.
+
+#### Map variation: included, as three hand-made variants
+
+Included, because the hypothesis needs it. On one fixed map, the better line is found once and then repeated, which is exactly the "obvious" the owner reported. Replay sameness ("deflating") is helped too, but it isn't what H2 measures.
+
+To avoid confounding the test, the variants change **only the Root**. Asteroid positions, slots and yields, the Bloom and every other tunable are the same in each. Procedural jitter of rocks or yields is **excluded**: it would move economy timing, make bot comparisons between strategies noisy, and mix "variety is fun" into a test of "depth is fun".
+
+| Variant | Index | Name | Root x | Root y | Root thorns (`rootCap`) | Model: better line |
+| --- | --- | --- | --- | --- | --- | --- |
+| `thin` | 0 | Thin Root | 820 | 110 | 4 | Cut the Root: about 50 s faster, same ships lost |
+| `knotted` | 1 | Knotted Root | 850 | 420 | 9 | A judgement call: cutting is a few seconds faster but loses about 2 more ships |
+| `deep` | 2 | Deep Root | 160 | 480 | 14 | Overwhelm: about 60 s faster, about 6 fewer ships lost |
+
+- **Selecting the variant at world creation:**
+  - If `system.variant > 0`, use variant `system.variant − 1`.
+  - Otherwise use `((seed mod 3) + 3) mod 3`.
+
+  Store the index in the world. The Root node takes `x`, `y` from the variant. Its effective thorn cap is `max(0, min(40, rootCap + root.capBonus))`.
+- The Root's radius is 45, and every Root position is at least 280 su from every other node.
+- `map.variants` in `data/sim.json` holds the table above. `map.nodes` gains the `root` entry (kind `root`, `r` 45, `slots` 0), with the `knotted` position as a placeholder.
+- **New run** (client) uses `seed + 1`, so consecutive runs cycle through the three Roots and the owner's second run is always a different system. The first-ever run keeps its random seed.
+
+#### Flavor (for Art Direction)
+
+The **Root** is where the Bloom drinks from. It is a hot-pink stalk sunk into a small dark rock, with its own ring of thorns, and a living vine runs from it across space to the Bloom. Pulses travel along the vine toward the Bloom, slowly, so it reads as feeding. Cut the Root and the stalk greys and the vine goes slack and grey. The Bloom drops its newest thorns and dims a little, but stays pink until it is taken. It must stay distinguishable from the Bloom at 24 px: smaller, upright and stalk-like rather than round coral. It follows `ART_STYLE.md`.
+
+Draw contract, which h2-client can call before h2-art merges:
+- `drawRoot(ctx, r, t, cut)`;
+- `drawVine(ctx, x1, y1, x2, y2, t, cut)`;
+- `drawWiltingThorn(ctx, r, frac)`, a thorn falling and fading, with `frac` going 0→1;
+- `drawThorn`, reused for the Root's thorns.
+
+#### Rules per tick: changes from H1
+
+The H1 rules stay as written. The changes:
+
+- **Guardians.** The single `guardian` becomes one guardian per guarded node: `rich` (the Bloom) and `root`. Each guardian has `node`, `alive`, `thorns[]` and `regrowProgress`. All guardians loop in node-index order (Bloom 6, then Root 7). Thorn ids still come from `nextId`. The exact layout is the Core Engineer's call, logged in DECISIONS.md.
+- **Effective parameters.** Thorn hp and damage are shared: `guardian.thornHp` and `guardian.thornDamage`.
+
+  | Guardian | Cap | Regrow ticks | Repair per round |
+  | --- | --- | --- | --- |
+  | Bloom, fed (Root alive) | `guardian.cap` | `guardian.regrowTicks` | `guardian.repairPerRound` |
+  | Bloom, starved (Root cut) | `bloom.starvedCap` | `bloom.starvedRegrowTicks` | `bloom.starvedRepairPerRound` |
+  | Root | variant `rootCap + root.capBonus` (clamped 0–40) | `root.regrowTicks` | `guardian.repairPerRound` |
+
+  The Root starts at its cap, like the Bloom.
+- **Rule 7 (combat).** For each living guardian with thorns, fight the H1 round against the ships `at` its node, using its effective repair. Each guarded node has its own battle, so two battles can run at once if the player splits the fleet. `lastBattle` records which node it was.
+- **Rule 8 (capture).** The capture condition is the same for each guardian.
+  - **Bloom:** as in H1. `capturedTick` still means the Bloom.
+  - **Root:** `alive = false`, `root.owned = true`, `stats.rootCutTick = tick`, and the Root battle ends `captured`. Then, if the Bloom is alive, it **wilts**: while its thorn count is above `bloom.starvedCap`, remove its highest-id thorn and add 1 to `stats.thornsWithered`. These are not kills. Set the Bloom's `regrowProgress = 0`.
+  - Taking the Root after the Bloom has fallen does nothing more.
+- **Rule 9 (regrowth).** Each living guardian regrows using its effective cap and regrow ticks. As in H1, a guardian at or above its cap holds `regrowProgress = 0`.
+- **Inputs.** No new inputs.
+  - `sendShips` to either guarded node while it is alive is an attack and counts in `wavesSent`. The one-wave-per-tick rule stays.
+  - `setTunable` accepts the new keys below. `system.variant` is `newRunOnly`, like `economy.startStock`.
+- **Stats.** New fields: `rootCutTick` (null until cut), `thornsWithered`, and `variant` (index).
+- **Data version 3.**
+
+#### Observable values: additions
+
+- **Map:**
+  - the Root node, a pink stalk drawn with its own thorn ring (reusing `drawThorn`);
+  - a **vine** from the Root to the Bloom, pink and alive, or grey once cut;
+  - when the Root is cut, the wilted thorns visibly drop off the Bloom (client-side animation, about 1 s).
+- **Root sheet:**
+  - thorns vs cap, regrowth, thorn and ship hp/damage, ships present and en route (the same block as the rich sheet);
+  - Attack and Retreat buttons, as on the rich sheet;
+  - a **"Feeds the Bloom"** box: "While the Root lives, the Bloom has 12 thorns, regrows 1 / 2.0 s, repairs 2. Cut it: 8 thorns, 1 / 10.0 s, no repair." All values come from live tunables.
+- **Rich sheet:** one line under the thorn count, either "Fed by the Root (cut it: 8 thorns, 1 / 10.0 s)" or "Starved: Root cut".
+- **Battle banner:** prefixed with the node name ("BLOOM · strip 1.3/s · regrow 0.5/s · 4 lost", "ROOT · …"). With two battles, show both on one line each.
+- **Battle report toasts for the Root:**
+  - captured: "Root cut: 15 sent, 3 lost. The Bloom wilts: 12 → 8 thorns, regrows 5× slower." The numbers come from the wilt and the tunables.
+  - repelled: "Root held: 10 sent, 10 lost, 2 thorns stripped".
+- **Result panel:** adds the system name ("Thin Root"), and "Root cut at 8:12" or "Root left standing". Ships lost includes the Root fight.
+- **Probe sheet:** the system name in small text.
+- **Tuning panel:** the new keys. `system.variant` shows "0 · by seed / 1 Thin / 2 Knotted / 3 Deep" and applies on New run.
+
+#### Touch interactions
+
+Nothing new to learn. The Root is a node: tap it to see its sheet, and attack it from there with the existing target-first buttons. Rally can be set on the Root once it is cut.
+
+The Root's hit area is at least 44 px and covers its thorn ring. The same change applies to the Bloom, which closes the "thorns drawn outside the tap area" note.
+
+Labels for nodes near the top edge (Thin Root at y 110, the Bloom) must not clip. This folds in cw-bloom-label-clip.
+
+#### Tunables (new; data/, all integers)
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `root.capBonus` | 0 | −14 to 20 | −14: every Root is unguarded and cutting is free (starve dominates) / 20: every Root is a fortress (overwhelm dominates) |
+| `root.regrowTicks` | 60 | 15–1800 | 15: the Root needs a big wave of its own / 1800: chip it down at leisure |
+| `bloom.starvedCap` | 8 | 1–40 | 1: cutting the Root nearly wins the Bloom / 12 or more: cutting removes no thorns, only slows regrowth |
+| `bloom.starvedRegrowTicks` | 300 | 15–1800 | 60: no regrowth change / 1800: regrowth effectively stops |
+| `bloom.starvedRepairPerRound` | 0 | 0–20 | 0: damage sticks / 2: same as fed |
+| `system.variant` | 0 | 0–3 | 0: chosen by seed / 1–3: force Thin, Knotted or Deep (new run only) |
+
+`map.variants` (positions, `rootCap`) is data that needs a restart, like `map.nodes`. `root.capBonus` is the live knob for the Root's strength. It is a bonus rather than a live `root.cap` because New run keeps live tuning, and a tuned `root.cap` would erase the difference between variants. In the "Feels like" column, the existing `guardian.*` keys now mean "the Bloom while fed", plus the thorn stats shared by both guardians.
+
+**Calibration** (throwaway model of these rules in the scratchpad, using H1 economy timing: the asteroid network plateaus at about 6.6 min, then about 10.8 ships/min):
+
+| Line | Ships sent | Ships lost | Model capture |
+| --- | --- | --- | --- |
+| Fed Bloom, overwhelm | 32 (min 27) | 11 | 9.7 min |
+| Starved Bloom (8 thorns), after the Root | 18 (min 15) | 8 | — |
+| Thin (Root 4), starve | Root 15 (min 13) | 3 | 8.9 min |
+| Knotted (Root 9), starve | Root 28 (min 21) | 7 | 9.65 min |
+| Deep (Root 14), starve | Root 40 (min 30) | 12 | 10.75 min |
+
+Survivors of the Root fight join the Bloom wave. Focus fire leaves at most one wounded survivor.
+
+#### Bot strategies (H2)
+
+- **rush:** unchanged from H1. It ignores the Root.
+- **turtle** (the overwhelm line): unchanged from H1. It ignores the Root. It doubles as a regression check, because a fed Bloom must behave exactly as in H1.
+- **raid-supply** (the starve line; replaces the stub):
+  1. Same economy plan as turtle, with the shipyard off until the plan is done.
+  2. Then: shipyard on, rally `probe`.
+  3. While the Root is alive, no ships are at or heading to `root`, and ships at `probe` ≥ `rootWave`: `sendShips(probe, root, 0)`.
+     - `rootWave = ceil(rootThorns × 5 / 2) + 5`, where `rootThorns` is the Root's current thorn count. That gives 15, 28 and 40 for the three variants.
+     - If repelled, it recomputes and waits again.
+  4. On the tick after the Root is cut: `setRally a5`, then `sendShips(root, a5, 0)`.
+  5. When ships at `a5` ≥ `bloomWave` and none are at or heading to `rich`: `sendShips(a5, rich, 0)`.
+     - `bloomWave = ceil(bloomThorns × 9 / 4)`, where `bloomThorns` is the Bloom's current thorn count. That gives 18 at 8 thorns.
+     - If repelled, it waits again.
+  6. After capture: build out `rich`, like turtle.
+- **Seeds.** The suite's seeds 1, 2 and 3 map to variants knotted, deep and thin, so the default `--seeds 3` covers all three. The report labels every row with its variant.
+- **Report additions** (per strategy and seed):
+  - the variant id;
+  - the Root cut time (or null);
+  - ships lost at the Root;
+  - thorns withered;
+  - waves sent per target.
+
+  Plus a per-variant comparison table: turtle vs raid-supply capture time and ships lost at capture.
+
+**Bot tuning targets** (report flags, not merge gates). Together they are the evidence that neither line dominates:
+1. turtle and raid-supply capture in every variant, within 8–13 game minutes.
+2. `thin`: raid-supply captures at least 30 s before turtle.
+3. `deep`: turtle captures at least 30 s before raid-supply.
+4. `knotted`: the two capture times are within 45 s of each other (a judgement call).
+5. **No dominance:** neither strategy is at least as good as the other on both capture time and ships lost at capture in all three variants. In practice: each captures first in at least one variant, and turtle loses fewer ships in at least one.
+6. Regression: turtle's capture matches the H1 report (9.8 min ± 10 s, 1 wave), because a fed Bloom is unchanged.
+7. rush keeps its H1 targets, and nothing softlocks.
+
+If the real numbers miss these, report them; the Designer retunes `map.variants` and the `bloom.starved*` defaults. The engineers do not retune.
+
+#### Success criteria (the owner, one ~20 minute phone session, two runs)
+
+Use 2x/4x freely once the economy is built. A run is about 10 game minutes.
+1. In run 1, before the big attack, the owner has opened both the Root's and the Bloom's sheets and can say in one sentence why they did or didn't cut the Root.
+2. Run 2 is a different Root (New run cycles them). The owner either changes plan, or can name what about this system would make the other line better.
+3. Cutting the Root reads without explanation: the vine goes grey, thorns visibly fall off the Bloom, and the toast says by how much.
+4. The owner does not call the solution "obvious" or "one-dimensional", and the answer to fun question 1 names a trade-off.
+5. Each run still captures in about 8–15 minutes. Every action is at most 2 taps from the map, not counting the confirm tap on Cancel and New run. This rewords the H1 criterion, which conflicted with Cancel's confirm.
+
+#### Fun questions for the handoff
+
+1. Before your big attack, did you weigh cutting the Root against hitting the Bloom head-on? What tipped it, and did it feel like a real choice or an obvious one?
+2. Your second run had a different Root. Did you change plan? Could you tell from the numbers on the sheets which way was better, or was it a guess? Did the new system make the replay feel fresh?
+3. When the Root fell and the Bloom wilted, did that feel like a payoff in itself, or like a chore on the way to the real fight?
+
+#### H1 carry-overs folded into H2 (client, small)
+
+Decisions on `cw-m1-design-notes` and `cw-m1-client-notes`:
+- **Tap areas:** the hit areas of guarded nodes cover their thorn rings (see Touch).
+- **Tuning panel:** tick values also show seconds ("60 · 2.0 s").
+- **First-run hint:** it moves into the notices strip, so it no longer covers the probe.
+- **Banner wording:** "BATTLE · strip … · regrow … · N lost" is confirmed, with the node-name prefix above.
+- **Kept as is:**
+  - the shipyard starts on (the first ship by about 2 minutes matters more than a 25 s delay to the first extractor);
+  - the map jump while a toast shows (cw-map-jump; the owner didn't mention it);
+  - staggered "All" (unused by the owner; stays low priority).
+
+#### Out of scope for H2
+
+Each is a candidate for later:
+- garrison or siege supply cuts;
+- ore on the Root;
+- overgrown asteroids that unlock when the Root is cut (this would make the economy order a decision too; candidate H2b if the plateau is still dull);
+- more than one Root;
+- a second ship type;
+- procedural maps;
+- research, tiers and NG+.
+
+### H1 (Milestone 1, tested on build-20261106-2): growing throughput is satisfying, and taking a guarded node is a puzzle
+
+**Result (owner, 2026-11-06):** claim 1 was weakly supported ("mildly satisfying"). Claim 2 was not supported ("obvious and one dimensional"). The result panel made the owner want to replay. See PLAYTEST_LOG.md. The H1 mechanics below stay as the base for H2.
 
 #### Claims
 
