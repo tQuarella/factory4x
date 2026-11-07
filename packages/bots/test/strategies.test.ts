@@ -181,9 +181,9 @@ describe('turtle yard timing', () => {
 });
 
 describe('stubs', () => {
-  it('greedy-expansion and raid-supply are labelled stubs that issue nothing', () => {
+  it('greedy-expansion is a labelled stub that issues nothing', () => {
     const stubs = strategies.filter((s) => s.stub);
-    expect(stubs.map((s) => s.name)).toEqual(['greedy-expansion', 'raid-supply']);
+    expect(stubs.map((s) => s.name)).toEqual(['greedy-expansion']);
     for (const s of stubs) {
       expect(s.description).toContain('STUB');
       expect(s.decide(fresh())).toEqual([]);
