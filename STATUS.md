@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 1 — First playable (iteration 1, hypothesis H1)
-**State:** Awaiting owner feedback on build-20261106-2 (Milestone 1 first playable, commit c11124b, handed off 2026-11-06). The handoff block is at the top of `QUESTIONS.md`.
+**State:** Owner feedback on build-20261106-2 is in (PLAYTEST_LOG.md): H1 only weakly supported. Throughput was "mildly satisfying", the Bloom was "obvious and one dimensional", and replay was wanted but the identical map was "deflating". Waiting on the owner to choose the H2 direction (depth vs variety) before /iterate.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261106-2 (M1 first playable), live and passing the live smoke test at desktop and phone sizes.
@@ -36,4 +36,4 @@ Subagent launches: 11 / 12 (designer, core-engineer ×2, art-direction, critic �
 
 ## Next step
 
-Wait for the owner to answer the build-20261106-2 fun questions. Until then, Can wait work only (`BACKLOG.md`: cw-* items, with no new hypothesis). When feedback arrives, the Designer triages it into `PLAYTEST_LOG.md` and proposes H2, then `/iterate`. The retrospective for this build is next.
+Ask the owner which matters more for H2: decision depth or run-to-run variety. Then the Designer triages the feedback and specs H2, and `/iterate` starts it. Keep a per-run launch ledger (PROCESS.md, Usage budget).

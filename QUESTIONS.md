@@ -21,6 +21,8 @@ Fun questions (the H1 hypothesis):
 3. Did the result panel after capture (time, ships lost, waves) make you want to replay and beat it, or did it feel like a clock you did not want? (This is also Q11; it can be switched off in the tuning panel.)
 4. "Attack with all" from two places arrives staggered, so the closer group fights first. Did you expect one combined wave?
 
+**Answer (owner, 2026-11-06, in chat):** "Neat! The team did a great job of producing a functioning game. It was mildly satisfying but the solution was obvious and one dimensional. I wanted to replay but seeing the same exact setup was deflating. I didn't use attack with all."
+
 Feedback: the speech-bubble button opens a prefilled GitHub issue with a replay of your session. Plain answers here or in chat work too.
 
 Also open: Q11 (result panel, covered by question 3), Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
