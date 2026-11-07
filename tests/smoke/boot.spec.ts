@@ -193,7 +193,7 @@ async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
       // Generous box around each guarded node: thorn ring, label above it, badges.
       const box = { l: pos.x - 50, r: pos.x + 50, t: Math.max(view.y, pos.y - 62), b: pos.y + 50 };
       const hit = r.x < box.r && r.x + r.width > box.l && r.y < box.b && r.y + r.height > box.t;
-      expect(hit, `${sel} overlaps node ${node}`).toBe(false);
+      expect(hit, `${sel} overlaps node ${node} r=${JSON.stringify(r)} box=${JSON.stringify(box)} view=${JSON.stringify(view)}`).toBe(false);
     }
     // Notices live in the strip above the canvas, so no text metric can push one onto the map.
     expect(r.y + r.height, `${sel} sits above the map`).toBeLessThanOrEqual(view.y + 1);

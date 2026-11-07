@@ -17,7 +17,7 @@ import {
   worldHash,
   type Input,
 } from '@factory4x/sim';
-import { setHidden, setText, toggleClass } from './dom.ts';
+import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { fmt10, shortVersion } from './format.ts';
 import { FeedbackPanel, TuningPanel, showResult, type PanelHost } from './panels.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
@@ -193,7 +193,10 @@ function refreshUi(): void {
   const showBanner = lines.length > 0 || forceBanner;
   setHidden(el.banner, !showBanner);
   if (lines.length === 0 && forceBanner) lines.push('BLOOM · strip 0.8/s · regrow 0.5/s · 6 lost', 'ROOT · strip 0.8/s · regrow 1/s · 2 lost');
-  if (showBanner) setText(el.banner, lines.join('\n'));
+  if (showBanner && el.banner.dataset.text !== lines.join('|')) {
+    el.banner.dataset.text = lines.join('|');
+    el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
+  }
 
   // Battle reports: every battle that ended since the last look, at any guarded node, oldest first.
   const ended: BattleResult[] = [];
