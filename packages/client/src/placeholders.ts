@@ -303,14 +303,14 @@ export function drawRoot(ctx: Ctx, r: number, t: number, cut: boolean): void {
   ctx.fillStyle = palette.rootRock;
   ctx.fill();
   ctx.lineWidth = Math.max(1, r * 0.07);
-  ctx.strokeStyle = cut ? palette.witheredDark : palette.rootRockEdge;
+  ctx.strokeStyle = cut ? palette.withered : palette.rootRockEdge;
   ctx.stroke();
 
   const base = rockY - r * 0.1;
   const sway = cut ? 0 : Math.sin(t * 1.6) * r * 0.06;
   const droop = cut ? r * 0.5 : 0;
   const topX = sway + droop;
-  const topY = -r * (cut ? 0.4 : 0.82);
+  const topY = -r * (cut ? 0.4 : 0.7);
   const ctrlX = sway * 0.5 + (cut ? r * 0.05 : 0);
   const ctrlY = (base + topY) / 2;
   const body = cut ? palette.withered : palette.bloom;
@@ -318,7 +318,7 @@ export function drawRoot(ctx: Ctx, r: number, t: number, cut: boolean): void {
 
   if (!cut) {
     ctx.fillStyle = palette.bloomGlow;
-    disc(ctx, topX * 0.5, -r * 0.1, r * (0.95 + 0.04 * Math.sin(t * 2.5)));
+    disc(ctx, topX * 0.5, -r * 0.1, r * (0.82 + 0.03 * Math.sin(t * 2.5)));
     ctx.fill();
   }
   // Stalk
@@ -382,8 +382,7 @@ export function drawVine(
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = cut ? palette.withered : palette.vine;
-  ctx.lineWidth = cut ? 2 : 3.5;
-  if (cut) ctx.globalAlpha = 0.8;
+  ctx.lineWidth = cut ? 2.5 : 3.5;
   const steps = 24;
   ctx.beginPath();
   for (let i = 0; i <= steps; i++) {
