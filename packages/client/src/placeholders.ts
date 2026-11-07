@@ -267,3 +267,166 @@ export function drawMob(ctx: Ctx, r: number, t: number): void {
   ctx.fill();
   ctx.restore();
 }
+
+function hexToRgb(h: string): [number, number, number] {
+  const n = parseInt(h.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Blend two #rrggbb colors; k 0 = a, 1 = b. */
+function mix(a: string, b: string, k: number): string {
+  const [ar, ag, ab] = hexToRgb(a);
+  const [br, bg, bb] = hexToRgb(b);
+  const f = Math.min(1, Math.max(0, k));
+  return `rgb(${Math.round(ar + (br - ar) * f)}, ${Math.round(ag + (bg - ag) * f)}, ${Math.round(ab + (bb - ab) * f)})`;
+}
+
+/**
+ * The Root: where the Bloom drinks from. An upright hot-pink stalk with a bud
+ * and two leaf blades, sunk into a small dark rock at the bottom; smaller and
+ * taller than the round Bloom. Alive: faint glow, gentle sway. Cut: the stalk
+ * greys and droops, no glow. The Root's thorns are drawn by the caller with
+ * `drawThorn`. Stays within r.
+ */
+export function drawRoot(ctx: Ctx, r: number, t: number, cut: boolean): void {
+  ctx.save();
+  const rockY = r * 0.62;
+  // Rock: small dark mass with a pale edge so it still reads on space.
+  ctx.beginPath();
+  const n = 9;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const j = 0.8 + 0.2 * Math.abs(Math.sin(i * 7.3 + 1.1));
+    ctx.lineTo(Math.cos(a) * r * 0.62 * j, rockY + Math.sin(a) * r * 0.3 * j);
+  }
+  ctx.closePath();
+  ctx.fillStyle = palette.rootRock;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, r * 0.07);
+  ctx.strokeStyle = cut ? palette.witheredDark : palette.rootRockEdge;
+  ctx.stroke();
+
+  const base = rockY - r * 0.1;
+  const sway = cut ? 0 : Math.sin(t * 1.6) * r * 0.06;
+  const droop = cut ? r * 0.5 : 0;
+  const topX = sway + droop;
+  const topY = -r * (cut ? 0.4 : 0.82);
+  const ctrlX = sway * 0.5 + (cut ? r * 0.05 : 0);
+  const ctrlY = (base + topY) / 2;
+  const body = cut ? palette.withered : palette.bloom;
+  const hi = cut ? palette.withered : palette.bloomHi;
+
+  if (!cut) {
+    ctx.fillStyle = palette.bloomGlow;
+    disc(ctx, topX * 0.5, -r * 0.1, r * (0.95 + 0.04 * Math.sin(t * 2.5)));
+    ctx.fill();
+  }
+  // Stalk
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = body;
+  ctx.lineWidth = Math.max(2.5, r * 0.26);
+  ctx.beginPath();
+  ctx.moveTo(0, base);
+  ctx.quadraticCurveTo(ctrlX, ctrlY, topX, topY);
+  ctx.stroke();
+  // Leaf blades (pointed, angled out and up; fold down when cut)
+  ctx.fillStyle = body;
+  const ly = r * 0.12 + (cut ? r * 0.1 : 0);
+  for (const s of [-1, 1]) {
+    const lift = cut ? r * 0.25 : -r * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(sway * 0.3, ly);
+    ctx.quadraticCurveTo(s * r * 0.55, ly + (cut ? r * 0.05 : -r * 0.35), s * r * 0.8, ly + lift);
+    ctx.quadraticCurveTo(s * r * 0.4, ly + lift * 0.1 + r * 0.12, sway * 0.3, ly + r * 0.1);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Bud
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(topX, topY, r * 0.2, r * 0.26, cut ? 0.9 : 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = hi;
+  disc(ctx, topX, topY, r * 0.08);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Vine from the Root (x1, y1) to the Bloom (x2, y2), in world coordinates (call
+ * with an untranslated context). Alive: a gently waving pink line with pale
+ * pulses travelling slowly toward the Bloom. Cut: thinner, grey, sagging, no
+ * pulses.
+ */
+export function drawVine(
+  ctx: Ctx,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  t: number,
+  cut: boolean,
+): void {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  // Offset along the normal at fraction u; alive waves, cut sags to one side.
+  const off = (u: number): number =>
+    cut
+      ? Math.sin(u * Math.PI) * len * 0.07
+      : Math.sin(u * Math.PI * 3 - t * 1.2) * Math.min(6, len * 0.02) * Math.sin(u * Math.PI);
+  const pt = (u: number): [number, number] => [x1 + dx * u + nx * off(u), y1 + dy * u + ny * off(u)];
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = cut ? palette.withered : palette.vine;
+  ctx.lineWidth = cut ? 2 : 3.5;
+  if (cut) ctx.globalAlpha = 0.8;
+  const steps = 24;
+  ctx.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const [px, py] = pt(i / steps);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  if (!cut) {
+    const count = Math.max(1, Math.round(len / 110));
+    ctx.fillStyle = palette.vinePulse;
+    for (let i = 0; i < count; i++) {
+      const u = (t * 0.22 + i / count) % 1;
+      const [px, py] = pt(u);
+      disc(ctx, px, py, 3.5);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * A thorn falling away and fading as the Bloom starves. frac 0 = a normal
+ * thorn, 1 = gone. It drifts down, tumbles, shrinks and greys out.
+ */
+export function drawWiltingThorn(ctx: Ctx, r: number, frac: number): void {
+  const f = Math.min(1, Math.max(0, frac));
+  ctx.save();
+  ctx.translate(0, r * 0.9 * f);
+  ctx.rotate(f * 2.2);
+  ctx.globalAlpha = 1 - f * f;
+  const body = r * (1 - 0.45 * f);
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const rr = i % 2 === 0 ? body : body * 0.32;
+    ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath();
+  ctx.fillStyle = mix(palette.thorn, palette.withered, f * 1.2);
+  ctx.fill();
+  ctx.fillStyle = mix(palette.thornCore, palette.withered, f * 1.2);
+  disc(ctx, 0, 0, body * 0.2);
+  ctx.fill();
+  ctx.restore();
+}
