@@ -21,4 +21,9 @@ export const palette = {
   thornCore: '#ffd0d6',
   routeBackedUp: '#ffd27a',
   flash: '#ffffff',
+  // H2 additions
+  rootRock: '#4a3a47',
+  rootRockEdge: '#94788a',
+  vine: '#d93d78',
+  vinePulse: '#ffb3cc',
 } as const;

@@ -33,6 +33,10 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Thorn core | `#ffd0d6` |
 | Backed-up route | `#ffd27a` |
 | Hit flash | `#ffffff` |
+| Root rock fill (low contrast; always drawn with an edge) | `#4a3a47` |
+| Root rock edge (5:1) | `#94788a` |
+| Vine (alive) | `#d93d78` |
+| Vine pulse | `#ffb3cc` |
 
 Contrast check: every entity color must read against `#05070d` at 4.5:1 or better.
 
@@ -69,5 +73,14 @@ Draw functions live in `packages/client/src/placeholders.ts`; `packages/client/g
 | Route | teal line, 1.5 + 1.5 x level px; backed up = dashed amber | thin line vs dashes |
 | Rally flag | amber pennant on a pale pole, centered within radius r (pole spans +0.9r to -0.9r) | flag |
 | Hit flash | white ring plus core, fades with frac | ring |
+| Root (alive) | upright hot-pink stalk with a bud and two leaf blades, sunk in a small dark rock, faint glow, slow sway; smaller than the Bloom. Its thorns are `drawThorn` | tall pink sprout, not a round gear |
+| Root (cut) | same shape in grey `#7a7f8a` with a grey `#7a7f8a` rock edge (5:1), stalk drooped, leaves folded, no glow | grey drooping sprout |
+| Vine (alive) | `#d93d78` line, 3.5 px, gentle wave, pale pulses (`#ffb3cc`) travelling Root to Bloom at about 0.22 of the length per second | pink line with moving dots |
+| Vine (cut) | grey `#7a7f8a` at full opacity (5:1), 2.5 px, sagging, no pulses | thin grey slack line |
+| Wilting thorn | a thorn drifting down, tumbling, shrinking and greying while fading (frac 0 to 1) | spiky star fading to grey |
+
+H2 palette additions: `rootRock` `#4a3a47` (the Root's rock fill; low contrast on purpose, always drawn with an edge), `rootRockEdge` `#94788a` (rock outline, 5:1 on space), `vine` `#d93d78` (vine line), `vinePulse` `#ffb3cc` (same as Bloom highlight; pulses). Cut states reuse `withered`. The Root and its glow stay within radius r in both states.
+
+Root vs Bloom: the Bloom is a round coral with a big glow; the Root is a tall, narrow, upright silhouette with a rock base. Never draw the Root round. The Root's draw is within radius r, with the stalk on the vertical axis (up is -y), so the renderer must not rotate it. The vine is drawn in world coordinates with an untranslated context.
 
 Rules: pink glow and round coral mean the Bloom, spikes mean thorns (shape, not only color). Amber is reserved for the player's probe, rally flag and backed-up routes.
