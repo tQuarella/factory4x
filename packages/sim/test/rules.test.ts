@@ -14,7 +14,7 @@ import {
   throughputPerMin,
   type World,
 } from '../src/index.ts';
-import { N, addShips, data, fresh, run, runUntil } from './helpers.ts';
+import { N, addShips, bloom, data, fresh, run, runUntil } from './helpers.ts';
 
 /** No stock, no probe mining, yard off: nothing happens unless the test sets it up. */
 function idle(): World {
@@ -205,10 +205,10 @@ describe('rule 7: combat', () => {
     addShips(w, N.rich, 3);
     step(w, data, []); // tick 0 is a round tick
     // Ships: 3 × 2 = 6 → thorn 1 at 14, repaired +2 → 16. Bloom: 12 × 3 = 36 → all three ships (30 hp).
-    expect(w.guardian.thorns.map((t) => t.hp)).toEqual([16, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]);
+    expect(bloom(w).thorns.map((t) => t.hp)).toEqual([16, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]);
     expect(w.ships).toEqual([]);
-    expect(w.battle).toBeNull();
-    expect(w.lastBattle).toEqual({ startTick: 0, endTick: 0, shipsEngaged: 3, shipsLost: 3, thornsKilled: 0, outcome: 'repelled' });
+    expect(bloom(w).battle).toBeNull();
+    expect(w.lastBattle).toMatchObject({ node: N.rich, startTick: 0, endTick: 0, shipsEngaged: 3, shipsLost: 3, thornsKilled: 0, outcome: 'repelled', wilt: null });
     expect(w.stats.shipsLost).toBe(3);
   });
 
@@ -217,8 +217,8 @@ describe('rule 7: combat', () => {
     addShips(w, N.rich, 15);
     step(w, data, []);
     // Ships: 30 → thorn 1 dies (20), thorn 2 takes 10 → 10, +2 repair → 12. Bloom (12 thorns at round start): 36 → ships 1-3 die, ship 4 at 4.
-    expect(w.guardian.thorns.length).toBe(11);
-    expect(w.guardian.thorns[0]!.hp).toBe(12);
+    expect(bloom(w).thorns.length).toBe(11);
+    expect(bloom(w).thorns[0]!.hp).toBe(12);
     expect(w.ships.length).toBe(12);
     expect(w.ships[0]!.hp).toBe(4);
     expect(battleStatus(w)).toMatchObject({ startTick: 0, shipsPresent: 12, shipsEngaged: 15, shipsLost: 3, thornsKilled: 1 });
@@ -230,16 +230,16 @@ describe('rule 7: combat', () => {
     run(w, 1); // tick 1
     addShips(w, N.rich, 2);
     run(w, 28); // ticks 1..28: no round
-    expect(w.battle).toBeNull();
+    expect(bloom(w).battle).toBeNull();
     run(w, 1); // tick 29
-    expect(w.battle).toBeNull();
+    expect(bloom(w).battle).toBeNull();
     run(w, 1); // tick 30: round
-    expect(w.battle).toMatchObject({ startTick: 30, shipsEngaged: 2 });
+    expect(bloom(w).battle).toMatchObject({ startTick: 30, shipsEngaged: 2 });
     run(w, 30);
-    expect(w.battle).toMatchObject({ startTick: 30, shipsEngaged: 2 });
+    expect(bloom(w).battle).toMatchObject({ startTick: 30, shipsEngaged: 2 });
     addShips(w, N.rich, 1);
     run(w, 30);
-    expect(w.battle!.shipsEngaged).toBe(3);
+    expect(bloom(w).battle!.shipsEngaged).toBe(3);
   });
 
   it('a battle ends "withdrew" when the ships leave', () => {
@@ -247,22 +247,22 @@ describe('rule 7: combat', () => {
     w.tun['guardian.thornDamage'] = 0;
     addShips(w, N.rich, 2);
     run(w, 5);
-    expect(w.battle).not.toBeNull();
+    expect(bloom(w).battle).not.toBeNull();
     step(w, data, [{ type: 'sendShips', from: N.rich, to: N.a5, count: 0 }]);
-    expect(w.battle).toBeNull();
+    expect(bloom(w).battle).toBeNull();
     expect(w.lastBattle).toMatchObject({ outcome: 'withdrew', startTick: 0, endTick: 5, shipsLost: 0 });
   });
 
   it('wounded thorns repair on every round tick, fight or not, up to thornHp', () => {
     const w = idle();
-    w.guardian.thorns[0]!.hp = 13;
-    w.guardian.thorns[1]!.hp = 19;
+    bloom(w).thorns[0]!.hp = 13;
+    bloom(w).thorns[1]!.hp = 19;
     step(w, data, []); // tick 0
-    expect(w.guardian.thorns.slice(0, 2).map((t) => t.hp)).toEqual([15, 20]);
+    expect(bloom(w).thorns.slice(0, 2).map((t) => t.hp)).toEqual([15, 20]);
     run(w, 29);
-    expect(w.guardian.thorns[0]!.hp).toBe(15);
+    expect(bloom(w).thorns[0]!.hp).toBe(15);
     run(w, 1);
-    expect(w.guardian.thorns[0]!.hp).toBe(17);
+    expect(bloom(w).thorns[0]!.hp).toBe(17);
   });
 
   it('combatRates gives kill rate vs regrowth in tenths per second', () => {
@@ -275,20 +275,20 @@ describe('rule 7: combat', () => {
 describe('rule 9: regrowth', () => {
   it('adds a full-hp thorn every regrowTicks up to the cap, then holds progress at 0', () => {
     const w = idle();
-    w.guardian.thorns = w.guardian.thorns.slice(0, 10);
-    const lastId = w.guardian.thorns[9]!.id;
+    bloom(w).thorns = bloom(w).thorns.slice(0, 10);
+    const lastId = bloom(w).thorns[9]!.id;
     run(w, 59);
-    expect(w.guardian.thorns.length).toBe(10);
+    expect(bloom(w).thorns.length).toBe(10);
     expect(guardianStatus(w).regrowProgress).toBe(59);
     run(w, 1);
-    expect(w.guardian.thorns.length).toBe(11);
-    expect(w.guardian.thorns[10]!.hp).toBe(20);
-    expect(w.guardian.thorns[10]!.id).toBeGreaterThan(lastId);
+    expect(bloom(w).thorns.length).toBe(11);
+    expect(bloom(w).thorns[10]!.hp).toBe(20);
+    expect(bloom(w).thorns[10]!.id).toBeGreaterThan(lastId);
     run(w, 60);
-    expect(w.guardian.thorns.length).toBe(12);
+    expect(bloom(w).thorns.length).toBe(12);
     run(w, 600);
-    expect(w.guardian.thorns.length).toBe(12);
-    expect(w.guardian.regrowProgress).toBe(0);
+    expect(bloom(w).thorns.length).toBe(12);
+    expect(bloom(w).regrowProgress).toBe(0);
   });
 
   it('the Bloom starts at its cap', () => {
@@ -299,19 +299,19 @@ describe('rule 9: regrowth', () => {
 describe('rule 8: capture', () => {
   it('when the last thorn falls with ships present: Bloom dies, node owned with free extractors, battle captured', () => {
     const w = idle();
-    w.guardian.thorns = [{ id: 999, hp: 2 }];
+    bloom(w).thorns = [{ id: 999, hp: 2 }];
     addShips(w, N.rich, 5);
     step(w, data, []);
     expect(isCaptured(w)).toBe(true);
-    expect(w.guardian.alive).toBe(false);
+    expect(bloom(w).alive).toBe(false);
     expect(w.nodes[N.rich]).toMatchObject({ owned: true, extractors: 1 });
     expect(w.capturedTick).toBe(0);
-    expect(w.lastBattle).toEqual({ startTick: 0, endTick: 0, shipsEngaged: 5, shipsLost: 0, thornsKilled: 1, outcome: 'captured' });
+    expect(w.lastBattle).toMatchObject({ node: N.rich, startTick: 0, endTick: 0, shipsEngaged: 5, shipsLost: 0, thornsKilled: 1, outcome: 'captured', wilt: null });
     expect(w.ships[0]!.hp).toBe(7); // the dying thorn still hit back this round
     expect(runSummary(w).captureSec).toBe(0);
     // No more combat or regrowth; the rich node now extracts at 25/min.
     run(w, 1800);
-    expect(w.guardian.thorns).toEqual([]);
+    expect(bloom(w).thorns).toEqual([]);
     expect(w.ships.length).toBe(5);
     expect(w.nodes[N.rich]!.buffer).toBe(25);
     expect(nodeStatus(w, N.rich).extractPerMin).toBe(25);
@@ -319,23 +319,23 @@ describe('rule 8: capture', () => {
 
   it('no capture without a ship present', () => {
     const w = idle();
-    w.guardian.thorns = [];
+    bloom(w).thorns = [];
     step(w, data, []);
     expect(isCaptured(w)).toBe(false);
-    expect(w.guardian.regrowProgress).toBe(1);
+    expect(bloom(w).regrowProgress).toBe(1);
   });
 
   it('a mutual wipe is repelled, and regrowth resumes', () => {
     const w = idle();
-    w.guardian.thorns = [{ id: 999, hp: 2 }];
+    bloom(w).thorns = [{ id: 999, hp: 2 }];
     w.tun['guardian.thornDamage'] = 30;
     addShips(w, N.rich, 1);
     step(w, data, []);
-    expect(w.guardian.thorns).toEqual([]);
+    expect(bloom(w).thorns).toEqual([]);
     expect(w.ships).toEqual([]);
     expect(w.lastBattle!.outcome).toBe('repelled');
     expect(isCaptured(w)).toBe(false);
-    runUntil(w, (x) => x.guardian.thorns.length === 1, 100);
+    runUntil(w, (x) => bloom(x).thorns.length === 1, 100);
   });
 });
 
@@ -356,6 +356,6 @@ describe('rule 10: stats', () => {
     const w = idle();
     addShips(w, N.probe, 3);
     step(w, data, [{ type: 'sendShips', from: N.probe, to: N.a5, count: 1 }]);
-    expect(shipCounts(w)).toEqual({ at: [2, 0, 0, 0, 0, 0, 0], enRoute: [0, 0, 0, 0, 0, 1, 0], total: 3 });
+    expect(shipCounts(w)).toEqual({ at: [2, 0, 0, 0, 0, 0, 0, 0], enRoute: [0, 0, 0, 0, 0, 1, 0, 0], total: 3 });
   });
 });

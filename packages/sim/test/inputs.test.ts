@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inputCost, isValidInput, step, worldHash, type Input, type World } from '../src/index.ts';
-import { N, addShips, clone, data, fresh, run } from './helpers.ts';
+import { N, addShips, bloom, clone, data, fresh, run } from './helpers.ts';
 
 /** The input is invalid, and stepping with it changes nothing compared with stepping without it. */
 function expectIgnored(w: World, input: Input): void {
@@ -32,7 +32,7 @@ function idle(): World {
 
 /** Captures the rich node by hand (test setup). */
 function captured(w: World): World {
-  w.guardian.thorns = [];
+  bloom(w).thorns = [];
   addShips(w, N.rich, 1);
   step(w, data, []);
   expect(w.capturedTick).not.toBeNull();
@@ -71,7 +71,7 @@ describe('buildExtractor', () => {
   });
   it('is invalid for a node index out of range or not an integer', () => {
     const w = idle();
-    expectIgnored(w, { type: 'buildExtractor', node: 7 });
+    expectIgnored(w, { type: 'buildExtractor', node: 8 });
     expectIgnored(w, { type: 'buildExtractor', node: -1 });
     expectIgnored(w, { type: 'buildExtractor', node: 1.5 });
   });
@@ -256,7 +256,7 @@ describe('setRally', () => {
     expect(w.ships[0]!.transit!.to).toBe(N.a5);
   });
   it('is invalid for a node out of range', () => {
-    expectIgnored(fresh(), { type: 'setRally', node: 7 });
+    expectIgnored(fresh(), { type: 'setRally', node: 8 });
   });
 });
 

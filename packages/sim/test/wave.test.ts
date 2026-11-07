@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { shipCounts, step, throughputPerMin, type BattleResult, type Input, type World } from '../src/index.ts';
-import { N, clone, data, fresh, networkDone, networkStep } from './helpers.ts';
+import { N, bloom, clone, data, fresh, networkDone, networkStep } from './helpers.ts';
 
 // The sim tsconfig has no DOM or Node types; vitest provides console at runtime.
 declare const console: { log(...args: unknown[]): void };
@@ -73,7 +73,7 @@ describe('scripted waves at defaults (acceptance 6)', () => {
       `network done at ${prep.networkDoneSec}s, 40 ships at a5 by ${prep.readySec}s, throughput ${prep.throughput}/min\n` +
         results.map((r) => `${r.size} ships: ${r.outcome}, lost ${r.lost}, thorns ${r.thornsKilled}, rounds ${r.rounds}`).join('\n'),
     );
-    expect(prep.world.guardian.thorns.length).toBe(data.tunables['guardian.cap'].default);
+    expect(bloom(prep.world).thorns.length).toBe(data.tunables['guardian.cap'].default);
     expect(prep.throughput).toBe(150);
   });
 

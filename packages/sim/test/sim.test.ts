@@ -107,13 +107,13 @@ describe('autosave', () => {
   it('refuses a save from another data version', () => {
     const w = createWorld(1, defaultData);
     const text = serializeWorld(w);
-    const r = deserializeWorld(text, { ...defaultData, dataVersion: 3 });
-    expect(r).toEqual({ ok: false, reason: 'dataVersion', saveDataVersion: 2 });
+    const r = deserializeWorld(text, { ...defaultData, dataVersion: 4 });
+    expect(r).toEqual({ ok: false, reason: 'dataVersion', saveDataVersion: 3 });
   });
 
   it('refuses corrupt saves', () => {
     expect(deserializeWorld('{not json', data)).toMatchObject({ ok: false, reason: 'corrupt' });
     expect(deserializeWorld('null', data)).toMatchObject({ ok: false, reason: 'corrupt' });
-    expect(deserializeWorld(JSON.stringify({ format: 1, dataVersion: 2, world: { tick: 1 } }), data)).toMatchObject({ ok: false, reason: 'corrupt' });
+    expect(deserializeWorld(JSON.stringify({ format: 1, dataVersion: 3, world: { tick: 1 } }), data)).toMatchObject({ ok: false, reason: 'corrupt' });
   });
 });

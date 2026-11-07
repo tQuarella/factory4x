@@ -8,6 +8,7 @@ import {
   combatRates,
   guardianStatus,
   inputCost,
+  isCaptured,
   isValidInput,
   nodeStatus,
   queueStatus,
@@ -86,7 +87,7 @@ export class Sheet {
   /** Rebuilds when the node's kind of sheet changes (the Bloom falls while its sheet is open). */
   private signature(): string {
     const n = this.world.nodes[this.node]!;
-    return `${this.node}:${n.kind === 'rich' && this.world.guardian.alive ? 'guarded' : 'open'}`;
+    return `${this.node}:${n.kind === 'rich' && !isCaptured(this.world) ? 'guarded' : 'open'}`;
   }
 
   private build(): void {
@@ -99,13 +100,13 @@ export class Sheet {
     this.root.scrollTop = 0;
 
     const head = h('div', 'sheet-head', '', this.root);
-    const title = h('h2', '', longName(n, !world.guardian.alive), head);
+    const title = h('h2', '', longName(n, isCaptured(world)), head);
     const closeBtn = btn(head, '✕', () => this.host.close(), 'close');
     closeBtn.el.setAttribute('aria-label', 'Close');
     void title;
 
     if (n.kind === 'probe') this.probeSections();
-    else if (n.kind === 'rich' && world.guardian.alive) this.richSections(n);
+    else if (n.kind === 'rich' && !isCaptured(world)) this.richSections(n);
     else this.producerSections(n);
 
     this.sendSection(n);
@@ -358,7 +359,7 @@ export class Sheet {
     const title = h('div', 'lbl', '', sec);
     const nodes = this.world.nodes;
     const sources: Array<{ node: number; b: Btn }> = [];
-    const attack = (): boolean => n.kind === 'rich' && this.world.guardian.alive;
+    const attack = (): boolean => n.kind === 'rich' && !isCaptured(this.world);
     for (const m of nodes) {
       if (m.index === n.index) continue;
       const b = btn(sec, '', () => this.host.send({ type: 'sendShips', from: m.index, to: n.index, count: 0 }), 'send-btn');

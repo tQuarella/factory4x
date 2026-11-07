@@ -8,6 +8,7 @@
  * stepped sit in `pending` and are saved with the world (see persist.ts).
  */
 import {
+  battleStatus,
   createWorld,
   defaultData,
   tunableMeta,
@@ -160,7 +161,7 @@ export class Session {
     for (const input of inputs) this.log.push({ tick: this.world.tick, input });
     step(this.world, this.data, inputs);
     const w = this.world;
-    if (w.battle !== null && (w.tick - 1) % w.tun['combat.roundTicks'] === 0) this.hitSeq++;
+    if (battleStatus(w) !== null && (w.tick - 1) % w.tun['combat.roundTicks'] === 0) this.hitSeq++;
     if (w.tick % w.tickRate === 0) {
       this.history.push(throughputPerMin(w));
       if (this.history.length > HISTORY_SECONDS) this.history.splice(0, this.history.length - HISTORY_SECONDS);

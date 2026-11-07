@@ -198,7 +198,7 @@ describe('New run keeps tuning', () => {
     old.stepOnce();
     const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2 });
     expect(s.world.stock).toBe(150);
-    expect(s.world.guardian.thorns.length).toBe(5);
+    expect(s.world.guardians[0]!.thorns.length).toBe(5);
     play(s, 800, script);
     const r = s.replay();
     expect(r.startTunables).toEqual({ 'economy.startStock': 150, 'guardian.cap': 5 });
@@ -264,9 +264,9 @@ describe('helpers', () => {
 
   it('battle report names the reason for a failed wave', () => {
     const s = new Session(defaultData, { seed: 1 });
-    const text = battleReport(s.world, { startTick: 0, endTick: 10, outcome: 'repelled', shipsEngaged: 6, shipsLost: 6, thornsKilled: 2 });
+    const text = battleReport(s.world, { id: 1, node: 6, wilt: null, startTick: 0, endTick: 10, outcome: 'repelled', shipsEngaged: 6, shipsLost: 6, thornsKilled: 2 });
     expect(text).toContain('Wave repelled: 6 sent, 6 lost, 2 thorns stripped');
     expect(text).toMatch(/Regrowth outpaced|Too few ships/);
-    expect(battleReport(s.world, { startTick: 0, endTick: 10, outcome: 'captured', shipsEngaged: 30, shipsLost: 12, thornsKilled: 12 })).toBe('Captured: 30 sent, 12 lost');
+    expect(battleReport(s.world, { id: 2, node: 6, wilt: null, startTick: 0, endTick: 10, outcome: 'captured', shipsEngaged: 30, shipsLost: 12, thornsKilled: 12 })).toBe('Captured: 30 sent, 12 lost');
   });
 });
