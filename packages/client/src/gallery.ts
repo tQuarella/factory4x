@@ -8,14 +8,38 @@ import {
   drawRallyFlag,
   drawRichNode,
   drawRoute,
+  drawRoot,
   drawShip,
   drawThorn,
+  drawVine,
+  drawWiltingThorn,
 } from './placeholders.ts';
 
 type Ctx = CanvasRenderingContext2D;
 type Entry = { label: string; draw: (ctx: Ctx, r: number) => void };
 
 const T = 1.3;
+
+function wiltSeq(c: Ctx, r: number): void {
+  [0, 0.33, 0.66, 0.9].forEach((f, i) => {
+    c.save();
+    c.translate((i - 1.5) * r * 0.9, -r * 0.3);
+    drawWiltingThorn(c, r * 0.4, f);
+    c.restore();
+  });
+}
+
+function rootVsBloom(c: Ctx, r: number): void {
+  c.save();
+  c.translate(-r * 0.9, 0);
+  drawRoot(c, r * 0.8, T, false);
+  c.restore();
+  c.save();
+  c.translate(r * 0.9, 0);
+  drawRichNode(c, r * 0.8, T, false);
+  c.restore();
+}
+
 const entries: Entry[] = [
   { label: 'probe', draw: (c, r) => drawProbe(c, r, T) },
   { label: 'asteroid 0/3', draw: (c, r) => drawAsteroid(c, r, 3, 0, 3) },
@@ -26,6 +50,13 @@ const entries: Entry[] = [
   { label: 'thorn hp 1', draw: (c, r) => drawThorn(c, r, T, 1) },
   { label: 'thorn hp .6', draw: (c, r) => drawThorn(c, r, T, 0.6) },
   { label: 'thorn hp .2', draw: (c, r) => drawThorn(c, r, T, 0.2) },
+  { label: 'root alive', draw: (c, r) => drawRoot(c, r, T, false) },
+  { label: 'root cut', draw: (c, r) => drawRoot(c, r, T, true) },
+  { label: 'root (left) vs bloom (right)', draw: (c, r) => rootVsBloom(c, r) },
+  { label: 'vine alive', draw: (c, r) => drawVine(c, -r * 1.2, r * 0.3, r * 1.2, -r * 0.3, T, false) },
+  { label: 'vine alive, later', draw: (c, r) => drawVine(c, -r * 1.2, r * 0.3, r * 1.2, -r * 0.3, T + 1.5, false) },
+  { label: 'vine cut', draw: (c, r) => drawVine(c, -r * 1.2, r * 0.3, r * 1.2, -r * 0.3, T, true) },
+  { label: 'wilting thorn 0 / .33 / .66 / .9', draw: (c, r) => wiltSeq(c, r) },
   { label: 'ship', draw: (c, r) => drawShip(c, r, 0) },
   { label: 'pod', draw: (c, r) => drawPod(c, r) },
   { label: 'rally flag', draw: (c, r) => drawRallyFlag(c, r) },
