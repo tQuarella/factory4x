@@ -15,13 +15,14 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | --- | --- | --- | --- | --- |
 | 1 | designer | H2 triage + spec | launch | Plan + Spec (done) |
 | 2 | core-engineer | h2-sim | launch | Build (committed d9563ff; session dropped before its report) |
-| r3 | core-engineer | h2-sim | resume | After session restart: merge main, re-run gates, report |
+| r3 | core-engineer | h2-sim | resume | After session restart: merged main (4933aca), gates green, reported |
+| 5 | critic | h2-sim | launch | Review round 1 |
 | 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
 | 4 | critic | h2-art | launch | Review round 1: REJECT (vine/rock contrast, glow bounds, palette table) |
 | r1 | art-direction | h2-art | resume | Fix round 1 (77e159d) |
 | r2 | critic | h2-art | resume | Review round 2: APPROVE; merged 6176e1f after green branch CI. Critic saw one flaky `test` gate run (28.5 s, passed on rerun) |
 
-Launches: 4 / 12. Resumes: 3.
+Launches: 5 / 12. Resumes: 3.
 
 ## Iteration 1 (H1) plan, closed
 
