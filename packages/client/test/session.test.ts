@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { defaultData, replayHashes, shipCounts, worldHash, type Input } from '@factory4x/sim';
+import { createWorld, defaultData, lastBattle, replayHashes, rootIndex, shipCounts, step, worldHash, type Input, type World } from '@factory4x/sim';
 import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
-import { battleReport } from '../src/report.ts';
-import { clampInt, fmt10, mmss, shortVersion, stepFor } from '../src/format.ts';
+import { bannerLines, battleReport, feedsBloomText, supplyLine } from '../src/report.ts';
+import { clampInt, fmt10, mmss, shortVersion, stepFor, ticksText } from '../src/format.ts';
+import { guardedReach, ringGeom } from '../src/view.ts';
 import { fitMap } from '../src/fit.ts';
 import { podTotalTicks, progressFrac } from '../src/interp.ts';
 
@@ -268,5 +269,74 @@ describe('helpers', () => {
     expect(text).toContain('Wave repelled: 6 sent, 6 lost, 2 thorns stripped');
     expect(text).toMatch(/Regrowth outpaced|Too few ships/);
     expect(battleReport(s.world, { id: 2, node: 6, wilt: null, startTick: 0, endTick: 10, outcome: 'captured', shipsEngaged: 30, shipsLost: 12, thornsKilled: 12 })).toBe('Captured: 30 sent, 12 lost');
+  });
+});
+
+function ship(w: World, node: number, n: number): void {
+  for (let i = 0; i < n; i++) w.ships.push({ id: w.nextId++, hp: w.tun['ship.hp'], at: node, transit: null, engagedIn: -1 });
+}
+
+/** Seed 3 is the Thin Root (4 thorns). Nothing happens unless a test sets it up. */
+function idleWorld(): World {
+  const w = createWorld(3, defaultData);
+  w.stock = 0;
+  w.shipyard.on = false;
+  w.tun['economy.probeOrePerMin'] = 0;
+  return w;
+}
+
+describe('H2 readouts', () => {
+  it('the Feeds the Bloom box and the rich-sheet line come from live tunables', () => {
+    const w = idleWorld();
+    expect(feedsBloomText(w, false)).toBe('While the Root lives, the Bloom has 12 thorns, regrows 1 / 2.0 s, repairs 2. Cut it: 8 thorns, 1 / 10.0 s, no repair.');
+    expect(supplyLine(w)).toBe('Fed by the Root (cut it: 8 thorns, 1 / 10.0 s)');
+    w.tun['bloom.starvedCap'] = 5;
+    w.tun['bloom.starvedRepairPerRound'] = 2;
+    w.tun['guardian.regrowTicks'] = 30;
+    expect(feedsBloomText(w, false)).toContain('regrows 1 / 1.0 s, repairs 2. Cut it: 5 thorns, 1 / 10.0 s, repairs 2.');
+    expect(supplyLine(w)).toContain('cut it: 5 thorns');
+  });
+
+  it('cutting the Root reports the wilt and flips the Bloom to starved', () => {
+    const w = idleWorld();
+    ship(w, rootIndex(w), 15);
+    for (let i = 0; i < 400 && lastBattle(w, rootIndex(w)) === null; i++) step(w, defaultData, []);
+    const r = lastBattle(w, rootIndex(w))!;
+    expect(r.outcome).toBe('captured');
+    expect(battleReport(w, r)).toBe(`Root cut: ${r.shipsEngaged} sent, ${r.shipsLost} lost. The Bloom wilts: 12 → 8 thorns, regrows 5× slower.`);
+    expect(supplyLine(w)).toBe('Starved: Root cut');
+    expect(feedsBloomText(w, false)).toContain('The Root is cut');
+  });
+
+  it('a Root held report and a Root repelled reason name the Root', () => {
+    const w = idleWorld();
+    const text = battleReport(w, { id: 1, node: rootIndex(w), wilt: null, startTick: 0, endTick: 10, outcome: 'repelled', shipsEngaged: 10, shipsLost: 10, thornsKilled: 2 });
+    expect(text).toContain('Root held: 10 sent, 10 lost, 2 thorns stripped');
+    expect(text).toContain('the Root regrows');
+  });
+
+  it('the banner has one prefixed line per running battle', () => {
+    const w = idleWorld();
+    expect(bannerLines(w)).toEqual([]);
+    ship(w, rootIndex(w), 3);
+    ship(w, 6, 20);
+    for (let i = 0; i < 31 && bannerLines(w).length < 2; i++) step(w, defaultData, []);
+    const lines = bannerLines(w);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatch(/^BLOOM · strip \d+(\.\d)?\/s · regrow 0\.5\/s · \d+ lost$/);
+    expect(lines[1]).toMatch(/^ROOT · strip /);
+  });
+
+  it('tick values also show seconds', () => {
+    expect(ticksText(60, 30)).toBe('60 · 2.0 s');
+    expect(ticksText(300, 30)).toBe('300 · 10.0 s');
+  });
+
+  it('guarded hit areas cover the thorn ring and are at least 44 px across', () => {
+    for (const rr of [14, 20, 28, 60]) {
+      const { ringR, thornR } = ringGeom(rr, 12);
+      expect(guardedReach(rr, 12)).toBeGreaterThanOrEqual(ringR + thornR);
+      expect(guardedReach(rr, 12)).toBeGreaterThanOrEqual(22);
+    }
   });
 });

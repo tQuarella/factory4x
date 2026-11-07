@@ -35,3 +35,8 @@ export function clampInt(v: number, min: number, max: number): number {
   if (!Number.isFinite(v)) return min;
   return Math.min(max, Math.max(min, Math.round(v)));
 }
+
+/** A tick count with its game seconds: 60 at 30 ticks/s -> "60 · 2.0 s". */
+export function ticksText(ticks: number, tickRate: number): string {
+  return `${ticks} · ${(ticks / tickRate).toFixed(1)} s`;
+}

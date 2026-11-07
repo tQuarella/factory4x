@@ -27,6 +27,10 @@ interface Window {
     /** Shows the battle banner and a sample toast (or hides them), to check layout. */
     debugShowNotices(on: boolean): void;
     debugShowResult(): void;
+    /** The run's system name ("Thin Root"). */
+    systemName(): string;
+    /** Node index of the Root. */
+    rootNode(): number;
     newRun(): void;
   };
 }

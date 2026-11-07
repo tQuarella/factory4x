@@ -61,10 +61,10 @@ body { font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
 #banner {
   padding: 6px 10px; border-radius: 10px;
-  background: rgba(70, 12, 36, 0.92); border: 1px solid var(--bloom); font-size: 12px; text-align: center;
+  background: rgba(70, 12, 36, 0.92); border: 1px solid var(--bloom); font-size: 12px; text-align: center; white-space: pre-line;
 }
 #hint {
-  position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 6px;
   background: rgba(17, 27, 46, 0.95); border: 1px solid var(--gold); border-radius: 10px; padding: 0 0 0 12px; color: var(--gold);
 }
 #hint span { flex: 1; font-size: 13px; }
@@ -82,7 +82,6 @@ body { font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   background: rgba(255, 210, 122, 0.16); border: 1px solid var(--gold); color: var(--gold); font-size: 12px; letter-spacing: 0.1em; pointer-events: none;
 }
 #hud-version { position: absolute; left: 8px; bottom: 6px; font-size: 10px; color: var(--dim); opacity: 0.7; pointer-events: none; }
-#hint:not([hidden]) ~ #hud-version, #hint:not([hidden]) ~ #paused { bottom: 58px; }
 
 /* ---- sheet (bottom in portrait) ---- */
 #sheet {
@@ -100,6 +99,10 @@ section:first-of-type { border-top: 0; }
 .note { font-size: 12px; color: var(--dim); margin: 4px 0; }
 .note.warn { color: var(--gold); background: rgba(255, 210, 122, 0.1); border: 1px solid rgba(255, 210, 122, 0.4); padding: 6px 8px; border-radius: 8px; }
 .actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.feeds-box { margin: 6px 0; padding: 6px 8px; border: 1px solid var(--bloom); border-radius: 8px; font-size: 12px; background: rgba(70, 12, 36, 0.35); }
+.feeds-box b { display: block; color: #ffb3cc; margin-bottom: 2px; }
+.note.sys { font-size: 11px; margin: 0; padding-top: 2px; }
+.t-name small.t-now { color: var(--ink); }
 .battle { color: #ffb3cc; font-size: 12px; }
 .battle .lines { min-height: 4.1em; }
 

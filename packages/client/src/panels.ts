@@ -1,8 +1,8 @@
 /** Full-screen panels: tuning, feedback, result, and the New run confirmation. */
 import { runSummary, tunableMeta, type Input, type SimData, type TunableMeta } from '@factory4x/sim';
-import { btn, h, toggleClass, type Btn } from './dom.ts';
+import { btn, h, setText, toggleClass, type Btn } from './dom.ts';
 import { buildNote } from './feedback.ts';
-import { clampInt, mmss, shortVersion, stepFor } from './format.ts';
+import { clampInt, mmss, shortVersion, stepFor, ticksText } from './format.ts';
 import type { Settings } from './persist.ts';
 import type { Session } from './session.ts';
 
@@ -51,6 +51,8 @@ interface TuneRow {
   minus: Btn;
   plus: Btn;
   reset: Btn;
+  /** Live caption under the name (ticks as seconds), or null. */
+  now: HTMLElement | null;
 }
 
 export class TuningPanel {
@@ -135,6 +137,13 @@ export class TuningPanel {
       const info = h('small', '', `${meta.min}–${meta.max} · default ${meta.default}`, name);
       if (meta.newRunOnly) h('span', 'tag', ' · applies on New run', info);
       if (meta.scope === 'client') h('span', 'tag', ' · this device', info);
+      // Tick values also show game seconds ("60 · 2.0 s"); the system variant lists what its numbers mean.
+      let now: HTMLElement | null = null;
+      if (meta.key.endsWith('Ticks')) now = h('small', 't-now', '', name);
+      if (meta.key === 'system.variant') {
+        const names = host.data.map.variants.map((v, i) => `${i + 1} ${v.name.replace(/ Root$/, '')}`);
+        h('small', '', `0 · by seed / ${names.join(' / ')}`, name);
+      }
       const step = stepFor(meta.min, meta.max);
       const minus = btn(row, '−', () => this.setValue(meta, this.value(meta) - step));
       minus.el.setAttribute('aria-label', `Decrease ${meta.key}`);
@@ -149,7 +158,7 @@ export class TuningPanel {
       plus.el.setAttribute('aria-label', `Increase ${meta.key}`);
       const reset = btn(row, '↺', () => this.setValue(meta, meta.default), 'reset');
       reset.el.setAttribute('aria-label', `Reset ${meta.key} to default`);
-      this.rows.push({ meta, row, input, minus, plus, reset });
+      this.rows.push({ meta, row, input, minus, plus, reset, now });
     }
   }
 
@@ -164,6 +173,7 @@ export class TuningPanel {
       r.plus.set('+', v < r.meta.max);
       r.reset.set('↺', v !== r.meta.default);
       toggleClass(r.row, 'changed', v !== r.meta.default);
+      if (r.now) setText(r.now, ticksText(v, this.host.data.tickRate));
     }
   }
 }
@@ -271,6 +281,7 @@ export function showResult(root: HTMLElement, session: Session, onKeep: () => vo
   root.replaceChildren();
   const card = h('div', 'card', '', root);
   h('h2', '', 'Rich node captured', card);
+  h('div', 'note sys', s.variantName, card);
   const line = (label: string, value: string): void => {
     const r = h('div', 'stat-line', '', card);
     h('span', '', label, r);
@@ -279,6 +290,7 @@ export function showResult(root: HTMLElement, session: Session, onKeep: () => vo
   line('Time to capture', s.captureSec === null ? '-' : mmss(s.captureSec));
   line('Peak ore/min', String(s.peakPerMin));
   line('Ships built', String(s.shipsBuilt));
+  line('Root', s.rootCutSec === null ? 'Root left standing' : `Root cut at ${mmss(s.rootCutSec)}`);
   line('Ships lost', String(s.shipsLost));
   line('Waves sent', String(s.wavesSent));
   const row = h('div', 'ov-actions', '', card);
