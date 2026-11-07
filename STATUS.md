@@ -15,9 +15,11 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | --- | --- | --- | --- | --- |
 | 1 | designer | H2 triage + spec | launch | Plan + Spec (done) |
 | 2 | core-engineer | h2-sim | launch | Build |
-| 3 | art-direction | h2-art | launch | Build |
+| 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
+| 4 | critic | h2-art | launch | Review round 1: REJECT (vine/rock contrast, glow bounds, palette table) |
+| r1 | art-direction | h2-art | resume | Fix round 1 |
 
-Launches: 3 / 12. Resumes: 0.
+Launches: 4 / 12. Resumes: 1.
 
 ## Iteration 1 (H1) plan, closed
 
