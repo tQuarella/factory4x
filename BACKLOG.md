@@ -20,7 +20,7 @@ Four tasks, sized to fit the 12-launch budget. `m1-sim` goes first, because the 
 | m1-client | Playable phone client: map, sheets, HUD, controls, tuning, feedback, autosave | engineer | Building |
 | m1-bots | rush and turtle strategies plus the capture-based report | engineer | **Merged** 4afda2f (approved round 2) |
 | m1-art | Draw functions and style for every M1 entity, including the Bloom | art-direction | **Merged** 7205468 (approved round 2) |
-| m1-toast-fix | Broken main: battle toast covered the Bloom on Linux CI (font metrics) | core-engineer | Building |
+| m1-toast-fix | Broken main: battle toast covered the Bloom on Linux CI (font metrics) | core-engineer | **Merged** dfdf62a (approved round 1) |
 
 ### m1-sim (core-engineer)
 
@@ -104,8 +104,8 @@ Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait 
 | --- | --- | --- | --- |
 | h2-sim | Root node, supply link and wilt, starved Bloom, three variants, new tunables, data v3 | core-engineer | Building |
 | h2-art | Root, vine and wilting-thorn draw functions; gallery; ART_STYLE | art-direction | Building |
-| h2-client | Root sheet, vine and wilt on the map, banner and toasts, result panel, tuning, H1 carry-overs | engineer | Waiting on h2-sim |
-| h2-bots | raid-supply strategy, per-variant report and depth flags | engineer | Waiting on h2-sim |
+| h2-client | Root sheet, vine and wilt on the map, banner and toasts, result panel, tuning, H1 carry-overs | engineer | Building |
+| h2-bots | raid-supply strategy, per-variant report and depth flags | engineer | Building |
 
 ### h2-sim (core-engineer)
 

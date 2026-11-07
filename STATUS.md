@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 1 — First playable (iteration 2, hypothesis H2: decision depth)
-**State:** Owner chose "Depth first" for H2. H2 specced (DESIGN.md → H2: cut the Root vs overwhelm the Bloom, three variants). Building h2-sim and h2-art; h2-client and h2-bots follow h2-sim.
+**State:** Owner chose "Depth first" for H2. H2 specced (DESIGN.md → H2: cut the Root vs overwhelm the Bloom, three variants). h2-art and h2-sim merged. Building h2-client and h2-bots in parallel.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261106-2 (M1 first playable), live and passing the live smoke test at desktop and phone sizes.
@@ -16,13 +16,15 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 1 | designer | H2 triage + spec | launch | Plan + Spec (done) |
 | 2 | core-engineer | h2-sim | launch | Build (committed d9563ff; session dropped before its report) |
 | r3 | core-engineer | h2-sim | resume | After session restart: merged main (4933aca), gates green, reported |
-| 5 | critic | h2-sim | launch | Review round 1 |
+| 5 | critic | h2-sim | launch | Review round 1: APPROVE; merged dfdf62a after green branch CI |
+| 6 | engineer | h2-client | launch | Build |
+| 7 | engineer | h2-bots | launch | Build |
 | 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
 | 4 | critic | h2-art | launch | Review round 1: REJECT (vine/rock contrast, glow bounds, palette table) |
 | r1 | art-direction | h2-art | resume | Fix round 1 (77e159d) |
 | r2 | critic | h2-art | resume | Review round 2: APPROVE; merged 6176e1f after green branch CI. Critic saw one flaky `test` gate run (28.5 s, passed on rerun) |
 
-Launches: 5 / 12. Resumes: 3.
+Launches: 7 / 12. Resumes: 3.
 
 ## Iteration 1 (H1) plan, closed
 
