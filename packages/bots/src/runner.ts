@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import { createWorld, runSummary, type RunSummary, step, throughputPerMin, worldHash, type BattleOutcome, type SimData } from '@factory4x/sim';
+import { createWorld, lastBattle, runSummary, type RunSummary, step, throughputPerMin, worldHash, type BattleOutcome, type SimData } from '@factory4x/sim';
 import type { Strategy } from './strategies.ts';
 
 /** won = the rich node was captured; timeout = still uncaptured at the tick cap. */
@@ -31,6 +31,16 @@ export interface GameResult {
   wavesRepelled: number;
   /** Outcome of the first wave's battle, or null if no battle finished. */
   firstWaveOutcome: BattleOutcome | null;
+  /** The system (DESIGN.md H2): variant id ('knotted', 'deep', 'thin') and name. */
+  variantId: string;
+  variantName: string;
+  /** Game seconds when the Root was cut; null if it was left standing. */
+  rootCutSec: number | null;
+  /** Ships lost at the Root, Bloom thorns withered by the cut, and waves sent per target (as of capture). */
+  rootShipsLost: number;
+  thornsWithered: number;
+  rootWavesSent: number;
+  bloomWavesSent: number;
   /** Whole-run totals (all ticks, including the post-capture build-out up to the tick cap). */
   wholeRun: { shipsBuilt: number; shipsLost: number; oreSpentShips: number; oreSpentEconomy: number };
   tickMsP50: number;
@@ -62,7 +72,7 @@ export function runGame(strategy: Strategy, seed: number, data: SimData, maxTick
   let repelledAtCapture = 0;
   let wavesRepelled = 0;
   let firstWaveOutcome: BattleOutcome | null = null;
-  let lastBattleEnd = -1;
+  const lastBattleEnd: number[] = [];
   const throughputAtMin: Record<string, number | null> = {};
   for (const m of SAMPLE_MINUTES) throughputAtMin[String(m)] = null;
   const sampleTicks = new Map<number, number>();
@@ -75,11 +85,14 @@ export function runGame(strategy: Strategy, seed: number, data: SimData, maxTick
       step(world, data, inputs);
       times[i] = performance.now() - t0;
 
-      const lb = world.lastBattle;
-      if (lb !== null && lb.endTick !== lastBattleEnd) {
-        lastBattleEnd = lb.endTick;
-        if (lb.outcome === 'repelled') wavesRepelled++;
-        if (firstWaveOutcome === null) firstWaveOutcome = lb.outcome;
+      // Per node: world.lastBattle is the latest at any node, so a Root battle would hide a Bloom one.
+      for (const g of world.guardians) {
+        const lb = lastBattle(world, g.node);
+        if (lb !== null && lb.endTick !== (lastBattleEnd[g.node] ?? -1)) {
+          lastBattleEnd[g.node] = lb.endTick;
+          if (lb.outcome === 'repelled') wavesRepelled++;
+          if (firstWaveOutcome === null) firstWaveOutcome = lb.outcome;
+        }
       }
       const minute = sampleTicks.get(world.tick);
       if (minute !== undefined) throughputAtMin[String(minute)] = throughputPerMin(world);
@@ -131,6 +144,13 @@ export function runGame(strategy: Strategy, seed: number, data: SimData, maxTick
     wavesSent: atCapture ? wavesSentAtCapture : s.wavesSent,
     wavesRepelled: atCapture ? repelledAtCapture : wavesRepelled,
     firstWaveOutcome,
+    variantId: end.variantId,
+    variantName: end.variantName,
+    rootCutSec: end.rootCutSec,
+    rootShipsLost: s.rootShipsLost,
+    thornsWithered: s.thornsWithered,
+    rootWavesSent: s.rootWavesSent,
+    bloomWavesSent: s.bloomWavesSent,
     oreSpentShips: s.oreSpentShips,
     oreSpentEconomy: s.oreSpentEconomy,
     wholeRun: { shipsBuilt: end.shipsBuilt, shipsLost: end.shipsLost, oreSpentShips: end.oreSpentShips, oreSpentEconomy: end.oreSpentEconomy },
@@ -147,4 +167,111 @@ export function runSeeds(strategy: Strategy, seeds: number, data: SimData, maxTi
   const out: GameResult[] = [];
   for (let seed = 1; seed <= seeds; seed++) out.push(runGame(strategy, seed, data, maxTicks));
   return out;
+}
+
+/** One depth-flag line: `pass` is a report marker, never a gate. */
+export interface DepthFlag {
+  name: string;
+  pass: boolean;
+  detail: string;
+}
+
+/** The first (lowest-seed) result per variant for a strategy. */
+function byVariant(results: readonly GameResult[], strategy: string): Map<string, GameResult> {
+  const m = new Map<string, GameResult>();
+  for (const r of results) if (r.strategy === strategy && !m.has(r.variantId)) m.set(r.variantId, r);
+  return m;
+}
+
+const sec = (v: number | null): string => (v === null ? 'never' : `${v} s (${(v / 60).toFixed(1)} min)`);
+
+/** Capture window, in game seconds, for the H2 depth flags. */
+export const CAPTURE_MIN_SEC = 8 * 60;
+export const CAPTURE_MAX_SEC = 13 * 60;
+/** turtle's H1 capture time (9.8 min) and its tolerance, in game seconds. */
+export const H1_TURTLE_SEC = 588;
+export const H1_TURTLE_TOL_SEC = 10;
+
+/** The variants the depth flags compare (seeds 1-3 cover them). */
+export const VARIANT_IDS = ['knotted', 'deep', 'thin'] as const;
+
+/**
+ * DESIGN.md H2 "Bot tuning targets" 1-6 as report lines (each variant needs a
+ * turtle and a raid-supply result; a missing or uncaptured one fails its flag).
+ */
+export function computeDepthFlags(results: readonly GameResult[]): DepthFlag[] {
+  const t = byVariant(results, 'turtle');
+  const r = byVariant(results, 'raid-supply');
+  const ids = VARIANT_IDS;
+  const cap = (m: Map<string, GameResult>, id: string): number | null => m.get(id)?.captureSec ?? null;
+  const lost = (m: Map<string, GameResult>, id: string): number | null => {
+    const g = m.get(id);
+    return g && g.captureSec !== null ? g.shipsLost : null;
+  };
+  const flags: DepthFlag[] = [];
+
+  const outside: string[] = [];
+  for (const [name, m] of [['turtle', t], ['raid-supply', r]] as const) {
+    for (const id of ids) {
+      const c = cap(m, id);
+      if (c === null || c < CAPTURE_MIN_SEC || c > CAPTURE_MAX_SEC) outside.push(`${name}/${id} ${sec(c)}`);
+    }
+  }
+  flags.push({
+    name: 'both strategies capture in every variant within 8-13 min',
+    pass: outside.length === 0,
+    detail: outside.length === 0 ? 'all six within the window' : `outside: ${outside.join('; ')}`,
+  });
+
+  /** Positive: turtle captured first, by that many seconds. */
+  const gap = (id: string): number | null => {
+    const a = cap(t, id);
+    const b = cap(r, id);
+    return a === null || b === null ? null : b - a;
+  };
+  const thin = gap('thin');
+  flags.push({
+    name: 'thin: raid-supply captures at least 30 s before turtle',
+    pass: thin !== null && thin <= -30,
+    detail: thin === null ? 'missing capture' : `raid-supply is ${thin >= 0 ? `${thin} s slower` : `${-thin} s faster`}`,
+  });
+  const deep = gap('deep');
+  flags.push({
+    name: 'deep: turtle captures at least 30 s before raid-supply',
+    pass: deep !== null && deep >= 30,
+    detail: deep === null ? 'missing capture' : `turtle is ${deep >= 0 ? `${deep} s faster` : `${-deep} s slower`}`,
+  });
+  const knotted = gap('knotted');
+  flags.push({
+    name: 'knotted: capture times within 45 s of each other',
+    pass: knotted !== null && Math.abs(knotted) <= 45,
+    detail: knotted === null ? 'missing capture' : `difference ${Math.abs(knotted)} s (${knotted >= 0 ? 'turtle' : 'raid-supply'} first)`,
+  });
+
+  // Strict dominance: at least as good on time and on losses in all three variants.
+  const dominates = (a: Map<string, GameResult>, b: Map<string, GameResult>): boolean =>
+    ids.every((id) => {
+      const ca = cap(a, id);
+      const cb = cap(b, id);
+      const la = lost(a, id);
+      const lb = lost(b, id);
+      return ca !== null && cb !== null && la !== null && lb !== null && ca <= cb && la <= lb;
+    });
+  const raidFirst = ids.filter((id) => (gap(id) ?? 0) < 0);
+  const turtleFirst = ids.filter((id) => (gap(id) ?? 0) > 0);
+  const turtleFewer = ids.filter((id) => (lost(t, id) ?? Infinity) < (lost(r, id) ?? Infinity));
+  const dom = dominates(t, r) ? 'turtle' : dominates(r, t) ? 'raid-supply' : 'none';
+  flags.push({
+    name: 'no dominance: each captures first in a variant, and turtle loses fewer ships in a variant',
+    pass: dom === 'none' && raidFirst.length > 0 && turtleFirst.length > 0 && turtleFewer.length > 0,
+    detail: `raid-supply first in [${raidFirst.join(', ')}], turtle first in [${turtleFirst.join(', ')}], turtle loses fewer in [${turtleFewer.join(', ')}], strict dominance: ${dom}`,
+  });
+
+  const off = ids.map((id) => ({ id, c: cap(t, id), w: t.get(id)?.wavesSent ?? null }));
+  flags.push({
+    name: 'turtle matches H1 (9.8 min +/- 10 s, 1 wave)',
+    pass: off.every((o) => o.c !== null && Math.abs(o.c - H1_TURTLE_SEC) <= H1_TURTLE_TOL_SEC && o.w === 1),
+    detail: off.map((o) => `${o.id} ${sec(o.c)}, ${o.w ?? '-'} wave(s)`).join('; '),
+  });
+  return flags;
 }
