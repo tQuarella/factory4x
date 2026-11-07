@@ -20,12 +20,14 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 6 | engineer | h2-client | launch | Build |
 | 7 | engineer | h2-bots | launch | Build (green; all six H2 depth flags met) |
 | 8 | critic | h2-bots | launch | Review round 1 |
+| r4 | critic | h2-bots | resume | Stalled 600 s waiting on background gates; told to run in foreground |
+| r5 | engineer | h2-client | resume | Stalled 600 s at "Now tests"; told to WIP-commit and continue with time limits |
 | 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
 | 4 | critic | h2-art | launch | Review round 1: REJECT (vine/rock contrast, glow bounds, palette table) |
 | r1 | art-direction | h2-art | resume | Fix round 1 (77e159d) |
 | r2 | critic | h2-art | resume | Review round 2: APPROVE; merged 6176e1f after green branch CI. Critic saw one flaky `test` gate run (28.5 s, passed on rerun) |
 
-Launches: 8 / 12. Resumes: 3.
+Launches: 8 / 12. Resumes: 5.
 
 ## Iteration 1 (H1) plan, closed
 
