@@ -48,8 +48,9 @@ export function deserializeWorld(text: string, data: SimData): LoadResult {
     Array.isArray(w.routes) &&
     Array.isArray(w.ships) &&
     Array.isArray(w.queue) &&
-    w.guardian !== null &&
-    typeof w.guardian === 'object' &&
+    Array.isArray(w.guardians) &&
+    w.system !== null &&
+    typeof w.system === 'object' &&
     w.stats !== null &&
     typeof w.stats === 'object' &&
     tun !== null &&

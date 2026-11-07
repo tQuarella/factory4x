@@ -6,6 +6,7 @@ import {
   nodeStatus,
   serializeWorld,
   step,
+  type Guardian,
   type Input,
   type SimData,
   type World,
@@ -13,8 +14,18 @@ import {
 
 export const data = defaultData;
 
-/** Node indices of the M1 map. */
-export const N = { probe: 0, a1: 1, a2: 2, a3: 3, a4: 4, a5: 5, rich: 6 } as const;
+/** Node indices of the map (the Root's position depends on the variant). */
+export const N = { probe: 0, a1: 1, a2: 2, a3: 3, a4: 4, a5: 5, rich: 6, root: 7 } as const;
+
+/** The Bloom's guardian (rich node). */
+export function bloom(w: World): Guardian {
+  return w.guardians.find((g) => g.node === N.rich)!;
+}
+
+/** The Root's guardian. */
+export function root(w: World): Guardian {
+  return w.guardians.find((g) => g.node === N.root)!;
+}
 
 /** Steps `n` ticks with no inputs. */
 export function run(world: World, n: number, d: SimData = data): void {

@@ -7,9 +7,10 @@ import { clone, data } from './helpers.ts';
 declare const console: { log(...args: unknown[]): void };
 
 /**
- * Acceptance 7: the reference replay (determinism gate and browser
- * cross-engine check) reaches combat and a capture, and every input type in
- * it does something.
+ * m1-sim acceptance 7 and h2-sim acceptance 6: the reference replay
+ * (determinism gate and browser cross-engine check) reaches combat, cuts the
+ * Root (wilt and starvation), captures the Bloom, and every input type in it
+ * does something.
  */
 describe('reference replay', () => {
   const w = createWorld(referenceReplay.seed, data);
@@ -34,12 +35,23 @@ describe('reference replay', () => {
     if (w.lastBattle !== prev && w.lastBattle) battles.push(w.lastBattle);
   }
 
-  it('reaches a repelled wave and then a capture before tick 3000 (the browser check length)', () => {
+  it('before tick 3000 (the browser check length): a repelled wave, the Root cut with the wilt, then the starved Bloom captured', () => {
     console.log(ignoredLog.join('\n'));
     console.log(battles.map((b) => `${b.outcome} @${b.startTick}-${b.endTick} engaged ${b.shipsEngaged} lost ${b.shipsLost} thorns ${b.thornsKilled}`).join('\n'));
-    expect(battles[0]).toMatchObject({ outcome: 'repelled', shipsEngaged: 3, shipsLost: 3 });
-    expect(battles[1]).toMatchObject({ outcome: 'captured' });
-    expect(w.capturedTick).not.toBeNull();
+    expect(w.system.id).toBe('thin');
+    expect(battles.map((b) => [b.node, b.outcome])).toEqual([
+      [6, 'repelled'],
+      [7, 'captured'],
+      [6, 'captured'],
+    ]);
+    expect(battles[0]).toMatchObject({ shipsEngaged: 3, shipsLost: 3, wilt: null });
+    // The Root grew to 6 thorns (root.capBonus 2) before the cut; the Bloom wilted 12 → 8.
+    expect(battles[1]).toMatchObject({ thornsKilled: 6, wilt: { from: 12, to: 8 } });
+    expect(w.stats.thornsWithered).toBe(4);
+    expect(w.stats.rootCutTick!).toBeLessThan(w.capturedTick!);
+    // Starved regrowth (tuned to 30 ticks) acted during the Bloom fight: more thorns killed than the 8 it had.
+    expect(battles[2]!.thornsKilled).toBeGreaterThan(8);
+    expect(battles[2]!.startTick).toBeGreaterThan(w.stats.rootCutTick!);
     expect(w.capturedTick!).toBeLessThan(3000);
   });
 

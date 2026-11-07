@@ -4,7 +4,7 @@
  * placeholders.ts get pixel radii, so line widths and sprites stay crisp at any
  * map scale. Ships and pods interpolate between ticks using session.alpha.
  */
-import { guardianStatus, nodeStatus, shipCounts, type Node } from '@factory4x/sim';
+import { guardianStatus, isCaptured, nodeStatus, shipCounts, type Node } from '@factory4x/sim';
 import { palette } from './palette.ts';
 import { drawAsteroid, drawHitFlash, drawPod, drawProbe, drawRallyFlag, drawRichNode, drawRoute, drawShip, drawThorn } from './placeholders.ts';
 import { fitMap, type Fit } from './fit.ts';
@@ -140,12 +140,12 @@ export class MapView {
       ctx.translate(x, y);
       if (n.kind === 'probe') drawProbe(ctx, rr, t);
       else if (n.kind === 'asteroid') drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
-      else drawRichNode(ctx, rr, t, !world.guardian.alive);
+      else drawRichNode(ctx, rr, t, isCaptured(world));
       ctx.restore();
 
       let labelTop = y - rr - 15;
       let selR = rr + 6;
-      if (n.kind === 'rich' && world.guardian.alive) {
+      if (n.kind === 'rich' && !isCaptured(world)) {
         const count = guard.thornHps.length;
         const ringR = rr * 1.38 + 4;
         const thornR = Math.max(3.5, Math.min(rr * 0.3, (Math.PI * 2 * ringR) / Math.max(1, count) / 2.3));

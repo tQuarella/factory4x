@@ -1,9 +1,9 @@
 import { isSimTunableKey, type SimData, type TunableKey } from './data.ts';
 import { ceilDiv } from './math.ts';
-import { PROBE, nodeDistance, richIndex, routeFrom, type World } from './world.ts';
+import { PROBE, guardianAt, isGuarded, nodeDistance, routeFrom, type World } from './world.ts';
 
 /**
- * Player intent (DESIGN.md H1 "Player inputs"). Node parameters are node
+ * Player intent (DESIGN.md H1 "Player inputs"; H2 adds none). Node parameters are node
  * indices. Inputs are the only way the outside world changes the sim, and
  * every one is recorded in a replay's input log.
  */
@@ -63,7 +63,7 @@ export function isValidInput(world: Readonly<World>, data: SimData, input: Input
     case 'buildExtractor': {
       if (!isIndex(world, input.node) || queueFull(world)) return false;
       const node = world.nodes[input.node]!;
-      const allowedKind = node.kind === 'asteroid' || (node.kind === 'rich' && !world.guardian.alive);
+      const allowedKind = node.kind === 'asteroid' || (node.kind === 'rich' && !isGuarded(world, input.node));
       return allowedKind && extractorsCommitted(world, input.node) < node.slots;
     }
     case 'buildRoute': {
@@ -152,7 +152,7 @@ export function applyInput(world: World, data: SimData, input: Input): void {
       world.shipyard.on = input.on;
       return;
     case 'sendShips': {
-      const rich = richIndex(world);
+      const target = guardianAt(world, input.to);
       let left = input.count === 0 ? Number.MAX_SAFE_INTEGER : input.count;
       for (const s of world.ships) {
         if (left === 0) break;
@@ -160,7 +160,11 @@ export function applyInput(world: World, data: SimData, input: Input): void {
         startTransit(world, s, input.to);
         left--;
       }
-      if (input.to === rich && world.guardian.alive) world.stats.wavesSent++;
+      // Sending to a guarded node while it lives is an attack (step folds same-tick orders per node into one wave).
+      if (target !== null && target.alive) {
+        target.wavesSent++;
+        world.stats.wavesSent++;
+      }
       return;
     }
     case 'setRally':

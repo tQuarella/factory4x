@@ -1,11 +1,28 @@
 import type { SimData } from './data.ts';
 import { applyInput, startTransit, type Input } from './inputs.ts';
 import { ceilDiv } from './math.ts';
-import { PROBE, addThorn, nodeDistance, richIndex, routeFrom, ticksPerMin, type Ship, type World } from './world.ts';
+import {
+  PROBE,
+  addThorn,
+  guardianAt,
+  guardianParams,
+  nodeDistance,
+  richIndex,
+  routeFrom,
+  ticksPerMin,
+  type BattleOutcome,
+  type BattleResult,
+  type Guardian,
+  type Ship,
+  type Wilt,
+  type World,
+} from './world.ts';
 
 /**
- * One tick of DESIGN.md H1 "Rules per tick", systems in the stated order.
- * Every loop runs over a dense array in id (or node index) order.
+ * One tick of DESIGN.md H1 "Rules per tick" with the H2 changes, systems in
+ * the stated order. Every loop runs over a dense array in id (or node index)
+ * order; rules 7-9 each run over all guardians (Bloom, then Root) before the
+ * next rule starts.
  */
 
 /** Rule 2. */
@@ -146,28 +163,33 @@ function movement(world: World): void {
   }
 }
 
-/** Rule 7. Runs only while the Bloom is alive. */
-function combat(world: World, rich: number): void {
-  const g = world.guardian;
+/** Ships parked at `node`, in id order. */
+function shipsAt(world: World, node: number): Ship[] {
+  const present: Ship[] = [];
+  for (const s of world.ships) if (s.at === node) present.push(s);
+  return present;
+}
+
+/** Rule 7, for one living guardian: a round against the ships at its node, with its effective repair. */
+function combat(world: World, g: Guardian): void {
   const t = world.tun;
   let lastShipsDied = false;
   if (world.tick % t['combat.roundTicks'] === 0) {
-    const present: Ship[] = [];
-    for (const s of world.ships) if (s.at === rich) present.push(s);
+    const present = shipsAt(world, g.node);
     if (present.length > 0 && g.thorns.length > 0) {
-      if (world.battle === null) {
-        world.battle = { startTick: world.tick, shipsEngaged: 0, shipsLost: 0, thornsKilled: 0 };
+      if (g.battle === null) {
+        g.battle = { id: world.nextId++, node: g.node, startTick: world.tick, shipsEngaged: 0, shipsLost: 0, thornsKilled: 0 };
       }
-      const battle = world.battle;
+      const battle = g.battle;
       for (const s of present) {
-        if (s.engagedIn !== battle.startTick) {
-          s.engagedIn = battle.startTick;
+        if (s.engagedIn !== battle.id) {
+          s.engagedIn = battle.id;
           battle.shipsEngaged += 1;
         }
       }
       // Both sides' damage comes from counts at the start of the round.
       let playerDamage = present.length * t['ship.damage'];
-      let bloomDamage = g.thorns.length * t['guardian.thornDamage'];
+      let guardDamage = g.thorns.length * t['guardian.thornDamage'];
       let thornsKilled = 0;
       for (const th of g.thorns) {
         if (playerDamage <= 0) break;
@@ -178,10 +200,10 @@ function combat(world: World, rich: number): void {
       }
       let shipsKilled = 0;
       for (const s of present) {
-        if (bloomDamage <= 0) break;
-        const hit = Math.min(bloomDamage, s.hp);
+        if (guardDamage <= 0) break;
+        const hit = Math.min(guardDamage, s.hp);
         s.hp -= hit;
-        bloomDamage -= hit;
+        guardDamage -= hit;
         if (s.hp <= 0) shipsKilled++;
       }
       if (thornsKilled > 0) g.thorns = g.thorns.filter((th) => th.hp > 0);
@@ -191,61 +213,86 @@ function combat(world: World, rich: number): void {
       }
       battle.thornsKilled += thornsKilled;
       battle.shipsLost += shipsKilled;
+      g.thornsKilled += thornsKilled;
+      g.shipsLost += shipsKilled;
       world.stats.thornsKilled += thornsKilled;
       world.stats.shipsLost += shipsKilled;
     }
     // Repair on every round tick, fight or not.
     const maxHp = t['guardian.thornHp'];
-    const repair = t['guardian.repairPerRound'];
+    const repair = guardianParams(world, g).repairPerRound;
     for (const th of g.thorns) if (th.hp < maxHp) th.hp = Math.min(th.hp + repair, maxHp);
   }
-  if (world.battle !== null) {
+  if (g.battle !== null) {
     let anyPresent = false;
     for (const s of world.ships) {
-      if (s.at === rich) {
+      if (s.at === g.node) {
         anyPresent = true;
         break;
       }
     }
-    if (!anyPresent) endBattle(world, lastShipsDied ? 'repelled' : 'withdrew');
+    if (!anyPresent) endBattle(world, g, lastShipsDied ? 'repelled' : 'withdrew', null);
   }
 }
 
-function endBattle(world: World, outcome: 'captured' | 'repelled' | 'withdrew'): void {
-  const b = world.battle;
+function endBattle(world: World, g: Guardian, outcome: BattleOutcome, wilt: Wilt | null): void {
+  const b = g.battle;
   if (b === null) return;
-  world.lastBattle = { ...b, endTick: world.tick, outcome };
-  world.battle = null;
+  const result: BattleResult = { ...b, endTick: world.tick, outcome, wilt };
+  g.lastBattle = result;
+  world.lastBattle = result;
+  g.battle = null;
 }
 
-/** Rule 8. */
-function capture(world: World, rich: number): void {
-  const g = world.guardian;
+/** The wilt (rule 8, Root): drop the Bloom's newest thorns down to the starved cap. Counted as withered, not killed. */
+function wilt(world: World): Wilt | null {
+  const bloom = guardianAt(world, richIndex(world))!;
+  if (!bloom.alive) return null;
+  const from = bloom.thorns.length;
+  const cap = world.tun['bloom.starvedCap'];
+  // Thorns are in ascending id order, so the newest (highest id) is last.
+  while (bloom.thorns.length > cap) {
+    bloom.thorns.pop();
+    world.stats.thornsWithered += 1;
+  }
+  bloom.regrowProgress = 0;
+  return { from, to: bloom.thorns.length };
+}
+
+/** Rule 8, for one living guardian. */
+function capture(world: World, g: Guardian): void {
   if (g.thorns.length > 0) return;
   let present = 0;
-  for (const s of world.ships) if (s.at === rich) present++;
+  for (const s of world.ships) if (s.at === g.node) present++;
   if (present === 0) return;
   g.alive = false;
   g.regrowProgress = 0;
-  const node = world.nodes[rich]!;
+  const node = world.nodes[g.node]!;
   node.owned = true;
-  node.extractors = Math.min(world.tun['rich.freeExtractors'], node.slots);
-  world.capturedTick = world.tick;
-  // Capture without a fought round (thorns and ships traded out to zero, then a ship arrived before regrowth).
-  if (world.battle === null) world.battle = { startTick: world.tick, shipsEngaged: present, shipsLost: 0, thornsKilled: 0 };
-  endBattle(world, 'captured');
+  // Capture without a fought round (thorns and ships traded out to zero, or a zero-thorn Root, then a ship arrived).
+  if (g.battle === null) {
+    g.battle = { id: world.nextId++, node: g.node, startTick: world.tick, shipsEngaged: present, shipsLost: 0, thornsKilled: 0 };
+  }
+  if (node.kind === 'root') {
+    world.stats.rootCutTick = world.tick;
+    endBattle(world, g, 'captured', wilt(world));
+  } else {
+    node.extractors = Math.min(world.tun['rich.freeExtractors'], node.slots);
+    world.capturedTick = world.tick;
+    endBattle(world, g, 'captured', null);
+  }
 }
 
-/** Rule 9. */
-function regrowth(world: World): void {
-  const g = world.guardian;
-  if (g.thorns.length >= world.tun['guardian.cap']) {
+/** Rule 9, for one living guardian, at its effective cap and regrow ticks. */
+function regrowth(world: World, g: Guardian): void {
+  const p = guardianParams(world, g);
+  if (g.thorns.length >= p.cap) {
     g.regrowProgress = 0;
     return;
   }
   g.regrowProgress += 1;
-  if (g.regrowProgress >= world.tun['guardian.regrowTicks']) {
-    addThorn(world);
+  if (g.regrowProgress >= p.regrowTicks) {
+    addThorn(world, g);
     g.regrowProgress = 0;
   }
 }
@@ -274,21 +321,29 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
   if (world.dataVersion !== data.dataVersion) {
     throw new Error(`World is data version ${world.dataVersion}, data is ${data.dataVersion}`);
   }
-  const wavesBefore = world.stats.wavesSent;
-  for (const input of inputs) applyInput(world, data, input);
-  // Several attack orders applied in the same tick are one wave ("All" sends one order per source node).
-  if (world.stats.wavesSent > wavesBefore + 1) world.stats.wavesSent = wavesBefore + 1;
+  const gs = world.guardians;
+  if (inputs.length > 0) {
+    const wavesBefore = gs.map((g) => g.wavesSent);
+    for (const input of inputs) applyInput(world, data, input);
+    // Several attack orders on one guarded node in the same tick are one wave ("All" sends one order per source node).
+    let extra = 0;
+    for (let i = 0; i < gs.length; i++) {
+      const over = gs[i]!.wavesSent - (wavesBefore[i]! + 1);
+      if (over > 0) {
+        gs[i]!.wavesSent -= over;
+        extra += over;
+      }
+    }
+    world.stats.wavesSent -= extra;
+  }
   construction(world);
   extraction(world);
   routes(world);
   shipyard(world);
   movement(world);
-  if (world.guardian.alive) {
-    const rich = richIndex(world);
-    combat(world, rich);
-    capture(world, rich);
-    if (world.guardian.alive) regrowth(world);
-  }
+  for (const g of gs) if (g.alive) combat(world, g);
+  for (const g of gs) if (g.alive) capture(world, g);
+  for (const g of gs) if (g.alive) regrowth(world, g);
   stats(world);
   world.tick += 1;
 }

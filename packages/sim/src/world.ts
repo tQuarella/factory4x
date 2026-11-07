@@ -1,8 +1,8 @@
-import { SIM_TUNABLE_KEYS, type NodeKind, type SimData, type Tunables } from './data.ts';
+import { ROOT_CAP_MAX, SIM_TUNABLE_KEYS, type NodeKind, type SimData, type Tunables } from './data.ts';
 import { isqrt } from './math.ts';
 
 /**
- * World state (DESIGN.md H1 "Entities and state"). Plain JSON data only: no
+ * World state (DESIGN.md H1 "Entities and state", with the H2 changes). Plain JSON data only: no
  * classes, no Maps, no undefined fields (absent values are null), so
  * JSON.stringify round-trips it exactly and the hash covers all of it.
  *
@@ -73,7 +73,7 @@ export interface Ship {
   /** Node index when parked; null while in transit. */
   at: number | null;
   transit: Transit | null;
-  /** startTick of the last battle this ship fought a round in, or -1. Used to count distinct ships engaged. */
+  /** Id of the last battle this ship fought a round in, or -1. Used to count distinct ships engaged. */
   engagedIn: number;
 }
 
@@ -82,14 +82,12 @@ export interface Thorn {
   hp: number;
 }
 
-export interface Guardian {
-  alive: boolean;
-  /** Oldest first. */
-  thorns: Thorn[];
-  regrowProgress: number;
-}
-
+/** Combat state at one guarded node. */
 export interface Battle {
+  /** From `nextId`; ships remember the last battle they fought in (`Ship.engagedIn`). */
+  id: number;
+  /** The guarded node it is fought at. */
+  node: number;
   startTick: number;
   shipsEngaged: number;
   shipsLost: number;
@@ -98,9 +96,50 @@ export interface Battle {
 
 export type BattleOutcome = 'captured' | 'repelled' | 'withdrew';
 
+/** The Bloom's wilt when the Root is cut: thorn count before and after (from - to thorns withered). */
+export interface Wilt {
+  from: number;
+  to: number;
+}
+
 export interface BattleResult extends Battle {
   endTick: number;
   outcome: BattleOutcome;
+  /** Set on the Root's `captured` result when the Bloom was alive (to = from if it was already at or below the starved cap); otherwise null. */
+  wilt: Wilt | null;
+}
+
+/**
+ * One guardian per guarded node (DESIGN.md H2 "Guardians"): the Bloom on the
+ * rich node and the Root on the root node. `world.guardians` is in node-index
+ * order and never changes length, so the systems loop over it in that order.
+ */
+export interface Guardian {
+  /** The node it guards. */
+  node: number;
+  alive: boolean;
+  /** Oldest first (ascending id). */
+  thorns: Thorn[];
+  regrowProgress: number;
+  /** The battle running at this node, or null. */
+  battle: Battle | null;
+  /** The last finished battle at this node, or null. */
+  lastBattle: BattleResult | null;
+  /** Attacks ordered at this node while it was guarded (at most one per tick). */
+  wavesSent: number;
+  /** Ships lost and thorns killed in battles at this node. */
+  shipsLost: number;
+  thornsKilled: number;
+}
+
+/** The system chosen at world creation (DESIGN.md H2 "Map variation"). Fixed for the run. */
+export interface SystemInfo {
+  /** Index into data `map.variants` (0 thin, 1 knotted, 2 deep in the shipped data). */
+  variant: number;
+  id: string;
+  name: string;
+  /** The variant's base Root cap, before `root.capBonus`. */
+  rootCap: number;
 }
 
 export interface Stats {
@@ -114,6 +153,10 @@ export interface Stats {
   firstShipTick: number | null;
   oreSpentShips: number;
   oreSpentEconomy: number;
+  /** Tick the Root was captured, or null. */
+  rootCutTick: number | null;
+  /** Bloom thorns removed by the wilt (not kills). */
+  thornsWithered: number;
 }
 
 export interface World {
@@ -136,11 +179,14 @@ export interface World {
   nodes: Node[];
   routes: Route[];
   ships: Ship[];
-  guardian: Guardian;
-  battle: Battle | null;
+  /** Bloom then Root (node-index order). */
+  guardians: Guardian[];
+  /** The most recent finished battle at any node (`node` says which). Per node: `guardians[i].lastBattle`. */
   lastBattle: BattleResult | null;
   stats: Stats;
+  /** Tick the Bloom (rich node) was captured, or null. */
   capturedTick: number | null;
+  system: SystemInfo;
 }
 
 /** The probe is always node 0 (enforced by parseSimData). */
@@ -173,14 +219,74 @@ export function ticksPerMin(world: Readonly<World>): number {
   return world.tickRate * 60;
 }
 
-function addThorn(world: World): void {
-  world.guardian.thorns.push({ id: world.nextId++, hp: world.tun['guardian.thornHp'] });
+/** Index of the Root node. */
+export function rootIndex(world: Readonly<World>): number {
+  const nodes = world.nodes;
+  for (let i = 0; i < nodes.length; i++) if (nodes[i]!.kind === 'root') return i;
+  throw new Error('world has no root node');
+}
+
+/** The guardian at `node`, or null if the node isn't a guarded node. */
+export function guardianAt(world: Readonly<World>, node: number): Guardian | null {
+  for (const g of world.guardians) if (g.node === node) return g;
+  return null;
+}
+
+/** True while `node` has a living guardian (sending ships there is an attack). */
+export function isGuarded(world: Readonly<World>, node: number): boolean {
+  const g = guardianAt(world, node);
+  return g !== null && g.alive;
+}
+
+/** True while the Root lives: the Bloom is fed and behaves as in H1. */
+export function bloomFed(world: Readonly<World>): boolean {
+  return guardianAt(world, rootIndex(world))!.alive;
+}
+
+/** Cap, regrowth and repair a guardian uses at the current tunables (DESIGN.md H2 "Effective parameters"). */
+export interface GuardianParams {
+  cap: number;
+  regrowTicks: number;
+  repairPerRound: number;
+}
+
+/** The Bloom's parameters while fed (`fed = true`) or starved. */
+export function bloomParams(world: Readonly<World>, fed: boolean): GuardianParams {
+  const t = world.tun;
+  return fed
+    ? { cap: t['guardian.cap'], regrowTicks: t['guardian.regrowTicks'], repairPerRound: t['guardian.repairPerRound'] }
+    : { cap: t['bloom.starvedCap'], regrowTicks: t['bloom.starvedRegrowTicks'], repairPerRound: t['bloom.starvedRepairPerRound'] };
+}
+
+/** The Root's effective cap: clamp(variant rootCap + root.capBonus, 0, 40). */
+export function rootCap(world: Readonly<World>): number {
+  return Math.max(0, Math.min(ROOT_CAP_MAX, world.system.rootCap + world.tun['root.capBonus']));
+}
+
+/** Effective parameters of guardian `g` now. */
+export function guardianParams(world: Readonly<World>, g: Readonly<Guardian>): GuardianParams {
+  if (world.nodes[g.node]!.kind === 'root') {
+    return { cap: rootCap(world), regrowTicks: world.tun['root.regrowTicks'], repairPerRound: world.tun['guardian.repairPerRound'] };
+  }
+  return bloomParams(world, bloomFed(world));
+}
+
+function addThorn(world: World, g: Guardian): void {
+  g.thorns.push({ id: world.nextId++, hp: world.tun['guardian.thornHp'] });
+}
+
+/** The variant index a new world uses: `forced - 1` when `forced > 0` (system.variant), else ((seed mod n) + n) mod n. */
+export function chooseVariant(seed: number, forced: number, variantCount: number): number {
+  if (forced > 0) return Math.min(forced, variantCount) - 1;
+  return (((seed | 0) % variantCount) + variantCount) % variantCount;
 }
 
 /** A fresh world at tick 0 from the given (validated) data. */
 export function createWorld(seed: number, data: SimData): World {
   const tun = {} as Tunables;
   for (const k of SIM_TUNABLE_KEYS) tun[k] = data.tunables[k].default;
+  const variantIndex = chooseVariant(seed, tun['system.variant'], data.map.variants.length);
+  const variant = data.map.variants[variantIndex]!;
   const world: World = {
     tick: 0,
     rng: seed | 0,
@@ -198,8 +304,9 @@ export function createWorld(seed: number, data: SimData): World {
       index,
       id: n.id,
       kind: n.kind,
-      x: n.x,
-      y: n.y,
+      // The Root's position comes from the variant; map.nodes holds a placeholder.
+      x: n.kind === 'root' ? variant.x : n.x,
+      y: n.kind === 'root' ? variant.y : n.y,
       r: n.r,
       slots: n.slots,
       owned: n.kind === 'probe',
@@ -209,8 +316,7 @@ export function createWorld(seed: number, data: SimData): World {
     })),
     routes: [],
     ships: [],
-    guardian: { alive: true, thorns: [], regrowProgress: 0 },
-    battle: null,
+    guardians: [],
     lastBattle: null,
     stats: {
       deliveredBuckets: new Array<number>(data.tunables['stats.throughputWindowSec'].default).fill(0),
@@ -222,10 +328,32 @@ export function createWorld(seed: number, data: SimData): World {
       firstShipTick: null,
       oreSpentShips: 0,
       oreSpentEconomy: 0,
+      rootCutTick: null,
+      thornsWithered: 0,
     },
     capturedTick: null,
+    system: { variant: variantIndex, id: variant.id, name: variant.name, rootCap: variant.rootCap },
   };
-  for (let i = 0; i < tun['guardian.cap']; i++) addThorn(world);
+  // One guardian per guarded node, in node-index order (Bloom 6, Root 7).
+  for (const n of world.nodes) {
+    if (n.kind !== 'rich' && n.kind !== 'root') continue;
+    world.guardians.push({
+      node: n.index,
+      alive: true,
+      thorns: [],
+      regrowProgress: 0,
+      battle: null,
+      lastBattle: null,
+      wavesSent: 0,
+      shipsLost: 0,
+      thornsKilled: 0,
+    });
+  }
+  // Each starts at its cap; thorn ids are handed out in guardian order.
+  for (const g of world.guardians) {
+    const cap = guardianParams(world, g).cap;
+    for (let i = 0; i < cap; i++) addThorn(world, g);
+  }
   return world;
 }
 
