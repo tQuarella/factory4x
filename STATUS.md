@@ -2,14 +2,22 @@
 
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
-**Milestone:** 1 — First playable (iteration 1, hypothesis H1)
-**State:** Owner feedback on build-20261106-2 is in (PLAYTEST_LOG.md): H1 only weakly supported. Throughput was "mildly satisfying", the Bloom was "obvious and one dimensional", and replay was wanted but the identical map was "deflating". Waiting on the owner to choose the H2 direction (depth vs variety) before /iterate.
+**Milestone:** 1 — First playable (iteration 2, hypothesis H2: decision depth)
+**State:** Owner chose "Depth first" for H2. Iteration 2 started: Designer is triaging the M1 feedback and specifying H2.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261106-2 (M1 first playable), live and passing the live smoke test at desktop and phone sizes.
 **Last updated:** 2026-11-06
 
-## Iteration plan
+## Iteration 2 (H2) ledger
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | H2 triage + spec | launch | Plan + Spec |
+
+Launches: 1 / 12. Resumes: 0.
+
+## Iteration 1 (H1) plan, closed
 
 The 12-launch budget can't fit ten small tasks plus a review for each, so M1 is four larger tasks:
 
@@ -36,4 +44,4 @@ Subagent launches: 11 / 12 (designer, core-engineer ×2, art-direction, critic �
 
 ## Next step
 
-Ask the owner which matters more for H2: decision depth or run-to-run variety. Then the Designer triages the feedback and specs H2, and `/iterate` starts it. Keep a per-run launch ledger (PROCESS.md, Usage budget).
+Designer specs H2 in DESIGN.md; then the Director splits it into BACKLOG.md tasks and launches builders.
