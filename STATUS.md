@@ -17,9 +17,10 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 2 | core-engineer | h2-sim | launch | Build |
 | 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
 | 4 | critic | h2-art | launch | Review round 1: REJECT (vine/rock contrast, glow bounds, palette table) |
-| r1 | art-direction | h2-art | resume | Fix round 1 |
+| r1 | art-direction | h2-art | resume | Fix round 1 (77e159d) |
+| r2 | critic | h2-art | resume | Review round 2: APPROVE; branch CI running before merge. Critic saw one flaky `test` gate run (28.5 s, passed on rerun) |
 
-Launches: 4 / 12. Resumes: 1.
+Launches: 4 / 12. Resumes: 2.
 
 ## Iteration 1 (H1) plan, closed
 
