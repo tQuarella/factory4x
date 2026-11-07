@@ -25,3 +25,38 @@ Required changes:
 - [ ] Add `rootRock`, `rootRockEdge`, `vine` and `vinePulse` to the ART_STYLE.md Palette table with their roles, matching `palette.ts`. The prose paragraph can stay or go.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-06
+
+Pillar fit: Unchanged and good. The bud now sits at -0.7r instead of -0.82r, and the Root still reads as a tall, upright stalk. At 24 px it is clearly different from the round Bloom gear. The cut state now shows a visible grey rock outline under the grey drooped stalk. That reads better as a dead Root, and it doesn't make the Root look like the withered Bloom.
+
+Quality: Fix commit 77e159d touches only `placeholders.ts` and `ART_STYLE.md`. The signatures haven't changed, so h2-client's contract holds. Each round-1 item, checked:
+- **Cut vine contrast:** fixed. The `globalAlpha = 0.8` is gone, so the line draws in `withered`, which is 5.02:1 on `#05070d`. It is now 2.5 px wide. The ART_STYLE row matches.
+- **Cut Root rock edge:** fixed. The edge is now `withered` (5.02:1), not `witheredDark`. The ART_STYLE "Root (cut)" row and palette note match.
+- **Root within r:** fixed. I worked out the extents from the code:
+  - Alive: the glow is centred at (≤0.03r, -0.1r) with radius ≤0.85r, so it reaches at most about 0.955r. The bud top is about 0.96r. The leaf tips are about 0.82r.
+  - Cut: the drooped bud reaches about 0.9r and the folded leaf tips about 0.93r.
+  - Both states: the rock bottom plus half the stroke is about 0.96r. At r = 12 the 1 px minimum line width adds about 0.04r.
+
+  Every part stays inside r, so the doc comment and ART_STYLE are now true.
+- **Palette table:** fixed. `rootRock`, `rootRockEdge`, `vine` and `vinePulse` are rows in the ART_STYLE Palette table with their roles, matching `palette.ts`.
+
+The round-1 non-blocking notes still apply, for h2-client to handle:
+- the caller rotates the wilting thorn so it doesn't snap from the spinning ring;
+- one pulse per in-game vine;
+- the Root vs Bloom gallery row is drawn at the same r.
+
+Phone: I rebuilt and opened `gallery.html` at 375x667 (DPR 2): scrollWidth is 375, with no sideways scroll. I looked at fresh screenshots of the Root alive, Root cut, Root vs Bloom, vine alive (two times), vine cut and wilting-thorn rows at 24, 48 and 96 px. The cut vine is now as visible as an M1 route line, and the cut rock shows at 24 px.
+
+Gates on `task/h2-art` (77e159d):
+- First run of `npm run gates -- --base main`: `test` **failed** in 28.5 s (it normally takes 10–14 s), and every other gate passed. I didn't capture which test failed.
+- No test imports `placeholders.ts` or `palette.ts`, and this commit changes no logic that runs under test.
+- A standalone `vitest run` then passed 120 of 120, and a full rerun of `npm run gates -- --base main` passed every gate (typecheck, lint, test 14.1 s, determinism, bots, protected-files).
+
+I take the first failure to be a load-sensitive flake (another worktree agent was active), not this change. Because a flaky gate weakens the gate, the Director should open a backlog item to find and fix it. It doesn't block this task.
+
+`npm run build` passes, and `npm run smoke` passed 32 of 32.
+
+Required changes: none.
+
+VERDICT: APPROVE
