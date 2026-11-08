@@ -14,14 +14,7 @@
             <span class="lbl">ORE/MIN</span>
             <span class="num"><span id="thr">0</span><span id="thr-arrow" aria-hidden="true"></span></span>
           </div>
-          <div class="stat">
-            <span class="lbl">STOCK</span>
-            <span class="num" id="stock">0</span>
-          </div>
-          <div class="stat">
-            <span class="lbl">SHIPS</span>
-            <span class="num"><span id="ships">0</span><small id="ships-rate"></small></span>
-          </div>
+          <div id="chips" aria-label="Stock and ships"></div>
         </div>
         <div id="controls">
           <button type="button" class="ctl" id="b-pause" aria-label="Pause">Pause</button>
@@ -56,6 +49,7 @@
     <section class="overlay" id="tuning" hidden aria-label="Tuning"></section>
     <section class="overlay" id="feedback" hidden aria-label="Feedback"></section>
     <section class="overlay modal" id="result" hidden aria-label="Result"></section>
+    <section class="overlay modal" id="sendpanel" hidden aria-label="Choose ships to send"></section>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

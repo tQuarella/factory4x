@@ -12,16 +12,19 @@ import {
   type BattleResult,
   replayHashes,
   shipCounts,
-  shipsPerMinX10,
+  shipsAtByType,
   throughputPerMin,
+  unlockStatus,
   worldHash,
   type Input,
 } from '@factory4x/sim';
 import { h, setHidden, setText, toggleClass } from './dom.ts';
-import { fmt10, shortVersion } from './format.ts';
+import { shortVersion } from './format.ts';
+import { Hud } from './hud.ts';
 import { FeedbackPanel, TuningPanel, showResult, type PanelHost } from './panels.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
-import { bannerLines, battleReport } from './report.ts';
+import { bannerLines, battleReport, unlockNotice } from './report.ts';
+import { SendPanel } from './sendpanel.ts';
 import { Session, dataWithDefaults, replayData, type Speed } from './session.ts';
 import { Sheet } from './sheet.ts';
 import { MapView } from './view.ts';
@@ -59,8 +62,10 @@ const sheet = new Sheet($('sheet'), {
   },
   send,
   sendAll,
+  choose: (from, to) => sendPanel.open(from, to),
   close: () => closeSheet(),
 });
+const sendPanel = new SendPanel($('sendpanel'), { world: () => app.session.world, sendAll });
 
 function send(input: Input): void {
   sendAll([input]);
@@ -108,6 +113,7 @@ const feedback = new FeedbackPanel($('feedback'), panelHost);
 function newRun(): void {
   app.session = new Session(dataWithDefaults(data, app.session.world.tun), { seed: nextSeed(app.session.seed) });
   sheet.close();
+  sendPanel.close();
   toast.hide();
   writeSave(app.session);
   refreshUi();
@@ -115,16 +121,23 @@ function newRun(): void {
 
 // --- toast (battle reports, notices); stays until tapped ----------------------------
 const toastEl = $('toast');
+let toastAction: (() => void) | null = null;
 const toast = {
-  show(text: string): void {
+  show(text: string, action: (() => void) | null = null): void {
     toastEl.textContent = text;
     toastEl.hidden = false;
+    toastAction = action;
   },
   hide(): void {
     toastEl.hidden = true;
+    toastAction = null;
   },
 };
-toastEl.addEventListener('click', () => toast.hide());
+toastEl.addEventListener('click', () => {
+  const act = toastAction;
+  toast.hide();
+  act?.();
+});
 toastEl.addEventListener('keydown', (ev) => {
   if (ev.key === 'Enter' || ev.key === ' ') {
     ev.preventDefault();
@@ -157,12 +170,10 @@ $('b-note').addEventListener('click', () => feedback.open());
 
 // --- HUD ----------------------------------------------------------------------------------
 $('version').textContent = shortVersion(fullVersion);
+const hud = new Hud($('chips'));
 const el = {
   thr: $('thr'),
   arrow: $('thr-arrow'),
-  stock: $('stock'),
-  ships: $('ships'),
-  rate: $('ships-rate'),
   pause: $('b-pause'),
   paused: $('paused'),
   banner: $('banner'),
@@ -170,6 +181,8 @@ const el = {
 };
 
 let forceBanner = false;
+/** Unlocked ship types as of the last look, per world, so a resumed run doesn't announce old unlocks. */
+const unlockSeen: { world: unknown; ships: Record<string, boolean> } = { world: null, ships: {} };
 
 function refreshUi(): void {
   const s = app.session;
@@ -181,9 +194,7 @@ function refreshUi(): void {
   setText(el.arrow, dir === 'up' ? '▲' : dir === 'down' ? '▼' : '');
   toggleClass(el.arrow, 'up', dir === 'up');
   toggleClass(el.arrow, 'down', dir === 'down');
-  setText(el.stock, String(w.stock.ore));
-  setText(el.ships, String(w.ships.length));
-  setText(el.rate, `${fmt10(shipsPerMinX10(w))}/min`);
+  hud.update(w);
   setText(el.pause, s.paused ? 'Play' : 'Pause');
   toggleClass(el.pause, 'on', s.paused);
   setHidden(el.paused, !s.paused);
@@ -192,7 +203,7 @@ function refreshUi(): void {
   const lines = bannerLines(w);
   const showBanner = lines.length > 0 || forceBanner;
   setHidden(el.banner, !showBanner);
-  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'ROOT · 6 Thorn 0 Spore · strip 0.8/s · 2 lost');
+  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'ROOT · 6 Thorn 4 Spore · strip 0.8/s · 2 lost');
   if (showBanner && el.banner.dataset.text !== lines.join('|')) {
     el.banner.dataset.text = lines.join('|');
     el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
@@ -206,6 +217,17 @@ function refreshUi(): void {
     s.flags.seenBattleEnd = ended[ended.length - 1]!.endTick;
     toast.show(ended.map((r) => battleReport(w, r)).join('\n\n'));
   }
+  // The first delivery that unlocks Lancers or Flak: say so (the yards start off); one tap opens the Probe.
+  if (unlockSeen.world !== w) {
+    unlockSeen.world = w;
+    unlockSeen.ships = { ...unlockStatus(w).ships };
+  }
+  const fresh = (['lancer', 'flak'] as const).filter((t) => unlockStatus(w).ships[t] && !unlockSeen.ships[t]);
+  if (fresh.length > 0) {
+    for (const t of fresh) unlockSeen.ships[t] = true;
+    const text = fresh.map(unlockNotice).join('\n\n');
+    toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`, () => sheet.open(0));
+  }
   // The first-run hint gives way to battle notices, so the strip keeps room for them.
   setHidden(el.hint, settings.hintDismissed || showBanner || !toastEl.hidden);
   if (isCaptured(w) && !s.flags.resultShown) {
@@ -215,6 +237,7 @@ function refreshUi(): void {
     }
   }
   sheet.update();
+  sendPanel.update();
   tuning.update();
 }
 
@@ -276,6 +299,10 @@ window.__factory4x = {
   inputCount: () => app.session.log.length,
   shipsAt: (node) => shipCounts(app.session.world).at[node] ?? 0,
   wavesSent: () => app.session.world.stats.wavesSent,
+  shipsAtByType: (node) => ({ ...shipsAtByType(app.session.world, node) }),
+  pocketNode: (prize) => app.session.world.nodes.find((n) => n.kind === 'pocket' && n.prize === prize)?.index ?? -1,
+  owned: (node) => app.session.world.nodes[node]!.owned,
+  lastInput: () => JSON.stringify(app.session.log[app.session.log.length - 1]?.input ?? null),
   saveNow,
   replayMatchesLive: () => {
     const s = app.session;

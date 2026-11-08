@@ -4,18 +4,22 @@
  * placeholders.ts get pixel radii, so line widths and sprites stay crisp at any
  * map scale. Ships and pods interpolate between ticks using session.alpha.
  */
-import { activeBattles, guardianStatus, heartIndex, isCaptured, isRootCut, lastBattle, nodeStatus, rootIndex, shipCounts, type Node, type World } from '@factory4x/sim';
+import { activeBattles, guardianStatus, heartIndex, isCaptured, isGuarded, isRootCut, lastBattle, nodeStatus, rootIndex, shipCounts, type Node, type World } from '@factory4x/sim';
 import { palette } from './palette.ts';
 import {
   drawAsteroid,
+  drawGuardRing,
   drawHitFlash,
+  drawPocket,
   drawPod,
   drawProbe,
   drawRallyFlag,
   drawRichNode,
   drawRoot,
+  drawResourceIcon,
   drawRoute,
   drawShip,
+  drawSpore,
   drawThorn,
   drawVine,
   drawWiltingThorn,
@@ -39,10 +43,25 @@ export function ringGeom(rr: number, count: number): { ringR: number; thornR: nu
   return { ringR, thornR };
 }
 
-/** Radius that a tap on a guarded node may land in: the whole thorn ring, and at least a 44 px target. */
-export function guardedReach(rr: number, count: number): number {
+/**
+ * Outer radius of the guard ring (two arcs, Thorn and Spore colour) in px. Pockets draw the ring only, at `ringR`;
+ * the Root and the heart also draw each guard, so their ring sits just outside those.
+ */
+export function guardRingOuter(rr: number, count: number, individuals: boolean): number {
   const { ringR, thornR } = ringGeom(rr, count);
-  return Math.max(MIN_HIT, ringR + thornR + 3);
+  return individuals ? ringR + thornR + 3 : ringR;
+}
+
+/** Radius the Root's and heart's individual guards sit at: just inside the ring band, so the ring stays within the old margin. */
+export function guardSpotR(rr: number, count: number): number {
+  const outer = guardRingOuter(rr, count, true);
+  const w = Math.max(2.5, outer * 0.16);
+  return outer - w - ringGeom(rr, count).thornR - 1;
+}
+
+/** Radius that a tap on a guarded node may land in: the whole guard ring, and at least a 44 px target. */
+export function guardedReach(rr: number, count: number, individuals = true): number {
+  return Math.max(MIN_HIT, guardRingOuter(rr, count, individuals) + 3);
 }
 
 interface WiltAnim {
@@ -139,7 +158,7 @@ export class MapView {
       const dy = py - this.sy(n.y);
       const d = Math.sqrt(dx * dx + dy * dy);
       const g = guardedKind(n) ? guardianStatus(this.session.world, n.index) : null;
-      const reach = g && g.alive ? guardedReach(this.nodeR(n), g.total) : Math.max(MIN_HIT, this.nodeR(n) + 4);
+      const reach = g && g.alive ? guardedReach(this.nodeR(n), g.total, n.kind !== 'pocket') : Math.max(MIN_HIT, this.nodeR(n) + 4);
       if (d <= reach && d < bestD) {
         best = n.index;
         bestD = d;
@@ -208,14 +227,19 @@ export class MapView {
     }
 
     const counts = shipCounts(world);
+    const labels: Array<{ text: string; x: number; y: number }> = [];
     for (const n of world.nodes) {
       const { x, y } = this.nodePos(n.index);
       const rr = this.nodeR(n);
       ctx.save();
       ctx.translate(x, y);
       if (n.kind === 'probe') drawProbe(ctx, rr, t);
-      // Interim (h3-sim): pockets draw as asteroids until h3-client uses drawPocket.
-      else if (n.kind === 'asteroid' || n.kind === 'pocket') drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
+      else if (n.kind === 'pocket' && isGuarded(world, n.index)) drawPocket(ctx, rr, t, true, n.prize ?? 'ore');
+      else if (n.kind === 'asteroid' || n.kind === 'pocket') {
+        drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
+        // A captured pocket is a rock that shows its prize.
+        if (n.kind === 'pocket') drawResourceIcon(ctx, rr * 0.4, n.prize ?? 'ore');
+      }
       else if (n.kind === 'root') drawRoot(ctx, rr, t, isRootCut(world));
       else drawRichNode(ctx, rr, t, isCaptured(world));
       ctx.restore();
@@ -225,46 +249,51 @@ export class MapView {
       const guard = guardedKind(n) ? guardianStatus(world, n.index) : null;
       if (guard && guard.alive) {
         const wilt = n.kind === 'heart' ? this.wilt : null;
+        const individuals = n.kind !== 'pocket';
         const count = wilt ? wilt.from : guard.total;
-        const { ringR, thornR } = ringGeom(rr, count);
-        for (let i = 0; i < count; i++) {
-          const ang = (i / count) * Math.PI * 2 + t * 0.12;
-          ctx.save();
-          ctx.translate(x + Math.cos(ang) * ringR, y + Math.sin(ang) * ringR);
-          if (wilt && i >= wilt.to) {
-            // Falls with the angle it had spinning (drawThorn turns at t * 0.8), so it doesn't snap when it starts to wilt.
-            const frac = (nowMs - wilt.startMs) / WILT_MS;
-            ctx.translate(0, frac * thornR * 3);
-            ctx.rotate((wilt.startMs / 1000) * 0.8);
-            drawWiltingThorn(ctx, thornR, frac);
-          } else {
-            // Interim (h3-sim): Spores draw as Thorns until h3-client uses drawSpore.
-            const gd = guard.guardHps[i] ?? { type: 'thorn' as const, hp: 0 };
-            drawThorn(ctx, thornR, t, gd.hp / Math.max(1, guard.guards[gd.type].hp));
+        const { thornR } = ringGeom(rr, count);
+        const spotR = guardSpotR(rr, count);
+        if (individuals) {
+          for (let i = 0; i < count; i++) {
+            const ang = (i / count) * Math.PI * 2 + t * 0.12;
+            ctx.save();
+            ctx.translate(x + Math.cos(ang) * spotR, y + Math.sin(ang) * spotR);
+            if (wilt && i >= wilt.to) {
+              // Falls with the angle it had spinning (drawThorn turns at t * 0.8), so it doesn't snap when it starts to wilt.
+              const frac = (nowMs - wilt.startMs) / WILT_MS;
+              ctx.translate(0, frac * thornR * 3);
+              ctx.rotate((wilt.startMs / 1000) * 0.8);
+              drawWiltingThorn(ctx, thornR, frac);
+            } else {
+              const gd = guard.guardHps[i] ?? { type: 'thorn' as const, hp: 0 };
+              const frac = gd.hp / Math.max(1, guard.guards[gd.type].hp);
+              if (gd.type === 'spore') drawSpore(ctx, thornR, t, frac);
+              else drawThorn(ctx, thornR, t, frac);
+            }
+            ctx.restore();
           }
-          ctx.restore();
         }
-        selR = ringR + thornR + 3;
-        labelTop = y - ringR - thornR - 12;
+        // The guard ring: Thorn and Spore arcs, each a share of the full strength (the caps), so it shrinks as guards die.
+        const outer = guardRingOuter(rr, count, individuals);
+        const cap = Math.max(1, guard.totalCap);
+        ctx.save();
+        ctx.translate(x, y);
+        drawGuardRing(ctx, outer, guard.guards.thorn.count / cap, guard.guards.spore.count / cap, t);
+        ctx.restore();
+        selR = outer + 3;
+        labelTop = y - outer - 10;
         const age = nowMs - this.hitAt;
         if (age < FLASH_MS && this.hitNodes.includes(n.index)) {
           ctx.save();
           ctx.translate(x, y);
-          drawHitFlash(ctx, ringR * 0.9, age / FLASH_MS);
+          drawHitFlash(ctx, outer * 0.9, age / FLASH_MS);
           ctx.restore();
         }
       }
 
-      // Label, selection ring, rally flag, ship badge, warning badge.
-      ctx.save();
-      ctx.font = '600 11px ui-monospace, Menlo, Consolas, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = '#9fb4d6';
+      // Label (drawn in a last pass, over every ring), selection ring, rally flag, ship badge, warning badge.
       // A label that would clip at the top edge goes below the node instead.
-      if (labelTop < LABEL_TOP_PAD) ctx.fillText(nodeLabel(n), x, y + selR + 12);
-      else ctx.fillText(nodeLabel(n), x, labelTop);
-      ctx.restore();
+      labels.push({ text: nodeLabel(n), x, y: labelTop < LABEL_TOP_PAD ? y + selR + 12 : labelTop });
 
       if (selected === n.index) {
         ctx.save();
@@ -288,6 +317,22 @@ export class MapView {
       if (n.kind !== 'probe' && (ns.backedUp || ns.noRoute)) this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
     }
 
+    // Labels last, each on a dark pill, so no guard ring hides the name of the node it rings or a neighbour.
+    ctx.save();
+    ctx.font = '600 11px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    for (const l of labels) {
+      const wd = ctx.measureText(l.text).width + 6;
+      ctx.fillStyle = 'rgba(5, 7, 13, 0.78)';
+      ctx.beginPath();
+      ctx.roundRect(l.x - wd / 2, l.y - 10, wd, 14, 4);
+      ctx.fill();
+      ctx.fillStyle = '#9fb4d6';
+      ctx.fillText(l.text, l.x, l.y);
+    }
+    ctx.restore();
+
     // Ships in transit.
     for (const s of world.ships) {
       const tr = s.transit;
@@ -297,7 +342,7 @@ export class MapView {
       const f = progressFrac(tr.ticksLeft, tr.totalTicks, alpha);
       ctx.save();
       ctx.translate(lerp(a.x, b.x, f), lerp(a.y, b.y, f));
-      drawShip(ctx, 6, Math.atan2(b.y - a.y, b.x - a.x));
+      drawShip(ctx, 6, Math.atan2(b.y - a.y, b.x - a.x), s.type);
       ctx.restore();
     }
   }

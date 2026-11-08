@@ -315,3 +315,10 @@ Scope: `git log build-20261106-2..build-20261108-1` (f1b1b33..13201db), `reviews
 - **The H2 tests that pinned H1/H2 numbers (h2, thin, wave) are replaced, not ported:** the map, guards and ships they describe no longer exist. The H1 fight is still pinned: rules.test.ts puts twelve 20-hp Thorns on the heart and fights them with drones, reproducing H1's round-by-round numbers.
 - **Interim bots and client.** rush, turtle and raid-supply cannot play the H3 map, so `packages/bots` runs two interim strategies (`drones-only`, `greedy`) that follow the spec's shared rules in their simplest form, and the H2 depth flags are removed until h3-bots adds the six H3 flags. The client and `tests/smoke` got name and signature fixes only (pockets draw as asteroids and Spores as Thorns until h3-client), so that branch CI and `main` stay green.
 - **Cost:** bot suite tick p95 about 0.003 ms against the 2 ms budget (16 nodes, 6 guardians; combat runs only on round ticks).
+
+
+## 2026-11-07 · h3-client: unlock on first delivery, and a notice for it
+
+- **Decision:** the capture toast for an ice or crystal pocket reads "Route its crystal to the Probe to unlock Lens and Lancers." until that prize has been delivered. The sim unlocks a resource, its component and its ship row on the first route delivery (`unlockStatus`), not on capture, so "unlocked" at capture would be untrue.
+- **Notice:** when the first delivery unlocks Lancers or Flak, the client shows "Crystal delivered: Lens and Lancers unlocked. Turn on the Lancer yard at the Probe. Tap here to open it." Tapping the toast opens the Probe sheet. The yards start off, so without the notice a player who never reopens the Probe would never build a counter.
+- **Map labels:** node labels are drawn in a last pass on a dark pill, over the guard rings, so a ring never hides a name (Root and A5 at 375 px).
