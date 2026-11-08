@@ -532,6 +532,8 @@ Only the minimal edits needed to keep `packages/client/src/*` and `packages/bots
 
 ## Can wait (allowed while waiting on the owner)
 
+- **cw-veil-starved-tag** (designer): on data v9 the Root-cut Spore Veil heart's counter tags read Even/Even, but the minimum waves say Flak is Strong (14 flak vs 20 drones). Fix the tag or the guard mix so the sheet reads true (h5-design-data review, round 1).
+
 - **cw-h3-review-notes** (Designer to judge, then engineer; from the H3 Critic reviews, 2026-11-07):
   - Pace: bots take the heart at 19–22 min with counters, short of the spec's 20–35 (and 35–45 for drones-only). The bot suite caps games at 30 min, which limits how slow calibration can go; raise the cap first if pace is retuned.
   - Twin Seams reads Even/Even for both counters at its Root and heart; 4 of 42 tags misread near the thresholds. A time-to-clear tag formula (sim selector) would be sturdier than the hp-weighted one.
