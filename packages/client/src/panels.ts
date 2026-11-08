@@ -6,7 +6,7 @@ import { clampInt, mmss, shortVersion, stepFor, ticksText } from './format.ts';
 import type { Settings } from './persist.ts';
 import { iconCanvas } from './icons.ts';
 import { drawProbeCore } from './placeholders.ts';
-import { RES_NAME, SHIP_NAME, plusText, tripleText } from './report.ts';
+import { RES_NAME, SHIP_NAME, plusText, recycledText, tripleText } from './report.ts';
 import type { Session } from './session.ts';
 
 export interface PanelHost {
@@ -46,6 +46,13 @@ function header(root: HTMLElement, title: string, onClose: () => void): void {
 }
 
 // ---------------------------------------------------------------------------
+
+/** H5: friendlier names for the fleet-cap tunables (the owner's A/B: `fleet.cap` 0 turns the limit off). The input's aria-label stays the key. */
+export const TUNE_LABEL: Readonly<Record<string, string>> = {
+  'fleet.cap': 'Fleet limit (0 = none)',
+  'fleet.recycleRefundPct': 'Recycle refund %',
+  'research.fleet.step': 'Command limit step',
+};
 
 interface TuneRow {
   meta: TunableMeta;
@@ -134,7 +141,7 @@ export class TuningPanel {
         h('div', 't-section', section, this.root);
       }
       const row = h('div', 't-row', '', this.root);
-      const name = h('div', 't-name', meta.key.slice(meta.section.length + 1), row);
+      const name = h('div', 't-name', TUNE_LABEL[meta.key] ?? meta.key.slice(meta.section.length + 1), row);
       const info = h('small', '', `${meta.min}–${meta.max} · default ${meta.default}`, name);
       if (meta.newRunOnly) h('span', 'tag', ' · applies on New system', info);
       if (meta.key === 'economy.startStock') h('span', 'tag', ' · applies at the next landing', info);
@@ -325,6 +332,7 @@ export function showAreaResult(root: HTMLElement, session: Session, onBack: () =
   h('b', '', captureOrderText(s.captures), order);
   statLine(card, 'Ships lost', byTypeText(s.shipsLostByType));
   statLine(card, 'Guards withered', String(s.guardsWithered));
+  if (s.shipsRecycled > 0) statLine(card, 'Recycled', recycledText(s.shipsRecycled, s.oreRefunded));
   const haul = h('div', 'capture-order haul-line', '', card);
   h('span', 'lbl', 'Hauled to the stockpile', haul);
   h('b', '', st ? plusText(st.haul) : '-', haul);
@@ -359,6 +367,7 @@ export function showWin(root: HTMLElement, session: Session, onNewSystem: () => 
   const multi = (id: string): boolean => (data.research.find((r) => r.id === id)?.levels.length ?? 1) > 1;
   h('b', '', sum.research.map((r) => (multi(r.item) ? `${r.name} ${r.level}` : r.name)).join(' → ') || '-', research);
   statLine(card, 'Ships lost', `${sum.shipsLost} of ${sum.shipsBuilt}`);
+  if (sum.shipsRecycled > 0) statLine(card, 'Recycled', recycledText(sum.shipsRecycled, sum.oreRefunded));
   const hs = h('div', 'win-list win-hauled', '', card);
   h('span', 'lbl', 'Hauled', hs);
   h('b', '', tripleText(sum.hauled), hs);

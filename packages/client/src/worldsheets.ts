@@ -6,6 +6,7 @@
 import {
   RAW_RESOURCES,
   areaStatus,
+  fleetStatus,
   landingEffects,
   researchStatus,
   type AreaGuardedNode,
@@ -29,6 +30,7 @@ import {
   purchaseNotice,
   ratesX10Text,
   researchBlock,
+  tierRequirementText,
   tripleText,
 } from './report.ts';
 import type { Session } from './session.ts';
@@ -75,6 +77,7 @@ export class AreaSheet {
   private area = -1;
   private sig = '';
   private land: Btn | null = null;
+  private limit: HTMLElement | null = null;
 
   constructor(root: HTMLElement, host: WorldHost) {
     this.root = root;
@@ -98,6 +101,7 @@ export class AreaSheet {
     this.area = -1;
     this.sig = '';
     this.land = null;
+    this.limit = null;
     this.root.replaceChildren();
     this.root.classList.remove('world');
     this.root.hidden = true;
@@ -111,6 +115,15 @@ export class AreaSheet {
   update(): void {
     if (this.area < 0) return;
     if (this.signature() !== this.sig) this.build();
+    else this.refreshLimit();
+  }
+
+  /** "Your fleet limit: 18", hidden while the limit is off. Live: it follows the tuning panel. */
+  private refreshLimit(): void {
+    if (!this.limit) return;
+    const cap = fleetStatus(this.world, this.host.session.data).cap;
+    setHidden(this.limit, cap === null);
+    setText(this.limit, cap === null ? '' : `Your fleet limit: ${cap}`);
   }
 
   private build(): void {
@@ -175,6 +188,10 @@ export class AreaSheet {
         badge.title = COUNTER_PHRASE[ship];
       }
     }
+
+    // H5: the fleet limit you would land with (no ships-needed number: estimating stays the puzzle).
+    this.limit = h('div', 'note fleet-limit', '', this.root);
+    this.refreshLimit();
 
     const foot = h('div', 'sheet-foot', '', this.root);
     if (st.state === 'reclaimed') {
@@ -286,14 +303,14 @@ export class ResearchSheet {
     closeBtn.el.setAttribute('aria-label', 'Close research');
     h('div', 'note', 'Bought with the stockpile. Reclaimed areas ship home while you play elsewhere.', this.root);
 
-    const order = ['core', 'lancer', 'flak', 'opening', 'extract', 'rigs', 'yards'];
+    const order = ['core', 'lancer', 'flak', 'fleet', 'opening', 'extract', 'rigs', 'yards'];
     const ordered = data.research
       .map((item, index) => ({ item, index }))
       .sort((a, b) => order.indexOf(a.item.id) - order.indexOf(b.item.id));
     this.cards = [];
     for (const { item, index } of ordered) {
       if (item.id === 'core') this.cards.push(this.coreCard(index));
-      else if (item.kind === 'design') this.cards.push(this.designCard(index));
+      else if (item.kind === 'design' || item.kind === 'limit') this.cards.push(this.designCard(index));
       else this.cards.push(this.grindRow(index));
     }
   }
@@ -303,9 +320,13 @@ export class ResearchSheet {
     return {
       set: (r, world) => {
         const item = this.host.session.data.research[r.index]!;
-        // h5-sim: compile-only support for the H5 requirement kinds; h5-client words them.
         const parts = item.requires.filter((q) => q.atLevel === undefined || q.atLevel === r.level + 1).map((q) => {
-          if ('tier' in q) return `${q.count} tier ${q.tier}+ area${q.count === 1 ? '' : 's'} reclaimed`;
+          if ('tier' in q) {
+            // "a medium area reclaimed", "both medium areas reclaimed": areas of tier >= q.tier, from the data.
+            const data = this.host.session.data;
+            const have = data.map.areas.filter((a, i) => a.tier >= q.tier && world.campaign.areas[i]?.reclaimedTick != null).length;
+            return `${tierRequirementText(q.tier, q.count)}${have >= q.count ? ' ✓' : ''}`;
+          }
           if ('item' in q) {
             const ok = (world.campaign.research[q.item] ?? 0) >= q.level;
             return `${this.itemLabel(q.item, q.level)}${ok ? ' ✓' : ''}`;
@@ -383,12 +404,16 @@ export class ResearchSheet {
     const row = h('section', 'rcard design', '', this.root);
     row.dataset.item = item.id;
     const top = h('div', 'rc-top', '', row);
-    // h5-sim: the fleet icon comes with h5-art and h5-client.
-    if (item.id !== 'fleet') researchIcon(top, 56, item.id);
+    researchIcon(top, 56, item.id);
     const text = h('div', 'rc-text', '', top);
-    h('b', 'rc-name', item.name, text);
+    const isLimit = item.kind === 'limit';
+    // H5: the Command limit is a large card with level pips ("1/3"), like the designs.
+    const nameLine = h('div', 'rc-nameline', '', text);
+    h('b', 'rc-name', item.name, nameLine);
+    const pips = isLimit ? h('span', 'rc-level', '', nameLine) : null;
+    if (isLimit) row.classList.add('limit');
     const phrase = item.id === 'lancer' || item.id === 'flak' ? COUNTER_PHRASE[item.id] : '';
-    h('div', 'rc-phrase', phrase, text);
+    if (!isLimit) h('div', 'rc-phrase', phrase, text);
     const eff = h('div', 'note', '', text);
     const chips = costChips(row);
     const reqs = this.requires(row);
@@ -396,6 +421,7 @@ export class ResearchSheet {
     return {
       row,
       update: (r, world) => {
+        if (pips) setText(pips, `${r.level}/${r.maxLevel}`);
         setText(eff, effectText(r, world.tun, world.tickRate));
         chips.set(r.cost, world.campaign.stockpile);
         reqs.set(r, world);
@@ -409,7 +435,7 @@ export class ResearchSheet {
     const row = h('section', 'rcard grind', '', this.root);
     row.dataset.item = item.id;
     const top = h('div', 'rc-top', '', row);
-    if (item.id !== 'fleet') researchIcon(top, 32, item.id);
+    researchIcon(top, 32, item.id);
     const text = h('div', 'rc-text', '', top);
     const nameLine = h('div', 'rc-nameline', '', text);
     h('b', 'rc-name', item.name, nameLine);

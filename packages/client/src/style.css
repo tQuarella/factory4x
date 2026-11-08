@@ -286,3 +286,14 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 @media (min-aspect-ratio: 1/1) {
   #b-research { grid-column: 1 / -1; margin: 0; width: auto; }
 }
+
+/* ---- H5: fleet chip, the Yards header, Recycle, the Command limit card ---- */
+/* The chip keeps a transparent 1 px edge so it never shifts when it turns amber (palette.probe, set in hud.ts) at the limit. */
+.chip.fleet { border: 1px solid transparent; border-radius: 8px; padding: 0 5px; white-space: nowrap; }
+.chip.fleet b { white-space: nowrap; }
+.chip.fleet.full b { color: var(--gold); }
+.fleet-line { font-size: 13px; color: var(--ink); padding: 2px 0 4px; overflow-wrap: anywhere; }
+.btn.recycle-btn { display: flex; align-items: center; justify-content: center; gap: 8px; border-color: #2f6c73; }
+.recycle-card h2 { display: flex; align-items: center; gap: 8px; }
+.recycle-preview { padding: 8px 0; font-size: 18px; font-weight: 700; color: var(--teal); text-align: center; border-top: 1px solid var(--line); }
+.rcard.limit { border-color: #3a5c8a; }

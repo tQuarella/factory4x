@@ -10,6 +10,7 @@ import {
   battleStatus,
   campaignStatus,
   combatRates,
+  fleetStatus,
   guardianStatus,
   inputCost,
   isCaptured,
@@ -36,7 +37,7 @@ import {
 import { palette } from './palette.ts';
 import { bar, btn, h, setHidden, setText, toggleClass, type Btn } from './dom.ts';
 import { fmt10 } from './format.ts';
-import { guardIcon, resourceIcon, shipIcon } from './icons.ts';
+import { guardIcon, recycleIcon, resourceIcon, shipIcon } from './icons.ts';
 import {
   COMPONENT_SOURCE,
   COUNTER_PHRASE,
@@ -51,6 +52,7 @@ import {
   guardName,
   regrowText,
   supplyLine,
+  fleetLine,
   unlockHint,
 } from './report.ts';
 import type { Session } from './session.ts';
@@ -62,6 +64,8 @@ export interface SheetHost {
   sendAll(inputs: readonly Input[]): void;
   /** Opens the "Choose…" send panel for a fleet at `from` going to `to`. */
   choose(from: number, to: number): void;
+  /** Opens the Recycle panel for the ships parked at `node`. */
+  recycle(node: number): void;
   close(): void;
 }
 
@@ -72,13 +76,18 @@ export function shipsText(c: Readonly<ShipTypeCounts>): string {
 }
 
 
-export const YARD_STATE_TEXT: Record<YardState, (component: string | null) => string> = {
+/** The fleet's count and limit, for the `fleetFull` row ("idle: fleet full (12/12)"). */
+export interface FleetCounts {
+  count: number;
+  cap: number | null;
+}
+
+export const YARD_STATE_TEXT: Record<YardState, (component: string | null, fleet?: FleetCounts) => string> = {
   building: () => 'building',
   needsDesign: () => 'Design not researched (Research, on the overworld)',
   noSource: (c) => (c === 'lens' || c === 'plating' ? `No ${COMPONENT_SOURCE[c]} here: no ${c} source in this area` : 'No component source in this area'),
   off: () => 'off',
-  // h5-sim: compile-only placeholder; h5-client adds the counts ("idle: fleet full (12/12)").
-  fleetFull: () => 'idle: fleet full',
+  fleetFull: (_c, f) => (f && f.cap !== null ? `idle: fleet full (${f.count}/${f.cap})` : 'idle: fleet full'),
   needsComponent: (c) => `idle: needs ${c ?? 'a component'}`,
   needsOre: () => 'idle: needs ore',
   ready: () => 'starting',
@@ -173,6 +182,7 @@ export class Sheet {
     else this.producerSections(n);
 
     this.sendSection(n);
+    if (!isGuarded(world, n.index)) this.recycleSection(n);
     this.rallySection(n);
     this.update();
   }
@@ -306,6 +316,7 @@ export class Sheet {
     });
     const yard = h('section', 'yards', '', this.root);
     h('div', 'lbl', 'Yards', yard);
+    const fleetHead = h('div', 'fleet-line', '', yard);
     const yardRows = SHIP_TYPES.map((type) => this.yardRow(yard, type));
     const mining = this.row(yard, 'Probe mining');
     const asm = h('section', 'assembly', '', this.root);
@@ -332,7 +343,10 @@ export class Sheet {
     this.ups.push(() => {
       const w = this.world;
       const ys = yardStatus(w);
-      ys.yards.forEach((y, i) => yardRows[i]!.update(y, w.tickRate));
+      const fleet = fleetStatus(w, this.host.session.data);
+      setHidden(fleetHead, fleet.cap === null);
+      if (fleet.cap !== null) setText(fleetHead, fleetLine({ count: fleet.count, cap: fleet.cap, level: fleet.level, maxLevel: fleet.maxLevel }));
+      ys.yards.forEach((y, i) => yardRows[i]!.update(y, w.tickRate, { count: fleet.count, cap: fleet.cap }));
       setText(mining.val, `+${ys.probeOrePerMin}/min`);
       const asms = assemblerStatus(w);
       asms.forEach((r, i) => asmRows[i]!.update(r, w.tickRate));
@@ -372,7 +386,7 @@ export class Sheet {
   }
 
   /** One yard row: icon, name, an on/off toggle, the cost line and a status; hidden (with its unlock hint) until unlocked. */
-  private yardRow(parent: HTMLElement, type: ShipType): { update(y: YardRow, tickRate: number): void } {
+  private yardRow(parent: HTMLElement, type: ShipType): { update(y: YardRow, tickRate: number, fleet: FleetCounts): void } {
     const wrap = h('div', 'yard-row', '', parent);
     wrap.dataset.yard = type;
     const hint = h('div', 'note locked-hint', unlockHint(type), parent);
@@ -384,7 +398,7 @@ export class Sheet {
     const status = h('div', 'yr-status', '', wrap);
     const progress = bar(wrap, 'yard');
     return {
-      update: (y, tickRate) => {
+      update: (y, tickRate, fleet) => {
         const shown = y.unlocked || y.researched;
         setHidden(wrap, !shown);
         setHidden(hint, shown || type === 'drone');
@@ -392,8 +406,8 @@ export class Sheet {
         tog.el.setAttribute('aria-label', `${SHIP_NAME[type]} yard ${y.on ? 'on, tap to stop' : 'off, tap to start'}`);
         toggleClass(tog.el, 'on', y.on);
         setText(cost, `${y.cost} ore${y.component ? ` + 1 ${y.component}` : ''} · ${(y.totalTicks / tickRate).toFixed(1)} s`);
-        setText(status, YARD_STATE_TEXT[y.state](y.component));
-        toggleClass(status, 'bad', y.state === 'needsComponent' || y.state === 'needsOre');
+        setText(status, YARD_STATE_TEXT[y.state](y.component, fleet));
+        toggleClass(status, 'bad', y.state === 'fleetFull' || y.state === 'needsComponent' || y.state === 'needsOre');
         progress.set(y.ticksLeft > 0 ? (y.totalTicks - y.ticksLeft) / y.totalTicks : 0);
       },
     };
@@ -590,6 +604,22 @@ export class Sheet {
       all.set(`${attack() ? 'Attack with all sources' : 'Send from all sources'} · ${total}`);
       setHidden(sec, total === 0);
       setText(title, attack() ? `Attack ${guardName(this.world, n.index)}` : 'Send ships here');
+    });
+  }
+
+  /**
+   * H5 "Recycle…": scrap the ships parked at this node for part of their ore (to change the mix at the limit). Shown only while ships are
+   * parked here; never on a living guarded node (no recycling in a battle). One tap opens the panel.
+   */
+  private recycleSection(n: Node): void {
+    const sec = h('section', 'recycle', '', this.root);
+    const b = btn(sec, '', () => this.host.recycle(n.index), 'recycle-btn');
+    recycleIcon(b.el, 22);
+    const label = h('span', '', '', b.el);
+    this.ups.push(() => {
+      const k = shipCounts(this.world).at[n.index]!;
+      setHidden(sec, k === 0);
+      setText(label, `Recycle… · ${k} here`);
     });
   }
 
