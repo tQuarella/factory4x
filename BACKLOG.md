@@ -105,7 +105,7 @@ Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait 
 | h2-sim | Root node, supply link and wilt, starved Bloom, three variants, new tunables, data v3 | core-engineer | **Merged** dfdf62a (approved round 1) |
 | h2-art | Root, vine and wilting-thorn draw functions; gallery; ART_STYLE | art-direction | **Merged** 6176e1f (approved round 2) |
 | h2-client | Root sheet, vine and wilt on the map, banner and toasts, result panel, tuning, H1 carry-overs | engineer | Building |
-| h2-bots | raid-supply strategy, per-variant report and depth flags | engineer | Building |
+| h2-bots | raid-supply strategy, per-variant report and depth flags | engineer | **Merged** 3f5d5d1 (approved round 1) |
 
 ### h2-sim (core-engineer)
 
@@ -199,6 +199,8 @@ Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait 
 5. Gates pass. Report the actual numbers against the flags; do not retune data.
 
 ## Can wait (allowed while waiting on the owner)
+
+- **cw-raid-regroup** (Designer to decide, then engineer): after cutting the Root, raid-supply moves the Root survivors to a5 but leaves ships built meanwhile at the probe. It is harmless at today's numbers, but would matter if Roots get weaker or starved Blooms stronger. The fix would be one `sendShips(probe, a5, 0)` after the cut (Critic note on h2-bots).
 
 - **cw-flaky-test** (engineer): during the h2-art round 2 review, `npm run gates` failed the `test` gate once (28.5 s against the usual 10–14 s) and passed on rerun. Which test failed wasn't captured. Find it (likely a timing-sensitive test under load) and make it deterministic. A flaky gate weakens the gate.
 

@@ -1,8 +1,11 @@
 import {
   PROBE,
+  guardianStatus,
   isCaptured,
+  isRootCut,
   nodeStatus,
   richIndex,
+  rootIndex,
   routeCapacityPerMin,
   shipCounts,
   type Input,
@@ -16,8 +19,8 @@ import {
  * function of the state. They issue Input commands only.
  *
  * rush and turtle follow DESIGN.md H1 "Bot strategies (M1)". greedy-expansion
- * and raid-supply are STUBS (no behavior, `stub: true`); raid-supply needs mob
- * supply lines, which are out of scope for M1.
+ * is a STUB (no behavior, `stub: true`). raid-supply follows DESIGN.md H2 "Bot
+ * strategies (H2)".
  */
 export interface Strategy {
   name: string;
@@ -126,6 +129,60 @@ export function turtleDecide(world: Readonly<World>): Input[] {
   return inputs;
 }
 
+/** Ships needed to take the Root: ceil(rootThorns * 5 / 2) + 5 (15, 28 and 40 for the three variants). */
+export function rootWave(rootThorns: number): number {
+  return Math.ceil((rootThorns * 5) / 2) + 5;
+}
+
+/** Ships needed to take the starved Bloom: ceil(bloomThorns * 9 / 4) (18 at 8 thorns). */
+export function bloomWave(bloomThorns: number): number {
+  return Math.ceil((bloomThorns * 9) / 4);
+}
+
+/** Ships at or heading to `node`. */
+function shipsAtOrHeading(world: Readonly<World>, node: number): number {
+  const c = shipCounts(world);
+  return c.at[node]! + c.enRoute[node]!;
+}
+
+/**
+ * raid-supply (the starve line): turtle's economy plan, then raid the Root
+ * from the probe, regroup the survivors at a5, and take the wilted Bloom.
+ */
+export function raidSupplyDecide(world: Readonly<World>): Input[] {
+  const inputs: Input[] = [];
+  const rich = richIndex(world);
+  const root = rootIndex(world);
+  const a5 = nodeIndex(world, 'a5');
+  const plan = buildPlan(world, ['a1', 'a2', 'a3', 'a4', 'a5'].map((id) => nodeIndex(world, id)));
+
+  if (!plan.done) {
+    if (world.shipyard.on) inputs.push({ type: 'setShipyard', on: false });
+    if (plan.order) inputs.push(plan.order);
+    return inputs;
+  }
+  if (!world.shipyard.on) inputs.push({ type: 'setShipyard', on: true });
+  const counts = shipCounts(world);
+
+  if (!isRootCut(world)) {
+    if (world.rally !== PROBE) inputs.push({ type: 'setRally', node: PROBE });
+    if (shipsAtOrHeading(world, root) === 0 && counts.at[PROBE]! >= rootWave(guardianStatus(world, root).thorns)) {
+      inputs.push({ type: 'sendShips', from: PROBE, to: root, count: 0 });
+    }
+    return inputs;
+  }
+
+  if (world.rally !== a5) inputs.push({ type: 'setRally', node: a5 });
+  if (counts.at[root]! > 0) inputs.push({ type: 'sendShips', from: root, to: a5, count: 0 });
+  if (isCaptured(world)) {
+    const out = buildPlan(world, [rich]);
+    if (out.order) inputs.push(out.order);
+  } else if (shipsAtOrHeading(world, rich) === 0 && counts.at[a5]! >= bloomWave(guardianStatus(world, rich).thorns)) {
+    inputs.push({ type: 'sendShips', from: a5, to: rich, count: 0 });
+  }
+  return inputs;
+}
+
 export const strategies: Strategy[] = [
   {
     name: 'rush',
@@ -138,5 +195,9 @@ export const strategies: Strategy[] = [
     decide: turtleDecide,
   },
   { name: 'greedy-expansion', description: 'STUB (no behavior): claim as many resource nodes as fast as possible.', stub: true, decide: () => NONE },
-  { name: 'raid-supply', description: 'STUB (no behavior, out of scope for M1): target mob logistics instead of defenders.', stub: true, decide: () => NONE },
+  {
+    name: 'raid-supply',
+    description: 'Turtle economy, then a wave of ceil(rootThorns*5/2)+5 from the probe cuts the Root, survivors stage at a5, and a wave of ceil(bloomThorns*9/4) takes the starved Bloom.',
+    decide: raidSupplyDecide,
+  },
 ];
