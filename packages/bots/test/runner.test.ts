@@ -1,120 +1,105 @@
 import { describe, expect, it } from 'vitest';
-import { defaultData, type World } from '@factory4x/sim';
-import { SOFTLOCK_SEC, runGame, runSeeds } from '../src/runner.ts';
-import { strategies, type Strategy } from '../src/strategies.ts';
+import { defaultData as data } from '@factory4x/sim';
+import { CAMPAIGN_CAP_MIN, defaultRunOptions, reclaimVisit, runCampaign, runFlag4Probes, runSeeds } from '../src/runner.ts';
+import { strategies, type CampaignStrategy } from '../src/strategies.ts';
 
-const TICKS_30_MIN = 54000;
-const dronesOnly: Strategy = strategies.find((s) => s.name === 'drones-only')!;
+const VISIT_CAP = 54000;
+const by = (name: string): CampaignStrategy => strategies.find((s) => s.name === name)!;
+const opts = defaultRunOptions(data, VISIT_CAP);
 
-describe('runner', () => {
-  it('reports a softlock when nothing is delivered and no ship is built for 5 game minutes', () => {
-    // Yard off and no builds: probe mining alone changes the hash every tick, but nothing progresses.
-    const idle: Strategy = {
-      name: 'idle',
-      description: '',
-      decide: (w) => (w.yards.drone.on ? [{ type: 'setShipyard', shipType: 'drone', on: false }] : []),
-    };
-    const r = runGame(idle, 1, defaultData, TICKS_30_MIN);
-    expect(r.outcome).toBe('softlock');
-    expect(r.ticks).toBeGreaterThanOrEqual(SOFTLOCK_SEC * defaultData.tickRate);
-    expect(r.ticks).toBeLessThan(SOFTLOCK_SEC * defaultData.tickRate + 120);
+describe('campaign runner', () => {
+  it('plays a whole campaign to the probe core and fills every report field', () => {
+    const r = runCampaign(by('full-kit'), 1, data, opts);
+    expect(r.outcome).toBe('won');
+    expect(r.playTicks).toBeGreaterThan(0);
+    expect(r.playTicks).toBeLessThan(CAMPAIGN_CAP_MIN * 60 * data.tickRate);
+    expect(r.reclaimOrder).toEqual(['landfall', 'shelf', 'shoal', 'veil', 'garden', 'deep']);
+    expect(r.visits.map((v) => v.area)).toEqual(r.reclaimOrder);
+    expect(r.skipped).toEqual([]);
+    expect(r.research.at(-1)!.item).toBe('core');
+    expect(r.research.map((b) => b.playTicks)).toEqual([...r.research.map((b) => b.playTicks)].sort((a, b) => a - b));
+    expect(r.hauled.ore + r.shipped.ore).toBeGreaterThan(0);
+    expect(r.shippedSharePct).toBeGreaterThanOrEqual(0);
+    expect(r.shippedSharePct).toBeLessThanOrEqual(100);
+    expect(r.shipsBuilt).toBeGreaterThan(0);
+    expect(r.tickMsP95).toBeGreaterThanOrEqual(r.tickMsP50);
+    expect(r.finalHash).toMatch(/^[0-9a-f]{8}$/);
+    // The visits' play times add up to the run's play time (every visit was reclaimed, none withdrawn).
+    expect(r.visits.reduce((n, v) => n + v.playTicks, 0)).toBe(r.playTicks);
+    for (const id of r.reclaimOrder) expect(r.entries[id]).toBe(1);
+    // Openings are measured on the visits that built an economy.
+    expect(reclaimVisit(r, 'shelf')!.openingTicks).not.toBeNull();
+    expect(reclaimVisit(r, 'landfall')!.openingTicks).toBeNull();
   });
 
-  it('fires at exactly 5 game minutes after the last delivery when an economy stalls mid-game', () => {
-    const STALL = 9000;
-    // drones-only's yard is off and its network is delivering at the stall tick. Then the economy dies
-    // (extractors, buffers and pods vanish) while probe mining continues and no ship is built.
-    const stalls: Strategy = {
-      name: 'stalls',
-      description: '',
-      decide: (w) => {
-        if (w.tick < STALL) return dronesOnly.decide(w);
-        const m = w as World;
-        for (const n of m.nodes) {
-          n.extractors = 0;
-          n.buffer = 0;
-        }
-        for (const r of m.routes) r.pods.length = 0;
-        m.queue.length = 0;
-        m.activeBuild = null;
-        return m.yards.drone.on ? [{ type: 'setShipyard', shipType: 'drone', on: false }] : [];
-      },
-    };
-    const r = runGame(stalls, 1, defaultData, TICKS_30_MIN);
-    expect(r.outcome).toBe('softlock');
-    // Last delivery was within one pod interval (90 ticks) before the stall; the old 60 s window added 1800 ticks.
-    const limit = SOFTLOCK_SEC * defaultData.tickRate;
-    expect(r.ticks).toBeGreaterThanOrEqual(STALL - 90 + limit);
-    expect(r.ticks).toBeLessThanOrEqual(STALL + limit + 1);
+  it('takes the areas in its own order and can skip some', () => {
+    const r = runCampaign(by('ice-line'), 1, data, opts);
+    expect(r.outcome).toBe('won');
+    expect(r.reclaimOrder.slice(0, 4)).toEqual(['landfall', 'shelf', 'veil', 'deep']);
+    expect(r.skipped.length).toBeGreaterThan(0);
   });
 
-  it('does not call a ship-building game a softlock even with no routes', () => {
-    const yardOnly: Strategy = { name: 'yard', description: '', decide: () => [] };
-    expect(runGame(yardOnly, 1, defaultData, TICKS_30_MIN).outcome).toBe('timeout');
+  it('is deterministic: the same seed and strategy end on the same hash, other seeds differ', () => {
+    const a = runCampaign(by('greedy'), 1, data, opts);
+    expect(runCampaign(by('greedy'), 1, data, opts).finalHash).toBe(a.finalHash);
+    expect(runCampaign(by('greedy'), 2, data, opts).finalHash).not.toBe(a.finalHash);
+  });
+
+  it('runs every seed as its own game', () => {
+    const rs = runSeeds(by('greedy'), 2, data, VISIT_CAP);
+    expect(rs.map((r) => r.seed)).toEqual([1, 2]);
+    expect(rs.every((r) => r.outcome === 'won')).toBe(true);
+  });
+
+  it('withdraws a visit past the cap, then reports a softlock on a second timeout in the same area', () => {
+    // A 10 second cap: Landfall (11 s) is never reclaimed in time, so it times out twice.
+    const r = runCampaign(by('greedy'), 1, data, { ...opts, visitCapTicks: 10 * data.tickRate });
+    expect(r.outcome).toBe('softlock');
+    expect(r.visits.map((v) => [v.area, v.result])).toEqual([
+      ['landfall', 'withdrawn'],
+      ['landfall', 'withdrawn'],
+    ]);
+    expect(r.entries.landfall).toBe(2);
+    // The run stops on the second timeout, still in the area: the sim has recorded one withdrawal.
+    expect(r.withdrawals.landfall).toBe(1);
+    expect(r.visits[0]!.playTicks).toBe(10 * data.tickRate);
+    expect(r.reclaimOrder).toEqual([]);
+  });
+
+  it('stops with timeout when the campaign cap of play time runs out', () => {
+    const r = runCampaign(by('no-research'), 1, data, { ...opts, campaignCapTicks: 5 * 60 * data.tickRate });
+    expect(r.outcome).toBe('timeout');
+    expect(r.playTicks).toBeGreaterThanOrEqual(5 * 60 * data.tickRate);
+    expect(r.playTicks).toBeLessThan(5 * 60 * data.tickRate + 60);
+  });
+
+  it('reports a softlock when the overworld has nothing to buy and nothing open', () => {
+    const dead: CampaignStrategy = { name: 'dead', description: '', kit: 'none', route: [] };
+    const r = runCampaign(dead, 1, data, {
+      ...opts,
+      start: { reclaimed: ['landfall', 'shelf', 'shoal', 'veil', 'garden', 'deep'] },
+    });
+    expect(r.outcome).toBe('softlock');
   });
 
   it('turns a crash into outcome crash', () => {
-    const boom: Strategy = {
-      name: 'boom',
-      description: '',
-      decide: () => {
-        throw new Error('kaboom');
-      },
-    };
-    const r = runGame(boom, 1, defaultData, 100);
+    const boom = { name: 'boom', description: '', kit: 'none', get route(): string[] { throw new Error('kaboom'); } } as CampaignStrategy;
+    const r = runCampaign(boom, 1, data, opts);
     expect(r.outcome).toBe('crash');
     expect(r.error).toContain('kaboom');
   });
 
-  it('treats capture as won and fills every report field', () => {
-    const r = runGame(dronesOnly, 1, defaultData, TICKS_30_MIN);
-    expect(r.outcome).toBe('won');
-    expect(r.captureSec).not.toBeNull();
-    expect(r.variantId).toBe('glass');
-    expect(r.rootCutSec).not.toBeNull();
-    expect(r.guardsWithered).toBeGreaterThan(0);
-    expect(r.heartWavesSent).toBeGreaterThanOrEqual(1);
-    expect(r.firstShipSec).not.toBeNull();
-    for (const m of ['2', '5', '10', '12', '15', '20']) expect(r.throughputAtMin[m]).not.toBeNull();
-    expect(r.peakPerMin).toBeGreaterThan(0);
-    expect(r.shipsBuilt).toBeGreaterThan(0);
-    expect(r.wavesSent).toBeGreaterThanOrEqual(1);
-    expect(r.oreSpentShips).toBeGreaterThan(0);
-    expect(r.oreSpentEconomy).toBeGreaterThan(0);
-    expect(r.tickMsP95).toBeGreaterThanOrEqual(r.tickMsP50);
+  it('counts only held play time, not the overworld or a reclaimed area left standing', () => {
+    const r = runCampaign(by('greedy'), 1, data, opts);
+    expect(r.ticks).toBeGreaterThan(r.playTicks);
   });
 
-  it('runs every seed as its own game (hashes differ because the seed is in the state)', () => {
-    const rs = runSeeds(dronesOnly, 3, defaultData, TICKS_30_MIN);
-    expect(rs.map((r) => r.seed)).toEqual([1, 2, 3]);
-    expect(rs.map((r) => r.variantId)).toEqual(['glass', 'twin', 'frost']);
-    expect(new Set(rs.map((r) => r.finalHash)).size).toBe(3);
-    expect(rs[1]!.finalHash).toBe(runGame(dronesOnly, 2, defaultData, TICKS_30_MIN).finalHash);
-  });
-
-  it('reports ships and ore as of capture, with whole-run totals labelled separately', () => {
-    const r = runGame(dronesOnly, 1, defaultData, TICKS_30_MIN);
-    expect(r.oreSpentShips).toBeLessThan(r.wholeRun.oreSpentShips);
-    expect(r.shipsBuilt).toBeLessThan(r.wholeRun.shipsBuilt);
-    expect(r.shipsLost).toBeLessThanOrEqual(r.wholeRun.shipsLost);
-  });
-
-  it('plays all four strategies to the heart in every layout', () => {
-    for (const st of strategies) {
-      const rs = runSeeds(st, 3, defaultData, TICKS_30_MIN);
-      for (const r of rs) expect(r.outcome, `${st.name} ${r.variantId}`).toBe('won');
-      expect(new Set(rs.map((r) => r.variantId)).size).toBe(3);
+  it('flag 4 probes reclaim the area from the constructed start and report ticks', () => {
+    const p = runFlag4Probes(data, VISIT_CAP);
+    for (const v of Object.values(p)) {
+      expect(v).not.toBeNull();
+      expect(v!).toBeGreaterThan(0);
     }
-  });
-
-  it('reports the capture order, losses by type and first deliveries', () => {
-    const r = runGame(strategies.find((s) => s.name === 'ice-first')!, 3, defaultData, TICKS_30_MIN);
-    expect(r.captureOrder.at(-1)!.id).toBe('heart');
-    expect(r.captureOrder.at(-1)!.sec).toBe(r.captureSec);
-    expect(r.captureOrder.some((c) => c.id === 'root')).toBe(true);
-    const l = r.shipsLostByType;
-    expect(l.drone + l.lancer + l.flak).toBe(r.shipsLost);
-    expect(r.firstDeliveredSec.ice).not.toBeNull();
-    expect(r.firstDeliveredSec.crystal).not.toBeNull();
+    expect(runFlag4Probes(data, VISIT_CAP)).toEqual(p);
   });
 });

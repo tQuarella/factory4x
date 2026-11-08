@@ -9,7 +9,6 @@ import {
   isAreaOpen,
   isGuarded,
   nodeStatus,
-  researchLevel,
   researchStatus,
   routeCapacityPerMin,
   shipCounts,
