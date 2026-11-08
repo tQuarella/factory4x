@@ -29,3 +29,26 @@ Required changes:
 - [ ] Update the DECISIONS.md entry if any of these numbers change. Re-run the gates and the new smoke test.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+Scope: `git diff 030da04 369aaad` (round 1 fixes), with the whole branch re-checked against main.
+
+**Required changes from round 1:**
+- [x] **Totals from the unrounded product.** `nodeStatus` now computes `totalX100 = extractors × base × extractPct` and floors it over 10 and over 100. This matches how `extraction` in step.ts accumulates.
+- [x] **Heart regression test.** The new test checks 4 heart extractors at Extraction 1 and 3: it expects `extractPerMinX10` 1250 and 1750, and that `extractPerMin` equals the ore produced over T ticks with a cap that doesn't bind.
+- [x] **Comment.** `perExtractorPerMinX10` now states that it floors (31.25 shows as 31.2) and that the totals aren't built from it. I accept the floor on the per-extractor figure.
+- [x] **No-op floor.** It is gone. Both totals now floor a real quotient.
+- [x] **DECISIONS.md.** The entry has a round 1 correction note.
+
+**Fail-before check (done by me, since the engineer didn't).** I put back the c7df834 `selectors.ts` and ran only the new test. It fails on the heart case with `extractPerMin` 124 and `extractPerMinX10` 1248, where 125 and 1250 were expected. With the branch's `selectors.ts` restored, it passes. The working tree was clean after the restore.
+
+**Note, non-blocking.** The odd-base-rate half of the test (asteroid 9/min × 3, pocket 7/min × 2) doesn't tell the old code from the new in whole units: both give 33/40/47 and 17/24. It is still a valid property check, that the shown total equals one minute's output, across levels 0 to 3. The heart half carries the regression.
+
+**Gates (run by me on 369aaad).** `npm run gates -- --base main`: typecheck, lint, test, determinism, bots, protected-files all PASS. The new smoke test passes on desktop and on phone (375 px). No sim rule, data or protected file changed. The reference replay and determinism pass.
+
+**Pillars.** Display fix only. The sheets now show the rate the owner actually gets with research. I'm comfortable with the owner playing this tonight.
+
+Required changes: none.
+
+VERDICT: APPROVE
