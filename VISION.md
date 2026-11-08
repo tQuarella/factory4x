@@ -21,14 +21,14 @@ You are a von Neumann probe arriving in a new star system. Everything you will e
 - A fun prototype for the owner and close friends, shared by a public link. Not a commercial release.
 - Playable on a phone browser. Logistics are abstract routes between nodes, not tile-by-tile belts.
 - Generated art, coherent with a style guide.
-- A roguelite campaign: each star system is one 20–40 minute run; the campaign spans many sessions.
+- Each star system is one long game, played across many short sessions and kept by autosave. It ends when you launch a new probe; then new game+ in a richer, harder system.
 - No fail state. You can lose ships and time, never the run.
 - Ships take orders at nodes (attack, guard, escort); no unit micro.
 - Autosave, so a run survives a closed tab.
 
 ## Design pillars
 
-1. **Throughput is the throttle.** Delivery rate to the probe gates everything else.
+1. **Throughput is the throttle.** The rate your network delivers resources to your factories and shipyards gates everything else.
 2. **Risk scales with reward.** The best resources are the best guarded; taking them costs ships, and a bad commitment wastes production.
 3. **Guardians have factories.** Mobs only defend, but they repair and replace up to a cap. Win a node by out-producing their replacement, or cut their supply first.
 4. **A puzzle, not a race.** No clock and no pressure. The challenge is building an efficient network.

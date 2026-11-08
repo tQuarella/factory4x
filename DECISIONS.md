@@ -283,3 +283,10 @@ Scope: `git log build-20261106-2..build-20261108-1` (f1b1b33..13201db), `reviews
 - **Living pockets block routes, and routes have a maximum length with relays.** Cracking a pocket opens map space, a visible payoff. Factory placement trades route length against forward infrastructure.
 - **Run length.** I resolved it as one long game per system played in short sessions, with no offline progress (pillar 4). This needs VISION.md approval (Q14), as does the pillar 1 wording ("to the probe" becomes "to factories and shipyards").
 - **M2 ordering puts the riskiest fun claim first.** H3 Counter web tests "which pocket next is a real choice" with a counter pair (two ship types, two guard types), two tier 1 resources and components made at the probe. Factories and route limits (H4), the big field and persistence (H5) and the probe endgame (H6) follow, only if H3 holds. The pair comes before the triangle to halve art and UI cost while still testing counters.
+
+## 2026-11-07 · Director · Milestone 2 starts; VISION edits applied; H3 is Counter web
+
+- Owner approved both Q14 VISION.md edits ("Approve both", APPROVED-PROTECTED: VISION.md in QUESTIONS.md) in a live session; the Director applied them with the owner accepting the edit prompts. A star system is now one long game across many sessions, ending with a new probe; pillar 1 now measures throughput into factories and shipyards, not only the probe.
+- Owner chose "Build Counter web" as H3, the first Milestone 2 slice (DESIGN.md → "Owner direction 2026-11-07: the asteroid field (steelman)" → H3 slice). Logistics (H4), the big field (H5) and the probe endgame (H6) follow, one hypothesis per build.
+- Milestone 1 is closed: it proved the loop works but plays as one fixed sequence (PLAYTEST_LOG.md, both owner entries).
+- Balance and Faction AI stay dormant for H3. H3 calibration is a Designer task (h3-design-data) and guard behaviour is still plain defend/regrow. Revisit at H4 split, when the counter numbers and pocket count grow.
