@@ -180,7 +180,7 @@ Riskiest claim first: that **pockets + counters + resource prizes make "which po
 
 The owner's feedback on build-20261108-2 (PLAYTEST_LOG.md, 2026-11-08) proposes the progression loop for the whole game: many areas connected on an overworld; a reclaimed area's resources can be sent elsewhere; you manage logistics on the overworld and choose which area to reclaim next; persistent research makes heavier areas reclaimable; you start with nothing (only an undefended area), grow stronger, reclaim richer areas, and repeat until you can build the new probe; the climb is a "miner grind" punctuated by meatier steps (new ship types, which still need their resources locally, extraction speed, starting resources). They also said in-area logistics "may be fine at the scope of a small area".
 
-This section is the strongest version of that game, how it absorbs H3 and the rest of the Milestone 2 plan, and its risks. It is a direction, not a spec. The first slice is chosen from "H4 candidates (awaiting the owner's pick)" under Hypotheses.
+This section is the strongest version of that game, how it absorbs H3 and the rest of the Milestone 2 plan, and its risks. It is a direction, not a spec. The owner picked "Reclaim ladder" as the first slice (Q16); its spec is "H4 (Milestone 2, iteration 4, spec ready): Reclaim ladder" under Hypotheses, and where the two differ, the spec wins.
 
 ### The pitch
 
@@ -277,69 +277,401 @@ Built in Milestone 1 (build-20261106-2, spec H1 below):
 
 H2 (build-20261108-1, spec below) added the Root, a second guarded node that feeds the Bloom, and three system variants that differ only in the Root.
 
+H3 (build-20261108-2, spec below) replaced the map with a 16-node field and three layouts: ice and crystal pockets, lens and plating made at the probe, lancer and flak yards next to the drone yard, Thorn and Spore guards with counter combat, the guard ring and Strong/Even/Weak tags, and a capture-order result panel.
+
 ## Hypotheses
 
-### H4 candidates (awaiting the owner's pick)
+### H4 (Milestone 2, iteration 4, spec ready): Reclaim ladder
 
-The direction is "Owner direction 2026-11-08: the overworld (steelman)" above. Each candidate tests one part of the owner's loop in one iteration of about five tasks (sim, client, art, bots, design-data), reusing the H3 sim inside each area. Only one will be specced, after the owner picks (QUESTIONS.md Q16).
+The owner picked A, "Reclaim ladder" (QUESTIONS.md Q16, 2026-11-08). The direction is "Owner direction 2026-11-08: the overworld (steelman)" above. **Not picked:** B "Supply lines" (lane capacity, sending output into the active area), because routing only matters once there is progression to route for, and the owner rated in-area logistics "may be fine"; C "Area runs with research", because a card draft drops the overworld and the areas that keep producing. B is the likely next slice if A holds.
 
-What H3 told us (PLAYTEST_LOG.md, 2026-11-08): the per-node guard mix creates a real choice, and in-area logistics can stay simple. What we don't know yet: whether an unlock feels like a payoff, and whether a run feels like a chosen path. All three candidates ask the second question again, at overworld scale.
+Everything inside an area is H3 ("Counter web", below). H1–H3 rules not mentioned here still apply. Where this spec and the BACKLOG differ, the spec wins.
 
-#### H4-A: Reclaim ladder (recommended)
+#### Claim
 
-- **Claim:** persistent research, paid for by the areas you've reclaimed, plus a choice of which area to take next, makes getting stronger feel good and makes heavier areas a goal. The repeated build-out at the start of each area reads as progress, not a chore, because research visibly shortens it.
-- **Built:**
-  - **An overworld of 6 areas on one screen,** joined by lanes that only decide which areas are available (an area opens when a neighbour is reclaimed). A0 is undefended. Two light areas follow (one gives ice, one crystal), then two medium, then one heavy area holding the probe core's last resource.
-  - **Areas are data:** H3 layouts on the existing 16-node frame with some nodes left out (A0 and the light areas about 6–8 nodes), plus a per-area guard scale. Each area is reclaimed by capturing its heart; A0's heart has no guards, so A0 teaches the build-out.
-  - **Area lifecycle:** enter, land with `area.startOre`, play H3 rules, reclaim or withdraw (withdraw resets the area). One area in progress at a time.
-  - **Stockpile:** every reclaimed area adds `area.exportPerMin` of each of its resources to the stockpile, in game time, while you play the next area.
-  - **Research sheet (about 7 items):** Lancer design (crystal) and Flak design (ice) as the meaty steps; Extraction +25% (3 levels), Opening ore +40 (3 levels), Faster yards (2 levels) as the grind; Probe core (a large cost in every resource) as the win, which shows a win panel.
-  - **One rule change inside areas:** a counter yard needs its design researched **and** its component made locally. The yard row names which is missing.
-- **Faked or deferred:**
-  - shipments are passive (no choice of destination, no import into the active area, no lane capacity);
-  - reclaimed areas are summaries, not simulated;
-  - ships don't cross areas;
-  - no Warden, Lash or tier 2 resources;
-  - the probe core is a research item and a win panel, with no new game+.
-- **Tunables (proposed; ranges for the spec):**
+**Persistent research, bought with what your reclaimed areas send home, plus a choice of which area to reclaim next, makes getting stronger feel good and makes heavier areas a goal.** The build-out at the start of every area reads as progress, not a chore, because research visibly shortens it. Which design you research first changes which area is cheap next, so the climb is a path you choose, not a fixed ladder.
 
-  | Key | Default | Range | Feels like (low / high) |
-  | --- | --- | --- | --- |
-  | `area.startOre` | 40 | 0–300 | 0: every opening is a slow trickle / 300: openings are skipped |
-  | `area.exportPerMin` | 6 | 1–30 | 1: research is a long wait / 30: research is instant and meaningless |
-  | `area.<id>.guardPct` | 0 / 60 / 100 / 160 by tier | 0–300 | per-area version of `guard.capPct` |
-  | `research.extract.stepPct` | 25 | 10–50 | 10: unnoticed / 50: two levels trivialise ore |
-  | `research.extract.maxLevel` | 3 | 1–5 | |
-  | `research.startOre.step` | 40 | 10–150 | 10: unnoticed / 150: the opening disappears |
-  | `research.startOre.maxLevel` | 3 | 1–5 | |
-  | `research.yard.stepPct` | 20 | 10–50 | |
-  | `research.yard.maxLevel` | 2 | 1–4 | |
-  | `research.<item>.cost.<resource>` | calibrated | 0–2000 | grind items cheap in ore; designs in their own resource |
-  | `research.probeCore.cost.<resource>` | calibrated | 0–5000 | the session-length knob: the win should land after 4–6 areas |
+What would disprove it:
+- The owner calls a later area "the same as the first" or a chore.
+- The owner can't name an upgrade they noticed when landing in a later area.
+- The owner takes the areas in the only order that makes sense, without weighing two.
+- Research reads as a shop of +% numbers with no moment that feels like a big step.
 
-- **Success (one 30–40 minute phone session):** the owner reclaims at least 4 areas; names a reason for picking one area over another; names one upgrade they noticed in a later area; does not call a later area a chore or a repeat.
-- **Fun questions:**
-  1. Did getting stronger between areas feel good? Which upgrade did you notice in the next area?
-  2. After each area, did you have more than one sensible next area? What decided it?
-  3. Did your third area feel like a fresh puzzle or a repeat of the first? Was there a moment that felt like a big step?
-- **Tasks:** ow-sim (overworld state, area lifecycle, stockpile, research effects, save shape and `dataVersion`), ow-client (overworld screen, research sheet, enter and withdraw, yard-row reasons), ow-art (area nodes by tier, lanes, research icons, the stockpile chip), ow-bots (a campaign runner with research-order strategies; flags: no softlock, at least two viable area orders, time to first attack falls area by area), ow-design-data (areas and research costs).
-- **Why recommended:** it tests the riskiest part of the owner's idea, the part they called "the progression loop": does growing stronger across areas feel like growth, and does the repeated opening stay minor? Overworld logistics (B) only matters once there is progression to route for, and the owner said simple logistics may be fine. A still includes the core of "a taken area's resources keep working for you", in passive form.
+#### The smallest mechanics that test it
 
-#### H4-B: Supply lines
+1. **An overworld of 6 areas on one screen**, joined by 7 lanes. Lanes only decide which areas are open: an area is open when it is still held and a lane joins it to a reclaimed area (Landfall is open at the start). There is no lane capacity and nothing travels along lanes in the sim.
+2. **Areas are cut from the H3 field.** Each area is the 16-node frame with some nodes left out, plus its own small layout (pocket prizes and slots, guard counts for its pockets, Root and heart) in the H3 layout format. The Deep is the full H3 field with the run's H3 layout, so it plays exactly like an H3 game.
+3. **Area lifecycle.** Land (enter), play H3 rules, then reclaim (capture the heart) or withdraw (the area resets). One area at a time. The overworld screen is paused.
+4. **A stockpile** of ore, ice and crystal on the overworld. Reclaiming an area pays its **haul** into the stockpile once. While you play any area that isn't yet reclaimed, every reclaimed area **ships** its export rates into the stockpile, in game time.
+5. **Research** (7 items, 14 levels), bought on the overworld from the stockpile: two ship designs (the meaty steps), four levelled grind items aimed at the opening, and the **probe core**, which wins the game.
+6. **One rule change inside areas:** a lancer or flak yard needs its design researched **and** its component made locally. The yard row names which is missing.
 
-- **Claim:** sending a reclaimed area's output where you need it is the logistics depth the owner is missing, and importing a resource into an area changes which of its pockets are worth taking.
-- **Built:** an overworld of 5 areas with lanes that have capacity and only join neighbours; each reclaimed area's output is assigned to one destination (the stockpile, or the active area's probe as an import stream); held areas block lanes. Each reclaim grants a fixed unlock instead of research.
-- **Faked or deferred:** the research sheet, levelled upgrades, opening ore and the grind; the probe core.
-- **Risk:** it tests the half of the loop the owner rated "may be fine" and leaves out the progression they asked for. Without a reason to grow, routing is plumbing.
-- **Fun questions:** Did importing a resource change your plan inside an area? Did choosing where to send an area's output feel like a decision? Did a blocked lane change which area you took next?
+New inputs: `enterArea`, `leaveArea`, `buyResearch`. Nothing else in the input set changes.
 
-#### H4-C: Area runs with research (no overworld map)
+#### The overworld
 
-- **Claim:** persistent research between areas is enough on its own to turn the H3 field into a satisfying climb with meatier steps.
-- **Built:** after reclaiming an area, a card list offers 2–3 next areas (prize, guard tier, mix). Research is paid from a lump of salvage on each reclaim. The same research sheet as A.
-- **Faked or deferred:** the overworld map, lanes, and areas that keep producing after you leave.
-- **Risk:** the cheapest option (the client is mostly lists), but it drops "a taken area's resources can be sent elsewhere" entirely, and a card draft feels more like a roguelite than a network you grow. A positive result here would still leave the overworld untested.
-- **Fun questions:** Did the research make each next area feel different, or just easier? Did choosing between the offered areas feel like a real choice? Was there a moment that felt like a big step?
+Frame x 0–1000, y 0–1300, fitted like an area. Area nodes are drawn at radius 80 su (at least 44 px tall at 375x667).
+
+```
+                 [The Deep]            tier 3
+                /          \
+       [Spore Veil] ---- [Thorn Garden]   tier 2
+            |                  |
+       [Frost Shelf]      [Glass Shoal]   tier 1
+                \          /
+                 [Landfall]            tier 0 (start)
+```
+
+Lanes (data `map.lanes`, undirected): `landfall–shelf`, `landfall–shoal`, `shelf–veil`, `shoal–garden`, `veil–garden`, `veil–deep`, `garden–deep`.
+
+What is open when:
+- At the start only Landfall is open.
+- After Landfall: Frost Shelf and Glass Shoal.
+- Frost Shelf opens Spore Veil; Glass Shoal opens Thorn Garden. Either medium opens the other (the `veil–garden` lane) and The Deep.
+- So the shortest path to The Deep is Landfall, one light area, one medium. The ice side (Shelf, Veil) and the crystal side (Shoal, Garden) are two doors to each tier.
+
+#### Areas (data `map.areas`)
+
+`nodes` are frame ids from `map.nodes` (positions unchanged; the client fits the present nodes, so small areas draw larger). Each area except The Deep carries its own guard counts (next table) in the H3 layout format: `pockets` (one per pocket node present), `root` (only if the Root is present) and `heart`. The Deep has `layout: "seed"`: the run's H3 layout, chosen as in H3 by `system.variant` or the seed. Caps are the H3 `capEff(n) = min(60, floor(n × guard.capPct / 100))`. Haul and export are ore / ice / crystal.
+
+| id | name | tier | x | y | nodes | haul | export/min |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `landfall` | Landfall | 0 | 500 | 1150 | probe a1 a2 a3 a4 a5 heart | 150 / 0 / 0 | 4 / 0 / 0 |
+| `shelf` | Frost Shelf | 1 | 220 | 870 | probe a1 a2 a3 a5 p1 heart | 150 / 80 / 0 | 3 / 2 / 0 |
+| `shoal` | Glass Shoal | 1 | 780 | 870 | probe a1 a2 a4 a5 p1 heart | 150 / 0 / 80 | 3 / 0 / 2 |
+| `veil` | Spore Veil | 2 | 220 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 300 / 60 / 30 | 5 / 3 / 0 |
+| `garden` | Thorn Garden | 2 | 780 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 300 / 30 / 60 | 5 / 0 / 3 |
+| `deep` | The Deep | 3 | 500 | 200 | all 16 | 650 / 60 / 60 | 8 / 3 / 3 |
+
+Totals: haul 1700 / 230 / 230, which covers every research level (1660 / 220 / 220; see "Research"). The sim's data validation enforces haul ≥ research cost per resource, so a player who takes every area can always afford the probe core, whatever they bought first. No softlock.
+
+**Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). Starting values, derived from the H3 layouts at about 20% (light) and 60% (medium) and then pushed toward each side's theme. h4-design-data calibrates them. The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
+
+| Area | Node | Prize | Slots | Guards (T/S) | Tags l / f |
+| --- | --- | --- | --- | --- | --- |
+| landfall | heart | ore | 4 | 0 / 0 | none (no guards: the first ship to arrive reclaims it) |
+| shelf | p1 | ice | 2 | 0 / 4 | Weak (25) / Strong (200) |
+| shelf | heart | ore | 4 | 2 / 10 | Even (95) / Even (130) |
+| shoal | p1 | crystal | 2 | 0 / 4 | Weak / Strong |
+| shoal | heart | ore | 4 | 5 / 3 | Strong (173) / Weak (51) |
+| veil | p1 | ice | 2 | 2 / 6 | Even (117) / Even (107) |
+| veil | p2 | crystal | 2 | 2 / 6 | Even / Even |
+| veil | root | none | 0 | 0 / 12 | Weak / Strong |
+| veil | heart | ore | 4 | 3 / 30, starved 1 / 15 | Weak (68) / Strong (156); starved Weak (56) / Strong (168) |
+| garden | p1 | crystal | 2 | 1 / 12 | Weak (63) / Strong (161) |
+| garden | p2 | ice | 2 | 4 / 3 | Strong (167) / Weak (57) |
+| garden | root | none | 0 | 7 / 0 | Strong / Weak |
+| garden | heart | ore | 4 | 17 / 9, starved 9 / 4 | Strong (176) / Weak (48); starved Strong (179) / Weak (45) |
+| deep | all | as H3 | as H3 | the H3 layout tables | as H3 |
+
+How an H3 field is cut down:
+- **Landfall** is the H3 frame's lower asteroids and an empty heart: a landing beat of under a minute (build one drone, send it). It gets the player to the overworld and the first research choice at once.
+- **Light areas** keep 4 asteroids (8 slots, 80 ore/min at full build), one light pocket (a small Spore patch) and the heart; no Root. Target 5–9 game minutes.
+- **Medium areas** keep the 7 near asteroids (13 slots), both light pockets, the Root and the heart; the far corners (a8, a9) and the heavy pockets (p3, p4) are left out. Target 7–12 game minutes.
+- **The Deep** is the whole H3 field with the run's H3 layout, unchanged. Target 9–15 game minutes with research (the H3 bots took 19–22 without any).
+- Areas without a Root: the heart is fed and can't be starved.
+
+Why these areas:
+- **Two doors per tier.** Ice comes first from the Shelf, crystal from the Shoal; each medium is reached from its own light area or from the other medium.
+- **Each side has a theme.** The ice side (Frost Shelf, Spore Veil) is held by Spore swarms; the crystal side (Glass Shoal, Thorn Garden) by Thorns. Spore Veil's heart and Root are Flak Strong; Thorn Garden's are Lancer Strong.
+- **Research decides the cheap medium.** The ice haul from the Shelf buys the Flak design, the crystal haul from the Shoal buys the Lancer design. So your first light area and your first design decide which medium is cheap. It's the owner's H3 read ("the heart is spore-heavy so go win the easiest flak node") one level up. Both mediums have both light pockets, so either design can be built in either.
+- **The probe core needs both designs and The Deep** (see Research), so every run crosses sides at some point; the order is yours.
+- **You can skip one area.** Both designs and the core need 160 ice and 160 crystal. Skipping a medium leaves 170–200 of each from hauls alone. Skipping a light area leaves 150 of its resource, and shipments close the gap of 10 if you didn't spend that resource on Fast yards. So whether to skip, and what, is a real choice. Four areas never do: one side's resource stops at 90, and nothing is left to ship during.
+
+#### Area lifecycle
+
+**Landing (`enterArea`).** The area's state is built fresh from data, in this order:
+1. Nodes: the frame nodes whose id is in the area's `nodes`, in frame order (so the probe is index 0). Pockets take prize and slots from the area's layout.
+2. One guardian per present pocket, Root and heart (node order), with the area's counts (The Deep: the run's H3 layout); guards start full (H3 rule). If the area has no Root, the heart's `starvedCounts` is null and `fed` stays true.
+3. Stock: `ore = economy.startStock + opening level × research.opening.step`; everything else 0. No ships, routes or queue; rally at the probe; assemblers idle; `yardTurn` 0.
+4. Yards: drone on; lancer on if the Lancer design is researched; flak on if the Flak design is. (A researched yard waits for its component, so starting it on saves a tap.)
+5. Seed rigs: at rigs level L, the first L of `a1`, `a2` start owned, with 1 extractor and a level-1 route to the probe, free.
+6. Area stats reset; `areaStartTick = tick`; the area's entry count goes up by 1.
+
+**Reclaim.** Capturing the area's heart (H3 rule 8) also:
+- marks the area reclaimed at this tick and appends it to the reclaim order;
+- pays its haul into the stockpile;
+- records the visit's play time, ships built and lost.
+
+The area stays on screen with the result panel. Shipments stop (rule 10). Free play is allowed but changes nothing in the campaign.
+
+**Leaving (`leaveArea`).**
+- From a reclaimed area: back to the overworld. The area becomes its summary (its export rates).
+- From a held area (a withdraw): back to the overworld, the area resets to held and its visit counts as a withdrawal. Ships, buildings and local stock are lost. Research, the stockpile and other areas are untouched. You lose time, never the run.
+- In both cases the area's own fields are cleared.
+
+**What carries in:** research levels (opening ore, seed rigs, extraction, yard speed, designs). **What never carries:** local stock, ships, buildings. The stockpile is never spent inside an area.
+
+**Pause on the overworld.** With no area active, `step` applies its inputs, advances `tick`, and runs no rules: nothing accrues, regrows or moves. The client steps only to apply overworld inputs, so the overworld is paused in effect and the log stays short.
+
+#### Stockpile and shipments (all integer)
+
+- `campaign.stockpile = {ore, ice, crystal}`, starting at 0.
+- **Haul:** paid once, at reclaim.
+- **Rule 10, shipments (new, after stats, only while an area is active and its heart isn't captured):** for each resource in the order ore, ice, crystal, `shipAccum[res] += Σ export[res] over reclaimed areas × shipments.pct`. While `shipAccum[res] ≥ ticksPerMin × 100`, subtract that and add 1 to `stockpile[res]` (and to the shipped total).
+- Shipments don't run on the overworld, while an area's result panel is up, or after the win. There is no offline progress and no timer.
+- Shipments are the grind texture (the stockpile visibly fills while you play); hauls are the backbone. Expected split over a full run: about 20–35% shipped, the rest hauled (bots report it).
+- Known risk: a player could idle in a held area to farm shipments. At 4–8 ore/min per area it's slow, and `shipments.pct` 0 turns shipping off as an A/B if the owner reports it.
+
+#### Research (data `research`)
+
+Bought on the overworld only (not inside an area), one level at a time. Cost per level is `floor(cost × research.costPct / 100)` per resource. Kinds: **design** (a meaty step: it changes what you can attempt), **grind** (shortens the opening or the fight), **win**.
+
+| id | name | kind | level | ore | ice | crystal | requires | effect |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `lancer` | Lancer design | design | 1 | 60 | 0 | 40 | none | lancer yards can run (each lancer still needs a lens made in the area) |
+| `flak` | Flak design | design | 1 | 60 | 40 | 0 | none | flak yards can run (each flak still needs plating made in the area) |
+| `opening` | Opening ore | grind | 1 | 50 | 0 | 0 | none | +`research.opening.step` (40) ore at every landing |
+| `opening` | Opening ore | grind | 2 | 100 | 0 | 0 | none | +40 more |
+| `opening` | Opening ore | grind | 3 | 150 | 0 | 0 | none | +40 more |
+| `extract` | Extraction | grind | 1 | 60 | 0 | 0 | none | every extractor in an area yields +`research.extract.stepPct` (25)% |
+| `extract` | Extraction | grind | 2 | 120 | 0 | 0 | none | +25% more |
+| `extract` | Extraction | grind | 3 | 180 | 0 | 0 | none | +25% more |
+| `rigs` | Seed rigs | grind | 1 | 100 | 0 | 0 | extract 1 | land with A1 already mined and routed (1 extractor) |
+| `rigs` | Seed rigs | grind | 2 | 200 | 0 | 0 | extract 1 | and A2 |
+| `yards` | Fast yards | grind | 1 | 60 | 20 | 20 | none | ship build time −`research.yards.stepPct` (20)% |
+| `yards` | Fast yards | grind | 2 | 120 | 40 | 40 | none | −20% more |
+| `core` | Probe core | win | 1 | 400 | 120 | 120 | lancer 1, flak 1, The Deep reclaimed | launches the new probe: the win panel |
+
+Totals over every level: 1660 ore, 220 ice, 220 crystal.
+
+Effects in the sim, all integer:
+- **Extraction** (rule 3): a node's accumulator adds `extractors × perExtractorPerMin × (100 + level × research.extract.stepPct)` per tick, and yields a unit each time it reaches `ticksPerMin × 100`. Asteroids, pockets and the captured heart; not probe mining.
+- **Fast yards** (rule 5b): a start sets `ticksLeft = max(15, floor(ship.<type>.buildTicks × (100 − level × research.yards.stepPct) / 100))`.
+- **Designs** (rule 5b): a lancer or flak yard can start only if its design level is 1. `setShipyard` stays always valid.
+- **Opening ore and seed rigs:** applied at landing (above).
+- **Probe core:** buying it sets `campaign.wonTick`. After that every input is invalid except `setTunable`; the client shows the win panel. There is no new game+ in H4.
+
+Which items are which:
+- **Meaty steps:** Lancer design, Flak design, The Deep (an area, not research, but the biggest step in play), and the probe core. Seed rigs is the most visible grind item: you see the network already running when you land.
+- **The grind:** Opening ore, Extraction, Seed rigs and Fast yards, 10 levels in all, all aimed at the opening and the yard rate. Each is cheap in ore, so most overworld visits buy something.
+- **Rhythm at defaults:** Landfall's haul (150 ore) buys two grind levels before the first real area. The first light area's haul buys its design. The second design comes after area 3 or 4. The core comes after area 5 or 6. No stretch of more than two areas without a meaty step.
+
+**Why it isn't a fixed ladder.** Two ice-side and two crystal-side runs, for example:
+- Landfall → Frost Shelf (Flak) → Spore Veil (flak-cheap) → The Deep → Glass Shoal or Thorn Garden (for crystal) → core.
+- Landfall → Glass Shoal (Lancer) → Thorn Garden (lancer-cheap) → Spore Veil → The Deep → core.
+- Landfall → Frost Shelf → Glass Shoal (both designs) → either medium → The Deep → core, skipping a medium.
+
+The design you buy first changes which medium is cheap (bot flag 4 checks this), and which area you skip is your call.
+
+#### Entities and state: changes
+
+- **`world.campaign`** (new, plain JSON, hashed and saved):
+  - `active`: index into `map.areas` of the area being played, or null on the overworld.
+  - `areaStartTick`: tick of the current landing (area times are `tick − areaStartTick`).
+  - `deepLayout`: the H3 layout index for The Deep (chosen at world creation as H3 chose `variant`).
+  - `areas[]`, one per `map.areas` entry: `reclaimedTick` (or null), `entries`, `withdrawals`, `playTicks` (all visits), `reclaimPlayTicks` (the reclaiming visit), `shipsBuilt`, `shipsLost`.
+  - `reclaimOrder`: area indices in reclaim order.
+  - `research`: one level per `research` item id.
+  - `researchLog`: `{item, level, tick}` per purchase (at most 14 entries).
+  - `stockpile` and `shipAccum`: `{ore, ice, crystal}`.
+  - `totals`: `hauled` and `shipped` per resource.
+  - `wonTick`: null until the probe core.
+- **The area state** is the existing world fields (`stock`, `nodes`, `routes`, `ships`, `guardians`, `yards`, `assemblers`, `queue`, `stats`, `capturedTick`, …). They hold the active area. With no area active they are empty (no nodes, ships or guardians) and area selectors aren't called. The core engineer chooses the exact shape; the constraints are one `World`, plain JSON, one hash, and as little churn as possible for the client and bots (keeping the existing top-level fields is preferred to nesting them).
+- **`system`** keeps naming the H3 layout, now The Deep's.
+- **`createWorld(seed, data)`** returns a campaign on the overworld with nothing reclaimed; Landfall is open.
+- **Test and tool helper:** `campaignWorld(seed, data, {reclaimed, research, stockpile})` builds a campaign as if those areas were reclaimed and those levels bought, without playing. Tests, the bots (flag 4 and the interim gate) and the client's dev hooks use it. It isn't reachable from the game.
+
+#### Player inputs: changes
+
+| Input | Rule |
+| --- | --- |
+| `enterArea {area}` | `area` is an index into `map.areas`. Valid if no area is active, the game isn't won, and the area is open (held, and Landfall or lane-joined to a reclaimed area). Lands as above. |
+| `leaveArea {}` | Valid if an area is active. Returns to the overworld; withdraws if the heart isn't captured. |
+| `buyResearch {item}` | `item` is an index into `research`. Valid if no area is active, the game isn't won, the item is below its max level, its requirements hold, and the stockpile covers the next level's cost. Pays it and raises the level. |
+| area inputs | `buildExtractor`, `buildRoute`, `upgradeRoute`, `cancelBuild`, `setRally`, `setShipyard`, `sendShips`: valid only while an area is active (and otherwise as H3). |
+| `setTunable` | Always valid (as H3). |
+
+#### Rules per tick: changes
+
+- **No area active:** rule 1 (inputs) only, then `tick += 1`.
+- **Area active:** H3 rules 1–9 and stats, with the research effects above, then **rule 10 (shipments)**.
+- **Rule 8 (capture), heart:** also reclaims the area (above).
+- **Effective caps** are unchanged (H3 `capEff`), applied to the area's counts.
+- **Determinism:** fixed orders everywhere (areas, lanes and research in data order; resources ore, ice, crystal); no RNG; integer only.
+
+#### Tunables (H4, data/sim.json, all integers)
+
+New keys, plus one changed default. Per-area numbers (guards, haul, export) and research costs are data in `map.areas` and `research`, not tunables. `guard.capPct` stays the live knob for every area's strength at once.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `economy.startStock` | 40 | 0–200 | changed from 30, and now read at every landing (live, not new-run-only). 0: every opening is a slow trickle / 200: openings are skipped |
+| `research.opening.step` | 40 | 10–150 | 10: unnoticed / 150: one level erases the opening |
+| `research.extract.stepPct` | 25 | 10–50 | 10: unnoticed / 50: two levels trivialise ore |
+| `research.yards.stepPct` | 20 | 10–40 | 10: unnoticed / 40: two levels make ships nearly instant |
+| `research.costPct` | 100 | 25–100 | the session-length knob. 25: research is a formality / 100: the calibrated climb. The max is 100 so hauls always cover costs |
+| `shipments.pct` | 100 | 0–300 | 0: no passive income, hauls only (the A/B if idling to farm becomes a thing) / 300: reclaimed areas pay for everything |
+
+`system.variant` keeps its range and label, and now picks The Deep's layout.
+
+#### Save, data version and replay
+
+- **`dataVersion` 6.** An H3 save (v5) fails the data-version check and is discarded with the existing toast ("Saved run was from an older version; starting fresh"). **No migration:** an H3 save is one field mid-game, and there's no honest way to map it onto a campaign. The owner loses one H3 run, which is a finished test.
+- **The save** is the world snapshot with `campaign` added (under 1 KB more than an H3 save) plus the client's input log, as now. `deserializeWorld` also checks the campaign's shape.
+- **The log grows over a campaign.** A full run is about 60–75 game minutes, or 110–135k ticks. The client stores inputs only (a few thousand), so the save stays well under 1 MB. A feedback replay re-runs the whole campaign; that's a few seconds in the browser. If it gets slow, area-boundary checkpoints are a follow-up, not H4 scope.
+- **The reference replay** is regenerated. It covers: landing in Landfall and reclaiming it; buying research (opening, extraction); landing in Frost Shelf; a withdraw; landing again (the opening includes the research); a pocket capture and a heart capture; leaving. It may use `setTunable` (for example `guard.capPct` 25) to stay short. The probe core and the win are covered by unit tests from `campaignWorld`. The determinism gate's run must land in an area (not idle on the overworld), and its hashes are re-baselined.
+
+#### What changes for H3 content
+
+- **Inside an area:** H3 unchanged, except for the research effects, the design gate on yards and the area's node subset.
+- **The result panel** becomes the **area result panel**. It shows the area name and time, capture order, ships lost, guards withered, and "Hauled to the stockpile: +300 ore +60 ice +30 crystal". Its one primary button is "Back to the overworld". There's no New run here.
+- **New run** becomes **New system** (in the menu, behind a confirm: "Start a new system? This erases your campaign"). It uses seed + 1, as before, which changes The Deep's layout.
+- **Tuning panel:** the new keys. `economy.startStock` is labelled "applies at the next landing".
+- **Bots:** the H3 strategies become the in-area engine of the campaign strategies (below).
+
+#### Client: screens and phone UI
+
+The H1–H3 rules hold: 375 px portrait, no hover, every target at least 44 px, every action at most 2 taps from its screen (confirms excepted).
+
+**Overworld screen** (the first screen of a new game, and the root screen):
+- **Map:** 6 area nodes and 7 lanes on the starfield, fitted like an area. Each area node shows tier (its size and spike count), state, the prize icon of its main haul (ore, ice or crystal; The Deep shows the probe core) and its name label. Reclaimed areas are amber with their export as a small label ("+5 ore +3 ice/min"). Lanes between two reclaimed areas pulse slowly toward Landfall (shipments flowing home).
+- **HUD, top row:** stockpile chips (ore, ice, crystal; ice and crystal hidden until first non-zero), each with its shipments rate when non-zero ("+11/min while you play"); "Reclaimed 3/6"; a **Research** button (44 px); the menu (tuning, feedback, New system). No speed or pause buttons: the overworld is paused.
+- **Area sheet** (tap an area):
+  1. Name, tier ("Medium"), state ("Open", "Held: reclaim a neighbour first" or "Reclaimed in 8:12").
+  2. Haul ("Reclaim to haul 300 ore · 60 ice · 30 crystal") and export ("then ships 5 ore · 3 ice per minute while you play elsewhere").
+  3. Guarded nodes: one row each with the guard ring, prize and T/S counts ("Heart · 7 Thorn 25 Spore · Root-fed").
+  4. Counter tags for the heart: Lancer and Flak, Strong/Even/Weak from the sim selector, with "(not researched)" on a design you lack. This is how research visibly changes which area looks cheap.
+  5. The primary button: **Land** (open areas only).
+- **First-run hint** (notices strip): "Your probe has arrived. Tap Landfall, then Land."
+- **Return notices** (the notices strip, after leaving an area): "Shipped while you were in Spore Veil: +56 ore +12 ice" (only if non-zero); after a reclaim, "Thorn Garden reclaimed: +300 ore +30 ice +60 crystal. Opened: The Deep."
+
+**Research sheet** (from the Research button; a bottom sheet over the overworld, scrollable):
+- **The probe core card** at the top: drawn probe core, cost chips with a progress bar per resource toward its cost, and a requirements line ("Needs: Lancer design ✓, Flak design, The Deep reclaimed").
+- **Design cards** (Lancer, Flak): larger cards with the ship silhouette in a blueprint frame, "Strong vs Thorns, Weak vs Spores", cost chips, and **Research** (44 px).
+- **Grind rows** (Opening ore, Extraction, Seed rigs, Fast yards): icon, name, level pips ("2/3"), effect as now → next ("Opening ore 80 → 120 per landing"; "Extractors 10 → 12.5 ore/min"; "Ship build 4.0 s → 3.2 s"; "Land with A1 mined"), cost chips, **Buy**.
+- A disabled button says why: "Needs 40 crystal" (the shortest missing resource), "Needs Extraction 1", "Needs The Deep reclaimed", or "Max".
+- Buying shows the new level at once and a short notice ("Extraction 2: extractors now yield +50%").
+
+**Inside an area:**
+- **HUD:** an **Overworld** button (44 px, top left). In a held area it opens a confirm: "Withdraw from Frost Shelf? Everything built here is lost and the area resets. Research and the stockpile are kept." [Withdraw] [Stay]. In a reclaimed area it goes straight back.
+- **The landing notice:** "Landed in Glass Shoal · 120 ore · A1 rig running · extraction +25%". It names every research effect in play, so the upgrade is noticed where the chore would be.
+- **The probe sheet:**
+  - a "Shipments" line ("+11 ore +2 ice/min to the stockpile"; "paused: area reclaimed");
+  - the Yards rows gain two states: "Design not researched (Research, on the overworld)" and "No crystal here: no lens source in this area" (no pocket of that prize in the area). These come before the H3 "idle: needs lens";
+  - a yard row is shown if its design is researched or its resource was delivered here.
+- **The area result panel:** as above.
+
+**Win panel** (after the probe core): "The new probe launches." Total play time (game time), the area order with each area's time, the research order, ships lost, and hauled vs shipped totals. One button: **New system** (with the same confirm).
+
+**Phone portrait checks:** the overworld fits 375x667 with the research sheet closed. Area labels don't clip at the top or bottom edge, and nothing in either HUD wraps at 375 px under the wide-font stress.
+
+#### Art needs (for Art Direction, within ART_STYLE.md)
+
+- **Area node:** an asteroid cluster (3–5 rocks inside radius r). Tier shows as size, set by the caller (r), and as Bloom spikes on the rim while held: 0 for Landfall, 1 for light, 2 for medium, 3 for The Deep. States:
+  - `locked`: dim, desaturated, spikes in mob pink at low alpha;
+  - `open`: full colour, spikes in mob pink, a soft pulsing outline that invites a tap;
+  - `reclaimed`: the rocks in player amber, no spikes, a steady amber rim.
+- **Lane:** a line between two area nodes, trimmed to their rims by the caller. States:
+  - `closed`: dim dotted;
+  - `open`: dashed, mid-brightness;
+  - `owned` (both ends reclaimed): solid amber with small pulses moving from (x1, y1) to (x2, y2). The caller orders the ends so pulses flow toward Landfall.
+- **Research icons:**
+  - `lancer` and `flak`: the ship silhouette inside a dashed blueprint square;
+  - `opening`: an ore chip with a plus;
+  - `extract`: a drill bit;
+  - `rigs`: a small extractor on a rock;
+  - `yards`: a chevron with speed lines;
+  - `core`: the probe core.
+
+  All of them must be told apart at 24 px.
+- **Probe core:** a compact, glowing seed of the probe shape. `frac` 0–1 fills it from outline to complete, for the research card and the win panel.
+- **Stockpile icon:** a crate or hold, used as the stockpile chip's prefix.
+
+Every new colour goes in the palette with a role row in ART_STYLE.md: for example `laneOwned`, `laneOpen`, `laneClosed`, `areaLocked`. Player amber stays the player's. Everything stays within its contract bounds: the area node within r including spikes; the lane within 4 px of its segment.
+
+Draw contract, so h4-client can call these before h4-art merges, with placeholders until then:
+- `drawAreaNode(ctx, r, t, tier, state)`, with `tier` 0–3 and `state` `'locked' | 'open' | 'reclaimed'`;
+- `drawLane(ctx, x1, y1, x2, y2, t, state)`, with `state` `'closed' | 'open' | 'owned'`;
+- `drawResearchIcon(ctx, r, id)`, with `id` `'lancer' | 'flak' | 'opening' | 'extract' | 'rigs' | 'yards' | 'core'`;
+- `drawProbeCore(ctx, r, t, frac)`;
+- `drawStockpileIcon(ctx, r)`.
+
+The client draws the prize icon in the area node's centre with the existing `drawResourceIcon` (The Deep: `drawProbeCore(ctx, r × 0.45, t, 0)`), and the label itself. Existing draw functions keep working.
+
+#### Selectors (sim, read-only)
+
+- `campaignStatus(world, data)`: the active area, stockpile, shipments per minute per resource (what the reclaimed areas would ship now), reclaimed count, won tick, research levels.
+- `areaStatus(world, data, area)`: id, name, tier, position, state (`locked | open | reclaimed | active`), lanes, haul, export, guarded nodes (kind, prize, slots, capEff per type, starved caps), Root present, heart counter tags for lancer and flak (with a researched flag), and the visit record.
+- `researchStatus(world, data)`: per item: kind, level and max, the next level's cost after `research.costPct`, affordable, missing (resources with shortfalls, item requirements, area requirements), and effect now and next as numbers the client formats.
+- `landingEffects(world, data)`: opening ore, rig nodes, extraction %, yard time % (for the landing notice and the sheet).
+- `yardStatus`: adds the states `needsDesign` and `noSource`, ahead of `needsComponent`.
+- `campaignSummary(world, data)`: area order with play times, entries and withdrawals; research order with ticks; total play ticks; ships built and lost; hauled and shipped totals. The win panel and the bots use it.
+- `runSummary`: area-relative times.
+
+#### Bots: campaign strategies
+
+A **campaign runner** plays a whole system from `createWorld(seed)`.
+- **On the overworld,** the strategy buys research, then lands.
+- **In an area,** the H3 engine plays: the economy plan on the area's asteroids, rally at a5 (present in every area), cheapest target by estimate, every researched yard on. When the heart falls, it leaves.
+- **Caps:** an area visit is capped at 30 game minutes (then withdraw; a second timeout on the same area is a softlock), and the whole campaign at 120 game minutes of play.
+
+Strategies:
+- **`ice-line`:** Landfall, Frost Shelf, Spore Veil, The Deep, then the cheapest open area until the core is bought.
+- **`crystal-line`:** Landfall, Glass Shoal, Thorn Garden, The Deep, then the cheapest open area until the core is bought.
+- **`full-kit`:** Landfall, Frost Shelf, Glass Shoal, Spore Veil, Thorn Garden, The Deep.
+- **`greedy`:** after Landfall, always the open area with the lowest estimate: the heart's `need` divided by the best per-ship power among drones and the researched designs (H3 estimate), lowest area index on ties. It stops as soon as the core is bought.
+- **`no-research`:** greedy's area choice, but buys only the designs and the core.
+
+Research policy (all except `no-research`): on every overworld visit, buy repeatedly the first affordable item in this list:
+1. core;
+2. lancer, then flak;
+3. opening 1, extract 1, rigs 1, yards 1;
+4. extract 2, opening 2, rigs 2, yards 2;
+5. extract 3, opening 3.
+
+Report, per strategy and seed:
+- total play time to the core;
+- the area order with each visit's time, entries and withdrawals;
+- each area's **opening time** (ticks from landing until area ore/min reaches 40);
+- the research order with times;
+- ships lost;
+- hauled vs shipped;
+- tick p50/p95.
+
+Plus a per-seed comparison table.
+
+**H4 flags** (report lines, not merge gates):
+1. **No softlock:** every strategy buys the probe core on every seed within 120 game minutes of play.
+2. **Run length:** the best strategy's full run is 45–75 game minutes on every seed. Area times: Landfall ≤ 1 min, light 4–9, medium 6–13, The Deep 8–16 (report per area, mean over strategies).
+3. **Two viable sides:** `ice-line` and `crystal-line` finish within 15% of each other on at least 2 of 3 seeds.
+4. **The design decides the cheap medium:** with the same grind levels (opening 1, extraction 1), from `campaignWorld` with Landfall, Frost Shelf and Glass Shoal reclaimed, the greedy engine reclaims Spore Veil at least 20% faster with Flak only than with Lancer only, and Thorn Garden at least 20% faster with Lancer only than with Flak only. Seed 1; four probe runs.
+5. **Research matters:** `no-research` takes at least 25% longer than the best strategy on every seed, and every researching strategy's opening time in its last area is at most 60% of its opening time in its first light area.
+6. **Order varies:** at least two different area orders finish within 15% of the best full-run time on every seed.
+7. Determinism and the reference replay pass.
+
+Reported, not flagged: the shipped share (target 20–35%), and areas skipped per strategy. If the numbers miss, the engineers report them and do not retune; h4-design-data retunes.
+
+**Interim bot gate (h4-sim, before h4-bots):** the runner starts from `campaignWorld` with every area but The Deep reclaimed and both designs bought, lands in The Deep, and runs the H3 strategies. That is an H3 game with a 40-ore opening, a regression check against the H3 numbers.
+
+#### Success criteria (the owner, one 30–40 minute phone session; 4x is fine)
+
+1. The owner reclaims at least 4 areas, counting Landfall.
+2. At least once, they can name a reason for picking one area over another.
+3. They can name one upgrade they noticed when landing in a later area.
+4. They don't call a later area a chore or a repeat of the first.
+5. They never have to ask why a yard is idle: the row says design or local component.
+6. Every action is at most 2 taps from its screen (confirms excepted), and nothing in either HUD wraps at 375 px.
+
+Reaching the probe core is a bonus in this session, not a criterion. A second session to finish tests the autosave across a campaign.
+
+#### Fun questions for the handoff
+
+1. Did getting stronger between areas feel good? Which upgrade did you notice when you landed in the next area?
+2. After each area, was there more than one sensible next area? What decided it: a design you had, a prize, or the guard mix?
+3. Did your third or fourth area feel like a fresh puzzle or a repeat of the first? Was there a moment that felt like a big step?
+
+#### Out of scope for H4
+
+- **B, supply lines:** lane capacity, choosing where an area's output goes, imports into the active area, held areas blocking lanes beyond adjacency.
+- **Random or seeded overworlds** and area order shuffles. Only The Deep's layout varies, by seed, as in H3.
+- **New game+**, probe design choices, a richer next system.
+- **Warden, Lash, tier 2 resources and sap.**
+- **Ships or stock crossing areas.** Re-entering a reclaimed area. Research bought mid-area.
+- **The "overwhelm" valve** (auto-reclaim of easy areas). Add it only if play shows a chore.
+- **Offline progress, research timers,** and an overworld Root.
+- **Area-boundary save checkpoints** (only if replay length becomes a problem).
+- **The H3 follow-ups** in BACKLOG "Can wait" (the time-to-clear tag formula, fleet-aware bot targets).
 
 ### H3 (Milestone 2, iteration 3, tested on build-20261108-2): Counter web
 

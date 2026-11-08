@@ -243,6 +243,155 @@ Owner chose this slice on 2026-11-07 (Q13, Q14). Where this backlog and the spec
 
 **Acceptance:** answer the spec's open calibration questions using the h3-bots report; retune layouts and defaults so as many depth flags as possible are met, with the reasoning in `DECISIONS.md`. Re-run the bot suite and gates; report which flags hold. Also in scope (Critic notes on h3-sim): (a) at defaults the hp-weighted Strong/Even/Weak tag misleads, e.g. flak reads Even at Frost Gate p1 though it needs 8 ships vs 13 drones, and both counters read Even at the Frost Gate heart; success criterion 3 relies on the tags, so fix the thresholds, the weighting or the mixes until the tag matches the real minimum waves; (b) interim bots take the heart in 12–16 min against the spec's 20–35, so calibrate pace too. The reference replay still passes (re-baseline only if the sim engineer's tooling requires it, and say so).
 
+## Milestone 2, iteration 4: H4 Reclaim ladder (spec in `DESIGN.md` → "H4 (Milestone 2, iteration 4, spec ready): Reclaim ladder")
+
+The owner chose this slice on 2026-11-08 (Q16: "A. Reclaim ladder"). Where this backlog and the spec differ, the spec wins.
+
+Order:
+- h4-sim and h4-art run in parallel.
+- After h4-sim merges, h4-client and h4-bots run in parallel.
+- h4-design-data starts after h4-bots merges. It may overlap h4-client, whose tests must not pin data values.
+
+Planned launches: 11 of 12. That is the Designer spec (1), 4 builders, 5 Critic reviews (one per task, h4-design-data included) and the Retrospective. h4-design-data is a **resume** of this iteration's Designer, not a launch, which leaves 1 spare.
+
+| Id | Task | Owner | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| h4-sim | Campaign state, areas, lanes, enter/leave/reclaim, stockpile and shipments, research and its effects, design gate on yards, selectors, data v6, save, reference replay, interim bot gate | core-engineer | none | Ready |
+| h4-art | Area node, lane, research icons, probe core, stockpile icon; palette; gallery; ART_STYLE | art-direction | none (draw contract in the spec) | Ready |
+| h4-client | Overworld screen, area sheet, research sheet, landing and withdraw, area result and win panels, notices, yard reasons, New system | engineer | h4-sim merged | Blocked |
+| h4-bots | Campaign runner, five strategies, per-area report, H4 flags | engineer | h4-sim merged | Blocked |
+| h4-design-data | Calibrate area guards, hauls, exports, research costs and the H4 tunables against the flags | designer (resume) | h4-bots merged | Blocked |
+
+### h4-sim (core-engineer)
+
+**Files:**
+- `packages/sim/**`, including a new frozen v6 test fixture if the rule tests need one;
+- `data/sim.json`;
+- `packages/bots/src/reference-replay.ts` and the determinism baselines;
+- minimal edits to `packages/bots/src/runner.ts` for the interim gate.
+
+Only the minimal edits needed to keep `packages/client/src/*` and `packages/bots/src/*` compiling and the smoke test booting. The client may land straight in Landfall through a temporary hook until h4-client. No feature work there. Not `placeholders.ts`, `palette.ts` or the gallery.
+
+**Acceptance:**
+1. Every rule in the spec's "Area lifecycle", "Stockpile and shipments", "Research" (effects), "Entities and state: changes", "Player inputs: changes" and "Rules per tick: changes" is implemented in integer math, with fixed orders and no RNG:
+   - one `World` with `campaign`;
+   - `enterArea`, `leaveArea` and `buyResearch`;
+   - landing with opening ore, seed rigs, and yards on per design;
+   - a reclaim pays the haul;
+   - a withdraw resets the area;
+   - rule 10 shipments;
+   - the extraction and yard-speed effects;
+   - the design gate on lancer and flak yards;
+   - the probe core sets `wonTick`;
+   - the overworld runs rule 1 only;
+   - in areas without a Root, the heart can't starve.
+2. `data/sim.json` has `dataVersion` 6, plus `map.areas`, `map.lanes` and `research` exactly as the spec tables give them, and the H4 tunables with their ranges. `parseSimData` validates:
+   - area node lists are frame ids, and include the probe and the heart;
+   - pocket and Root entries match the nodes present;
+   - The Deep has every node;
+   - lanes join known areas;
+   - research requirements name known items and areas;
+   - **Σ haul ≥ Σ every research level's cost, per resource** (at the `research.costPct` max).
+3. Data tests compare `data/sim.json` with the spec tables, as the H3 test does:
+   - the "Areas" table;
+   - the "Area guards" table;
+   - the "Research" table;
+   - "Tunables (H4, data/sim.json, all integers)".
+
+   The existing H3 table tests keep passing; the H3 tables are unchanged.
+4. The spec's selectors exist: `campaignStatus`, `areaStatus`, `researchStatus`, `landingEffects` and `campaignSummary`, the `yardStatus` states `needsDesign` and `noSource`, and area-relative `runSummary`. A test shows `counterTag` on each area's guard caps reproduces the spec's "Area guards" tag column.
+5. `campaignWorld(seed, data, {reclaimed, research, stockpile})` is exported for tests, bots and dev hooks.
+6. Unit tests cover at least:
+   - only Landfall is open at the start, and lanes open areas on reclaim;
+   - each input's validity rules, including "no research inside an area" and "nothing after the win";
+   - landing with each research effect: opening ore, rigs on a1/a2, yards on, extraction exact over a minute, and yard time with its floor of 15;
+   - a withdraw resets the area and keeps research and the stockpile;
+   - a reclaim pays the haul once;
+   - shipments accrue exactly (integer, ×`shipments.pct`), only while a held area is active and never on the overworld;
+   - `research.costPct` rounding;
+   - the core needs both designs and The Deep;
+   - a heart with no Root never starves;
+   - Landfall's empty heart falls to the first ship;
+   - The Deep at defaults plays like H3 (the min-wave helper gives the H3 numbers from `campaignWorld`);
+   - the serialize round trip with `campaign`;
+   - a v5 save is refused.
+7. The reference replay is regenerated as the spec describes: Landfall reclaimed, research bought, a withdraw, a re-landing, a pocket capture and a heart capture. The determinism gate lands in an area. Hashes are re-baselined in this task.
+8. Interim bot gate: the runner starts from `campaignWorld` (every area but The Deep reclaimed, both designs bought) and plays The Deep with the H3 strategies. Report the times against the H3 table; do not retune. `npm run gates -- --base main` passes.
+
+### h4-art (art-direction, parallel with h4-sim)
+
+**Files:** `packages/client/src/placeholders.ts`, `packages/client/src/palette.ts`, the art gallery files, `ART_STYLE.md`. Nothing else in the client.
+
+**Acceptance:**
+1. The spec's draw contract ("Art needs") exists with these exact signatures, and existing draw functions keep working:
+   - `drawAreaNode(ctx, r, t, tier, state)`;
+   - `drawLane(ctx, x1, y1, x2, y2, t, state)`;
+   - `drawResearchIcon(ctx, r, id)`;
+   - `drawProbeCore(ctx, r, t, frac)`;
+   - `drawStockpileIcon(ctx, r)`.
+2. Readability:
+   - the three area states and four tiers are told apart at 24 px (show a greyscale row);
+   - the seven research icons are told apart at 24 px;
+   - `owned` lanes visibly pulse in one direction;
+   - player amber marks reclaimed areas only.
+3. Bounds are measured and shown in the gallery: the area node within r including spikes, the lane within 4 px of its segment, and icons within r.
+4. Every new palette key has a matching row in the ART_STYLE.md Palette table (the palette-sync test). It passes the contrast test or is on the documented allow-list.
+5. The gallery shows every new entity at 24 px and at full size, plus an overworld mock (6 areas, 7 lanes, mixed states) at 375x667. `npm run gates -- --base main` passes. Browser-facing: green branch CI before merge.
+
+### h4-client (engineer, after h4-sim merges; parallel with h4-bots)
+
+**Files:** `packages/client/src/**` except the h4-art files, and `tests/smoke/**`.
+
+**Acceptance:**
+1. Everything in the spec's "Client: screens and phone UI" and "What changes for H3 content":
+   - the overworld screen, paused (the client steps only to apply overworld inputs);
+   - the area sheet with haul, export, guarded nodes, and heart tags marked "(not researched)";
+   - the research sheet with the probe core card, design cards, grind rows, and disabled reasons from `researchStatus`;
+   - Land, and the in-area Overworld button with the withdraw confirm;
+   - the landing notice from `landingEffects`, and the return and reclaim notices;
+   - the probe sheet's Shipments line and the new yard states;
+   - the area result panel with the haul and "Back to the overworld";
+   - the win panel;
+   - New system behind a confirm;
+   - the new tuning keys.
+2. Every displayed number comes from sim selectors or live tunables, never from client constants. Smoke tests don't pin data values, because h4-design-data will retune them.
+3. 375 px portrait, targets ≥ 44 px, every action ≤ 2 taps from its screen. Nothing in either HUD wraps under the wide-font stress.
+4. Smoke tests at desktop and phone cover:
+   - the first screen is the overworld: land in Landfall, reclaim it, return;
+   - buy a research level and see it in the next landing's notice;
+   - withdraw from an area;
+   - reach the win panel from a dev-hook `campaignWorld` with the core affordable.
+5. An H3 save starts fresh with the existing toast. The browser-vs-Node replay check passes on a campaign log. Gates pass, with green branch CI.
+
+### h4-bots (engineer, after h4-sim merges; parallel with h4-client)
+
+**Files:** `packages/bots/src/strategies.ts`, `runner.ts`, `cli.ts`, `packages/bots/test/**`. Not the reference replay.
+
+**Acceptance:**
+1. The campaign runner and the five strategies (`ice-line`, `crystal-line`, `full-kit`, `greedy`, `no-research`), with the research policy, exactly as the spec's "Bots: campaign strategies" describes. This includes the per-visit 30-minute cap with withdraw and the 120-minute campaign cap.
+2. The report:
+   - per strategy and seed: area order with visit times, opening times, research order, ships lost, hauled vs shipped, and tick p50/p95;
+   - a per-seed comparison table;
+   - the seven H4 flags as report lines (not gates). Flag 4 runs its four probe games from `campaignWorld`.
+3. Bot gate: no crash or softlock, and tick p95 within budget. If the campaign suite is too slow for the gate at `--seeds 3`, the gate runs a shorter configuration and the full report runs separately; say which in DECISIONS.md.
+4. Tests cover the research policy, the area-choice logic and the flag computation. Report the numbers; do not retune. Gates pass.
+
+### h4-design-data (designer, resume; after h4-bots merges)
+
+**Files:** `data/sim.json` (values only; bump `dataVersion` if a default changes), `DESIGN.md`, `DECISIONS.md`.
+
+**Acceptance:**
+1. Using the h4-bots report, retune the area guards, hauls, exports, research costs and the H4 tunables so that as many H4 flags as possible hold. Put the reasoning in DECISIONS.md. Keep the Σ haul ≥ Σ cost invariant.
+2. Priorities, in order:
+   1. no softlock;
+   2. a run length of 45–75 min, with area times in their bands;
+   3. flag 4 (the design decides the cheap medium);
+   4. flags 3 and 6 (two sides, several orders);
+   5. flag 5 (research matters, and openings shrink).
+3. Update the DESIGN.md H4 tables to match. The data tests read them, so `data/sim.json` and DESIGN.md change together and no test changes.
+4. Every number written in DESIGN.md or DECISIONS.md is copied from a committed report or test output and names its source.
+5. Re-run the bot suite and gates, and report which flags hold. The reference replay still passes (re-baseline only if the tooling requires it, and say so).
+
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-h3-review-notes** (Designer to judge, then engineer; from the H3 Critic reviews, 2026-11-07):
