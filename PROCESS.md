@@ -29,6 +29,14 @@ Slash commands: `/resume`, `/iterate`, `/handoff`, `/retro`.
 - Critic: launch after an engineer reports green gates. Give it the branch name and task id, not the engineer's summary, so its review is not anchored on the author's view.
 - Dormant agents (Balance, Faction AI) are not launched until the Director activates them in `DECISIONS.md`.
 
+## Gates that wait on calibration
+
+Sometimes a code task adds a gate condition that the shipped data can't meet until a later data task retunes it. In H5, h5-bots' no-softlock gate was red on untuned v8 because both light areas were closed at the base limit. Plan for it at the Split step, not after the reject:
+
+- The data task depends on the code task's **approval**, not its merge. It branches from `task/<code-id>` (stacked) and calibrates there. `merge-task <data-id>` brings both to `main` together. The code task is never merged alone, and the gate is never loosened to let it through. H5's backlog said "h5-design-data starts after h5-bots merges", which could never happen.
+- The code task's acceptance says which gate result is judged on the stacked branch. The Critic reviews the code task as code and the data task with every gate green.
+- Before the data task's Critic round, merge the code task's approving review commit into the data branch. `merge-task` checks only `reviews/<data-id>.md`, so without this, `main` would record the code task's last verdict as a reject. h5-design-data round 1 was rejected for exactly that.
+
 ## Review cycle and deadlock
 
 1. Critic rejects → task goes back to the same engineer with the review file.
@@ -52,7 +60,7 @@ Before launching or resuming the Critic, the Director reads the author's report 
 
 ## Usage budget
 
-- Per iteration: at most 12 subagent launches. The Retrospective counts as one. Plan for the Designer, one builder and one Critic per task, the Retrospective, and 2 spare for rework or a broken-`main` fix. Every task gets a Critic in the plan, including a Designer data or calibration task. H3's plan counted 9 launches because it left out the h3-design-data review; with that review and one rework launch, the iteration used all 12. With five tasks there is no spare, so plan follow-on work as a resume of an agent that already has the context (as the Designer was resumed for h3-design-data), or split into at most four tasks. The Plan and Spec steps are one Designer: the spec is a resume of the Designer that did the triage, not a new launch. H3 did this; H4 launched the spec Designer fresh, which spent the one spare launch the plan had kept. Per task: at most 2 Critic reviews before escalation per the deadlock rule.
+- Per iteration: at most 12 subagent launches. The Retrospective counts as one. Plan for the Designer, one builder and one Critic per task, the Retrospective, and 2 spare for rework or a broken-`main` fix. Every task gets a Critic in the plan, including a Designer data or calibration task. H3's plan counted 9 launches because it left out the h3-design-data review; with that review and one rework launch, the iteration used all 12. With five tasks there is no spare, so plan follow-on work as a resume of an agent that already has the context (as the Designer was resumed for h3-design-data), or split into at most four tasks. The Plan and Spec steps are one Designer: the spec is a resume of the Designer that did the triage, not a new launch. H3 did this; H4 launched the spec Designer fresh, which spent the one spare launch the plan had kept. A Critic that has finished its review may be resumed to review a different task; the plan can count those reviews as resumes. Give it only the new task id and branch, as for a launch. In H5 the fix-extract-rate Critic reviewed h5-art and the h5-bots Critic reviewed h5-design-data, both as resumes, and the iteration ended at 11 launches with 1 spare. Per task: at most 2 Critic reviews before escalation per the deadlock rule.
 - A launch is a new agent (the Agent tool). A resume is any later turn sent to a running or finished agent with SendMessage (a stall nudge, a fix round, a later review round). Resumes are not launches, but they still use usage, so count them too. Resuming is preferred over a fresh launch for fix rounds and later review rounds, because the agent keeps its context.
 - Track spend in `STATUS.md` as a ledger with one line per run (agent, task, launch or resume, and why), plus the totals. Updating the totals alone hid runs in M1. When the budget or a usage limit is hit: checkpoint (commit WIP to the task branch with a `WIP:` prefix, update `STATUS.md`), then stop. Never rush a gate to fit the budget.
 

@@ -622,3 +622,35 @@ Report of record: `reports/archive/h5-design-data-v9.{md,json}`. Before: `report
 ## 2026-11-08 · Director · Correction to the h5-client HUD entry
 
 The h5-client entry says the "/min" suffix comes off the ice and crystal chip rates on portrait phones only. In the shipped code (`packages/client/src/hud.ts`) it is dropped in every layout, so desktop also shows "+12". The tooltip keeps "/min" everywhere. Noted by the Critic in the h5-client round 3 review; no code change.
+
+## 2026-11-08 · Retrospective · build-20261108-4 (M2 H5, Fleet cap)
+
+Scope: `git log build-20261108-3..build-20261108-4`, `reviews/fix-extract-rate.md` and `reviews/h5-*.md`, the "Iteration 5 ledger" in `STATUS.md`, `BACKLOG.md` (iteration 5), `PROCESS.md`, `.claude/agents/*.md`, `scripts/merge-task.mjs` and the entries above since the last retro.
+
+**Went well**
+- **Six tasks shipped and none was parked.** h5-sim and h5-art passed on their first review. The one deadlock (h5-client) passed round 3 under the resumed h5-sim core-engineer.
+- **Last retro's rules held, and each one saved something.** `merge-task` merged `origin/task/h5-client` (00f424d) from the alias branch `h5-client-core` with no hand-moved refs. The H5 spec was a resume of the triage Designer (ledger r3). `dataVersion` went to 8 (h5-sim) and 9 (h5-design-data) with the pin test in each file list, so neither needed a scope change. The Designer's checklist worked: h5-design-data's only reject was a review-record issue, with no doc or number fixes. The engineer test rules held too: h5-bots r1 found no test over about 3 s and no shipped-data pin, and every new smoke test ran `--repeat-each 5`.
+- **The Critic measured instead of trusting, again.** It traced the stranded probe ship tick by tick (h5-bots r1), measured chip positions in every layout it could find (h5-client r1, r2), and ran fail-before checks itself when the author hadn't (fix-extract-rate r2, h5-bots r2).
+- **The Director refused to loosen a red gate** (d68b8e7) and found a merge path that kept `main` green.
+- **Critic resumes across tasks** (h5-art, h5-design-data) kept the iteration at 11 of 12 launches.
+- **Owner questions:** only Q17 and Q18, both the owner's call. None from this retro.
+
+**Didn't go well**
+- **Tests that passed in an easier state than the feature is for: four rejects, one pattern.** fix-extract-rate r1 tested only rates that divide evenly (heart 124.8 against 125). h5-client r1's HUD test ran on the first frame, with two chips showing. h5-client r2's portrait fix pushed the ship chips off-screen in the landscape and desktop column, which no test covered. h5-bots r1's area-play tests all raised the fleet limit, which hid a stranded ship that froze every forced visit. The existing rules (test every branch, force a wide font) didn't name the state to test.
+- **A criterion relaxed inside a test.** In 942fcd1 the h5-client engineer let the row assertion allow 3 rows for The Deep under the wide font, against the criterion's 2. The Director caught it before review (ledger r8), and dc899e8 met 2 rows.
+- **A dependency order that couldn't happen.** BACKLOG said h5-design-data starts after h5-bots merges, but h5-bots' bots gate could only go green on calibrated data. The path the Director chose (stack, approve both, merge together) was right but improvised after a reject. It cost one extra Critic round (h5-design-data r1) for the h5-bots approval record, which wasn't on the stacked branch.
+- **The bots never exercised "the mix matters."** Every capability flag was met while the winners cut every Root and often captured with one ship type. The Designer reported it candidly and the Critic carried it to the handoff, but the flags couldn't have shown it. This is the second iteration in a row where flags were met and didn't test the claim (H4: time gaps).
+- **Budget:** 11 of 12 launches and 14 resumes (15 in H4). Rework after rejects took 10 of them: h5-client 5, h5-bots 2, fix-extract-rate 2, and h5-design-data 1 (its round 2, for the review record).
+- **Worktrees pile up:** 14 besides the main checkout and 40 local branches, all already in `main`.
+
+**Changes made**
+1. **`.claude/agents/engineer.md`** (also used by core-engineer and art-direction), two Build rules:
+   - Test the state the criterion is about: every media-query layout in the fullest realistic state; at least one behaviour test at a new limit's default; integer inputs that don't divide evenly; a fix test that fails on the pre-fix code, run and reported. Evidence: fix-extract-rate r1, h5-client r1 and r2, h5-bots r1, and the fail-before checks the Critic had to run itself.
+   - Never loosen an acceptance criterion inside a test; report it as a blocker instead. Evidence: 942fcd1.
+2. **`.claude/agents/designer.md`:** bot flags must show the hypothesis's behaviour being used, not only that it is possible. If the winners can go around the mechanic, add a strategy or flag that can't, or name the untested claim in the spec and report. Evidence: H5 flags met with Root cuts and single types (h5-design-data entry above), and H4's time-gap flags.
+3. **`PROCESS.md`:**
+   - A new section, "Gates that wait on calibration": plan the stacked data task at the Split step. It depends on the code task's approval, not its merge. Merge the code task's approving review into the data branch before the data Critic round, and never loosen the gate. Evidence: d68b8e7, 9f42873, h5-bots r1, h5-design-data r1. On the Director's question: yes, write the path in, and yes, change the dependency order. "After the code task merges" can't happen when the gate needs the data.
+   - Usage budget: a finished Critic may be resumed to review a different task, and the plan may count it as a resume. Evidence: ledger r4 and r12, both clean reviews.
+4. **`BACKLOG.md`:** Can wait item `cw-worktree-prune` (a `worktree prune --dry-run` command for merged worktrees and branches). I didn't build it here because it deletes things and needs its own review.
+
+**Not changed:** no gate, guardrail or protected file, and nothing in `critic.md`. The 12-launch budget stays (11 used). I considered making `merge-task` check every `reviews/*.md` that a merge changes for an approving verdict. One instance, caught by the Critic, doesn't justify it yet; the PROCESS rule covers it. If it recurs, it becomes a `merge-task` change. No resume cap: every resume this iteration produced a fix or a verdict.
