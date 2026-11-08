@@ -13,6 +13,7 @@ import {
   type ShipType,
   type Tunables,
 } from './data.ts';
+import { designResearched, yardBuildTicks } from './campaign.ts';
 import { shipsAtByType } from './inputs.ts';
 import { counterPct, deliveredInWindow, perExtractorPerMin, prizeInWindow, reservedOre } from './step.ts';
 import {
@@ -74,7 +75,7 @@ export function incomePerMin(world: Readonly<World>): number {
 export function shipsPerMinX10(world: Readonly<World>, type: ShipType = 'drone'): number {
   if (!world.yards[type].on) return 0;
   const byOre = Math.floor((incomePerMin(world) * 10) / world.tun[`ship.${type}.cost`]);
-  const byYard = Math.floor((ticksPerMin(world) * 10) / world.tun[`ship.${type}.buildTicks`]);
+  const byYard = Math.floor((ticksPerMin(world) * 10) / yardBuildTicks(world, type));
   return Math.min(byOre, byYard);
 }
 
@@ -237,21 +238,26 @@ export function queueStatus(world: Readonly<World>): QueueStatus {
 }
 
 /**
- * A yard's state for its status line: 'building' (a ship in progress), 'off',
- * 'needsComponent' ("idle: needs lens"; checked first, as it is the scarce
- * input), 'needsOre' ("idle: needs ore"), or 'ready' (on, idle and affordable:
- * it starts on the next tick).
+ * A yard's state for its status line, first match wins: 'building' (a ship in
+ * progress); H4 'needsDesign' (lancer or flak design not researched: it can't
+ * run, on or off); H4 'noSource' (no component in stock and no node in this
+ * area yields its input, so it can never get one here: "No crystal here");
+ * 'off'; 'needsComponent' ("idle: needs lens"; the scarce input);
+ * 'needsOre' ("idle: needs ore"); 'ready' (on, idle and affordable: it starts
+ * on the next tick).
  */
-export type YardState = 'building' | 'off' | 'needsComponent' | 'needsOre' | 'ready';
+export type YardState = 'building' | 'needsDesign' | 'noSource' | 'off' | 'needsComponent' | 'needsOre' | 'ready';
 
 export interface YardRow {
   type: ShipType;
   on: boolean;
-  /** Its row is shown (DESIGN.md H3: lancer and flak are hidden until their resource is first delivered). */
+  /** Its resource has been delivered in this area (DESIGN.md H3: lancer and flak rows were hidden until then). H4 shows a row if `unlocked || researched`. */
   unlocked: boolean;
+  /** H4: its design is researched (always true for drones). */
+  researched: boolean;
   /** 0 when idle. */
   ticksLeft: number;
-  /** For a progress bar; at current tunables. */
+  /** For a progress bar: the build time at current tunables and research (Fast yards, floor 15). */
   totalTicks: number;
   /** Ore per ship. */
   cost: number;
@@ -279,8 +285,12 @@ export function yardStatus(world: Readonly<World>): YardStatus {
     const y = world.yards[type];
     const cost = t[`ship.${type}.cost`];
     const component = SHIP_COMPONENT[type];
+    const researched = designResearched(world, type);
+    const source = component === null || world.stock[component] > 0 || world.nodes.some((n) => n.prize === COMPONENT_INPUT[component]);
     let state: YardState;
     if (y.ticksLeft > 0) state = 'building';
+    else if (!researched) state = 'needsDesign';
+    else if (!source) state = 'noSource';
     else if (!y.on) state = 'off';
     else if (component !== null && world.stock[component] < 1) state = 'needsComponent';
     else if (free < cost) state = 'needsOre';
@@ -289,8 +299,9 @@ export function yardStatus(world: Readonly<World>): YardStatus {
       type,
       on: y.on,
       unlocked: unlocked[type],
+      researched,
       ticksLeft: y.ticksLeft,
-      totalTicks: Math.max(y.ticksLeft, t[`ship.${type}.buildTicks`]),
+      totalTicks: Math.max(y.ticksLeft, yardBuildTicks(world, type)),
       cost,
       component,
       hp: t[`ship.${type}.hp`],
@@ -481,8 +492,11 @@ export interface HeartParams {
 
 export interface SupplyStatus {
   heartNode: number;
+  /** -1 when the area has no Root (H4). */
   rootNode: number;
-  /** The Root still stands. */
+  /** H4: false in an area without a Root (its heart is always fed and can't starve). */
+  hasRoot: boolean;
+  /** The Root still stands (false when there is none). */
   rootAlive: boolean;
   /** The heart is fed (false once the Root is cut). */
   fed: boolean;
@@ -506,7 +520,8 @@ export function supplyStatus(world: Readonly<World>): SupplyStatus {
   return {
     heartNode: heart.node,
     rootNode,
-    rootAlive: guardianOrThrow(world, rootNode).alive,
+    hasRoot: rootNode >= 0,
+    rootAlive: rootNode >= 0 && guardianOrThrow(world, rootNode).alive,
     fed: heart.fed !== false,
     rootCutTick: world.stats.rootCutTick,
     fedHeart: {
@@ -530,7 +545,7 @@ export interface SystemStatus {
   /** Player-facing name ("Frost Gate"). */
   name: string;
   rootCutTick: number | null;
-  /** Whole game seconds when the Root was cut, or null. */
+  /** Whole game seconds from the landing to the Root cut, or null. */
   rootCutSec: number | null;
 }
 
@@ -542,7 +557,7 @@ export function systemStatus(world: Readonly<World>): SystemStatus {
     id: world.system.id,
     name: world.system.name,
     rootCutTick: cut,
-    rootCutSec: cut === null ? null : Math.floor(cut / world.tickRate),
+    rootCutSec: cut === null ? null : Math.floor((cut - world.campaign.areaStartTick) / world.tickRate),
   };
 }
 
@@ -657,9 +672,11 @@ export interface TargetSummary {
 }
 
 export interface RunSummary {
+  /** H4: the tick this area was landed in. Every `…Sec` below is area-relative (seconds since the landing); `…Tick` fields are world ticks. */
+  areaStartTick: number;
   /** Tick the heart was captured, or null. */
   capturedTick: number | null;
-  /** Whole game seconds to capture the heart, or null. */
+  /** Whole game seconds from the landing to the heart capture, or null. */
   captureSec: number | null;
   peakPerMin: number;
   shipsBuilt: number;
@@ -689,7 +706,7 @@ export interface RunSummary {
   firstDeliveredSec: Record<RawResource, number | null>;
   /** Per guarded node (node order): waves sent, ships lost, guards killed, capture tick. */
   targets: TargetSummary[];
-  /** Shortcuts into `targets`. */
+  /** Shortcuts into `targets` (the Root's are 0 in an area without one). */
   heartWavesSent: number;
   heartShipsLost: number;
   rootWavesSent: number;
@@ -698,17 +715,21 @@ export interface RunSummary {
 
 const sumShips = (c: ShipTypeCounts): number => c.drone + c.lancer + c.flak;
 
-/** Result panel and bot report numbers. */
+/** Result panel and bot report numbers, for the active area. Seconds are area-relative (H4). */
 export function runSummary(world: Readonly<World>): RunSummary {
   const st = world.stats;
-  const sec = (tick: number | null): number | null => (tick === null ? null : Math.floor(tick / world.tickRate));
+  const start = world.campaign.areaStartTick;
+  const toSec = (tick: number): number => Math.floor((tick - start) / world.tickRate);
+  const sec = (tick: number | null): number | null => (tick === null ? null : toSec(tick));
   const heart = guardianOrThrow(world, heartIndex(world));
-  const root = guardianOrThrow(world, rootIndex(world));
+  const rootNode = rootIndex(world);
+  const root = rootNode >= 0 ? guardianOrThrow(world, rootNode) : null;
   const capTick = (node: number): number | null => {
     for (const c of st.captures) if (c.node === node) return c.tick;
     return null;
   };
   return {
+    areaStartTick: start,
     capturedTick: world.capturedTick,
     captureSec: sec(world.capturedTick),
     peakPerMin: st.peakPerMin,
@@ -731,7 +752,7 @@ export function runSummary(world: Readonly<World>): RunSummary {
     guardsKilled: { ...st.guardsKilled },
     captures: st.captures.map((c) => {
       const n = world.nodes[c.node]!;
-      return { node: c.node, id: n.id, kind: n.kind, prize: n.prize, tick: c.tick, sec: Math.floor(c.tick / world.tickRate) };
+      return { node: c.node, id: n.id, kind: n.kind, prize: n.prize, tick: c.tick, sec: toSec(c.tick) };
     }),
     delivered: { ...st.delivered },
     firstDeliveredSec: { ore: sec(st.firstDeliveredTick.ore), ice: sec(st.firstDeliveredTick.ice), crystal: sec(st.firstDeliveredTick.crystal) },
@@ -745,7 +766,7 @@ export function runSummary(world: Readonly<World>): RunSummary {
     })),
     heartWavesSent: heart.wavesSent,
     heartShipsLost: heart.shipsLost,
-    rootWavesSent: root.wavesSent,
-    rootShipsLost: root.shipsLost,
+    rootWavesSent: root === null ? 0 : root.wavesSent,
+    rootShipsLost: root === null ? 0 : root.shipsLost,
   };
 }

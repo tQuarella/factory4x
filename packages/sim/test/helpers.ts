@@ -1,6 +1,5 @@
 import {
   SHIP_TYPES,
-  createWorld,
   deserializeWorld,
   guardianAt,
   isValidInput,
@@ -15,6 +14,7 @@ import {
   type World,
 } from '../src/index.ts';
 import { fixtureData } from './fixture.ts';
+import { h3World } from './h3-world.ts';
 
 export const data = fixtureData;
 
@@ -92,7 +92,7 @@ export function addShips(w: World, node: number, n: number, type: ShipType = 'dr
 }
 
 export function fresh(seed = 0): World {
-  return createWorld(seed, data);
+  return h3World(seed, data);
 }
 
 /** No stock, no probe mining, every yard off: nothing happens unless the test sets it up. */

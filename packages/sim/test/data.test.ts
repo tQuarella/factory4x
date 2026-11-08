@@ -93,10 +93,10 @@ describe('the frozen test fixture (data v4)', () => {
     expect(fixtureData.tunables['stats.throughputWindowSec']).toEqual({ default: 60, min: 60, max: 60 });
   });
 
-  it('drops every key the spec removes, and map.variants (the shipped data too)', () => {
+  it('drops every key the spec removes, and map.variants (the shipped data too); H4 adds map.areas and map.lanes', () => {
     for (const raw of [rawData, shippedRaw]) {
       for (const k of REMOVED) expect(Object.keys(raw.tunables)).not.toContain(k);
-      expect(Object.keys(raw.map)).toEqual(['nodes', 'layouts']);
+      expect(Object.keys(raw.map)).toEqual(['nodes', 'layouts', 'areas', 'lanes']);
     }
   });
 
@@ -137,14 +137,14 @@ describe('the frozen test fixture (data v4)', () => {
     ]);
   });
 
-  it('tunable metadata marks stats.* fixed, client.* client-scope, and startStock and system.variant new-run-only', () => {
+  it('tunable metadata marks stats.* fixed, client.* client-scope, system.variant new-run-only, and startStock live (H4: read at every landing)', () => {
     const meta = tunableMeta(fixtureData);
     expect(meta.map((m) => m.key)).toEqual([...TUNABLE_KEYS]);
     const by = (k: string) => meta.find((m) => m.key === k)!;
     expect(by('ship.lancer.cost')).toEqual({ key: 'ship.lancer.cost', section: 'ship', default: 15, min: 5, max: 60, live: true, scope: 'sim', newRunOnly: false });
     expect(by('stats.throughputWindowSec').live).toBe(false);
     expect(by('client.autosaveSec').scope).toBe('client');
-    expect(by('economy.startStock').newRunOnly).toBe(true);
+    expect(by('economy.startStock')).toMatchObject({ live: true, newRunOnly: false });
     expect(by('system.variant')).toMatchObject({ section: 'system', live: true, scope: 'sim', newRunOnly: true });
     expect(by('guard.capPct').newRunOnly).toBe(false);
   });

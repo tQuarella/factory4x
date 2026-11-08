@@ -6,7 +6,6 @@ import {
   chooseVariant,
   combatRates,
   counterTag,
-  createWorld,
   deserializeWorld,
   guardCaps,
   guardianStatus,
@@ -23,6 +22,7 @@ import {
   type World,
 } from '../src/index.ts';
 import { L, N, addShips, data, fresh, guardian, heart, idle, root, run, setGuards } from './helpers.ts';
+import { h3World } from './h3-world.ts';
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
@@ -50,7 +50,7 @@ describe('layout selection and setup', () => {
   it('by seed: ((seed mod 3) + 3) mod 3, including negative seeds; system.variant k forces layout k − 1', () => {
     expect([0, 1, 2, 3, 4, -1, -2, -3].map((s) => chooseVariant(s, 0, 3))).toEqual([0, 1, 2, 0, 1, 2, 1, 0]);
     for (let k = 1; k <= 3; k++) {
-      for (const seed of [0, 1, 2, -5]) expect(createWorld(seed, withDefault('system.variant', k)).system.variant).toBe(k - 1);
+      for (const seed of [0, 1, 2, -5]) expect(h3World(seed, withDefault('system.variant', k)).system.variant).toBe(k - 1);
     }
     expect([0, 1, 2].map((s) => systemStatus(fresh(s)))).toEqual([
       { variant: 0, id: 'frost', name: 'Frost Gate', rootCutTick: null, rootCutSec: null },
@@ -94,7 +94,7 @@ describe('capEff and guard.capPct', () => {
   });
 
   it('applies to every layout count, starved caps included, at creation and live', () => {
-    const w = createWorld(0, withDefault('guard.capPct', 50));
+    const w = h3World(0, withDefault('guard.capPct', 50));
     expect(w.guardians.map((g) => typeCounts(w, g.node).join('/'))).toEqual(['0/4', '1/1', '4/2', '1/9', '3/0', '5/7']);
     expect(supplyStatus(w).starvedHeart.caps).toEqual({ thorn: 3, spore: 3 });
     // Live: raising it raises the caps, and regrowth fills toward them.
@@ -113,7 +113,7 @@ describe('capEff and guard.capPct', () => {
   it('a guarded node whose effective caps are all 0 has no guards, and the first ship to arrive takes it', () => {
     const d = clone(data);
     d.map.layouts[0]!.pockets.p2 = { prize: 'crystal', slots: 2, thorns: 0, spores: 0 };
-    const w = createWorld(0, d);
+    const w = h3World(0, d);
     w.stock.ore = 0;
     expect(guardian(w, N.p2).guards).toEqual([]);
     run(w, 600, d);
@@ -124,7 +124,7 @@ describe('capEff and guard.capPct', () => {
     expect(guardian(w, N.p2).alive).toBe(false);
     expect(w.lastBattle).toMatchObject({ node: N.p2, outcome: 'captured', shipsEngaged: 1, guardsKilled: 0 });
     // capPct 25 also zeroes the Frost Gate p1 Thorn: floor(1 × 25 / 100) = 0.
-    expect(typeCounts(createWorld(0, withDefault('guard.capPct', 25)), N.p1)).toEqual([0, 2]);
+    expect(typeCounts(h3World(0, withDefault('guard.capPct', 25)), N.p1)).toEqual([0, 2]);
   });
 });
 
@@ -333,6 +333,7 @@ describe('selectors', () => {
     expect(supplyStatus(w)).toEqual({
       heartNode: N.heart,
       rootNode: N.root,
+      hasRoot: true,
       rootAlive: true,
       fed: true,
       rootCutTick: null,

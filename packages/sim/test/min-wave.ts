@@ -1,5 +1,6 @@
-import { SHIP_TYPES, createWorld, guardianAt, step, type ShipType, type ShipTypeCounts, type SimData, type World } from '../src/index.ts';
+import { SHIP_TYPES, guardianAt, step, type ShipType, type ShipTypeCounts, type SimData, type World } from '../src/index.ts';
 import { fixtureData } from './fixture.ts';
+import { h3World } from './h3-world.ts';
 
 /**
  * The scripted minimum-wave search (h3-sim acceptance 5): the smallest
@@ -21,7 +22,7 @@ function placeShips(w: World, node: number, fleet: Readonly<ShipTypeCounts>): vo
 
 /** A world on `layout` with every yard off; `starved` cuts the Root first (the heart wilts to its starved caps). */
 export function baseWorld(layout: number, starved: boolean, data: SimData = fixtureData): World {
-  const w = createWorld(layout, data);
+  const w = h3World(layout, data);
   if (w.system.variant !== layout) throw new Error('seed did not pick the layout');
   for (const t of SHIP_TYPES) w.yards[t].on = false;
   if (starved) {

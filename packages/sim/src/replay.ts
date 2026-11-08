@@ -1,3 +1,4 @@
+import { campaignWorld, type CampaignStart } from './campaign.ts';
 import type { SimData } from './data.ts';
 import { hashState } from './hash.ts';
 import type { Input } from './inputs.ts';
@@ -8,6 +9,11 @@ import { createWorld, type World } from './world.ts';
 export interface Replay {
   seed: number;
   dataVersion: number;
+  /**
+   * Optional constructed start (tests, tools and dev hooks only; the game always starts from createWorld):
+   * the replay starts from campaignWorld(seed, data, start) instead of createWorld(seed, data).
+   */
+  start?: CampaignStart;
   /** Each input is applied on the step where world.tick === tick, in log order. */
   inputs: Array<{ tick: number; input: Input }>;
 }
@@ -22,7 +28,7 @@ export function replayHashes(replay: Replay, data: SimData, ticks: number, every
   if (replay.dataVersion !== data.dataVersion) {
     throw new Error(`Replay is data version ${replay.dataVersion}, data is ${data.dataVersion}`);
   }
-  const world = createWorld(replay.seed, data);
+  const world = replay.start === undefined ? createWorld(replay.seed, data) : campaignWorld(replay.seed, data, replay.start);
   const byTick = new Map<number, Input[]>();
   for (const { tick, input } of replay.inputs) {
     const list = byTick.get(tick) ?? [];
