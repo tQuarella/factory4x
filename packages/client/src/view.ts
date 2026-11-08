@@ -8,19 +8,22 @@ import { activeBattles, guardianStatus, heartIndex, isCaptured, isGuarded, isRoo
 import { palette } from './palette.ts';
 import {
   drawAsteroid,
+  drawGuardRing,
   drawHitFlash,
+  drawPocket,
   drawPod,
   drawProbe,
   drawRallyFlag,
   drawRichNode,
   drawRoot,
+  drawResourceIcon,
   drawRoute,
+  drawShip,
+  drawSpore,
   drawThorn,
   drawVine,
   drawWiltingThorn,
 } from './placeholders.ts';
-// Until h3-art merges, the H3 draw functions come from the shim (same signatures); the Director swaps this import.
-import { drawGuardRing, drawPocket, drawResourceIcon, drawShip, drawSpore } from './h3-art-shim.ts';
 import { fitMap, type Fit } from './fit.ts';
 import { lerp, podTotalTicks, progressFrac } from './interp.ts';
 import type { Session } from './session.ts';

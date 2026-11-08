@@ -423,6 +423,9 @@ async function h3PlayThrough(page: Page): Promise<void> {
   await expectControlsFit(page, '#sheet', 'probe sheet with yards and assembly');
   await lancerRow.locator('button.tog').click();
   await expect(lancerRow.locator('button.tog')).toHaveText('ON');
+  // The first wave took every drone, so start the drone yard again for the mixed fleet.
+  await droneRow.locator('button.tog').click();
+  await expect(droneRow.locator('button.tog')).toHaveText('ON');
   await expect(page.locator('#chip-lancer')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('#chip-lancer b')).not.toHaveText('0', { timeout: 30_000 });
   await expectControlsFit(page, '#bars', 'HUD with chips');
@@ -467,6 +470,7 @@ async function h3PlayThrough(page: Page): Promise<void> {
   const wave0 = await page.evaluate(() => window.__factory4x!.wavesSent());
   await sendBtn.click();
   await expect(panel).toBeHidden();
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.__factory4x!.lastInput()).type as string)).toBe('sendShips');
   const input = JSON.parse(await page.evaluate(() => window.__factory4x!.lastInput())) as { type: string; from: number; to: number; counts: Record<string, number> };
   expect(input.type).toBe('sendShips');
   expect(input.from).toBe(0);

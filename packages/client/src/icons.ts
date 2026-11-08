@@ -1,6 +1,5 @@
 /** Small canvas icons for the HUD chips, guard rows, yard rows and the send panel. Drawn once when built. */
-import { drawThorn } from './placeholders.ts';
-import { drawResourceIcon, drawShip, drawSpore, type ResourceKind, type ShipType } from './h3-art-shim.ts';
+import { drawResourceIcon, drawShip, drawSpore, drawThorn, type ResourceKind, type ShipType } from './placeholders.ts';
 import { h } from './dom.ts';
 
 /** A `size` px square canvas (CSS px, crisp on 2x screens), drawn by `draw(ctx, r)` centred, r = half the size minus a pixel. */
