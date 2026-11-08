@@ -13,7 +13,7 @@ import {
   type ShipType,
   type Tunables,
 } from './data.ts';
-import { designResearched, yardBuildTicks } from './campaign.ts';
+import { designResearched, extractPct, yardBuildTicks } from './campaign.ts';
 import { shipsAtByType } from './inputs.ts';
 import { counterPct, deliveredInWindow, perExtractorPerMin, prizeInWindow, reservedOre } from './step.ts';
 import {
@@ -152,9 +152,13 @@ export interface NodeStatus {
   slots: number;
   /** Built + under construction + queued. */
   extractorsCommitted: number;
-  /** Units per minute one extractor yields here. */
+  /** Units per minute one extractor yields here with Extraction research applied, whole units (floor). */
   perExtractorPerMin: number;
+  /** The same in tenths of a unit per minute, exact for the shipped steps (12.5 -> 125). */
+  perExtractorPerMinX10: number;
+  /** extractors x per-extractor rate with research applied, whole units (floor). */
   extractPerMin: number;
+  extractPerMinX10: number;
   buffer: number;
   bufferCap: number;
   /** Buffer full: extraction is being lost ("route at capacity: upgrade", or no route). */
@@ -179,10 +183,15 @@ export function routeCapacityPerMin(world: Readonly<World>, level: number): numb
   return Math.floor((level * world.tun['route.podOrePerLevel'] * ticksPerMin(world)) / world.tun['route.podIntervalTicks']);
 }
 
+/** Tenths of a unit per minute one extractor yields at a node of this kind, with Extraction research (what `extraction` in step.ts adds). */
+function boostedX10(world: Readonly<World>, kind: World['nodes'][number]['kind']): number {
+  return Math.floor((perExtractorPerMin(world.tun, kind) * extractPct(world)) / 10);
+}
+
 /** Extraction, buffer and route state for one node (asteroid, captured pocket and heart sheets). */
 export function nodeStatus(world: Readonly<World>, node: number): NodeStatus {
   const n = world.nodes[node]!;
-  const per = perExtractorPerMin(world.tun, n.kind);
+  const perX10 = boostedX10(world, n.kind);
   const route = routeFrom(world, node);
   const bufferCap = world.tun['node.bufferCap'];
   return {
@@ -190,8 +199,10 @@ export function nodeStatus(world: Readonly<World>, node: number): NodeStatus {
     extractors: n.extractors,
     slots: n.slots,
     extractorsCommitted: n.extractors + pendingOf(world, 'extractor', node),
-    perExtractorPerMin: per,
-    extractPerMin: n.extractors * per,
+    perExtractorPerMin: Math.floor(perX10 / 10),
+    perExtractorPerMinX10: perX10,
+    extractPerMin: Math.floor((n.extractors * perX10) / 10),
+    extractPerMinX10: Math.floor(n.extractors * perX10),
     buffer: n.buffer,
     bufferCap,
     backedUp: n.extractors > 0 && n.buffer >= bufferCap,
@@ -429,6 +440,8 @@ export interface GuardianStatus {
   prize: RawResource | null;
   slots: number;
   prizePerMinPerExtractor: number;
+  /** The same in tenths, with Extraction research applied. */
+  prizePerMinPerExtractorX10: number;
   /** One row per guard type: Thorns, then Spores. */
   guards: Record<GuardType, GuardRow>;
   /** Living guards and effective caps, both types. */
@@ -473,7 +486,8 @@ export function guardianStatus(world: Readonly<World>, node: number): GuardianSt
     alive: g.alive,
     prize: n.prize,
     slots: n.slots,
-    prizePerMinPerExtractor: perExtractorPerMin(t, n.kind),
+    prizePerMinPerExtractor: Math.floor(boostedX10(world, n.kind) / 10),
+    prizePerMinPerExtractorX10: boostedX10(world, n.kind),
     guards: { thorn: row('thorn'), spore: row('spore') },
     total: counts.thorn + counts.spore,
     totalCap: caps.thorn + caps.spore,

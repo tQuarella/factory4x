@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEND_ALL,
+  guardianStatus,
+  nodeStatus,
   areaStatus,
   campaignStatus,
   campaignSummary,
@@ -305,6 +307,22 @@ describe('research effects in an area', () => {
     q.tun['research.extract.stepPct'] = 10;
     run(q, T);
     expect(q.nodes[at(q, 'a1')]!.buffer).toBe(12);
+  });
+
+  it('node sheet and guardian sheet rates show Extraction research (regression: owner saw the unboosted rate)', () => {
+    const w = extracting(1, 'a1');
+    w.guardians[0]!.alive = false;
+    w.nodes[at(w, 'p1')]!.extractors = 2;
+    // Asteroid 10/min at +25%: 12.5 each; pocket 6/min: 7.5 each, two extractors 15.
+    expect(nodeStatus(w, at(w, 'a1'))).toMatchObject({ perExtractorPerMin: 12, perExtractorPerMinX10: 125, extractPerMin: 12, extractPerMinX10: 125 });
+    expect(nodeStatus(w, at(w, 'p1'))).toMatchObject({ perExtractorPerMinX10: 75, extractPerMin: 15, extractPerMinX10: 150 });
+    expect(guardianStatus(w, at(w, 'p1')).prizePerMinPerExtractorX10).toBe(75);
+    // Level 0 is the base rate, and the shown rate matches what a minute of ticks actually yields.
+    expect(nodeStatus(extracting(0, 'a1'), at(w, 'a1'))).toMatchObject({ perExtractorPerMinX10: 100, extractPerMin: 10 });
+    const l3 = extracting(3, 'a1');
+    const shown = nodeStatus(l3, at(l3, 'a1')).extractPerMin;
+    run(l3, T);
+    expect(l3.nodes[at(l3, 'a1')]!.buffer).toBe(shown);
   });
 
   it('extraction does not boost probe mining', () => {
