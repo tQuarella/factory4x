@@ -1,30 +1,66 @@
 import {
+  SHIP_TYPES,
   createWorld,
   defaultData,
   deserializeWorld,
+  guardianAt,
   isValidInput,
   nodeStatus,
   serializeWorld,
   step,
+  type GuardType,
   type Guardian,
   type Input,
+  type ShipType,
   type SimData,
   type World,
 } from '../src/index.ts';
 
 export const data = defaultData;
 
-/** Node indices of the map (the Root's position depends on the variant). */
-export const N = { probe: 0, a1: 1, a2: 2, a3: 3, a4: 4, a5: 5, rich: 6, root: 7 } as const;
+/** Node indices of the H3 map. */
+export const N = {
+  probe: 0,
+  a1: 1,
+  a2: 2,
+  a3: 3,
+  a4: 4,
+  a5: 5,
+  a6: 6,
+  a7: 7,
+  a8: 8,
+  a9: 9,
+  p1: 10,
+  p2: 11,
+  p3: 12,
+  p4: 13,
+  root: 14,
+  heart: 15,
+} as const;
 
-/** The Bloom's guardian (rich node). */
-export function bloom(w: World): Guardian {
-  return w.guardians.find((g) => g.node === N.rich)!;
+/** Layout indices; seeds 0, 1, 2 pick them in order. */
+export const L = { frost: 0, glass: 1, twin: 2 } as const;
+
+/** The guardian at a node (throws if none). */
+export function guardian(w: World, node: number): Guardian {
+  const g = guardianAt(w, node);
+  if (g === null) throw new Error(`no guardian at ${node}`);
+  return g;
+}
+
+/** The heart's guardian. */
+export function heart(w: World): Guardian {
+  return guardian(w, N.heart);
 }
 
 /** The Root's guardian. */
 export function root(w: World): Guardian {
-  return w.guardians.find((g) => g.node === N.root)!;
+  return guardian(w, N.root);
+}
+
+/** Replaces a guardian's guards with these (type, hp) pairs, new ids in order. Test setup only. */
+export function setGuards(w: World, node: number, guards: ReadonlyArray<readonly [GuardType, number]>): void {
+  guardian(w, node).guards = guards.map(([type, hp]) => ({ id: w.nextId++, type, hp }));
 }
 
 /** Steps `n` ticks with no inputs. */
@@ -50,18 +86,27 @@ export function clone(world: World): World {
   return r.world;
 }
 
-/** Parks `n` new ships at `node` (test setup only). */
-export function addShips(w: World, node: number, n: number): void {
-  for (let i = 0; i < n; i++) w.ships.push({ id: w.nextId++, hp: w.tun['ship.hp'], at: node, transit: null, engagedIn: -1 });
+/** Parks `n` new ships of `type` at `node` (test setup only). */
+export function addShips(w: World, node: number, n: number, type: ShipType = 'drone'): void {
+  for (let i = 0; i < n; i++) w.ships.push({ id: w.nextId++, type, hp: w.tun[`ship.${type}.hp`], at: node, transit: null, engagedIn: -1 });
 }
 
-export function fresh(seed = 1): World {
+export function fresh(seed = 0): World {
   return createWorld(seed, data);
 }
 
+/** No stock, no probe mining, every yard off: nothing happens unless the test sets it up. */
+export function idle(seed = 0): World {
+  const w = fresh(seed);
+  w.stock.ore = 0;
+  for (const t of SHIP_TYPES) w.yards[t].on = false;
+  w.tun['economy.probeOrePerMin'] = 0;
+  return w;
+}
+
 /**
- * A fixed economy script (the turtle plan from DESIGN.md, one queued item at a
- * time): for a1..a5 in order, extractor, route, upgrade when committed extraction
+ * A fixed economy script (the turtle plan, one queued item at a time): for
+ * a1..a5 in order, extractor, route, upgrade when committed extraction
  * exceeds capacity, then fill the slots. Returns the next input or null.
  */
 export function networkStep(w: World): Input | null {
@@ -80,9 +125,4 @@ export function networkStep(w: World): Input | null {
     for (const t of tries) if (isValidInput(w, data, t)) return t;
   }
   return null;
-}
-
-/** True when the network script has nothing left to build. */
-export function networkDone(w: World): boolean {
-  return networkStep(w) === null && w.queue.length === 0 && w.activeBuild === null;
 }

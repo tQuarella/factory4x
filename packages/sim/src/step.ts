@@ -1,17 +1,34 @@
-import type { SimData } from './data.ts';
+import {
+  COMBAT_ORDER,
+  COMPONENTS,
+  COMPONENT_INPUT,
+  GUARD_TYPES,
+  SHIP_COMPONENT,
+  YARD_ORDER,
+  type GuardType,
+  type RawResource,
+  type ShipType,
+  type SimData,
+  type Tunables,
+} from './data.ts';
 import { applyInput, startTransit, type Input } from './inputs.ts';
 import { ceilDiv } from './math.ts';
 import {
   PROBE,
-  addThorn,
+  addGuard,
+  countGuards,
+  guardCaps,
+  guardRegrowTicks,
+  guardRepair,
   guardianAt,
-  guardianParams,
+  heartIndex,
   nodeDistance,
-  richIndex,
   routeFrom,
   ticksPerMin,
+  type Battle,
   type BattleOutcome,
   type BattleResult,
+  type Guard,
   type Guardian,
   type Ship,
   type Wilt,
@@ -19,10 +36,10 @@ import {
 } from './world.ts';
 
 /**
- * One tick of DESIGN.md H1 "Rules per tick" with the H2 changes, systems in
- * the stated order. Every loop runs over a dense array in id (or node index)
- * order; rules 7-9 each run over all guardians (Bloom, then Root) before the
- * next rule starts.
+ * One tick of DESIGN.md "Rules per tick" (H1 numbering, with the H2 and H3
+ * changes), systems in the stated order. Every loop runs over a dense array
+ * in id (or node index) order, or over a fixed type order; rules 7-9 each run
+ * over all guardians (node order) before the next rule starts.
  */
 
 /** Rule 2. */
@@ -62,8 +79,8 @@ function construction(world: World): void {
         return;
       }
     }
-    if (world.stock >= head.cost) {
-      world.stock -= head.cost;
+    if (world.stock.ore >= head.cost) {
+      world.stock.ore -= head.cost;
       world.stats.oreSpentEconomy += head.cost;
       world.queue.shift();
       const ticks = head.kind === 'extractor' ? world.tun['extractor.buildTicks'] : world.tun['route.buildTicks'];
@@ -72,14 +89,21 @@ function construction(world: World): void {
   }
 }
 
+/** Units per minute one extractor at a node of this kind yields (0 for nodes that never extract). */
+export function perExtractorPerMin(t: Readonly<Tunables>, kind: World['nodes'][number]['kind']): number {
+  if (kind === 'asteroid') return t['extractor.orePerMin'];
+  if (kind === 'pocket') return t['pocket.resourcePerMin'];
+  if (kind === 'heart') return t['heart.orePerMin'];
+  return 0;
+}
+
 /** Rule 3. */
 function extraction(world: World): void {
   const T = ticksPerMin(world);
   const cap = world.tun['node.bufferCap'];
   for (const node of world.nodes) {
     if (node.extractors === 0) continue;
-    const perMin = node.kind === 'rich' ? world.tun['rich.orePerMin'] : world.tun['extractor.orePerMin'];
-    node.accum += node.extractors * perMin;
+    node.accum += node.extractors * perExtractorPerMin(world.tun, node.kind);
     while (node.accum >= T) {
       node.accum -= T;
       if (node.buffer < cap) node.buffer += 1;
@@ -88,30 +112,38 @@ function extraction(world: World): void {
   world.probeAccum += world.tun['economy.probeOrePerMin'];
   while (world.probeAccum >= T) {
     world.probeAccum -= T;
-    world.stock += 1;
+    world.stock.ore += 1;
   }
+}
+
+/** The per-second delivery ring buffer for a resource. */
+function bucketsOf(world: World, res: RawResource): number[] {
+  return res === 'ore' ? world.stats.deliveredBuckets : world.stats.prizeBuckets[res];
 }
 
 /** Rule 4. */
 function routes(world: World): void {
   const t = world.tun;
-  const buckets = world.stats.deliveredBuckets;
-  const bucket = Math.floor(world.tick / world.tickRate) % buckets.length;
+  const st = world.stats;
+  const bucket = Math.floor(world.tick / world.tickRate) % st.deliveredBuckets.length;
   for (const route of world.routes) {
     if (route.cooldown > 0) route.cooldown -= 1;
     const src = world.nodes[route.from]!;
-    if (route.cooldown === 0 && src.buffer > 0) {
+    if (route.cooldown === 0 && src.buffer > 0 && src.prize !== null) {
       const amount = Math.min(src.buffer, route.level * t['route.podOrePerLevel']);
       src.buffer -= amount;
-      route.pods.push({ amount, ticksLeft: ceilDiv(route.length, t['route.podSpeedSu']) });
+      route.pods.push({ res: src.prize, amount, ticksLeft: ceilDiv(route.length, t['route.podSpeedSu']) });
       route.cooldown = t['route.podIntervalTicks'];
     }
     let delivered = false;
     for (const pod of route.pods) {
       pod.ticksLeft -= 1;
       if (pod.ticksLeft <= 0) {
-        world.stock += pod.amount;
-        buckets[bucket] = buckets[bucket]! + pod.amount;
+        world.stock[pod.res] += pod.amount;
+        st.delivered[pod.res] += pod.amount;
+        if (st.firstDeliveredTick[pod.res] === null) st.firstDeliveredTick[pod.res] = world.tick;
+        const b = bucketsOf(world, pod.res);
+        b[bucket] = b[bucket]! + pod.amount;
         delivered = true;
       }
     }
@@ -119,34 +151,67 @@ function routes(world: World): void {
   }
 }
 
-function newShip(world: World): Ship {
-  const ship: Ship = { id: world.nextId++, hp: world.tun['ship.hp'], at: PROBE, transit: null, engagedIn: -1 };
-  world.ships.push(ship);
-  world.stats.shipsBuilt += 1;
-  if (world.stats.firstShipTick === null) world.stats.firstShipTick = world.tick;
-  if (world.rally !== PROBE) startTransit(world, ship, world.rally);
-  return ship;
-}
-
-/** Ore reserved by unpaid build orders. */
+/** Ore reserved by unpaid build orders (queued builds pay before assemblers and yards). */
 export function reservedOre(world: Readonly<World>): number {
   let sum = 0;
   for (const o of world.queue) sum += o.cost;
   return sum;
 }
 
-/** Rule 5. */
-function shipyard(world: World): void {
-  const yard = world.shipyard;
-  if (yard.ticksLeft > 0) {
-    yard.ticksLeft -= 1;
-    if (yard.ticksLeft === 0) newShip(world);
+/** Rule 5a: lens, then plating. */
+function assemblers(world: World): void {
+  const t = world.tun;
+  const reserved = reservedOre(world);
+  for (const c of COMPONENTS) {
+    const a = world.assemblers[c];
+    if (a.ticksLeft > 0) {
+      a.ticksLeft -= 1;
+      if (a.ticksLeft === 0) {
+        world.stock[c] += 1;
+        world.stats.componentsBuilt[c] += 1;
+      }
+    }
+    if (a.ticksLeft !== 0) continue;
+    const res = COMPONENT_INPUT[c];
+    const ore = t[`component.${c}.ore`];
+    const need = c === 'lens' ? t['component.lens.crystal'] : t['component.plating.ice'];
+    if (world.stock[c] < t['component.stockCap'] && world.stock.ore - reserved >= ore && world.stock[res] >= need) {
+      world.stock.ore -= ore;
+      world.stock[res] -= need;
+      world.stats.oreSpentComponents += ore;
+      a.ticksLeft = t['component.buildTicks'];
+    }
   }
-  const cost = world.tun['ship.cost'];
-  if (yard.on && yard.ticksLeft === 0 && world.stock - reservedOre(world) >= cost) {
-    world.stock -= cost;
+}
+
+function newShip(world: World, type: ShipType): Ship {
+  const ship: Ship = { id: world.nextId++, type, hp: world.tun[`ship.${type}.hp`], at: PROBE, transit: null, engagedIn: -1 };
+  world.ships.push(ship);
+  world.stats.shipsBuilt[type] += 1;
+  if (world.stats.firstShipTick === null) world.stats.firstShipTick = world.tick;
+  if (world.rally !== PROBE) startTransit(world, ship, world.rally);
+  return ship;
+}
+
+/** Rule 5b: lancer, flak, then drone. */
+function yards(world: World): void {
+  const t = world.tun;
+  for (const type of YARD_ORDER) {
+    const yard = world.yards[type];
+    if (yard.ticksLeft > 0) {
+      yard.ticksLeft -= 1;
+      if (yard.ticksLeft === 0) newShip(world, type);
+    }
+    if (!yard.on || yard.ticksLeft !== 0) continue;
+    const cost = t[`ship.${type}.cost`];
+    const comp = SHIP_COMPONENT[type];
+    // Recomputed per yard: reservedOre doesn't change here, but stock does.
+    if (world.stock.ore - reservedOre(world) < cost) continue;
+    if (comp !== null && world.stock[comp] < 1) continue;
+    world.stock.ore -= cost;
+    if (comp !== null) world.stock[comp] -= 1;
     world.stats.oreSpentShips += cost;
-    yard.ticksLeft = world.tun['ship.buildTicks'];
+    yard.ticksLeft = t[`ship.${type}.buildTicks`];
   }
 }
 
@@ -170,58 +235,137 @@ function shipsAt(world: World, node: number): Ship[] {
   return present;
 }
 
-/** Rule 7, for one living guardian: a round against the ships at its node, with its effective repair. */
+/** Target order per ship type (rule 7). Drones use all guards in id order and are handled apart. */
+const TARGET_ORDER: Readonly<Record<'lancer' | 'flak', readonly GuardType[]>> = {
+  lancer: ['thorn', 'spore'],
+  flak: ['spore', 'thorn'],
+};
+
+/** Damage multiplier, percent, of a ship type against a guard type: strong, weak, or 100 for drones. */
+export function counterPct(t: Readonly<Tunables>, ship: ShipType, guard: GuardType): number {
+  if (ship === 'drone') return 100;
+  const strong = (ship === 'lancer') === (guard === 'thorn');
+  return strong ? t['counter.strongPct'] : t['counter.weakPct'];
+}
+
+/**
+ * Applies `dmg` to the living guards (hp > 0) of `type` (or of every type when
+ * null) in id order, overflowing from one to the next as in H1. Returns the
+ * damage left over.
+ */
+function applyToGuards(guards: Guard[], type: GuardType | null, dmg: number): number {
+  for (const gd of guards) {
+    if (dmg <= 0) break;
+    if (gd.hp <= 0 || (type !== null && gd.type !== type)) continue;
+    const hit = Math.min(dmg, gd.hp);
+    gd.hp -= hit;
+    dmg -= hit;
+  }
+  return dmg;
+}
+
+function anyLiving(guards: readonly Guard[], type: GuardType): boolean {
+  for (const gd of guards) if (gd.type === type && gd.hp > 0) return true;
+  return false;
+}
+
+/**
+ * Rule 7 player damage for one round: each ship type present, in the order
+ * lancer, flak, drone, pools its damage and walks its target order. Damage
+ * from earlier types is already applied when later types act.
+ */
+export function playerDamage(t: Readonly<Tunables>, guards: Guard[], present: Readonly<Record<ShipType, number>>): void {
+  for (const type of COMBAT_ORDER) {
+    const n = present[type];
+    if (n === 0) continue;
+    let base = n * t[`ship.${type}.damage`];
+    if (type === 'drone') {
+      applyToGuards(guards, null, base);
+      continue;
+    }
+    for (const gt of TARGET_ORDER[type]) {
+      if (base <= 0) break;
+      // A type with no living guards takes nothing, so the pool passes on unconverted (DECISIONS.md, h3-sim).
+      if (!anyLiving(guards, gt)) continue;
+      const pct = counterPct(t, type, gt);
+      const left = applyToGuards(guards, gt, Math.floor((base * pct) / 100));
+      base = anyLiving(guards, gt) ? 0 : Math.floor((left * 100) / pct);
+    }
+  }
+}
+
+function newBattle(world: World, g: Guardian): Battle {
+  return {
+    id: world.nextId++,
+    node: g.node,
+    startTick: world.tick,
+    guardsAtStart: countGuards(g),
+    shipsEngaged: 0,
+    engagedByType: { drone: 0, lancer: 0, flak: 0 },
+    shipsLost: 0,
+    lostByType: { drone: 0, lancer: 0, flak: 0 },
+    guardsKilled: 0,
+    killedByType: { thorn: 0, spore: 0 },
+  };
+}
+
+/** Rule 7, for one living guardian: a round against the ships at its node, then repair. */
 function combat(world: World, g: Guardian): void {
   const t = world.tun;
   let lastShipsDied = false;
   if (world.tick % t['combat.roundTicks'] === 0) {
     const present = shipsAt(world, g.node);
-    if (present.length > 0 && g.thorns.length > 0) {
-      if (g.battle === null) {
-        g.battle = { id: world.nextId++, node: g.node, startTick: world.tick, shipsEngaged: 0, shipsLost: 0, thornsKilled: 0 };
-      }
+    if (present.length > 0 && g.guards.length > 0) {
+      if (g.battle === null) g.battle = newBattle(world, g);
       const battle = g.battle;
+      const byType = { drone: 0, lancer: 0, flak: 0 };
       for (const s of present) {
+        byType[s.type] += 1;
         if (s.engagedIn !== battle.id) {
           s.engagedIn = battle.id;
           battle.shipsEngaged += 1;
+          battle.engagedByType[s.type] += 1;
         }
       }
-      // Both sides' damage comes from counts at the start of the round.
-      let playerDamage = present.length * t['ship.damage'];
-      let guardDamage = g.thorns.length * t['guardian.thornDamage'];
-      let thornsKilled = 0;
-      for (const th of g.thorns) {
-        if (playerDamage <= 0) break;
-        const hit = Math.min(playerDamage, th.hp);
-        th.hp -= hit;
-        playerDamage -= hit;
-        if (th.hp <= 0) thornsKilled++;
-      }
+      // Both sides' damage comes from the state at the start of the round.
+      let guardDamage = 0;
+      for (const gd of g.guards) guardDamage += t[`guard.${gd.type}.damage`];
+      playerDamage(t, g.guards, byType);
       let shipsKilled = 0;
       for (const s of present) {
         if (guardDamage <= 0) break;
         const hit = Math.min(guardDamage, s.hp);
         s.hp -= hit;
         guardDamage -= hit;
-        if (s.hp <= 0) shipsKilled++;
+        if (s.hp <= 0) {
+          shipsKilled++;
+          battle.lostByType[s.type] += 1;
+          world.stats.shipsLost[s.type] += 1;
+        }
       }
-      if (thornsKilled > 0) g.thorns = g.thorns.filter((th) => th.hp > 0);
+      let guardsKilled = 0;
+      for (const gd of g.guards) {
+        if (gd.hp > 0) continue;
+        guardsKilled++;
+        battle.killedByType[gd.type] += 1;
+        world.stats.guardsKilled[gd.type] += 1;
+      }
+      if (guardsKilled > 0) g.guards = g.guards.filter((gd) => gd.hp > 0);
       if (shipsKilled > 0) {
         world.ships = world.ships.filter((s) => s.hp > 0);
         lastShipsDied = shipsKilled === present.length;
       }
-      battle.thornsKilled += thornsKilled;
+      battle.guardsKilled += guardsKilled;
       battle.shipsLost += shipsKilled;
-      g.thornsKilled += thornsKilled;
+      g.guardsKilled += guardsKilled;
       g.shipsLost += shipsKilled;
-      world.stats.thornsKilled += thornsKilled;
-      world.stats.shipsLost += shipsKilled;
     }
-    // Repair on every round tick, fight or not.
-    const maxHp = t['guardian.thornHp'];
-    const repair = guardianParams(world, g).repairPerRound;
-    for (const th of g.thorns) if (th.hp < maxHp) th.hp = Math.min(th.hp + repair, maxHp);
+    // Repair on every round tick, fight or not, up to the type's hp.
+    const repair = { thorn: guardRepair(world, g, 'thorn'), spore: guardRepair(world, g, 'spore') };
+    for (const gd of g.guards) {
+      const maxHp = t[`guard.${gd.type}.hp`];
+      if (gd.hp < maxHp) gd.hp = Math.min(gd.hp + repair[gd.type], maxHp);
+    }
   }
   if (g.battle !== null) {
     let anyPresent = false;
@@ -244,75 +388,106 @@ function endBattle(world: World, g: Guardian, outcome: BattleOutcome, wilt: Wilt
   g.battle = null;
 }
 
-/** The wilt (rule 8, Root): drop the Bloom's newest thorns down to the starved cap. Counted as withered, not killed. */
+/** The wilt (rule 8, Root): the heart starves and drops its newest guards of each type down to the starved caps. Counted as withered, not killed. */
 function wilt(world: World): Wilt | null {
-  const bloom = guardianAt(world, richIndex(world))!;
-  if (!bloom.alive) return null;
-  const from = bloom.thorns.length;
-  const cap = world.tun['bloom.starvedCap'];
-  // Thorns are in ascending id order, so the newest (highest id) is last.
-  while (bloom.thorns.length > cap) {
-    bloom.thorns.pop();
-    world.stats.thornsWithered += 1;
+  const heart = guardianAt(world, heartIndex(world))!;
+  if (!heart.alive) return null;
+  heart.fed = false;
+  const from = countGuards(heart);
+  const caps = guardCaps(world, heart);
+  const count = { ...from };
+  for (const type of GUARD_TYPES) {
+    while (count[type] > caps[type]) {
+      // Guards are in ascending id order: the newest of this type is the last one.
+      let i = heart.guards.length - 1;
+      while (heart.guards[i]!.type !== type) i--;
+      heart.guards.splice(i, 1);
+      count[type] -= 1;
+      world.stats.guardsWithered += 1;
+    }
   }
-  bloom.regrowProgress = 0;
-  return { from, to: bloom.thorns.length };
+  heart.regrowProgress = { thorn: 0, spore: 0 };
+  return { from, to: count };
 }
 
 /** Rule 8, for one living guardian. */
 function capture(world: World, g: Guardian): void {
-  if (g.thorns.length > 0) return;
-  let present = 0;
-  for (const s of world.ships) if (s.at === g.node) present++;
-  if (present === 0) return;
+  if (g.guards.length > 0) return;
+  const present = shipsAt(world, g.node);
+  if (present.length === 0) return;
   g.alive = false;
-  g.regrowProgress = 0;
+  g.regrowProgress = { thorn: 0, spore: 0 };
   const node = world.nodes[g.node]!;
   node.owned = true;
-  // Capture without a fought round (thorns and ships traded out to zero, or a zero-thorn Root, then a ship arrived).
+  world.stats.captures.push({ node: g.node, tick: world.tick });
+  // Capture without a fought round (guards and ships traded out to zero, or a zero-cap node, then a ship arrived).
   if (g.battle === null) {
-    g.battle = { id: world.nextId++, node: g.node, startTick: world.tick, shipsEngaged: present, shipsLost: 0, thornsKilled: 0 };
+    const b = newBattle(world, g);
+    for (const s of present) {
+      b.shipsEngaged += 1;
+      b.engagedByType[s.type] += 1;
+    }
+    g.battle = b;
   }
   if (node.kind === 'root') {
     world.stats.rootCutTick = world.tick;
     endBattle(world, g, 'captured', wilt(world));
-  } else {
-    node.extractors = Math.min(world.tun['rich.freeExtractors'], node.slots);
-    world.capturedTick = world.tick;
-    endBattle(world, g, 'captured', null);
-  }
-}
-
-/** Rule 9, for one living guardian, at its effective cap and regrow ticks. */
-function regrowth(world: World, g: Guardian): void {
-  const p = guardianParams(world, g);
-  if (g.thorns.length >= p.cap) {
-    g.regrowProgress = 0;
     return;
   }
-  g.regrowProgress += 1;
-  if (g.regrowProgress >= p.regrowTicks) {
-    addThorn(world, g);
-    g.regrowProgress = 0;
+  if (node.kind === 'pocket') {
+    node.extractors = Math.min(world.tun['pocket.freeExtractors'], node.slots);
+  } else {
+    node.extractors = Math.min(world.tun['heart.freeExtractors'], node.slots);
+    world.capturedTick = world.tick;
+  }
+  endBattle(world, g, 'captured', null);
+}
+
+/** Rule 9, for one living guardian: each type regrows toward its effective cap at its own period. */
+function regrowth(world: World, g: Guardian): void {
+  const caps = guardCaps(world, g);
+  const count = countGuards(g);
+  for (const type of GUARD_TYPES) {
+    if (count[type] >= caps[type]) {
+      g.regrowProgress[type] = 0;
+      continue;
+    }
+    g.regrowProgress[type] += 1;
+    if (g.regrowProgress[type] >= guardRegrowTicks(world, g, type)) {
+      addGuard(world, g, type);
+      g.regrowProgress[type] = 0;
+    }
   }
 }
 
-/** Sum of the delivery ring buffer: ore delivered over the last window (a minute at the fixed 60 s window). */
+function sum(buckets: readonly number[]): number {
+  let s = 0;
+  for (const b of buckets) s += b;
+  return s;
+}
+
+/** Sum of the ore delivery ring buffer: ore delivered over the last window (a minute at the fixed 60 s window). */
 export function deliveredInWindow(world: Readonly<World>): number {
-  let sum = 0;
-  for (const b of world.stats.deliveredBuckets) sum += b;
-  return sum;
+  return sum(world.stats.deliveredBuckets);
+}
+
+/** The same for a prize resource (ice or crystal). */
+export function prizeInWindow(world: Readonly<World>, res: 'ice' | 'crystal'): number {
+  return sum(world.stats.prizeBuckets[res]);
 }
 
 /** Rule 10. */
 function stats(world: World): void {
   const st = world.stats;
-  const sum = deliveredInWindow(world);
-  if (sum > st.peakPerMin) st.peakPerMin = sum;
-  // The next tick starts a new game second: clear the bucket it will write to.
+  const s = deliveredInWindow(world);
+  if (s > st.peakPerMin) st.peakPerMin = s;
+  // The next tick starts a new game second: clear the bucket it will write to, in every ring buffer.
   const next = world.tick + 1;
   if (next % world.tickRate === 0) {
-    st.deliveredBuckets[Math.floor(next / world.tickRate) % st.deliveredBuckets.length] = 0;
+    const i = Math.floor(next / world.tickRate) % st.deliveredBuckets.length;
+    st.deliveredBuckets[i] = 0;
+    st.prizeBuckets.ice[i] = 0;
+    st.prizeBuckets.crystal[i] = 0;
   }
 }
 
@@ -339,7 +514,8 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
   construction(world);
   extraction(world);
   routes(world);
-  shipyard(world);
+  assemblers(world);
+  yards(world);
   movement(world);
   for (const g of gs) if (g.alive) combat(world, g);
   for (const g of gs) if (g.alive) capture(world, g);
