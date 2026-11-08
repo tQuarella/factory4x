@@ -20,10 +20,13 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Dim star | `#3a4a66` |
 | Bright star / UI text | `#cfe8ff` |
 | Probe (player core) | `#ffd27a` |
+| Probe glow | `rgba(255, 210, 122, 0.25)` |
 | Asteroid rock | `#8a7d6b` |
 | Ore / resources / routes | `#4fd1c5` |
 | Player ships | `#7ab8ff` |
 | Mobs | `#ff5d73` |
+| Mob glow | `rgba(255, 93, 115, 0.25)` |
+| Route line | `rgba(79, 209, 197, 0.6)` |
 | Bloom body (alive) | `#ff4f8b` |
 | Bloom highlight / core | `#ffb3cc` |
 | Bloom glow | `rgba(255, 79, 139, 0.28)` |
