@@ -4,7 +4,35 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
-## Build build-20261106-2 is ready (2026-11-06): Milestone 1, first playable
+## Build build-20261108-1 is ready (2026-11-07): H2, two ways to take the Bloom
+
+Play: https://factory4x.pages.dev (on your phone, portrait). Plan on about 20 minutes for **two runs**: use 2x/4x once your economy is built, and tap New run after the first capture. Your old save is from an older data version, so the game will start fresh.
+
+What changed:
+- The Bloom now drinks from the Root, a smaller guarded stalk joined to it by a pink vine. Cut the Root first and the Bloom drops to 8 thorns and regrows 5× slower, so a smaller wave can take it. Or skip it and overwhelm the Bloom at full strength.
+- Every run is one of three systems: Thin Root, Knotted Root and Deep Root. How strong the Root is changes which line is better, and New run moves you to the next system.
+- Clearer battles: each battle line names its node, the Root and Bloom sheets show the Bloom fed and starved side by side, the result panel names the system and when you cut the Root, and taps on guarded nodes are easier to hit.
+
+Try this: build up as before, then open both the Root's sheet and the Bloom's sheet before you attack, and decide whether to cut the Root first. After you take the Bloom, tap New run. The next system has a different Root; look again before you commit. (The bots found that cutting the Root first wins on Thin, the big wave wins on Deep, and Knotted is a trade-off: a little faster, but a few more ships lost.)
+
+Fun questions (the H2 hypothesis):
+1. Before your big attack, did you weigh cutting the Root against hitting the Bloom head-on? What tipped it, and did it feel like a real choice or an obvious one?
+2. Your second run had a different Root. Did you change plan? Could you tell from the numbers on the sheets which way was better, or was it a guess? Did the new system make the replay feel fresh?
+3. When the Root fell and the Bloom wilted, did that feel like a payoff in itself, or like a chore on the way to the real fight?
+
+Feedback: plain answers in chat work best. The speech-bubble button also opens a prefilled GitHub issue with a replay of your session.
+
+Also open: Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection). None blocks anything.
+
+Protected files changed this build: none. Every merge passed the protected-files gate.
+
+## Blocking
+
+None.
+
+## Answered
+
+### build-20261106-2 handoff (Milestone 1 first playable, H1)
 
 Play: https://factory4x.pages.dev (on your phone, portrait). Give it one ~20 minute session.
 
@@ -28,12 +56,6 @@ Feedback: the speech-bubble button opens a prefilled GitHub issue with a replay 
 Also open: Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
 
 Protected files changed this build: none. Every merge passed the protected-files gate.
-
-## Blocking
-
-None.
-
-## Answered
 
 ### Q11. A result panel when you take the guarded node? (2026-11-06, Designer)
 

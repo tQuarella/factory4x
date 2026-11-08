@@ -6,6 +6,12 @@ Player-facing changes per build. Three plain lines per build, written by the Dir
 
 Nothing yet.
 
+## build-20261108-1 (2026-11-07, commit 13201db) · Milestone 1, H2: decision depth
+
+- The Bloom now drinks from the Root, a smaller guarded stalk joined to it by a pink vine. Cut the Root first and the Bloom drops to 8 thorns and regrows 5× slower, so a smaller wave can take it. Or skip it and overwhelm the Bloom at full strength.
+- Every run is one of three systems: Thin Root, Knotted Root and Deep Root. How strong the Root is changes which line is better, and New run moves you to the next system.
+- Clearer battles: each battle line names its node, the Root and Bloom sheets show the Bloom fed and starved side by side, the result panel names the system and when you cut the Root, and taps on guarded nodes are easier to hit.
+
 ## build-20261106-2 (2026-11-06, commit c11124b) · Milestone 1: first playable
 
 - Build extractors and ore routes on five asteroids. Delivered ore per minute is the big number at the top, and your shipyard speeds up with it.

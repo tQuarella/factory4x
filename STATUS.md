@@ -3,11 +3,11 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 1 — First playable (iteration 2, hypothesis H2: decision depth)
-**State:** Owner chose "Depth first" for H2. H2 specced (DESIGN.md → H2: cut the Root vs overwhelm the Bloom, three variants). h2-art, h2-sim and h2-bots merged (all six H2 depth flags met). h2-client merged. Release gates passed on 624b1e0; deploying, then /handoff.
+**State:** Awaiting owner feedback on build-20261108-1 (H2: cut the Root vs overwhelm the Bloom). Only Can wait work until feedback arrives.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
-**Last build:** build-20261106-2 (M1 first playable), live and passing the live smoke test at desktop and phone sizes.
-**Last updated:** 2026-11-06
+**Last build:** build-20261108-1 (H2 decision depth), commit 13201db, live and passing the live smoke test.
+**Last updated:** 2026-11-07
 
 ## Iteration 2 (H2) ledger
 
@@ -62,9 +62,7 @@ Subagent launches: 11 / 12 (designer, core-engineer ×2, art-direction, critic �
 
 ## Next step
 
-1. h2-client fix round 1 → Critic round 2. If the engineer or Critic agent from this session is gone (new session or machine), a fresh launch is fine: the review file on the branch carries the context.
-2. On approval: merge `main` into `task/h2-client`, push, and wait for green Linux CI on that commit. Then run `npm run merge-task -- h2-client` from `main`.
-3. `npm run release-gates`, push `main`, `/handoff`, `/retro`.
+Waiting on the owner's playtest of build-20261108-1 (handoff block at the top of QUESTIONS.md). When feedback arrives: record it verbatim in PLAYTEST_LOG.md, then the Designer triages it and picks H3. Retro for iteration 2 is done right after this handoff.
 
 ## Moving to another machine
 
