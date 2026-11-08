@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 1 — First playable (iteration 2, hypothesis H2: decision depth)
-**State:** Awaiting owner feedback on build-20261108-1 (H2: cut the Root vs overwhelm the Bloom). Only Can wait work until feedback arrives. Can wait in flight: cw-palette-sync-test, cw-flaky-test (engineers building).
+**State:** Iteration 3 Plan step. Owner played build-20261108-1 (feedback in PLAYTEST_LOG.md) and, instead of picking an H3 candidate, asked for a more radical direction (Q13: a large persistent asteroid field, resource combos into components, ship types, counter triangle vs Bloom guard types, deeper logistics) and asked the team to steelman it. Designer is writing the steelman and an M2 hypothesis plan into DESIGN.md.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-1 (H2 decision depth), commit 13201db, live and passing the live smoke test.
@@ -72,12 +72,23 @@ Started 2026-11-07 on the desktop, while build-20261108-1 awaits feedback.
 | --- | --- | --- | --- | --- |
 | w1 | engineer | cw-palette-sync-test | launch | Build (worktree, branch `task/cw-palette-sync-test`) |
 | w2 | engineer | cw-flaky-test | launch | Build (worktree, branch `task/cw-flaky-test`) |
+| w3 | critic | cw-palette-sync-test | launch | Round 1: APPROVE; green CI on 4ba678f; merged a61824b. Also added 3 missing palette rows to ART_STYLE.md |
+| w4 | critic | cw-flaky-test | launch | Round 1: APPROVE. Critic reproduced the flake: two ~0.5 s bot tests hit vitest's 5 s timeout under heavy load; 30 s timeout fixes it. Merged c3adac2 |
 
-Launches: 2. Resumes: 0. Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
+Launches: 4. Resumes: 0. Both tasks done. Follow-ups from the reviews (not blocking): palette test is one-way (stale table rows not flagged); "Dim star" row not marked low-contrast; `reports/gates-latest.json` should keep a failing gate's output tail (protected `scripts/gates/`, needs owner approval).
+
+## Iteration 3 (H3) ledger
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | H2 triage + H3 candidates | launch | Plan (triage done; candidates A/B/C, commit ab31453) |
+| r1 | designer | H3 steelman of owner direction | resume | Owner asked for the asteroid-field direction instead (Q13) |
+
+Launches: 1 / 12. Resumes: 1. Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
 
 ## Next step
 
-Waiting on the owner's playtest of build-20261108-1 (handoff block at the top of QUESTIONS.md). When feedback arrives: record it verbatim in PLAYTEST_LOG.md, then the Designer triages it and picks H3. Retro for iteration 2 is done (DECISIONS.md, 2026-11-07). While waiting, Can wait work is allowed: cw-palette-sync-test and cw-flaky-test are good candidates.
+Designer (iteration 3 ledger r1) returns the steelman and M2 hypothesis plan. Director presents it to the owner for sign-off, including any VISION.md change (needs `APPROVED-PROTECTED: VISION.md`). Then Spec H3, Split into BACKLOG.md, Build.
 
 ## Moving to another machine
 
