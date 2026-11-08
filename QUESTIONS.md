@@ -30,7 +30,15 @@ Protected files changed this build: none. Every merge passed the protected-files
 
 ## Blocking
 
-None.
+### Q13. Which idea should the next build test? (2026-11-07, Designer)
+
+Your H2 feedback showed two problems. Every run is the same sequence (build the economy, then ships, then attack), and the trade-offs were too small to feel. Cutting the Root was the fun part. Pick one (details in DESIGN.md → "H3 candidates"):
+
+- **A. Fight to grow (Designer's pick).** Most asteroids start overgrown with small guards, so you fight from early on to grow your economy, and choosing which rock to take next is the puzzle. The Root feeds some of those guards too, so you get more satisfying cuts.
+- **B. Prizes that change your factory.** Guarded nodes give you something new, such as a material for a tougher ship, instead of just more ore. What you take first changes how the rest of the run plays.
+- **C. A new system every run.** A different generated map each time. It's fresher, but probably the same plan on a new map until A or B adds real choices.
+
+**Answer:**
 
 ## Answered
 

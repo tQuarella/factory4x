@@ -45,11 +45,51 @@ Built in Milestone 1 (build-20261106-2, spec H1 below):
 - Capture of the rich node, a result panel, then free play.
 - Pause, 1x/2x/4x, a tuning panel, a feedback button, and autosave.
 
-H2 (spec below) adds the Root, a second guarded node that feeds the Bloom, and three system variants that differ only in the Root.
+H2 (build-20261108-1, spec below) added the Root, a second guarded node that feeds the Bloom, and three system variants that differ only in the Root.
 
 ## Hypotheses
 
-### H2 (Milestone 1, iteration 2, spec ready): cutting supply vs overwhelming is a real choice
+### H3 candidates (iteration 3, awaiting the owner's pick)
+
+The H2 playtest (PLAYTEST_LOG.md, 2026-11-07) gave three signals. Cutting the Root first felt obvious. Both runs followed the same sequence: max economy, then ships, then attack. Cutting the Root was satisfying. These are the two mechanical causes, and each candidate below attacks one or both:
+- **(a) Fixed sequence.** The economy is a closed, unguarded build-out, and fighting pays nothing until the final prize. So "economy first, fight last" is always right, whatever the guardians look like.
+- **(b) Time-only trade-offs.** Every cost in H2 was time (ships are ore, ore is minutes). A 50 s gap in a 10-minute run with no clock is invisible, so close choices read as obvious.
+
+All three keep the pillars: no fail state, no clock, defend-only guardians, and orders at nodes with no new kind of input. Only one will be specced, after the owner picks (QUESTIONS.md Q13).
+
+#### H3-A: Fight to grow (recommended)
+
+- **Claim:** when most of the economy sits behind small guards, fighting and building interleave from the first minutes. The order in which you take rocks then becomes the puzzle, and the run stops being "max economy, then attack". Cutting a Root that feeds several guards turns the satisfying moment into one that happens more than once and pays off in ore/min.
+- **Attacks:** (a) directly, since you can't max the economy without fighting. Also (b), partly: each choice shows up as ore/min climbing sooner or later, and that compounds where the player can see it.
+- **Smallest build:** the H2 map and rules. Two asteroids start free. The other three are **overgrown**, each with its own small guard (thorn counts such as 3 / 6 / 10). Reward does not track guard size: one is poor but close and lightly guarded, another is rich but far and heavily guarded. The Root feeds one overgrown rock as well as the Bloom, so one cut weakens two things. Guards reuse the H2 guardian, wilt and capture rules. No new inputs. The three Root variants become three layouts of the same pieces.
+- **Risk:** it collapses into "take the smallest guard first", a new obvious ladder. The bot check: a greedy-cheapest, a greedy-richest and a Root-first strategy, where none may dominate across layouts. The early fights also use few ships, and might feel fiddly rather than meaningful.
+- **Pillars:** 1 (throughput gates everything, now including how fast you can grow), 2 (better rocks are better guarded) and 3 (cut supply or out-produce, several times a run).
+
+#### H3-B: Prizes that change your factory
+
+- **Claim:** if each guarded node gives you something different rather than more of the same ore, which fight you pick first changes how the rest of the run plays, and two runs can go differently. One example: the cut Root drops a second material that builds a tougher ship, and the Bloom gives ore.
+- **Attacks:** (b) directly, because choices differ in kind, not minutes. It only softens (a): the economy is still built first unless the new material changes that.
+- **Smallest build:** one new material from one guarded node, one thing it unlocks (a tougher ship, or route upgrades past level 2), and a second stock line on the probe. The Bloom is unchanged.
+- **Risk:** the biggest build of the three (a new resource, recipe and UI). One unlock may simply be best, which gives a new fixed order. It also starts the 3–4 tier chain earlier than planned.
+- **Pillars:** 1 and 2, and it seeds 5 (research and probe design carry forward).
+
+#### H3-C: A new system every run
+
+- **Claim:** if every run deals a different map from its seed (how many rocks, where they are, how rich, where the Roots and guards sit), the plan has to be read fresh each time, and replay stops feeling deflating.
+- **Attacks:** the "same exact setup" deflation from H1. It doesn't attack (a) or (b).
+- **Smallest build:** a seeded generator within fixed bounds, using only existing pieces (asteroids, one Bloom, one Root), plus bot runs over many seeds.
+- **Risk:** H2 already changed the Root between runs and the owner's plan didn't change. Variety without new decisions will probably give "the same plan on a different map". It also makes bot balance noisier. It fits better after A or B, once there are decisions worth varying.
+- **Pillars:** 5 (each system different) and replay.
+
+#### Considered, not proposed
+
+- **Siege (the Root stays cut only while your ships hold it):** it adds a standing cost, but the cost is still idle ships, which means time. It doesn't break the sequence.
+- **Retuning the Root variants for wider gaps:** moves the 50 s margins around without breaking the sequence.
+- **Guardians that grow over time:** breaks "waiting doesn't make it worse" (owner direction) and pillar 4.
+
+### H2 (Milestone 1, iteration 2, tested on build-20261108-1): cutting supply vs overwhelming is a real choice
+
+**Result (owner, 2026-11-07):** not supported. Cutting the Root first felt obvious, and both runs followed the same sequence. Cutting the Root itself was satisfying. See PLAYTEST_LOG.md and H3 candidates above.
 
 Owner's pick after the H1 playtest: "Depth first" (PLAYTEST_LOG.md, 2026-11-06). H1's single line was: build everything, mass ships, attack once. H2 tests whether a second, competing line turns the Bloom into a decision.
 

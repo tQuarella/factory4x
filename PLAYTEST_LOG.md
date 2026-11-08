@@ -50,5 +50,10 @@ Owned by the Designer. Each entry: date, build, who (owner or friend name), the 
 
 (Answers the three H2 fun questions in order; given in chat after two runs.)
 
-**Interpretation:** pending Designer triage.
-**Action:** pending.
+**Interpretation (Designer, 2026-11-07, iteration 3):** H2 failed its main claim. The one part that worked, cutting the Root, is worth keeping and building on.
+- **"Attacking the root first felt like the obvious choice" (fun question 1): H2 claim not supported.** The bots found the two lines balanced, about 50 s apart on Thin and Deep and 14 s on Knotted, but a human can't feel 50 s in a 10-minute run. Pillar 4 also tells the player that time doesn't matter. Every cost in H2 came down to time: ships lost are just ore, and ore is just minutes. So the trade-off was real on paper and invisible in play. With the numbers that close, the player picks the line that looks safer and feels better, two smaller fights with a visible wilt, and it reads as obvious. **Lesson for H3:** a trade-off measured only in minutes won't register. Choices have to differ in what you get or what you can do next, not in how long they take.
+- **"Both runs felt the same: max economy then shift to building ships and attack once you have enough" (fun question 2): the run is still one fixed sequence.** This is the deeper problem, and it is the same cause as H1's "one dimensional". The economy is a closed, unguarded build-out (about 450 ore, done by about 6.5 minutes), and fighting pays nothing until the final prize. So "finish the economy, then build ships" is always right, and the Root only adds one step to the end of that sequence. Changing the Root between runs didn't change the plan, which is evidence that map variety alone won't fix sameness. Success criteria 1, 2 and 4 were not met.
+- **"Cutting the root was satisfying" (fun question 3): supported, and the best signal from H2.** The cut reads well (the vine greys, thorns fall, the toast gives numbers) and feels like a payoff, not a chore. Success criterion 3 was met. Keep the Root and the supply cut, and give the player more moments like it.
+- **Not a balance problem.** Retuning `map.variants` or `bloom.starved*` would move the 50 s margins around but leave the sequence alone. No retune is proposed.
+
+**Action:** DESIGN.md → "H3 candidates (awaiting the owner's pick)": three options, with Fight to grow recommended. QUESTIONS.md Q13 asks the owner to pick. No spec until then.

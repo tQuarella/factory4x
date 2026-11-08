@@ -266,3 +266,10 @@ Scope: `git log build-20261106-2..build-20261108-1` (f1b1b33..13201db), `reviews
 - The budget stays at 12 launches. H2 used 10 for four tasks with no escalation, which leaves room for one.
 - Still no resume cap: half of the resumes were host stalls, so the data doesn't support one.
 - No gate, guardrail or protected file was touched, and there is no new owner question.
+
+## 2026-11-07 · Designer · H2 triage and H3 candidates
+
+- **H2 is read as a structural failure, not a balance miss, so no retune is proposed.** The bots found the lines balanced (about 50 s apart on Thin and Deep), and the owner still found cutting the Root obvious and both runs the same. Retuning `map.variants` or `bloom.starved*` would only move small time margins around.
+- **Trade-offs measured only in time don't register.** With no clock (pillar 4), and ships that are only ore, every H2 cost came down to minutes, and a 50 s gap in a 10-minute run is invisible. From H3 on, a choice should differ in what the player gets or can do next, or show up as visible compounding (ore/min), not only as a capture time.
+- **The fixed sequence (economy, then ships, then attack) comes from an unguarded economy.** As long as growth needs no fighting, "economy first" is always right. This is why Fight to grow (H3-A) is recommended over variety (H3-C): H2 already changed the Root between runs, and the plan didn't change.
+- **Siege supply cuts (the H2 follow-up named in the H2 spec) were dropped from the shortlist.** Holding the Root costs idle ships, which is time again, and it doesn't break the sequence.
