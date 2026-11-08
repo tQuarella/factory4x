@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   SEND_ALL,
   createWorld,
-  defaultData,
   deserializeWorld,
   nextU32,
   replayHashes,
@@ -50,22 +49,22 @@ describe('world', () => {
   it('is deterministic for the same seed and inputs', () => {
     const replay: Replay = {
       seed: 7,
-      dataVersion: defaultData.dataVersion,
+      dataVersion: data.dataVersion,
       inputs: [
         { tick: 0, input: { type: 'buildExtractor', node: N.a1 } },
         { tick: 10, input: { type: 'buildRoute', from: N.a1, to: N.probe } },
         { tick: 400, input: { type: 'setTunable', key: 'ship.drone.cost', value: 5 } },
       ],
     };
-    const a = replayHashes(replay, defaultData, 1800, 300);
-    expect(a).toEqual(replayHashes(replay, defaultData, 1800, 300));
+    const a = replayHashes(replay, data, 1800, 300);
+    expect(a).toEqual(replayHashes(replay, data, 1800, 300));
     expect(new Set(a).size).toBe(a.length);
   });
 
   it('a live setTunable in the input log changes the outcome, so replays must carry it', () => {
-    const base: Replay = { seed: 1, dataVersion: defaultData.dataVersion, inputs: [] };
+    const base: Replay = { seed: 1, dataVersion: data.dataVersion, inputs: [] };
     const tuned: Replay = { ...base, inputs: [{ tick: 100, input: { type: 'setTunable', key: 'economy.probeOrePerMin', value: 60 } }] };
-    expect(replayHashes(tuned, defaultData, 900, 900)).not.toEqual(replayHashes(base, defaultData, 900, 900));
+    expect(replayHashes(tuned, data, 900, 900)).not.toEqual(replayHashes(base, data, 900, 900));
   });
 
   it('two busy games with the same inputs hash identically', () => {
@@ -73,16 +72,16 @@ describe('world', () => {
   });
 
   it('hash is independent of key insertion order', () => {
-    const w = createWorld(3, defaultData);
+    const w = createWorld(3, data);
     const reordered = Object.fromEntries(Object.entries(w).reverse()) as unknown as World;
     expect(worldHash(reordered)).toEqual(worldHash(w));
   });
 
   it('step and replayHashes refuse data of another version', () => {
-    const w = createWorld(1, defaultData);
-    const other = { ...defaultData, dataVersion: 1 };
+    const w = createWorld(1, data);
+    const other = { ...data, dataVersion: 1 };
     expect(() => step(w, other, [])).toThrow(/data version/);
-    expect(() => replayHashes({ seed: 1, dataVersion: 1, inputs: [] }, defaultData, 10, 5)).toThrow(/data version/);
+    expect(() => replayHashes({ seed: 1, dataVersion: 1, inputs: [] }, data, 10, 5)).toThrow(/data version/);
   });
 
   it('holds only plain JSON data (no undefined, NaN, classes or Maps)', () => {
@@ -106,10 +105,10 @@ describe('autosave', () => {
   });
 
   it('refuses a save from another data version', () => {
-    const w = createWorld(1, defaultData);
+    const w = createWorld(1, data);
     const text = serializeWorld(w);
-    const r = deserializeWorld(text, { ...defaultData, dataVersion: 5 });
-    expect(r).toEqual({ ok: false, reason: 'dataVersion', saveDataVersion: 4 });
+    const r = deserializeWorld(text, { ...data, dataVersion: data.dataVersion + 1 });
+    expect(r).toEqual({ ok: false, reason: 'dataVersion', saveDataVersion: data.dataVersion });
   });
 
   it('refuses corrupt saves', () => {

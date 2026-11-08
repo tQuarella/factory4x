@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { L, N } from './helpers.ts';
-import { baseWorld, minWaves, waveWins, type MinWaves } from './min-wave.ts';
+import { defaultData, guardianStatus, type World } from '../src/index.ts';
+import { L, N, data } from './helpers.ts';
+import { baseWorld, minSingle, minWaves, waveWins, type MinWaves } from './min-wave.ts';
 
 declare const console: { log(...args: unknown[]): void };
 
 /**
  * h3-sim acceptance 5: per layout, the smallest simultaneous wave that
  * captures each guarded node from full strength, as drones / lancers / flak /
- * best mix (any mix of the three), with the real sim at the shipped defaults.
- * `spec` is the throwaway model's column from DESIGN.md H3 "Layouts"; `sim` is
- * what the sim gives. The engineers report these and do not retune.
+ * best mix (any mix of the three), with the real sim on the frozen v4 fixture
+ * (the h3-sim spec layouts and defaults). `spec` is the throwaway model's
+ * column from the h3-sim DESIGN.md H3 "Layouts"; `sim` is what the sim gives.
+ * Pinned on the fixture, these check the rules, not the calibration.
+ * The shipped (calibrated) numbers are reported at the end of this file.
  */
 
 type Row = [drones: number, lancers: number, flak: number, mix: number];
@@ -66,6 +69,20 @@ const LAYOUTS: Array<{ name: string; layout: number; cases: Case[] }> = [
 
 const row = (m: MinWaves): Array<number | null> => [m.drones, m.lancers, m.flak, m.mix];
 
+/** Does the node hold both guard types at the start of the wave? (A single-type node has no better mix than its counter.) */
+function isMixed(w: World, node: number): boolean {
+  const g = guardianStatus(w, node).guards;
+  return g.thorn.count > 0 && g.spore.count > 0;
+}
+
+it('the fixture is the frozen v4 data, and the heart and Root single-type exemptions are the ones the spec names', () => {
+  expect(data.dataVersion).toBe(4);
+  // Frost Gate's Root is all Thorn and Glass Thicket's all Spore at v4; every other node is mixed.
+  expect(isMixed(baseWorld(L.frost, false), N.root)).toBe(false);
+  expect(isMixed(baseWorld(L.glass, false), N.root)).toBe(false);
+  expect(isMixed(baseWorld(L.twin, false), N.root)).toBe(true);
+});
+
 for (const { name, layout, cases } of LAYOUTS) {
   describe(`scripted minimum waves: ${name}`, () => {
     const fed = baseWorld(layout, false);
@@ -97,9 +114,8 @@ for (const { name, layout, cases } of LAYOUTS) {
     });
 
     it('the spec headline holds: a mix beats every single type on mixed nodes, the right counter beats drones, and a starved heart needs about half', () => {
-      for (const { c, m } of results) {
-        const mixed = !(c.id === 'root' && (layout === L.frost || layout === L.glass));
-        if (mixed) expect(m.mix!, c.id).toBeLessThan(Math.min(m.drones!, m.lancers!, m.flak!));
+      for (const { c, base, m } of results) {
+        if (isMixed(base, NODE[c.id])) expect(m.mix!, c.id).toBeLessThan(Math.min(m.drones!, m.lancers!, m.flak!));
         expect(Math.min(m.lancers!, m.flak!), c.id).toBeLessThanOrEqual(m.drones!);
       }
       const heart = results.find((r) => r.c.id === 'heart')!.m.mix!;
@@ -108,3 +124,42 @@ for (const { name, layout, cases } of LAYOUTS) {
     });
   });
 }
+
+/**
+ * Report only: the single-type minimum waves on the shipped, calibrated
+ * data/sim.json, with each lancer/flak tag judged against them (the Designer's
+ * rule in DESIGN.md H3 "Tag accuracy": Strong means at most 80% of the drones'
+ * wave, Weak means more than the drones, Even anything between). The numbers
+ * are printed, not pinned, so calibration never breaks this test. It asserts
+ * only what must hold for any calibration: every guarded node, the starved
+ * heart included, falls to some single-type wave within the search cap.
+ */
+describe('shipped data: minimum single-type waves and tag accuracy (report)', () => {
+  it('every guarded node can be taken; prints the numbers and the tags that disagree with them', () => {
+    const lines: string[] = [`Shipped data v${defaultData.dataVersion}: node | d / l / f | tags l / f`];
+    let right = 0;
+    let total = 0;
+    for (const { name, layout } of LAYOUTS) {
+      const fed = baseWorld(layout, false, defaultData);
+      const starved = baseWorld(layout, true, defaultData);
+      lines.push(`${name}:`);
+      for (const id of Object.keys(NODE) as Array<keyof typeof NODE>) {
+        const base = id === 'starved heart' ? starved : fed;
+        const node = NODE[id];
+        const [d = null, l = null, f = null] = (['drone', 'lancer', 'flak'] as const).map((t) => minSingle(base, node, t, defaultData));
+        expect([d, l, f].some((v) => v !== null), `${name} ${id}`).toBe(true);
+        const tags = guardianStatus(base, node).tags;
+        const judged = ([['lancer', l], ['flak', f]] as const).map(([t, n]) => {
+          const tag = tags[t].tag;
+          const want = d === null || n === null ? null : n * 100 <= d * 80 ? 'strong' : n > d ? 'weak' : 'even';
+          total++;
+          if (want === null || want === tag) right++;
+          return want === null || want === tag ? tag : `${tag} (waves say ${want})`;
+        });
+        lines.push(`  ${id.padEnd(13)} | ${[d, l, f].map((v) => v ?? '>80').join(' / ').padEnd(14)} | ${judged.join(' / ')}`);
+      }
+    }
+    lines.push(`Tags that match the waves: ${right} of ${total}.`);
+    console.log(lines.join('\n'));
+  });
+});
