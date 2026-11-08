@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
-**State:** Iteration 3 Build step. Owner approved the Q14 VISION edits (applied b3b7a86) and chose H3 Counter web. Spec in DESIGN.md (e83c3aa), tasks in BACKLOG.md (625d9ca). h3-sim (9bb36ae) and h3-bots (3585322) merged. h3-art approved round 2, waiting on branch CI. h3-client building; h3-design-data calibrating.
+**State:** Iteration 3 Build step. Owner approved the Q14 VISION edits (applied b3b7a86) and chose H3 Counter web. Spec in DESIGN.md (e83c3aa), tasks in BACKLOG.md (625d9ca). h3-sim, h3-bots, h3-art merged. h3-client in Critic review. h3-design-data: calibrated (data v5); core-engineer fixing pinned tests and yard order on the same branch.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-1 (H2 decision depth), commit 13201db, live and passing the live smoke test.
@@ -93,9 +93,11 @@ Launches: 4. Resumes: 0. Both tasks done. Follow-ups from the reviews (not block
 | 7 | engineer | h3-bots | launch | Build (worktree, `task/h3-bots`); green e0a2997. Flags 2–6 met, flag 1 (pace) missed: heart at 12–16 min |
 | r4 | critic | h3-art | resume | Round 2: APPROVE (79b9393). Fix commit c8fed7a pushed by art-direction, which never sent a final report |
 | 8 | critic | h3-bots | launch | Round 1: APPROVE (85effbe); merged 3585322 |
-| r5 | designer | h3-design-data | resume | Calibration: pace, tag accuracy, flag margins (branch `task/h3-design-data`) |
+| r5 | designer | h3-design-data | resume | Calibration to data v5 (12a8fca): pace met (18–28 min), tags 35/36 accurate; flag 4 now missed (ice-first wins every layout ~2 min, yard order starves flak); 42 tests pinned to v4 values fail the `test` gate |
+| 9 | critic | h3-client | launch | Round 1 review of 357e85d |
+| 10 | core-engineer | h3-design-data | launch | Decouple tests from shipped data (frozen fixture); round-robin yard service (rule 5b) for flag 4 |
 
-Launches: 8 / 12. Resumes: 5. Remaining: Critic h3-client, Critic h3-design-data. h3-art merging after green CI on 5f06ea9. Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
+Launches: 10 / 12. Resumes: 5. h3-art merged 4929fe6 after green CI on 31d61a2. Remaining: Critic h3-design-data (launch 11). One spare. Follow-up (not this build): bots pick targets without regard to their own counters (Designer note). Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
 
 ## Next step
 
