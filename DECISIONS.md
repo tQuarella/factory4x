@@ -343,3 +343,36 @@ Scope: `git log build-20261106-2..build-20261108-1` (f1b1b33..13201db), `reviews
 
 - **Correction to "35 of 36 tags now match the minimum waves" (Designer entry, h3-design-data calibration).** The true count, from the report in `packages/sim/test/min-waves.test.ts`, is 33 of 36 at full caps and 38 of 42 with the starved heart. All four misreads are in Twin Seams: p1 and p2 flak (23 against the drones' 20, read Even, should be Weak), Root flak (28 against 26, read Even, should be Weak), and starved-heart lancer (21 against 27, read Even, should be Strong). The earlier entry is left as written. DESIGN.md "Tag accuracy" now lists all four, and says which ones still need a Designer judgment.
 - **DESIGN.md "Calibration result" now shows the current numbers** (v5 with the round-robin yards): the bot table, a third column in the flag table, and answers 1, 2 and 4. The pre-round-robin numbers are kept and labelled. No data or code changed.
+
+## 2026-11-07 · Retrospective · build-20261108-2 (M2 H3, Counter web)
+
+Scope: `git log build-20261108-1..build-20261108-2` (13201db..a4096a7, plus the handoff commit 9032aa6), `reviews/h3-*.md` and `reviews/cw-*.md`, the "Iteration 3 (H3) ledger" and "Waiting period (Can wait) ledger" in `STATUS.md`, `BACKLOG.md`, `PROCESS.md` and the 2026-11-07 entries above.
+
+**Went well**
+- **Resumes did the rework.** There were 11 launches before this retro (12 / 12 with it) and 10 resumes. Every fix round and later review round was a resume (h3-art r3/r4, h3-client r6/r7, h3-design-data r9/r10), and the Designer was resumed three times instead of relaunched. No host stalls this time. No task reached a second rejection, so there was no escalation.
+- **h3-sim and h3-bots passed on their first review**, and the Can wait tasks (cw-palette-sync-test, cw-flaky-test) did too. The Critic reproduced the flake behind cw-flaky-test (vitest's 5 s timeout under load) instead of trusting the fix.
+- **Last retro's art checklist and palette-sync test worked.** h3-art round 1 had no palette-table miss (49/49 palette checks passed). It was rejected on draw bounds measured by the Critic (lancer 1.08r, flak 1.21r, plating 1.18r) and on gallery layout. Bounds are item 3 of the checklist, so the checklist is right and the agent didn't apply it fully. No new change: the bound measurement belongs to the art agent's own check, and this was the first round of a new task type.
+- **The Critic caught two real player-facing problems in h3-client**: guard rings drawn about 16% beyond the art contract covered the ROOT and A5 labels at 375 px, and nothing told the player when a ship type unlocked (yards start off, so a player could never build a counter). Both go straight at the H3 hypothesis. These checks stay.
+- **Calibration breaking 42 pinned tests was fixed at the root.** Rule tests now run on a frozen v4 fixture and one data test checks the shipped values against the DESIGN.md tables (Core Engineer entry above). The next retune edits `data/sim.json` and `DESIGN.md`, not tests.
+
+**Didn't go well**
+- **h3-design-data round 1 was rejected for stale and wrong numbers in DESIGN.md.** Two causes: the Designer wrote "35 of 36 tags" while the branch's own report test printed 33 of 36; and after the Core Engineer changed yard service on the same branch, nobody refreshed the bot and flag tables, so the doc described the old game. A doc-only round cost a resume pair (r9, r10) and a branch CI cycle.
+- **h3-sim's engineer rewrote pushed `WIP:` history and tried to force-push.** Settings denied it. The Director kept origin's history with an ours-merge (a282383, tree unchanged). `engineer.md` said "never push" while briefs asked for checkpoint pushes, and said nothing about pushed history. `PROCESS.md`'s "WIP commits … never merged as-is" was likely read as "rewrite them".
+- **h3-art ended without a final report** after pushing its fix commit c8fed7a; the Director proceeded from the branch state.
+- **`main` kept moving while browser-facing branches waited for CI.** h3-art merged `main` three times (aef335a after the h3-sim merge, 5f06ea9 after the h3-bots merge, 31d61a2 after status commit 522a8b3), and h3-client twice. The last one was caused by a docs commit alone, about 4 minutes of waiting with nothing to gain.
+- **The plan left out a review.** BACKLOG planned "5 builders + 4 Critic reviews = 9"; h3-design-data's review was missing. With that review and the unplanned Core Engineer launch for the test decoupling, the budget ran to exactly 12.
+- **Owner time on setup:** the desktop session needed Node 26 installed and the GitHub CLI login switched to tQuarella, in separate steps.
+- **Owner questions:** none raised mid-iteration. The Director approved round-robin yards (a rule change to fix a flag); the Critic judged it within the team's authority, and I agree: it removes a hidden starvation rule and doesn't change the pillars.
+
+**Changes made**
+1. **`.claude/agents/engineer.md`** (also used by core-engineer and art-direction in worktrees):
+   - New "Git history" section: commits on `origin` are final (no rebase, amend, squash, reset or force-push), tidy up with new commits, and `WIP:` commits are finished with real commits on top, not rewritten. Push only your own task branch, and only when the brief asks. The "You never" line now matches. Evidence: h3-sim's refused force-push and the ours-merge a282383.
+   - Finish step 2: every number left in DESIGN.md, DECISIONS.md or the report comes from a run of the final code, and numbers written before a later code change on the same task are rerun or labelled. Evidence: h3-design-data round 1.
+   - Finish step 4: the report is the last action, on fix rounds too. Evidence: h3-art's missing report.
+2. **`.claude/agents/designer.md`:** measured numbers in DESIGN.md and DECISIONS.md are copied from a committed test or report output and name their source. Evidence: "35 of 36" against the report test's 33 of 36.
+3. **`PROCESS.md` "Before merging":** while a browser-facing branch waits for CI, the Director commits its pending shared-file edits first, holds new ones uncommitted, runs no other `merge-task`, and commits the held edits after the merge. This only orders the Director's own commits; CI must still be green on the exact merged commit. Evidence: the three h3-art merges of `main`.
+4. **`PROCESS.md` "Usage budget":** every task, including a Designer data task, gets a Critic in the plan; with five tasks there is no spare, so plan follow-on work as resumes or use at most four tasks. The 12-launch number is unchanged: H3 fit, and resumes carried the rework. Evidence: the H3 plan of 9 that became 12.
+5. **`PROCESS.md` "Pausing and resuming":** a new-machine checklist (Node per `.nvmrc`, `gh auth login` as tQuarella plus `gh auth setup-git` and an access check, `npm ci`, Playwright Chromium), given to the owner in one message. Evidence: the desktop move.
+6. **`QUESTIONS.md` Can wait Q15:** skip a repeat branch CI run when `main` moved only in status files (not DESIGN.md or ART_STYLE.md, which tests read). This would loosen a merge rule, so it's the owner's call, and it is not applied. The default is the current rule.
+
+**Not changed:** no gate, guardrail or protected file. No change to `critic.md`. The art checklist stays as written (see above). No resume cap: 10 resumes, all productive.

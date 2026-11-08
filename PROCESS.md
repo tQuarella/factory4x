@@ -38,12 +38,18 @@ Slash commands: `/resume`, `/iterate`, `/handoff`, `/retro`.
 ## Before merging
 
 - **Browser-facing tasks** (any change under `packages/client/`, including its Vite config, or under `tests/smoke/`, or to `playwright.config.ts`): after Critic approval, merge `main` into the task branch if `main` has moved, push `task/<id>`, and wait for the CI run on that exact commit to pass. Only then run `merge-task`. CI runs the smoke test on Linux, whose fallback fonts differ from Windows. A local pass on Windows doesn't prove the layout holds there: m1-client passed every local check and still turned `main` red. The push also deploys a branch preview. Pushing a task branch never deploys production.
+- **Keep `main` still while branch CI runs.** Every commit to `main` while a browser-facing branch waits for CI means merging `main` again, pushing again and waiting about 4 minutes again. In H3, h3-art merged `main` three times (aef335a, 5f06ea9, 31d61a2) because `main` moved in between: once for the h3-bots merge, once for a Director status commit. So the Director:
+  1. commits its pending `STATUS.md` / `BACKLOG.md` edits before merging `main` into the branch;
+  2. while that branch's CI runs, keeps further edits to its own shared files uncommitted in the working tree, and does not run `merge-task` for any other task;
+  3. after `merge-task`, commits the held edits in one commit.
+
+  If two browser-facing tasks are approved close together, merge them one after the other in this way; the second one needs a fresh CI run anyway, because the first changed code on `main`. The rule itself is unchanged: CI must be green on the exact commit that is merged.
 - **Reading the CI result:** if `gh run watch` exits with an error, that is not yet a CI failure. A network blip can end the watch. Before acting, recheck the run itself with `gh run view <run-id>` (or `gh run list --branch task/<id>`), and treat the run's own conclusion as the result. In H2 a dropped watch looked like a failed CI until it was rechecked.
 - **DECISIONS.md conflicts:** `.gitattributes` merges it with git's union driver, so entries appended on both sides are both kept with no conflict. A task branch cut before that line existed gets it the first time it merges `main`. Check the merged file once for an entry that lost its blank line, and keep the file append-only, because union merging would silently keep both versions of a line edited in place.
 
 ## Usage budget
 
-- Per iteration: at most 12 subagent launches. The Retrospective counts as one. Plan for the Designer, one builder and one Critic per task, the Retrospective, and 2 spare for rework or a broken-`main` fix. Per task: at most 2 Critic reviews before escalation per the deadlock rule.
+- Per iteration: at most 12 subagent launches. The Retrospective counts as one. Plan for the Designer, one builder and one Critic per task, the Retrospective, and 2 spare for rework or a broken-`main` fix. Every task gets a Critic in the plan, including a Designer data or calibration task. H3's plan counted 9 launches because it left out the h3-design-data review; with that review and one rework launch, the iteration used all 12. With five tasks there is no spare, so plan follow-on work as a resume of an agent that already has the context (as the Designer was resumed for h3-design-data), or split into at most four tasks. Per task: at most 2 Critic reviews before escalation per the deadlock rule.
 - A launch is a new agent (the Agent tool). A resume is any later turn sent to a running or finished agent with SendMessage (a stall nudge, a fix round, a later review round). Resumes are not launches, but they still use usage, so count them too. Resuming is preferred over a fresh launch for fix rounds and later review rounds, because the agent keeps its context.
 - Track spend in `STATUS.md` as a ledger with one line per run (agent, task, launch or resume, and why), plus the totals. Updating the totals alone hid runs in M1. When the budget or a usage limit is hit: checkpoint (commit WIP to the task branch with a `WIP:` prefix, update `STATUS.md`), then stop. Never rush a gate to fit the budget.
 
@@ -51,6 +57,7 @@ Slash commands: `/resume`, `/iterate`, `/handoff`, `/retro`.
 
 - Any session can stop at any time. State lives in git and the shared files.
 - `/resume` reads `CLAUDE.md`, `STATUS.md`, `QUESTIONS.md`, checks `git worktree list` and open `task/*` branches, and continues.
+- **A new machine** needs, before the first session: Node at the major version in `.nvmrc` (26); `gh auth login` with the GitHub account that owns the repo (tQuarella), then `gh auth setup-git`, and `gh repo view tQuarella/factory4x` to confirm access; `npm ci`; `npx playwright install chromium`. The git commit identity (`user.name` / `user.email`) is a separate setting and stays as configured. On the desktop move (2026-11-07) the owner had to install Node 26 and switch the GitHub login to tQuarella in separate steps. Give the owner this whole list in one message, and run every step that isn't a login yourself.
 - For overnight runs the owner schedules `/resume` (Claude Code scheduled task or routine) at an interval longer than the usage-limit reset.
 
 ## Concurrent sessions in one working tree

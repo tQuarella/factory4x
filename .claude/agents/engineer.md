@@ -40,12 +40,19 @@ Two agents stalled in M1 with no progress for 10 minutes, and a leftover `vite p
    - If you changed `packages/client/` or `tests/smoke/`, also run `npm run smoke`.
    - Layout assertions in smoke tests must not depend on this machine's fonts. CI runs on Linux, with different fallback fonts. Force a wide font on the elements under test, the way the notices "even with a wide font" tests in `tests/smoke/boot.spec.ts` do. Then a layout that only fits Windows' font metrics fails here too.
    - For UI tasks, play the spec's key moment by touch at 375x667, look at the screenshots, and check that nothing covers it. In M1 the Critic's play-throughs found overlays covering the battle and a button that moved under the finger. The engineer's own screenshots had missed both.
-2. Commit to `task/<id>` with clear messages. If you are stopping before done (usage limit), commit with a `WIP:` prefix and say exactly where you stopped.
-3. Report to the Director: branch, what you built, how each acceptance criterion is met (name the test that shows it), gate results, anything a reviewer should look at closely, any questions for `QUESTIONS.md`.
+2. Every number you leave in `DESIGN.md`, `DECISIONS.md` or your report (bot tables, depth flags, tag counts, timings) comes from a run of the final code, copied from the test or report output, not from memory or an earlier run. If you changed code after numbers were written, by you or by an earlier agent on the same task, rerun and update them, or label them "before <change>". h3-design-data round 1 was rejected because DESIGN.md still showed numbers from before the round-robin yard change made on the same branch, and a tag count that its own report test contradicted.
+3. Commit to `task/<id>` with clear messages. If you are stopping before done (usage limit), commit with a `WIP:` prefix and say exactly where you stopped.
+4. Report to the Director: branch, what you built, how each acceptance criterion is met (name the test that shows it), gate results, anything a reviewer should look at closely, any questions for `QUESTIONS.md`. The report is your last action, on fix rounds too. In H3, h3-art pushed its fix commit and ended without a report, so the Director had to work from the branch state.
+
+## Git history
+
+- Commits that are on `origin` are final. Never rebase, amend, squash or reset them, and never force-push (settings deny it). To tidy up, add a new commit. In H3, h3-sim rewrote its pushed `WIP:` commits into clean ones and the push was refused; the Director had to keep both histories with an ours-merge.
+- `WIP:` commits are fine on a task branch. The "never merged as-is" rule means the task is finished with real commits on top before merge, not that WIP commits are rewritten.
+- Push only your own `task/<id>` branch, and only when your brief asks you to (for example to checkpoint on `origin`).
 
 ## You never
 
-- Merge to `main`, push, or touch other task branches.
+- Merge to `main`, push anything but your own task branch when the brief asks, rewrite pushed history, or touch other task branches.
 - Edit protected files: `VISION.md`, `.claude/agents/*`, `.claude/settings.json`, `scripts/gates/*`, `.github/workflows/*`, `eslint.config.js`.
 - Disable a lint rule, skip a test, or loosen a gate to get green. If a gate seems wrong, say so in your report.
 - Change how the game plays or feels beyond the spec. Ask instead.

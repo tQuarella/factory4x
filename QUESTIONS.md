@@ -182,6 +182,12 @@ APPROVED-PROTECTED: VISION.md
 
 ## Can wait
 
+### Q15. Skip a repeat branch CI run when `main` moved only in status files? (2026-11-07, Retrospective)
+
+Before a browser-facing task merges, its branch must pass CI on the exact commit that gets merged. When `main` moves while that CI runs, the Director merges `main` again and waits about 4 more minutes, even if the only new commit on `main` edited `STATUS.md`. The process now asks the Director not to commit during that wait, so this happens less. Proposed on top of that: when the only files changed on `main` since the branch's green CI run are `STATUS.md`, `BACKLOG.md`, `QUESTIONS.md`, `DECISIONS.md`, `CHANGELOG.md`, `PLAYTEST_LOG.md` or `reviews/*`, merge without a new branch CI run. `merge-task` still runs every gate on the merged result, and CI runs again on `main` after the push. `DESIGN.md` and `ART_STYLE.md` would not count, because tests read them. This loosens a merge rule slightly, so it's your call. Default if unanswered: keep the current rule.
+
+**Answer:**
+
 ### Q10. Let agents list secret names (2026-11-06, Retrospective)
 
 The deny rule `Bash(gh secret *)` in `.claude/settings.json` blocks every `gh secret` command, including `gh secret list`, which shows only secret names and never values. The Director wanted to run it to confirm the Cloudflare secrets existed before the first deploy. The first deploy was then skipped because the secrets were added after the CI job started. Proposed: replace the rule with `Bash(gh secret set *)`, `Bash(gh secret delete *)` and `Bash(gh secret remove *)`, so agents still can't write or delete secrets but can check that they exist. `.claude/settings.json` is protected and agents can't change their own permissions, so you'd apply this yourself. It could go in with the Q9 change.
