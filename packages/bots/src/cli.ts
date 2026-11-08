@@ -175,6 +175,8 @@ const md = [
   '',
   '## H5 flags (report lines, not gates)',
   '',
+  'Flags 2 and 5 include strategy halves (drones-only, no-command) that pass vacuously when a strategy never leaves tier 1; the details print the area orders.',
+  '',
   ...flags.map((f, i) => `${i + 1}. ${f.pass ? 'MET' : 'MISSED'}: ${f.name}\n   - ${f.detail}`),
   '',
   failures.length ? `## Failures\n\n${failures.map((f) => `- ${f}`).join('\n')}` : '',
