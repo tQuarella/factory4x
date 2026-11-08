@@ -1,4 +1,4 @@
-import { RESOURCES, SHIP_TYPES, SIM_TUNABLE_KEYS, type SimData } from './data.ts';
+import { RESOURCES, SHIP_TYPES, SIM_TUNABLE_KEYS, YARD_ROTATION, type SimData } from './data.ts';
 import type { World } from './world.ts';
 
 /**
@@ -51,6 +51,9 @@ export function deserializeWorld(text: string, data: SimData): LoadResult {
     yards !== null &&
     typeof yards === 'object' &&
     SHIP_TYPES.every((t) => yards[t] !== null && typeof yards[t] === 'object') &&
+    isInt(w.yardTurn) &&
+    w.yardTurn >= 0 &&
+    w.yardTurn < YARD_ROTATION.length &&
     w.assemblers !== null &&
     typeof w.assemblers === 'object' &&
     Array.isArray(w.nodes) &&

@@ -10,6 +10,8 @@ import { clampInt, fmt10, mmss, shortVersion, stepFor, ticksText } from '../src/
 import { guardRingOuter, guardedReach, ringGeom } from '../src/view.ts';
 import { fitMap } from '../src/fit.ts';
 import { podTotalTicks, progressFrac } from '../src/interp.ts';
+// The frozen v4 test fixture: tests that pin rule outcomes (guard counts, wilt text) run on it, so calibration doesn't break them.
+import { fixtureData } from '../../sim/test/fixture.ts';
 
 function mem(): StorageLike & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -202,8 +204,11 @@ describe('New run keeps tuning', () => {
     old.stepOnce();
     const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2 });
     expect(s.world.stock.ore).toBe(150);
-    // Seed 2 is Twin Seams: p1 is 2 Thorns 5 Spores, so 1 and 2 at guard.capPct 50.
-    expect(s.world.guardians[0]!.guards.length).toBe(3);
+    // Seed 2 is Twin Seams. Its p1 (the first guardian) starts at floor(count × 50 / 100) per type.
+    // This test runs on the shipped data (replayData rebuilds from it), so the count is read from the layout.
+    const p1 = defaultData.map.layouts[2]!.pockets.p1!;
+    expect(s.world.system.variant).toBe(2);
+    expect(s.world.guardians[0]!.guards.length).toBe(Math.floor(p1.thorns / 2) + Math.floor(p1.spores / 2));
     play(s, 800, script);
     const r = s.replay();
     expect(r.startTunables).toEqual({ 'economy.startStock': 150, 'guard.capPct': 50 });
@@ -350,9 +355,9 @@ function ship(w: World, node: number, n: number): void {
   for (let i = 0; i < n; i++) w.ships.push({ id: w.nextId++, type: 'drone', hp: w.tun['ship.drone.hp'], at: node, transit: null, engagedIn: -1 });
 }
 
-/** Seed 3 is Frost Gate (Root 6 Thorns; heart 10/14, starved 6/7). Nothing happens unless a test sets it up. */
+/** Seed 3 is Frost Gate; on the v4 fixture: Root 6 Thorns, heart 10/14, starved 6/7. Nothing happens unless a test sets it up. */
 function idleWorld(): World {
-  const w = createWorld(3, defaultData);
+  const w = createWorld(3, fixtureData);
   w.stock.ore = 0;
   w.yards.drone.on = false;
   w.tun['economy.probeOrePerMin'] = 0;
@@ -377,7 +382,7 @@ describe('supply readouts', () => {
   it('cutting the Root reports the wilt and flips the heart to starved', () => {
     const w = idleWorld();
     ship(w, rootIndex(w), 20);
-    for (let i = 0; i < 400 && lastBattle(w, rootIndex(w)) === null; i++) step(w, defaultData, []);
+    for (let i = 0; i < 400 && lastBattle(w, rootIndex(w)) === null; i++) step(w, fixtureData, []);
     const r = lastBattle(w, rootIndex(w))!;
     expect(r.outcome).toBe('captured');
     expect(battleReport(w, r)).toBe(`Root cut: ${r.shipsEngaged} sent, ${r.shipsLost} lost. The Heart wilts: 10 Thorns 14 Spores → 6 Thorns 7 Spores, regrows 5× slower.`);
@@ -397,7 +402,7 @@ describe('supply readouts', () => {
     expect(bannerLines(w)).toEqual([]);
     ship(w, rootIndex(w), 3);
     ship(w, 15, 20);
-    for (let i = 0; i < 31 && bannerLines(w).length < 2; i++) step(w, defaultData, []);
+    for (let i = 0; i < 31 && bannerLines(w).length < 2; i++) step(w, fixtureData, []);
     const lines = bannerLines(w);
     expect(lines).toHaveLength(2);
     expect(lines[0]).toMatch(/^ROOT · \d+ Thorn 0 Spore · strip /);

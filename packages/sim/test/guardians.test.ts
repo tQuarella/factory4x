@@ -7,7 +7,6 @@ import {
   combatRates,
   counterTag,
   createWorld,
-  defaultData,
   deserializeWorld,
   guardCaps,
   guardianStatus,
@@ -27,9 +26,9 @@ import { L, N, addShips, data, fresh, guardian, heart, idle, root, run, setGuard
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
-/** Default data with one tunable's default replaced. */
+/** Fixture data with one tunable's default replaced. */
 function withDefault(key: keyof SimData['tunables'], value: number): SimData {
-  const d = clone(defaultData);
+  const d = clone(data);
   d.tunables[key].default = value;
   return d;
 }
@@ -112,7 +111,7 @@ describe('capEff and guard.capPct', () => {
   });
 
   it('a guarded node whose effective caps are all 0 has no guards, and the first ship to arrive takes it', () => {
-    const d = clone(defaultData);
+    const d = clone(data);
     d.map.layouts[0]!.pockets.p2 = { prize: 'crystal', slots: 2, thorns: 0, spores: 0 };
     const w = createWorld(0, d);
     w.stock.ore = 0;
@@ -255,7 +254,7 @@ describe('rule 8: the Root cut wilts the heart', () => {
 });
 
 describe('Strong / Even / Weak tags', () => {
-  const t = defaultData.tunables;
+  const t = data.tunables;
   const tun = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v.default])) as unknown as World['tun'];
 
   it('weighted multiplier = Σ count × hp × mult / Σ count × hp, integer with the division last', () => {
@@ -290,7 +289,7 @@ describe('Strong / Even / Weak tags', () => {
     expect(counterTag({ ...tun, 'guard.spore.hp': 20 }, 'flak', { thorn: 1, spore: 8 })).toEqual({ multPct: 180, tag: 'strong' });
   });
 
-  it('guardianStatus tags every guarded node from its live mix (the shipped layouts at defaults)', () => {
+  it('guardianStatus tags every guarded node from its live mix (the fixture layouts at defaults)', () => {
     const tags = (w: World) => w.guardians.map((g) => {
       const s = guardianStatus(w, g.node).tags;
       return `${w.nodes[g.node]!.id} L${s.lancer.multPct} ${s.lancer.tag} F${s.flak.multPct} ${s.flak.tag} D ${s.drone.tag}`;

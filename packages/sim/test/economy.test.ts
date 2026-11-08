@@ -108,7 +108,7 @@ describe('rule 5a: assemblers', () => {
 });
 
 describe('rule 5b: yards', () => {
-  it('resolve lancer, flak, drone: with ore for two, the drone waits', () => {
+  it('component yards before drones: with ore for two, lancer and flak start and the drone waits', () => {
     const w = idle();
     for (const t of ['drone', 'lancer', 'flak'] as const) w.yards[t].on = true;
     w.stock = { ore: 30, ice: 0, crystal: 0, lens: 1, plating: 1 };
@@ -155,6 +155,93 @@ describe('rule 5b: yards', () => {
     expect(w.yards.lancer.ticksLeft).toBe(120);
     expect(w.stock.lens).toBe(0);
     expect(w.yards.flak.ticksLeft).toBe(0);
+  });
+
+  /** Lancer and flak on, 15-tick builds, components plenty, nothing else: the test hands out ore. */
+  function rotationWorld(): World {
+    const w = idle();
+    w.yards.lancer.on = true;
+    w.yards.flak.on = true;
+    w.tun['ship.lancer.buildTicks'] = 15;
+    w.tun['ship.flak.buildTicks'] = 15;
+    w.stock.lens = 10;
+    w.stock.plating = 10;
+    return w;
+  }
+
+  /** Gives ore for exactly one ship, steps once, and returns which component yard started (or null); then lets it finish. */
+  function startOne(w: World): string | null {
+    w.stock.ore = 15;
+    step(w, data, []);
+    const started = (['lancer', 'flak'] as const).filter((t) => w.yards[t].ticksLeft === 15);
+    run(w, 15);
+    expect(started.length).toBeLessThanOrEqual(1);
+    return started[0] ?? null;
+  }
+
+  it('round-robin: with ore for one ship at a time, lancer and flak take turns (the old fixed order built only lancers)', () => {
+    const w = rotationWorld();
+    expect(w.yardTurn).toBe(0);
+    const starts: Array<string | null> = [];
+    const turns: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      starts.push(startOne(w));
+      turns.push(w.yardTurn);
+    }
+    expect(starts).toEqual(['lancer', 'flak', 'lancer', 'flak', 'lancer', 'flak']);
+    expect(turns).toEqual([1, 0, 1, 0, 1, 0]);
+    expect(w.stats.shipsBuilt).toEqual({ drone: 0, lancer: 3, flak: 3 });
+  });
+
+  it('round-robin: a yard that cannot start keeps its turn, and gets the next ship it can afford', () => {
+    const w = rotationWorld();
+    w.stock.plating = 0;
+    expect(startOne(w)).toBe('lancer');
+    expect(w.yardTurn).toBe(1); // flak's turn
+    // Flak has no plating, so the lancer yard starts again; the turn stays with flak.
+    expect(startOne(w)).toBe('lancer');
+    expect(w.yardTurn).toBe(1);
+    // A yard that is off is skipped the same way.
+    w.yards.flak.on = false;
+    w.stock.plating = 1;
+    expect(startOne(w)).toBe('lancer');
+    expect(w.yardTurn).toBe(1);
+    w.yards.flak.on = true;
+    expect(startOne(w)).toBe('flak');
+    expect(w.yardTurn).toBe(0);
+  });
+
+  it('round-robin: with ore for both, both start and the yard tried first keeps the next turn', () => {
+    const w = rotationWorld();
+    w.yardTurn = 1;
+    w.stock.ore = 30;
+    step(w, data, []);
+    expect([w.yards.lancer.ticksLeft, w.yards.flak.ticksLeft]).toEqual([15, 15]);
+    // Flak started first, then lancer: flak started least recently, so it goes first next time.
+    expect(w.yardTurn).toBe(1);
+    run(w, 15);
+    expect(startOne(w)).toBe('flak');
+  });
+
+  it('round-robin never lets drones go ahead: a component yard that can start always beats the drone yard, whatever the turn', () => {
+    for (const turn of [0, 1]) {
+      const w = rotationWorld();
+      w.yards.drone.on = true;
+      w.yards.lancer.on = false;
+      w.yardTurn = turn;
+      w.stock.ore = 15;
+      step(w, data, []);
+      expect(w.yards.flak.ticksLeft, `turn ${turn}`).toBe(15);
+      expect(w.yards.drone.ticksLeft, `turn ${turn}`).toBe(0);
+      expect(yard(w, 'drone').state).toBe('needsOre');
+      // Drone starts never move the turn.
+      w.yards.flak.on = false;
+      w.stock.ore = 15;
+      const before = w.yardTurn;
+      step(w, data, []);
+      expect(w.yards.drone.ticksLeft).toBe(90);
+      expect(w.yardTurn).toBe(before);
+    }
   });
 
   it('component before ore in the status line, and every yard state', () => {

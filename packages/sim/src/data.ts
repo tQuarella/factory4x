@@ -10,8 +10,15 @@
 export const SHIP_TYPES = ['drone', 'lancer', 'flak'] as const;
 export type ShipType = (typeof SHIP_TYPES)[number];
 
-/** Rule 5b (yards) and rule 7 (player damage) resolve ship types in this order, so a scarce component is never starved by drones. */
+/**
+ * Rule 5b: finished ships spawn in this order. Starts: the component yards
+ * (YARD_ROTATION) go before the drone yard, so a scarce component is never
+ * starved by drones; among themselves they take turns (world.yardTurn).
+ * Rule 7 (player damage) uses COMBAT_ORDER.
+ */
 export const YARD_ORDER: readonly ShipType[] = ['lancer', 'flak', 'drone'];
+/** Rule 5b: the yards served round-robin, before the drone yard. `world.yardTurn` indexes this list. */
+export const YARD_ROTATION: readonly ShipType[] = ['lancer', 'flak'];
 export const COMBAT_ORDER: readonly ShipType[] = ['lancer', 'flak', 'drone'];
 
 /** Guard types, in the fixed order every per-type loop uses (regrowth, wilt, initial fill). */

@@ -32,6 +32,8 @@
  *   id order) and its layout counts; caps are capEff(count) = min(60, floor(count × guard.capPct / 100)).
  *   Capturing the Root starves the heart (guardian.fed = false): it wilts to its starved caps, newest first.
  *   world.stock = {ore, ice, crystal, lens, plating}; world.yards and world.assemblers are at the probe.
+ *   Yards (rule 5b): lancer and flak start before drones and take turns (world.yardTurn indexes YARD_ROTATION:
+ *   the component yard tried first; each start passes the turn on), so neither starves the other when ore is short.
  *
  * Selectors (read-only; rates needing a decimal are in tenths, `…X10`)
  *   isCaptured(world), isRootCut(world)   heart captured? / Root cut?
@@ -71,7 +73,7 @@
  *   counterPct(tun, ship, guard)    the raw damage multiplier (strongPct, weakPct, or 100 for drones).
  *
  * Constants: SHIP_TYPES, GUARD_TYPES, RESOURCES, RAW_RESOURCES, COMPONENTS, COMPONENT_INPUT, SHIP_COMPONENT,
- *   YARD_ORDER, COMBAT_ORDER, TAG_STRONG_PCT, TAG_WEAK_PCT, GUARD_CAP_MAX, SEND_ALL.
+ *   YARD_ORDER, YARD_ROTATION, COMBAT_ORDER, TAG_STRONG_PCT, TAG_WEAK_PCT, GUARD_CAP_MAX, SEND_ALL.
  *
  * Tuning
  *   TUNABLE_KEYS, tunableMeta(data) every tunable: key, section, default, min, max, live, scope, newRunOnly.
@@ -99,6 +101,7 @@ export {
   SHIP_TYPES,
   TUNABLE_KEYS,
   YARD_ORDER,
+  YARD_ROTATION,
   parseSimData,
   tunableMeta,
 } from './data.ts';

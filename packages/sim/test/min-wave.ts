@@ -1,4 +1,5 @@
-import { SHIP_TYPES, createWorld, defaultData, guardianAt, step, type ShipType, type ShipTypeCounts, type SimData, type World } from '../src/index.ts';
+import { SHIP_TYPES, createWorld, guardianAt, step, type ShipType, type ShipTypeCounts, type SimData, type World } from '../src/index.ts';
+import { fixtureData } from './fixture.ts';
 
 /**
  * The scripted minimum-wave search (h3-sim acceptance 5): the smallest
@@ -19,7 +20,7 @@ function placeShips(w: World, node: number, fleet: Readonly<ShipTypeCounts>): vo
 }
 
 /** A world on `layout` with every yard off; `starved` cuts the Root first (the heart wilts to its starved caps). */
-export function baseWorld(layout: number, starved: boolean, data: SimData = defaultData): World {
+export function baseWorld(layout: number, starved: boolean, data: SimData = fixtureData): World {
   const w = createWorld(layout, data);
   if (w.system.variant !== layout) throw new Error('seed did not pick the layout');
   for (const t of SHIP_TYPES) w.yards[t].on = false;
@@ -40,7 +41,7 @@ export function baseWorld(layout: number, starved: boolean, data: SimData = defa
 }
 
 /** True if `fleet`, arriving together at `node` of `base`, captures it. */
-export function waveWins(base: Readonly<World>, node: number, fleet: Readonly<ShipTypeCounts>, data: SimData = defaultData): boolean {
+export function waveWins(base: Readonly<World>, node: number, fleet: Readonly<ShipTypeCounts>, data: SimData = fixtureData): boolean {
   const w = JSON.parse(JSON.stringify(base)) as World;
   placeShips(w, node, fleet);
   const g = guardianAt(w, node)!;
@@ -55,13 +56,13 @@ export function waveWins(base: Readonly<World>, node: number, fleet: Readonly<Sh
 const only = (type: ShipType, n: number): ShipTypeCounts => ({ drone: 0, lancer: 0, flak: 0, [type]: n });
 
 /** The smallest single-type wave that wins, or null within SEARCH_MAX. */
-export function minSingle(base: Readonly<World>, node: number, type: ShipType, data: SimData = defaultData): number | null {
+export function minSingle(base: Readonly<World>, node: number, type: ShipType, data: SimData = fixtureData): number | null {
   for (let n = 1; n <= SEARCH_MAX; n++) if (waveWins(base, node, only(type, n), data)) return n;
   return null;
 }
 
 /** The smallest total of any mix of the three types that wins, and one such mix (fewest drones, then fewest lancers). */
-export function minMix(base: Readonly<World>, node: number, upTo: number, data: SimData = defaultData): { total: number; fleet: ShipTypeCounts } | null {
+export function minMix(base: Readonly<World>, node: number, upTo: number, data: SimData = fixtureData): { total: number; fleet: ShipTypeCounts } | null {
   for (let n = 1; n <= upTo; n++) {
     for (let d = 0; d <= n; d++) {
       for (let l = 0; l <= n - d; l++) {
@@ -82,7 +83,7 @@ export interface MinWaves {
 }
 
 /** All four minimums for one node. */
-export function minWaves(base: Readonly<World>, node: number, data: SimData = defaultData): MinWaves {
+export function minWaves(base: Readonly<World>, node: number, data: SimData = fixtureData): MinWaves {
   const drones = minSingle(base, node, 'drone', data);
   const lancers = minSingle(base, node, 'lancer', data);
   const flak = minSingle(base, node, 'flak', data);

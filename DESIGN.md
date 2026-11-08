@@ -255,40 +255,50 @@ There are 15 asteroid slots, 150 ore/min at full build: the same ore ceiling as 
 
 #### Layouts (data `map.layouts`; chosen like the H2 variants)
 
-Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per type after the Root is cut. Slots apply to the pocket after capture. The model columns come from the throwaway model (scratchpad, defaults below): the minimum simultaneous wave that wins, as drones / lancers / flak / best mix.
+Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per type after the Root is cut. Slots apply to the pocket after capture. **Calibrated by h3-design-data (data v5).** The wave columns are measured on the real sim: the minimum simultaneous wave of one type that wins, as drones / lancers / flak. The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (weighted multiplier in brackets).
 
 **Layout 0: Frost Gate**
 
-| Node | Prize | Slots | Guards (T/S) | Model: drones / lancers / flak / best mix |
-| --- | --- | --- | --- | --- |
-| p1 | ice | 2 | 1 / 8 | 14 / 17 / 8 / 5 |
-| p2 | crystal | 2 | 3 / 3 | 13 / 12 / 20 / 6 |
-| p3 | ice | 3 | 9 / 4 | 25 / 17 / 35 / 11 |
-| p4 | crystal | 3 | 2 / 18 | 22 / 25 / 18 / 10 |
-| root | none | 0 | 6 / 0 | 16 / 6 / 25 / 6 |
-| heart | ore | 4 | 10 / 14, starved 6 / 7 | 32 / 25 / 39 / 14; starved 16 / 10 / 17 / 7 |
+| Node | Prize | Slots | Guards (T/S) | Min wave d / l / f | Tags l / f |
+| --- | --- | --- | --- | --- | --- |
+| p1 | ice | 2 | 2 / 21 | 23 / 27 / 18 | Weak (67) / Strong (157) |
+| p2 | crystal | 2 | 6 / 6 | 22 / 17 / 28 | Strong (159) / Weak (65) |
+| p3 | ice | 3 | 18 / 8 | 43 / 25 / 56 | Strong / Weak |
+| p4 | crystal | 3 | 4 / 37 | 36 / 39 / 26 | Weak (71) / Strong (153) |
+| root | none | 0 | 0 / 25 | 18 / 27 / 8 | Weak / Strong |
+| heart | ore | 4 | 23 / 27, starved 12 / 14 | 63 / 42 / 70; starved 30 / 18 / 31 | Strong (154) / Weak (70) |
 
 **Layout 1: Glass Thicket**
 
-| Node | Prize | Slots | Guards (T/S) | Model: drones / lancers / flak / best mix |
-| --- | --- | --- | --- | --- |
-| p1 | crystal | 2 | 1 / 8 | 14 / 17 / 8 / 5 |
-| p2 | ice | 2 | 3 / 3 | 13 / 12 / 20 / 6 |
-| p3 | ice | 3 | 2 / 18 | 22 / 25 / 18 / 10 |
-| p4 | crystal | 3 | 9 / 4 | 25 / 17 / 35 / 11 |
-| root | none | 0 | 0 / 12 | 11 / 17 / 4 / 4 |
-| heart | ore | 4 | 14 / 8, starved 8 / 4 | 36 / 23 / 46 / 16; starved 17 / 9 / 21 / 8 |
+| Node | Prize | Slots | Guards (T/S) | Min wave d / l / f | Tags l / f |
+| --- | --- | --- | --- | --- | --- |
+| p1 | crystal | 2 | 2 / 21 | 23 / 27 / 18 | Weak / Strong |
+| p2 | ice | 2 | 8 / 6 | 25 / 18 / 33 | Strong (167) / Weak (57) |
+| p3 | ice | 3 | 4 / 37 | 36 / 39 / 26 | Weak / Strong |
+| p4 | crystal | 3 | 18 / 8 | 43 / 25 / 56 | Strong / Weak |
+| root | none | 0 | 12 / 0 | 27 / 11 / 39 | Strong / Weak |
+| heart | ore | 4 | 29 / 16, starved 16 / 8 | 67 / 38 / >80; starved 33 / 17 / 40 | Strong (175) / Weak (49) |
 
 **Layout 2: Twin Seams**
 
-| Node | Prize | Slots | Guards (T/S) | Model: drones / lancers / flak / best mix |
-| --- | --- | --- | --- | --- |
-| p1 | ice | 2 | 2 / 5 | 14 / 15 / 17 / 5 |
-| p2 | crystal | 2 | 2 / 5 | 14 / 15 / 17 / 5 |
-| p3 | crystal | 3 | 2 / 18 | 22 / 25 / 18 / 10 |
-| p4 | ice | 3 | 9 / 4 | 25 / 17 / 35 / 11 |
-| root | none | 0 | 3 / 6 | 16 / 16 / 20 / 7 |
-| heart | ore | 4 | 6 / 20, starved 4 / 10 | 30 / 28 / 30 / 13; starved 14 / 11 / 12 / 6 |
+| Node | Prize | Slots | Guards (T/S) | Min wave d / l / f | Tags l / f |
+| --- | --- | --- | --- | --- | --- |
+| p1 | ice | 2 | 4 / 10 | 20 / 20 / 23 | Even (125) / Even (100) |
+| p2 | crystal | 2 | 4 / 10 | 20 / 20 / 23 | Even / Even |
+| p3 | crystal | 3 | 4 / 37 | 36 / 39 / 26 | Weak / Strong |
+| p4 | ice | 3 | 18 / 8 | 43 / 25 / 56 | Strong / Weak |
+| root | none | 0 | 6 / 12 | 26 / 22 / 28 | Even (134) / Even (90) |
+| heart | ore | 4 | 12 / 42, starved 8 / 21 | 52 / 47 / 47; starved 27 / 21 / 23 | Even (110) / Even (114) |
+
+**Tag accuracy at these numbers.** Say a type's tag is "right" when Strong means it needs at most 80% of the drones' wave, Weak means it needs more than the drones, and Even is anything in between. By that test (as measured by the report in `packages/sim/test/min-waves.test.ts`), 33 of the 36 tags at full caps are right, and 38 of 42 when the starved heart is included. The four misreads, all in Twin Seams:
+- **p1 flak:** needs 23 against the drones' 20 (15% more) and reads Even; by the test it should read Weak. The Designer's calibration called this close enough.
+- **p2 flak:** the same mix as p1, so the same numbers and the same misread.
+- **Root flak:** needs 28 against the drones' 26 (8% more) and reads Even; it should read Weak. Not covered by the earlier "close enough" call; needs a Designer judgment.
+- **Starved heart lancer:** needs 21 against the drones' 27 (78%) and reads Even; it should read Strong. It is just past the 80% line, in the final fight; needs a Designer judgment (or the tag-formula follow-up below).
+
+Twin Seams reads Even/Even for both counters at its Root and at its heart, fed and starved, so there the tags give no guidance in the final fight. Whether that is intended for the symmetric layout is a Designer follow-up (Critic note).
+
+The H2-era mixes are kept in git history (data v4).
 
 Why these layouts:
 - **Every first move is a light pocket taken with drones**, about 13–14 of them. There are two doors, one per resource.
@@ -313,7 +323,7 @@ Selection:
   - the node's `buffer` holds its prize resource (asteroids: ore; heart: ore).
 - **Pod:** gains `res` (`ore | ice | crystal`), copied from the source node. On delivery it adds to `stock[res]`.
 - **Assemblers:** `assemblers: {lens: {ticksLeft}, plating: {ticksLeft}}`, at the probe. There is no input: they always run (see rules).
-- **Yards:** `yards: {drone: {on, ticksLeft}, lancer: {on, ticksLeft}, flak: {on, ticksLeft}}`. They replace `shipyard`.
+- **Yards:** `yards: {drone: {on, ticksLeft}, lancer: {on, ticksLeft}, flak: {on, ticksLeft}}`. They replace `shipyard`. `yardTurn` (0 or 1) says whether lancer or flak is tried first for the next start (rule 5b).
 - **Ship:** gains `type` (`drone | lancer | flak`). The hp comes from its type.
 - **Guardian:** one per guarded node (`p1`–`p4`, `root`, `heart`) in node-index order.
   - `thorns[]` becomes `guards[]` (`{id, type: thorn | spore, hp}`, ascending id).
@@ -346,11 +356,13 @@ The rule numbers are H1's. Anything not listed is unchanged.
     - `stock[component] < component.stockCap`;
     - `stock.ore − reservedOre ≥ component.<c>.ore`, where `reservedOre = Σ queue[].cost`;
     - `stock[res] ≥ component.<c>.<res>`.
-- **5b. Yards (replaces rule 5).** For each type, in the fixed order lancer, flak, drone:
-  - If `ticksLeft > 0`, decrement it. At 0, spawn a ship of that type at `probe` with `ship.<type>.hp`. If `rally ≠ probe`, it starts transit to `rally`.
-  - Then, if the yard is on and idle, `stock.ore − reservedOre ≥ ship.<type>.cost` and (for lancer and flak) `stock[component] ≥ 1`: pay both and set `ticksLeft = ship.<type>.buildTicks`.
+- **5b. Yards (replaces rule 5; starts round-robin since h3-design-data).**
+  - **Finish.** For each type, in the fixed order lancer, flak, drone: if `ticksLeft > 0`, decrement it. At 0, spawn a ship of that type at `probe` with `ship.<type>.hp`. If `rally ≠ probe`, it starts transit to `rally`.
+  - **Start.** A yard *can start* if it is on and idle, `stock.ore − reservedOre ≥ ship.<type>.cost` and (for lancer and flak) `stock[component] ≥ 1`. Starting pays both and sets `ticksLeft = ship.<type>.buildTicks`. Yards are tried in this order:
+    1. lancer and flak, **round-robin**: starting with the one `yardTurn` names (0 lancer, 1 flak), then the other. Whenever one of them starts, `yardTurn` passes to the other. So the component yard that started least recently goes first, and a yard that can't start (no component, off, or no ore) keeps its turn until it does;
+    2. then drone. A drone start never changes `yardTurn`.
 
-  Queued builds still reserve their ore ahead of assemblers and yards. Lancers and flak go first, so a scarce component is never starved by drones.
+  `yardTurn` is world state (an integer, 0 at the start, saved and hashed). Queued builds still reserve their ore ahead of assemblers and yards. Lancers and flak still go before drones, so a scarce component is never starved by drones. With ore for one ship at a time, lancer and flak now alternate, where the old fixed order gave every ship to the lancer yard and starved flak.
 - **7. Combat** (per living guardian, on round ticks, ships `at` its node, resolved together from start-of-round state):
   - **Player damage.**
     - For each ship type present, in the order lancer, flak, drone, pool `base = count × ship.<type>.damage`.
@@ -395,15 +407,15 @@ New or renamed keys. H1 economy, route and build keys are unchanged.
 
 | Key | Default | Range | Feels like (low / high) |
 | --- | --- | --- | --- |
-| `ship.drone.cost` | 15 | 5–60 | from `ship.cost` |
+| `ship.drone.cost` | 18 | 5–60 | from `ship.cost` |
 | `ship.drone.buildTicks` | 90 | 15–900 | from `ship.buildTicks` |
 | `ship.drone.hp` | 10 | 1–100 | |
 | `ship.drone.damage` | 2 | 1–20 | 1: drones are fodder / 4: counters don't matter |
-| `ship.lancer.cost` | 15 | 5–60 | ore part; plus 1 lens |
+| `ship.lancer.cost` | 18 | 5–60 | ore part; plus 1 lens |
 | `ship.lancer.buildTicks` | 120 | 15–900 | |
 | `ship.lancer.hp` | 12 | 1–100 | |
 | `ship.lancer.damage` | 4 | 1–20 | |
-| `ship.flak.cost` | 15 | 5–60 | ore part; plus 1 plating |
+| `ship.flak.cost` | 18 | 5–60 | ore part; plus 1 plating |
 | `ship.flak.buildTicks` | 120 | 15–900 | |
 | `ship.flak.hp` | 12 | 1–100 | |
 | `ship.flak.damage` | 4 | 1–20 | |
@@ -420,7 +432,7 @@ New or renamed keys. H1 economy, route and build keys are unchanged.
 | `guard.capPct` | 100 | 25–300 | the live knob for overall guard strength (replaces `root.capBonus`). 25: everything is soft / 300: everything is a fortress |
 | `bloom.starvedRegrowMul` | 5 | 1–30 | replaces `bloom.starvedRegrowTicks`. 1: cutting the Root only drops caps / 30: a starved heart barely regrows |
 | `bloom.starvedRepairPerRound` | 0 | 0–20 | unchanged |
-| `pocket.resourcePerMin` | 6 | 1–40 | per extractor. 2: a prize trickles, components throttle everything / 20: one pocket floods you |
+| `pocket.resourcePerMin` | 12 | 1–40 | per extractor. 2: a prize trickles, components throttle everything / 20: one pocket floods you |
 | `pocket.freeExtractors` | 1 | 0–3 | 0: the prize waits for a build / 3: an instant payoff |
 | `heart.orePerMin` | 25 | 10–80 | from `rich.orePerMin` |
 | `heart.freeExtractors` | 1 | 0–4 | from `rich.freeExtractors` |
@@ -569,15 +581,56 @@ If the numbers miss these, the engineers report them and do not retune. h3-desig
 2. Did the ring and the Strong/Weak tags tell you which ships to bring? Did you ever send the wrong ships, and did it sting?
 3. Did unlocking a new ship type feel like a payoff? Did the game feel like one fixed sequence, or like a path you chose?
 
-#### Open calibration questions (for h3-design-data, after h3-sim merges)
+#### Calibration result (h3-design-data, data v5)
 
-1. **Pacing.** With the H1 economy, do bots take the first light pocket at about 4–6 min and the heart at 20–35 min, or 35–45 for `drones-only`? If they're too slow, trim the asteroid build-out cost before trimming the guards.
-2. **Prize throughput.** At 6/min per extractor and 4 per component, a light pocket gives about 3 components/min. Is the component, not ore, the visible throttle for lancers and flak, without the player waiting on it?
-3. **Door balance.** Do flags 3 and 4 hold? Twin Seams is symmetric by design. If a layout fails, change its heavy pocket's mix before touching `counter.*`.
-4. **Drones as the fallback.** Are they clearly worse (flag 2), yet able to finish? Is `ship.drone.damage` 2 too strong?
-5. **Spore regrowth at 20 ticks.** Does it keep trickles from winning, as Thorns did in H1? The model says yes for waves under about 8.
-6. **Combat order.** Lancers resolve before flak, so lancers soak the Thorns first in a mixed wave. Check that this doesn't make one type always better in mixes.
-7. **The bot estimator.** The constant 3 and the +20 margin overestimate drones and underestimate wrong-type waves. Tune it only so the bots behave sensibly. It isn't shown to the player.
+The changes from v4:
+- every layout guard count is about x2.1;
+- p1 in Frost Gate and Glass Thicket is more Spore-heavy;
+- Frost Gate's heart is a little more Thorn-heavy;
+- Glass Thicket's p2 has one more Thorn;
+- the Root mixes of Frost Gate (now all Spore) and Glass Thicket (now all Thorn) are swapped;
+- `ship.*.cost` goes from 15 to 18, and `pocket.resourcePerMin` from 6 to 12.
+
+`guard.capPct` stays at 100, so it's still a neutral live knob. `counter.*` is unchanged.
+
+Bot suite, `--seeds 3`, data v5 with the round-robin yards (current; `reports/bots-latest.md`), heart capture in game time (m:ss):
+
+| Layout | drones-only | ice-first | crystal-first | greedy |
+| --- | --- | --- | --- | --- |
+| Frost Gate | 25:17 | 20:40 | 20:27 | 19:33 |
+| Glass Thicket | 27:51 | 21:58 | 21:45 | 21:45 |
+| Twin Seams | 25:27 | 19:42 | 19:16 | 19:42 |
+
+Before round-robin (fixed yard order, same v5 data) ice-first / crystal-first were 18:54 / 21:08, 18:24 / 20:31 and 20:12 / 22:12; drones-only is unchanged.
+
+| Flag | v4 | v5, before round-robin | v5, current (round-robin yards) |
+| --- | --- | --- | --- |
+| 1. All capture within 15-45 min | **missed** (12.0-15.7) | met (18:24-27:51) | met (19:16-27:51) |
+| 2. Counters matter | met on time only (20-31% later) | met on time only (26-52% later) | met on time only (drones-only 28-32% later than the best); the "40% more losses" half still fails (52/57/51 lost against 42/47/38) |
+| 3. Two viable doors | met (gaps 0-5%) | met (gaps 10-12%) | met in 3 of 3 (gaps 1-2%) |
+| 4. No fixed best opening | met on knife edges (3 s, 17 s, 33 s gaps) | **missed**: ice-first faster everywhere by about 2 min | **missed**: crystal-first faster in all three layouts, by 13-26 s |
+| 5. Order varies | met | met | met |
+| 6. Determinism | met | met | met |
+
+Answers to the open questions:
+1. **Pacing.**
+   - **Bots:** the first pocket falls at 10-11 min, because the bots finish their economy plan first. The heart falls at 19-22 min with counters and 25-28 min with drones only.
+   - **Players:** they take decisions and attack late, so a session should land at about 25-35 min, inside the spec's 20-35 target.
+   - **Why I didn't go slower:** drones-only would cross the bot suite's 30-minute tick cap and show as "never captured".
+2. **Prize throughput.** At 6/min, the counter strategies built only about 10-15 component ships, so counters barely showed. At 12/min per extractor, a light pocket gives about 6 components/min. Components are visibly the main fleet. With the fixed yard order the counter fleets were lancer-heavy (see 3a). Since the round-robin yards, both types appear in every counter game: lancers / flak lost by heart capture are 5/6, 4/7 and 2/9 for ice-first and 9/6, 6/4 and 10/1 for crystal-first (before: 12/1, 23/3, 3/8 and 21/0, 34/0, 27/0). Each door still leans towards its own counter.
+3. **Door balance.** Flag 3 holds. Flag 4 can't be held robustly with data, for two structural reasons:
+   - **(a) Yard order (fixed since; see "Sim fix done" below).** Yards were served lancer, then flak, then drone (rule 5b as first written), so when ore is short, lancers take it all and flak is starved. Every counter strategy ends up lancer-heavy. A mixed heart then punishes the crystal-first path, which never gets flak going.
+   - **(b) Bot target choice.** The bots pick targets by `need / prizeWeight` and ignore their own fleet's counters, so the order doesn't react to which door was taken.
+
+   Every data lever I tried (Root swaps, light-pocket mixes, lens cost, Thorn repair, Spore regrowth) moved flag 4 by seconds, not structurally. Proposed sim fix: serve idle yards **round-robin** (the yard that started a ship least recently goes first), not in fixed order. Proposed bot fix: choose targets by the estimated fleet needed *with the current types*.
+
+   **Sim fix done (h3-design-data, engineering):** rule 5b now serves lancer and flak round-robin. On the same v5 data, ice-first's lead of about 2 min is gone: the two doors finish within 13-26 s of each other in every layout (flag 3 gaps 1-2%), with crystal-first a hair faster in all three, so flag 4 is still missed, now on a knife edge. The bot fix is not done. Numbers are in DECISIONS.md.
+4. **Drones as the fallback.** They finish every layout, 28-32% slower than the best strategy (26-52% before the round-robin yards). They lose about as many ships as the counter strategies, because the bots misuse counters too (all-in waves include lancers sent against Spores). `ship.drone.damage` stays at 2.
+5. **Spore regrowth at 20 ticks.** Fine. No repelled-trickle problems, and no wave was repelled except one bot misread.
+6. **Combat order.** The lancer-first combat order isn't the issue. The yard order (3a) is.
+7. **The bot estimator.** Unchanged. It is good enough, with zero or one repel per game.
+
+**The Strong/Even/Weak tag.** The Critic's two misreads came from mixes sitting on the 150/75 thresholds. They are fixed by the mixes above, not by changing the formula. The hp-weighted formula is still fragile: it ignores how fast Spores regrow, and new mixes near 150 or 75 can misread again. A sturdier formula (time-to-clear: sum of hp / sum of (hp / mult), compared against drones) would need sim code. It is suggested as a follow-up, and isn't needed for this build.
 
 #### Out of scope for H3
 

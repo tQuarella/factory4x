@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import rawData from '../../../data/sim.json' with { type: 'json' };
-import { TUNABLE_KEYS, defaultData, nodeDistance, parseSimData, tunableMeta } from '../src/index.ts';
+import shippedRaw from '../../../data/sim.json' with { type: 'json' };
+import design from '../../../DESIGN.md?raw';
+import { TUNABLE_KEYS, defaultData, nodeDistance, parseSimData, tunableMeta, type SimData } from '../src/index.ts';
+import { fixtureData } from './fixture.ts';
+import rawData from './fixtures/sim-v4.json' with { type: 'json' };
 import { N, fresh } from './helpers.ts';
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
-/** DESIGN.md H3 "Tunables": every new or renamed key with its default and range. */
+/** The frozen fixture (data v4, the h3-sim spec): every H3 key with its default and range. Rule tests rely on these numbers. */
 const H3_TUNABLES: Record<string, [number, number, number]> = {
   'ship.drone.cost': [15, 5, 60],
   'ship.drone.buildTicks': [90, 15, 900],
@@ -45,6 +48,18 @@ const H3_TUNABLES: Record<string, [number, number, number]> = {
   'system.variant': [0, 0, 3],
 };
 
+/** Layouts in a compact row form: name, then `p1 ice 2 1/8` per pocket, the Root and the heart. */
+const layoutRows = (d: SimData) =>
+  d.map.layouts.map((l) => [
+    l.name,
+    ...(['p1', 'p2', 'p3', 'p4'] as const).map((p) => {
+      const x = l.pockets[p]!;
+      return `${p} ${x.prize} ${x.slots} ${x.thorns}/${x.spores}`;
+    }),
+    `root ${l.root.thorns}/${l.root.spores}`,
+    `heart ${l.heart.thorns}/${l.heart.spores} starved ${l.heart.starvedThorns}/${l.heart.starvedSpores}`,
+  ]);
+
 /** Keys the H3 spec removes. */
 const REMOVED = [
   'ship.cost',
@@ -64,27 +79,29 @@ const REMOVED = [
   'rich.freeExtractors',
 ];
 
-describe('data/sim.json', () => {
-  it('is data version 4 and holds every H3 tunable with its default and range', () => {
-    expect(defaultData.dataVersion).toBe(4);
-    expect(defaultData.tickRate).toBe(30);
-    expect(Object.keys(defaultData.tunables).sort()).toEqual([...TUNABLE_KEYS].sort());
+describe('the frozen test fixture (data v4)', () => {
+  it('is data version 4 and holds every H3 tunable with its v4 default and range', () => {
+    expect(fixtureData.dataVersion).toBe(4);
+    expect(fixtureData.tickRate).toBe(30);
+    expect(Object.keys(fixtureData.tunables).sort()).toEqual([...TUNABLE_KEYS].sort());
     for (const [k, [d, min, max]] of Object.entries(H3_TUNABLES)) {
-      expect(defaultData.tunables[k as keyof typeof defaultData.tunables], k).toEqual({ default: d, min, max });
+      expect(fixtureData.tunables[k as keyof typeof fixtureData.tunables], k).toEqual({ default: d, min, max });
     }
     // Kept from H1.
-    expect(defaultData.tunables['ship.speedSu']).toEqual({ default: 4, min: 1, max: 20 });
-    expect(defaultData.tunables['combat.roundTicks']).toEqual({ default: 30, min: 10, max: 90 });
-    expect(defaultData.tunables['stats.throughputWindowSec']).toEqual({ default: 60, min: 60, max: 60 });
+    expect(fixtureData.tunables['ship.speedSu']).toEqual({ default: 4, min: 1, max: 20 });
+    expect(fixtureData.tunables['combat.roundTicks']).toEqual({ default: 30, min: 10, max: 90 });
+    expect(fixtureData.tunables['stats.throughputWindowSec']).toEqual({ default: 60, min: 60, max: 60 });
   });
 
-  it('drops every key the spec removes, and map.variants', () => {
-    for (const k of REMOVED) expect(Object.keys(rawData.tunables)).not.toContain(k);
-    expect(Object.keys(rawData.map)).toEqual(['nodes', 'layouts']);
+  it('drops every key the spec removes, and map.variants (the shipped data too)', () => {
+    for (const raw of [rawData, shippedRaw]) {
+      for (const k of REMOVED) expect(Object.keys(raw.tunables)).not.toContain(k);
+      expect(Object.keys(raw.map)).toEqual(['nodes', 'layouts']);
+    }
   });
 
   it('has the 16-node field at the spec positions, every node at least 160 su from every other', () => {
-    expect(defaultData.map.nodes.map((n) => [n.id, n.kind, n.x, n.y, n.r, n.slots])).toEqual([
+    expect(fixtureData.map.nodes.map((n) => [n.id, n.kind, n.x, n.y, n.r, n.slots])).toEqual([
       ['probe', 'probe', 500, 1180, 70, 0],
       ['a1', 'asteroid', 300, 1010, 45, 2],
       ['a2', 'asteroid', 700, 1010, 45, 2],
@@ -111,26 +128,17 @@ describe('data/sim.json', () => {
     expect(N.heart).toBe(15);
   });
 
-  it('has the three layouts exactly as the spec tables give them', () => {
-    const rows = defaultData.map.layouts.map((l) => [
-      l.id,
-      l.name,
-      ...(['p1', 'p2', 'p3', 'p4'] as const).map((p) => {
-        const x = l.pockets[p]!;
-        return `${p} ${x.prize} ${x.slots} ${x.thorns}/${x.spores}`;
-      }),
-      `root ${l.root.thorns}/${l.root.spores}`,
-      `heart ${l.heart.thorns}/${l.heart.spores} starved ${l.heart.starvedThorns}/${l.heart.starvedSpores}`,
-    ]);
-    expect(rows).toEqual([
-      ['frost', 'Frost Gate', 'p1 ice 2 1/8', 'p2 crystal 2 3/3', 'p3 ice 3 9/4', 'p4 crystal 3 2/18', 'root 6/0', 'heart 10/14 starved 6/7'],
-      ['glass', 'Glass Thicket', 'p1 crystal 2 1/8', 'p2 ice 2 3/3', 'p3 ice 3 2/18', 'p4 crystal 3 9/4', 'root 0/12', 'heart 14/8 starved 8/4'],
-      ['twin', 'Twin Seams', 'p1 ice 2 2/5', 'p2 crystal 2 2/5', 'p3 crystal 3 2/18', 'p4 ice 3 9/4', 'root 3/6', 'heart 6/20 starved 4/10'],
+  it('has the three v4 layouts (the h3-sim spec tables)', () => {
+    expect(fixtureData.map.layouts.map((l) => l.id)).toEqual(['frost', 'glass', 'twin']);
+    expect(layoutRows(fixtureData)).toEqual([
+      ['Frost Gate', 'p1 ice 2 1/8', 'p2 crystal 2 3/3', 'p3 ice 3 9/4', 'p4 crystal 3 2/18', 'root 6/0', 'heart 10/14 starved 6/7'],
+      ['Glass Thicket', 'p1 crystal 2 1/8', 'p2 ice 2 3/3', 'p3 ice 3 2/18', 'p4 crystal 3 9/4', 'root 0/12', 'heart 14/8 starved 8/4'],
+      ['Twin Seams', 'p1 ice 2 2/5', 'p2 crystal 2 2/5', 'p3 crystal 3 2/18', 'p4 ice 3 9/4', 'root 3/6', 'heart 6/20 starved 4/10'],
     ]);
   });
 
   it('tunable metadata marks stats.* fixed, client.* client-scope, and startStock and system.variant new-run-only', () => {
-    const meta = tunableMeta(defaultData);
+    const meta = tunableMeta(fixtureData);
     expect(meta.map((m) => m.key)).toEqual([...TUNABLE_KEYS]);
     const by = (k: string) => meta.find((m) => m.key === k)!;
     expect(by('ship.lancer.cost')).toEqual({ key: 'ship.lancer.cost', section: 'ship', default: 15, min: 5, max: 60, live: true, scope: 'sim', newRunOnly: false });
@@ -139,6 +147,102 @@ describe('data/sim.json', () => {
     expect(by('economy.startStock').newRunOnly).toBe(true);
     expect(by('system.variant')).toMatchObject({ section: 'system', live: true, scope: 'sim', newRunOnly: true });
     expect(by('guard.capPct').newRunOnly).toBe(false);
+  });
+});
+
+/** Body rows of the first Markdown table between `from` and `until` in DESIGN.md (cells trimmed). */
+function specTable(from: string, until: string): string[][] {
+  const at = design.indexOf(from);
+  if (at < 0) throw new Error(`DESIGN.md has no "${from}"`);
+  const end = design.indexOf(until, at + from.length);
+  return design
+    .slice(at, end < 0 ? undefined : end)
+    .split('\n')
+    .filter((l) => l.startsWith('|') && !l.startsWith('| ---'))
+    .slice(1)
+    .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
+}
+
+/** The layouts in DESIGN.md H3 "Layouts", in the same row form as `layoutRows`. */
+function specLayouts(): string[][] {
+  const at = design.indexOf('#### Layouts (data `map.layouts`');
+  if (at < 0) throw new Error('DESIGN.md has no H3 Layouts section');
+  return design
+    .slice(at, design.indexOf('Why these layouts', at))
+    .split('**Layout ')
+    .slice(1)
+    .map((block) => {
+      const title = /^\d+: (.+?)\*\*/.exec(block)?.[1] ?? '?';
+      const rows = block
+        .split('\n')
+        .filter((l) => /^\| (p\d|root|heart) \|/.test(l))
+        .map((l) => {
+          const [node = '', prize = '', slots = '', guards = ''] = l.split('|').slice(1, 5).map((c) => c.trim());
+          const g = guards.replace(/ \/ /g, '/').replace(', starved ', ' starved ');
+          return node.startsWith('p') ? `${node} ${prize} ${slots} ${g}` : `${node} ${g}`;
+        });
+      return [title, ...rows];
+    });
+}
+
+/**
+ * The shipped data/sim.json. Calibration changes it, so these tests check
+ * that it is well formed and agrees with the spec tables in DESIGN.md, and
+ * pin no tuned number of their own: a retune edits data/sim.json and
+ * DESIGN.md together, and no test. Rule tests use the fixture above.
+ */
+describe('data/sim.json (shipped)', () => {
+  it('is valid, newer than the fixture, and has every tunable with its default inside its range', () => {
+    expect(() => parseSimData(clone(shippedRaw))).not.toThrow();
+    expect(defaultData.dataVersion).toBeGreaterThan(fixtureData.dataVersion);
+    expect(defaultData.tickRate).toBe(30);
+    expect(Object.keys(defaultData.tunables).sort()).toEqual([...TUNABLE_KEYS].sort());
+    for (const k of TUNABLE_KEYS) {
+      const { default: d, min, max } = defaultData.tunables[k];
+      expect(min <= d && d <= max, k).toBe(true);
+    }
+  });
+
+  it('matches every default and range in the DESIGN.md H3 Tunables table', () => {
+    const rows = specTable('#### Tunables (data/, all integers)\n\nNew or renamed keys.', '- **Removed:**');
+    expect(rows.map((r) => r[0]!.replace(/`/g, '')).sort()).toEqual(Object.keys(H3_TUNABLES).sort());
+    for (const [key = '', def = '', range = ''] of rows) {
+      const k = key.replace(/`/g, '') as keyof SimData['tunables'];
+      const [min, max] = range.split('–').map(Number);
+      expect(defaultData.tunables[k], k).toEqual({ default: Number(def), min, max });
+    }
+  });
+
+  it('keeps the fixture field: node positions do not change with calibration', () => {
+    expect(defaultData.map.nodes).toEqual(fixtureData.map.nodes);
+  });
+
+  it('has three well-formed layouts that match the DESIGN.md H3 layout tables', () => {
+    const layouts = defaultData.map.layouts;
+    expect(layouts.map((l) => [l.id, l.name])).toEqual([
+      ['frost', 'Frost Gate'],
+      ['glass', 'Glass Thicket'],
+      ['twin', 'Twin Seams'],
+    ]);
+    for (const l of layouts) {
+      const pockets = Object.values(l.pockets);
+      // Two doors: two ice and two crystal pockets per layout, and every guarded node has guards.
+      expect(pockets.filter((p) => p.prize === 'ice').length, l.id).toBe(2);
+      expect(pockets.filter((p) => p.prize === 'crystal').length, l.id).toBe(2);
+      for (const p of pockets) expect(p.thorns + p.spores, l.id).toBeGreaterThan(0);
+      expect(l.root.thorns + l.root.spores, l.id).toBeGreaterThan(0);
+      // Cutting the Root weakens the heart and never strengthens it.
+      expect(l.heart.starvedThorns, l.id).toBeLessThanOrEqual(l.heart.thorns);
+      expect(l.heart.starvedSpores, l.id).toBeLessThanOrEqual(l.heart.spores);
+      expect(l.heart.starvedThorns + l.heart.starvedSpores, l.id).toBeLessThan(l.heart.thorns + l.heart.spores);
+    }
+    expect(layoutRows(defaultData)).toEqual(specLayouts());
+  });
+
+  it('tunable metadata follows the shipped defaults and ranges', () => {
+    const meta = tunableMeta(defaultData);
+    expect(meta.map((m) => m.key)).toEqual([...TUNABLE_KEYS]);
+    for (const m of meta) expect([m.default, m.min, m.max], m.key).toEqual([defaultData.tunables[m.key].default, defaultData.tunables[m.key].min, defaultData.tunables[m.key].max]);
   });
 });
 

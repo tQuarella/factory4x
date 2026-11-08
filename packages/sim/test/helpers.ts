@@ -1,7 +1,6 @@
 import {
   SHIP_TYPES,
   createWorld,
-  defaultData,
   deserializeWorld,
   guardianAt,
   isValidInput,
@@ -15,8 +14,9 @@ import {
   type SimData,
   type World,
 } from '../src/index.ts';
+import { fixtureData } from './fixture.ts';
 
-export const data = defaultData;
+export const data = fixtureData;
 
 /** Node indices of the H3 map. */
 export const N = {
