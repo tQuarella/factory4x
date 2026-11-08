@@ -1,14 +1,22 @@
+import { buyResearch, canBuyResearch, isAreaOpen, isWon, leaveActive } from './campaign.ts';
 import { SHIP_TYPES, isSimTunableKey, type ShipType, type SimData, type TunableKey } from './data.ts';
 import { ceilDiv } from './math.ts';
-import { PROBE, guardianAt, isGuarded, nodeDistance, routeFrom, type ShipTypeCounts, type World } from './world.ts';
+import { PROBE, guardianAt, isGuarded, landArea, nodeDistance, routeFrom, type ShipTypeCounts, type World } from './world.ts';
 
 /**
  * Player intent (DESIGN.md H1 "Player inputs", with the H3 changes: the yard
- * toggle and the send order take ship types). Node parameters are node
- * indices. Inputs are the only way the outside world changes the sim, and
- * every one is recorded in a replay's input log.
+ * toggle and the send order take ship types; and H4: the three campaign
+ * inputs). Node parameters are node indices into the active area's nodes.
+ * Inputs are the only way the outside world changes the sim, and every one is
+ * recorded in a replay's input log.
  */
 export type Input =
+  /** H4: land in an open area (`area` indexes data map.areas). Valid on the overworld before the win. */
+  | { type: 'enterArea'; area: number }
+  /** H4: back to the overworld; a withdraw if the heart isn't captured. Valid while an area is active. */
+  | { type: 'leaveArea' }
+  /** H4: buy the next level of a research item (`item` indexes data research). Valid on the overworld before the win. */
+  | { type: 'buyResearch'; item: number }
   | { type: 'buildExtractor'; node: number }
   | { type: 'buildRoute'; from: number; to: number }
   | { type: 'upgradeRoute'; from: number }
@@ -85,6 +93,31 @@ function extractable(world: Readonly<World>, node: number): boolean {
 
 /** True if `input` would change the world this tick. Invalid inputs are ignored by `step`; the client greys them out. */
 export function isValidInput(world: Readonly<World>, data: SimData, input: Input): boolean {
+  // After the win only live tuning is accepted; the area inputs need an area.
+  if (input.type === 'setTunable') return validTunable(data, input.key, input.value);
+  if (isWon(world)) return false;
+  const active = world.campaign.active !== null;
+  switch (input.type) {
+    case 'enterArea':
+      return !active && Number.isInteger(input.area) && isAreaOpen(world, data, input.area);
+    case 'leaveArea':
+      return active;
+    case 'buyResearch':
+      return typeof input.item === 'number' && Number.isInteger(input.item) && canBuyResearch(world, data, input.item);
+    default:
+      return active && validAreaInput(world, input);
+  }
+}
+
+function validTunable(data: SimData, key: unknown, value: unknown): boolean {
+  if (!isSimTunableKey(key)) return false;
+  if (typeof value !== 'number' || !Number.isInteger(value)) return false;
+  const range = data.tunables[key];
+  return value >= range.min && value <= range.max;
+}
+
+/** The H3 rules for the area inputs (an area is active). */
+function validAreaInput(world: Readonly<World>, input: Input): boolean {
   switch (input.type) {
     case 'buildExtractor': {
       if (!isIndex(world, input.node) || queueFull(world)) return false;
@@ -111,12 +144,6 @@ export function isValidInput(world: Readonly<World>, data: SimData, input: Input
     }
     case 'setRally':
       return isIndex(world, input.node);
-    case 'setTunable': {
-      if (!isSimTunableKey(input.key)) return false;
-      if (typeof input.value !== 'number' || !Number.isInteger(input.value)) return false;
-      const range = data.tunables[input.key];
-      return input.value >= range.min && input.value <= range.max;
-    }
     default:
       return false;
   }
@@ -155,6 +182,15 @@ export function startTransit(world: World, ship: World['ships'][number], to: num
 export function applyInput(world: World, data: SimData, input: Input): void {
   if (!isValidInput(world, data, input)) return;
   switch (input.type) {
+    case 'enterArea':
+      landArea(world, data, input.area);
+      return;
+    case 'leaveArea':
+      leaveActive(world, data);
+      return;
+    case 'buyResearch':
+      buyResearch(world, data, input.item);
+      return;
     case 'buildExtractor':
       world.queue.push({ kind: 'extractor', node: input.node, cost: inputCost(world, input) });
       return;

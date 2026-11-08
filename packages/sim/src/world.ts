@@ -1,13 +1,18 @@
 import {
   GUARD_CAP_MAX,
   GUARD_TYPES,
+  RIG_NODES,
   SIM_TUNABLE_KEYS,
+  type AreaHeart,
+  type AreaLayout,
   type Component,
   type GuardType,
   type MapLayout,
   type NodeKind,
   type RawResource,
+  type ResearchId,
   type Resource,
+  type ResourceTriple,
   type ShipType,
   type SimData,
   type Tunables,
@@ -15,8 +20,9 @@ import {
 import { isqrt } from './math.ts';
 
 /**
- * World state (DESIGN.md H1 "Entities and state", with the H2 and H3
- * changes). Plain JSON data only: no classes, no Maps, no undefined fields
+ * World state (DESIGN.md H1 "Entities and state", with the H2, H3 and H4
+ * changes). One World holds the campaign (`campaign`) and the one area being
+ * played (the H3 fields, empty on the overworld). Plain JSON data only: no classes, no Maps, no undefined fields
  * (absent values are null), so JSON.stringify round-trips it exactly and the
  * hash covers all of it.
  *
@@ -233,6 +239,57 @@ export interface Assembler {
   ticksLeft: number;
 }
 
+/** One overworld area's record (DESIGN.md H4 "Entities and state"). Times are game ticks. */
+export interface AreaRecord {
+  /** Tick its heart was captured (the area was reclaimed), or null while held. */
+  reclaimedTick: number | null;
+  /** Landings, and landings that ended in a withdraw. */
+  entries: number;
+  withdrawals: number;
+  /** Ticks played here while it was held, over every visit (a visit ends at the reclaim or the withdraw; free play after a reclaim isn't counted). */
+  playTicks: number;
+  /** Ticks of the reclaiming visit, landing to heart capture; null while held. */
+  reclaimPlayTicks: number | null;
+  /** Ships built and lost here while it was held, over every visit. */
+  shipsBuilt: number;
+  shipsLost: number;
+}
+
+/** One research purchase, in order. `item` is the research item id. */
+export interface ResearchPurchase {
+  item: string;
+  level: number;
+  tick: number;
+}
+
+/**
+ * The campaign (DESIGN.md H4): the overworld state around the one area being
+ * played. Plain JSON; hashed and saved with the rest of the world.
+ */
+export interface Campaign {
+  /** Index into data `map.areas` of the area being played, or null on the overworld. */
+  active: number | null;
+  /** Tick of the current landing (area times are tick − areaStartTick). */
+  areaStartTick: number;
+  /** The H3 layout index The Deep uses (chosen at world creation, as H3 chose its variant). Same as `world.system.variant`. */
+  deepLayout: number;
+  /** One per data `map.areas` entry, in data order. */
+  areas: AreaRecord[];
+  /** Area indices in the order they were reclaimed. */
+  reclaimOrder: number[];
+  /** Level per research item id (every data `research` id, 0 until bought). */
+  research: Record<string, number>;
+  /** Every purchase, in order. */
+  researchLog: ResearchPurchase[];
+  /** The overworld stockpile: what hauls and shipments paid in, minus research spent. */
+  stockpile: ResourceTriple;
+  /** Rule 10 accumulators, in units·ticks/min × 100: a unit ships each time one reaches ticksPerMin × 100. */
+  shipAccum: ResourceTriple;
+  totals: { hauled: ResourceTriple; shipped: ResourceTriple };
+  /** Tick the probe core was bought (the win), or null. */
+  wonTick: number | null;
+}
+
 export interface World {
   tick: number;
   rng: number;
@@ -270,7 +327,14 @@ export interface World {
   stats: Stats;
   /** Tick the heart was captured, or null. */
   capturedTick: number | null;
+  /** The H3 layout The Deep uses (H4: chosen at world creation, fixed for the campaign). */
   system: SystemInfo;
+  /**
+   * The overworld (H4). Every field above from `stock` to `capturedTick` is
+   * the active area's state; on the overworld they are empty (no nodes,
+   * guardians, ships or routes; zero stock).
+   */
+  campaign: Campaign;
 }
 
 /** The probe is always node 0 (enforced by parseSimData). */
@@ -299,15 +363,17 @@ export function ticksPerMin(world: Readonly<World>): number {
 function indexOfKind(world: Readonly<World>, kind: NodeKind): number {
   const nodes = world.nodes;
   for (let i = 0; i < nodes.length; i++) if (nodes[i]!.kind === kind) return i;
-  throw new Error(`world has no ${kind} node`);
+  return -1;
 }
 
-/** Index of the Bloom heart (H1's rich node). */
+/** Index of the Bloom heart (H1's rich node). Every area has one; throws on the overworld (no area active). */
 export function heartIndex(world: Readonly<World>): number {
-  return indexOfKind(world, 'heart');
+  const i = indexOfKind(world, 'heart');
+  if (i < 0) throw new Error('world has no heart node (no area is active)');
+  return i;
 }
 
-/** Index of the Root. */
+/** Index of the Root, or -1 when the active area has none (H4: light areas and Landfall have no Root). */
 export function rootIndex(world: Readonly<World>): number {
   return indexOfKind(world, 'root');
 }
@@ -380,89 +446,135 @@ export function chooseVariant(seed: number, forced: number, layoutCount: number)
   return (((seed | 0) % layoutCount) + layoutCount) % layoutCount;
 }
 
-function guardianFor(layout: MapLayout, n: Node): Pick<Guardian, 'counts' | 'starvedCounts' | 'fed'> {
+/** The guard counts of one guarded node, from an H3 layout or an area layout (H4). */
+function guardianFor(layout: MapLayout | AreaLayout, n: Node, hasRoot: boolean): Pick<Guardian, 'counts' | 'starvedCounts' | 'fed'> {
   if (n.kind === 'pocket') {
     const p = layout.pockets[n.id]!;
     return { counts: { thorn: p.thorns, spore: p.spores }, starvedCounts: null, fed: null };
   }
-  if (n.kind === 'root') return { counts: { thorn: layout.root.thorns, spore: layout.root.spores }, starvedCounts: null, fed: null };
-  const h = layout.heart;
-  return {
-    counts: { thorn: h.thorns, spore: h.spores },
-    starvedCounts: { thorn: h.starvedThorns, spore: h.starvedSpores },
-    fed: true,
-  };
+  if (n.kind === 'root') {
+    const r = layout.root!;
+    return { counts: { thorn: r.thorns, spore: r.spores }, starvedCounts: null, fed: null };
+  }
+  const h: AreaHeart = layout.heart;
+  // With no Root in the area the heart can't starve: no starved counts, and `fed` stays true for good.
+  const starved =
+    hasRoot && h.starvedThorns !== undefined && h.starvedSpores !== undefined ? { thorn: h.starvedThorns, spore: h.starvedSpores } : null;
+  return { counts: { thorn: h.thorns, spore: h.spores }, starvedCounts: starved, fed: true };
 }
 
 const zeroShips = (): ShipTypeCounts => ({ drone: 0, lancer: 0, flak: 0 });
+const zeroTriple = (): ResourceTriple => ({ ore: 0, ice: 0, crystal: 0 });
 
-/** A fresh world at tick 0 from the given (validated) data. */
-export function createWorld(seed: number, data: SimData): World {
-  const tun = {} as Tunables;
-  for (const k of SIM_TUNABLE_KEYS) tun[k] = data.tunables[k].default;
-  const variant = chooseVariant(seed, tun['system.variant'], data.map.layouts.length);
-  const layout = data.map.layouts[variant]!;
+/** Fresh area statistics (every visit starts its own). */
+function freshStats(data: SimData): Stats {
   const window = data.tunables['stats.throughputWindowSec'].default;
   const ring = (): number[] => new Array<number>(window).fill(0);
-  const world: World = {
-    tick: 0,
-    rng: seed | 0,
-    dataVersion: data.dataVersion,
-    tickRate: data.tickRate,
-    nextId: 1,
-    tun,
-    stock: { ore: tun['economy.startStock'], ice: 0, crystal: 0, lens: 0, plating: 0 },
+  return {
+    deliveredBuckets: ring(),
+    prizeBuckets: { ice: ring(), crystal: ring() },
+    delivered: { ore: 0, ice: 0, crystal: 0 },
+    firstDeliveredTick: { ore: null, ice: null, crystal: null },
+    peakPerMin: 0,
+    shipsBuilt: zeroShips(),
+    shipsLost: zeroShips(),
+    componentsBuilt: { lens: 0, plating: 0 },
+    guardsKilled: { thorn: 0, spore: 0 },
+    guardsWithered: 0,
+    wavesSent: 0,
+    firstShipTick: null,
+    oreSpentShips: 0,
+    oreSpentEconomy: 0,
+    oreSpentComponents: 0,
+    rootCutTick: null,
+    captures: [],
+  };
+}
+
+/** The world fields that hold the active area. */
+type AreaFields = Pick<
+  World,
+  | 'stock'
+  | 'probeAccum'
+  | 'queue'
+  | 'activeBuild'
+  | 'assemblers'
+  | 'yards'
+  | 'yardTurn'
+  | 'rally'
+  | 'nodes'
+  | 'routes'
+  | 'ships'
+  | 'guardians'
+  | 'lastBattle'
+  | 'stats'
+  | 'capturedTick'
+>;
+
+/** The area fields with no area active: nothing on the map, nothing in stock, every yard off. */
+function emptyAreaFields(data: SimData): AreaFields {
+  return {
+    stock: { ore: 0, ice: 0, crystal: 0, lens: 0, plating: 0 },
     probeAccum: 0,
     queue: [],
     activeBuild: null,
     assemblers: { lens: { ticksLeft: 0 }, plating: { ticksLeft: 0 } },
-    // As in H1, the drone yard starts on (the first ship early matters); lancer and flak wait for their components.
-    yards: { drone: { on: true, ticksLeft: 0 }, lancer: { on: false, ticksLeft: 0 }, flak: { on: false, ticksLeft: 0 } },
+    yards: { drone: { on: false, ticksLeft: 0 }, lancer: { on: false, ticksLeft: 0 }, flak: { on: false, ticksLeft: 0 } },
     yardTurn: 0,
     rally: PROBE,
-    nodes: data.map.nodes.map((n, index) => {
-      const pocket = n.kind === 'pocket' ? layout.pockets[n.id]! : null;
-      return {
-        index,
-        id: n.id,
-        kind: n.kind,
-        x: n.x,
-        y: n.y,
-        r: n.r,
-        slots: pocket ? pocket.slots : n.slots,
-        prize: pocket ? pocket.prize : n.kind === 'asteroid' || n.kind === 'heart' ? 'ore' : null,
-        owned: n.kind === 'probe',
-        extractors: 0,
-        buffer: 0,
-        accum: 0,
-      };
-    }),
+    nodes: [],
     routes: [],
     ships: [],
     guardians: [],
     lastBattle: null,
-    stats: {
-      deliveredBuckets: ring(),
-      prizeBuckets: { ice: ring(), crystal: ring() },
-      delivered: { ore: 0, ice: 0, crystal: 0 },
-      firstDeliveredTick: { ore: null, ice: null, crystal: null },
-      peakPerMin: 0,
-      shipsBuilt: zeroShips(),
-      shipsLost: zeroShips(),
-      componentsBuilt: { lens: 0, plating: 0 },
-      guardsKilled: { thorn: 0, spore: 0 },
-      guardsWithered: 0,
-      wavesSent: 0,
-      firstShipTick: null,
-      oreSpentShips: 0,
-      oreSpentEconomy: 0,
-      oreSpentComponents: 0,
-      rootCutTick: null,
-      captures: [],
-    },
+    stats: freshStats(data),
     capturedTick: null,
-    system: { variant, id: layout.id, name: layout.name },
   };
+}
+
+/** Clears the area fields (H4 "Leaving"): ships, buildings and local stock are gone; the map is empty. */
+export function clearArea(world: World, data: SimData): void {
+  Object.assign(world, emptyAreaFields(data));
+}
+
+/** The level of a research item (0 if never bought). */
+export function researchLevel(world: Readonly<World>, id: ResearchId): number {
+  return world.campaign.research[id] ?? 0;
+}
+
+/**
+ * Builds area `a` fresh from data as the active area (DESIGN.md H4
+ * "Landing", steps 1-6): its nodes in frame order, one full guardian per
+ * pocket, Root and heart, the opening stock, the yards per researched design,
+ * and the seed rigs. Used by `enterArea` and by `campaignWorld` with `land`.
+ */
+export function landArea(world: World, data: SimData, a: number): void {
+  const area = data.map.areas[a]!;
+  const camp = world.campaign;
+  const t = world.tun;
+  const layout: MapLayout | AreaLayout = area.layout === 'seed' ? data.map.layouts[camp.deepLayout]! : area.layout;
+  Object.assign(world, emptyAreaFields(data));
+  // 1. Nodes: the frame nodes present, in frame order (so the probe is index 0).
+  const frame = data.map.nodes.filter((n) => area.nodes.includes(n.id));
+  world.nodes = frame.map((n, index) => {
+    const pocket = n.kind === 'pocket' ? layout.pockets[n.id]! : null;
+    return {
+      index,
+      id: n.id,
+      kind: n.kind,
+      x: n.x,
+      y: n.y,
+      r: n.r,
+      slots: pocket ? pocket.slots : n.slots,
+      prize: pocket ? pocket.prize : n.kind === 'asteroid' || n.kind === 'heart' ? 'ore' : null,
+      owned: n.kind === 'probe',
+      extractors: 0,
+      buffer: 0,
+      accum: 0,
+    };
+  });
+  // 2. One guardian per guarded node, in node order. They start full: ids in guardian order, Thorns before Spores.
+  const hasRoot = world.nodes.some((n) => n.kind === 'root');
   for (const n of world.nodes) {
     if (!isGuardedKind(n.kind)) continue;
     world.guardians.push({
@@ -470,7 +582,7 @@ export function createWorld(seed: number, data: SimData): World {
       alive: true,
       guards: [],
       regrowProgress: { thorn: 0, spore: 0 },
-      ...guardianFor(layout, n),
+      ...guardianFor(layout, n, hasRoot),
       battle: null,
       lastBattle: null,
       wavesSent: 0,
@@ -478,10 +590,68 @@ export function createWorld(seed: number, data: SimData): World {
       guardsKilled: 0,
     });
   }
-  // Guardians start full. Ids go in guardian order, Thorns before Spores.
   for (const g of world.guardians) {
     const caps = guardCaps(world, g);
     for (const type of GUARD_TYPES) for (let i = 0; i < caps[type]; i++) addGuard(world, g, type);
   }
-  return world;
+  // 3. Opening stock: economy.startStock (read now, so it is live) plus the Opening ore research.
+  world.stock.ore = t['economy.startStock'] + researchLevel(world, 'opening') * t['research.opening.step'];
+  // 4. Yards: drones on (the first ship early matters); a researched design's yard starts on and waits for its component.
+  world.yards.drone.on = true;
+  world.yards.lancer.on = researchLevel(world, 'lancer') >= 1;
+  world.yards.flak.on = researchLevel(world, 'flak') >= 1;
+  // 5. Seed rigs: the first L of a1, a2 start owned, each with one extractor and a level-1 route to the probe, free.
+  const rigs = Math.min(researchLevel(world, 'rigs'), RIG_NODES.length);
+  for (let k = 0; k < rigs; k++) {
+    const node = world.nodes.find((n) => n.id === RIG_NODES[k]);
+    if (node === undefined) continue;
+    node.owned = true;
+    node.extractors = 1;
+    world.routes.push({ id: world.nextId++, from: node.index, to: PROBE, length: nodeDistance(world, node.index, PROBE), level: 1, cooldown: 0, pods: [] });
+  }
+  // 6. The visit starts.
+  camp.active = a;
+  camp.areaStartTick = world.tick;
+  camp.areas[a]!.entries += 1;
+}
+
+/** A fresh campaign at tick 0 (DESIGN.md H4): on the overworld, nothing reclaimed or researched, Landfall open. */
+export function createWorld(seed: number, data: SimData): World {
+  const tun = {} as Tunables;
+  for (const k of SIM_TUNABLE_KEYS) tun[k] = data.tunables[k].default;
+  const variant = chooseVariant(seed, tun['system.variant'], data.map.layouts.length);
+  const layout = data.map.layouts[variant]!;
+  const research: Record<string, number> = {};
+  for (const item of data.research) research[item.id] = 0;
+  return {
+    tick: 0,
+    rng: seed | 0,
+    dataVersion: data.dataVersion,
+    tickRate: data.tickRate,
+    nextId: 1,
+    tun,
+    ...emptyAreaFields(data),
+    system: { variant, id: layout.id, name: layout.name },
+    campaign: {
+      active: null,
+      areaStartTick: 0,
+      deepLayout: variant,
+      areas: data.map.areas.map(() => ({
+        reclaimedTick: null,
+        entries: 0,
+        withdrawals: 0,
+        playTicks: 0,
+        reclaimPlayTicks: null,
+        shipsBuilt: 0,
+        shipsLost: 0,
+      })),
+      reclaimOrder: [],
+      research,
+      researchLog: [],
+      stockpile: zeroTriple(),
+      shipAccum: zeroTriple(),
+      totals: { hauled: zeroTriple(), shipped: zeroTriple() },
+      wonTick: null,
+    },
+  };
 }

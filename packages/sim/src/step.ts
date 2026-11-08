@@ -12,6 +12,7 @@ import {
   type SimData,
   type Tunables,
 } from './data.ts';
+import { designResearched, extractPct, reclaimActive, shipments, yardBuildTicks } from './campaign.ts';
 import { applyInput, startTransit, type Input } from './inputs.ts';
 import { ceilDiv } from './math.ts';
 import {
@@ -37,8 +38,9 @@ import {
 } from './world.ts';
 
 /**
- * One tick of DESIGN.md "Rules per tick" (H1 numbering, with the H2 and H3
- * changes), systems in the stated order. Every loop runs over a dense array
+ * One tick of DESIGN.md "Rules per tick" (H1 numbering, with the H2, H3 and
+ * H4 changes), systems in the stated order. H4: with no area active only
+ * rule 1 runs; in an area, rules 2-9 and stats run, then rule 10 (shipments). Every loop runs over a dense array
  * in id (or node index) order, or over a fixed type order; rules 7-9 each run
  * over all guardians (node order) before the next rule starts.
  */
@@ -98,15 +100,21 @@ export function perExtractorPerMin(t: Readonly<Tunables>, kind: World['nodes'][n
   return 0;
 }
 
-/** Rule 3. */
+/**
+ * Rule 3. H4 Extraction research: a node's accumulator (units·ticks/min × 100)
+ * adds extractors × perExtractorPerMin × (100 + level × stepPct) and yields a
+ * unit each time it reaches ticksPerMin × 100. Probe mining is not boosted.
+ */
 function extraction(world: World): void {
   const T = ticksPerMin(world);
+  const unit = T * 100;
+  const pct = extractPct(world);
   const cap = world.tun['node.bufferCap'];
   for (const node of world.nodes) {
     if (node.extractors === 0) continue;
-    node.accum += node.extractors * perExtractorPerMin(world.tun, node.kind);
-    while (node.accum >= T) {
-      node.accum -= T;
+    node.accum += node.extractors * perExtractorPerMin(world.tun, node.kind) * pct;
+    while (node.accum >= unit) {
+      node.accum -= unit;
       if (node.buffer < cap) node.buffer += 1;
     }
   }
@@ -194,11 +202,15 @@ function newShip(world: World, type: ShipType): Ship {
   return ship;
 }
 
-/** Starts a build at an idle, switched-on yard if ore (net of reservations) and its component allow. Returns true if it started. */
+/**
+ * Starts a build at an idle, switched-on yard if its design is researched (H4)
+ * and ore (net of reservations) and its component allow. The build takes
+ * yardBuildTicks (H4 Fast yards). Returns true if it started.
+ */
 function startShip(world: World, type: ShipType): boolean {
   const t = world.tun;
   const yard = world.yards[type];
-  if (!yard.on || yard.ticksLeft !== 0) return false;
+  if (!yard.on || yard.ticksLeft !== 0 || !designResearched(world, type)) return false;
   const cost = t[`ship.${type}.cost`];
   const comp = SHIP_COMPONENT[type];
   // Recomputed per yard: reservedOre doesn't change here, but stock does.
@@ -207,7 +219,7 @@ function startShip(world: World, type: ShipType): boolean {
   world.stock.ore -= cost;
   if (comp !== null) world.stock[comp] -= 1;
   world.stats.oreSpentShips += cost;
-  yard.ticksLeft = t[`ship.${type}.buildTicks`];
+  yard.ticksLeft = yardBuildTicks(world, type);
   return true;
 }
 
@@ -429,8 +441,8 @@ function wilt(world: World): Wilt | null {
   return { from, to: count };
 }
 
-/** Rule 8, for one living guardian. */
-function capture(world: World, g: Guardian): void {
+/** Rule 8, for one living guardian. H4: capturing the heart also reclaims the area. */
+function capture(world: World, data: SimData, g: Guardian): void {
   if (g.guards.length > 0) return;
   const present = shipsAt(world, g.node);
   if (present.length === 0) return;
@@ -458,6 +470,7 @@ function capture(world: World, g: Guardian): void {
   } else {
     node.extractors = Math.min(world.tun['heart.freeExtractors'], node.slots);
     world.capturedTick = world.tick;
+    reclaimActive(world, data);
   }
   endBattle(world, g, 'captured', null);
 }
@@ -495,7 +508,7 @@ export function prizeInWindow(world: Readonly<World>, res: 'ice' | 'crystal'): n
   return sum(world.stats.prizeBuckets[res]);
 }
 
-/** Rule 10. */
+/** Stats (H1-H3 rule 10; runs before the H4 rule 10, shipments). */
 function stats(world: World): void {
   const st = world.stats;
   const s = deliveredInWindow(world);
@@ -515,14 +528,17 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
   if (world.dataVersion !== data.dataVersion) {
     throw new Error(`World is data version ${world.dataVersion}, data is ${data.dataVersion}`);
   }
-  const gs = world.guardians;
   if (inputs.length > 0) {
-    const wavesBefore = gs.map((g) => g.wavesSent);
+    const before = world.guardians;
+    const wavesBefore = before.map((g) => g.wavesSent);
     for (const input of inputs) applyInput(world, data, input);
     // Several attack orders on one guarded node in the same tick are one wave ("All" sends one order per source node).
+    // If the tick's inputs landed in (or left) an area, the area's guardians are new and start from 0 waves.
+    const gs = world.guardians;
+    const same = gs === before;
     let extra = 0;
     for (let i = 0; i < gs.length; i++) {
-      const over = gs[i]!.wavesSent - (wavesBefore[i]! + 1);
+      const over = gs[i]!.wavesSent - ((same ? wavesBefore[i]! : 0) + 1);
       if (over > 0) {
         gs[i]!.wavesSent -= over;
         extra += over;
@@ -530,6 +546,12 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
     }
     world.stats.wavesSent -= extra;
   }
+  // The overworld is paused: rule 1 only.
+  if (world.campaign.active === null) {
+    world.tick += 1;
+    return;
+  }
+  const gs = world.guardians;
   construction(world);
   extraction(world);
   routes(world);
@@ -537,8 +559,9 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
   yards(world);
   movement(world);
   for (const g of gs) if (g.alive) combat(world, g);
-  for (const g of gs) if (g.alive) capture(world, g);
+  for (const g of gs) if (g.alive) capture(world, data, g);
   for (const g of gs) if (g.alive) regrowth(world, g);
   stats(world);
+  shipments(world, data);
   world.tick += 1;
 }

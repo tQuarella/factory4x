@@ -1,25 +1,52 @@
 /**
- * @factory4x/sim — the deterministic game simulation (DESIGN.md H1, H2's Root and supply, and H3 "Counter web").
+ * @factory4x/sim — the deterministic game simulation (DESIGN.md H1, H2's Root and supply, H3 "Counter web"
+ * and H4 "Reclaim ladder": the campaign of areas around them).
  *
  * PUBLIC API. The client, bots and tests depend only on what this file
  * exports. Treat it as stable: add, don't rename or remove, without a
- * DECISIONS.md entry (the H3 changes are logged under "h3-sim").
+ * DECISIONS.md entry (the H3 changes are logged under "h3-sim", the H4 ones under "h4-sim").
  *
  * Lifecycle
- *   defaultData                     validated data/sim.json (tunables, map.nodes, map.layouts).
- *   parseSimData(raw)               validate other data (e.g. a feedback replay's) → SimData; throws on bad data.
- *   createWorld(seed, data)         fresh World at tick 0. The layout is system.variant − 1 if that
- *                                   tunable's default is > 0, else ((seed mod 3) + 3) mod 3 (chooseVariant).
+ *   defaultData                     validated data/sim.json (tunables, map.nodes, map.layouts, map.areas, map.lanes, research).
+ *   parseSimData(raw)               validate other data (e.g. a feedback replay's) → SimData; throws on bad data
+ *                                   (including Σ haul < Σ research cost per resource at the research.costPct max).
+ *   createWorld(seed, data)         fresh campaign at tick 0, ON THE OVERWORLD (no area active: world.nodes is empty).
+ *                                   The Deep's layout is system.variant − 1 if that tunable's default is > 0, else
+ *                                   ((seed mod 3) + 3) mod 3 (chooseVariant); world.system and campaign.deepLayout name it.
+ *   campaignWorld(seed, data, start)   TEST/TOOL/DEV-HOOK ONLY: a campaign as if `start.reclaimed` (area ids) were
+ *                                   reclaimed and `start.research` ({id: level}) bought, with `start.stockpile`;
+ *                                   `start.land` (an open area id) lands there at tick 0. Not reachable by inputs.
  *   step(world, data, inputs)       advance one tick (mutates world); inputs apply first, invalid ones are ignored.
- *   worldHash(world)                8-hex fingerprint of all state.
- *   replayHashes(replay, data, ticks, every)   hashes every `every` ticks of a replay.
+ *                                   No area active: inputs only, then tick + 1 (the overworld is paused).
+ *   worldHash(world)                8-hex fingerprint of all state (the campaign included).
+ *   replayHashes(replay, data, ticks, every)   hashes every `every` ticks of a replay (replay.start, if set, starts it
+ *                                   from campaignWorld instead of createWorld; tools and dev hooks only).
  *   serializeWorld(world)           save string (plain JSON).
- *   deserializeWorld(text, data)    LoadResult; refuses a different dataVersion ('dataVersion') or a malformed save ('corrupt').
+ *   deserializeWorld(text, data)    LoadResult; refuses a different dataVersion ('dataVersion') or a malformed save
+ *                                   ('corrupt', which includes a bad campaign shape).
+ *
+ * Campaign (H4; world.campaign, plain JSON). Areas, lanes and research are indexed in data order.
+ *   campaign.active                 index into data.map.areas of the area being played, or null on the overworld.
+ *   campaign.areaStartTick          tick of the current landing; area times are tick − areaStartTick.
+ *   campaign.areas[i]               {reclaimedTick, entries, withdrawals, playTicks, reclaimPlayTicks, shipsBuilt, shipsLost}.
+ *   campaign.reclaimOrder, research {id: level}, researchLog [{item, level, tick}], stockpile, shipAccum,
+ *   totals {hauled, shipped}, wonTick (non-null after the probe core: only setTunable is valid then).
+ *   The area fields (stock, nodes, routes, ships, guardians, yards, stats, capturedTick, ...) hold the active
+ *   area, with its node subset in frame order (probe = 0); on the overworld they are empty.
+ *   Capturing the heart reclaims the area (pays its haul once). Rule 10 ships Σ export × shipments.pct of the
+ *   reclaimed areas into the stockpile while a held area is played (integer accumulators).
  *
  * Inputs (the `Input` union; node params are node indices, see world.nodes)
+ *   enterArea{area}                 H4: land in an open area (held, and the tier-0 start or lane-joined to a reclaimed
+ *                                   area). Valid on the overworld, before the win.
+ *   leaveArea{}                     H4: back to the overworld; a withdraw (the area resets) if its heart isn't captured.
+ *   buyResearch{item}               H4: next level of data.research[item], paid from the stockpile. Overworld only,
+ *                                   before the win, below max, requirements met, affordable.
+ *   Every input below except setTunable is valid only while an area is active.
  *   buildExtractor{node}            asteroids, captured pockets, the captured heart.
  *   buildRoute{from,to} upgradeRoute{from} cancelBuild{index} setRally{node} setTunable{key,value}
- *   setShipyard{shipType,on}        one yard per ship type ('drone' | 'lancer' | 'flak'); always valid.
+ *   setShipyard{shipType,on}        one yard per ship type ('drone' | 'lancer' | 'flak'); valid in any area. A lancer or
+ *                                   flak yard only starts builds once its design is researched (H4 design gate).
  *   sendShips{from,to,counts}       counts = {drone, lancer, flak}, each an integer ≥ 0, clamped to the ships of
  *                                   that type at `from` (pass shipsAtByType(world, from) or SEND_ALL to send all).
  *                                   Valid if from ≠ to and the clamped total is ≥ 1.
@@ -27,7 +54,8 @@
  *   inputCost(world, input)            ore the build order would lock if queued now (0 for non-builds).
  *   clampSendCounts(world, from, counts)   what a sendShips order would really send.
  *
- * Map (H3): node 0 probe, a1-a9 asteroids, p1-p4 pockets, root, heart. world.guardians has one guardian
+ * Map (H3; H4 areas use a subset in the same frame order): node 0 probe, a1-a9 asteroids, p1-p4 pockets, root, heart.
+ *   Outside The Deep, find nodes by id (world.nodes[i].id), not by fixed index. world.guardians has one guardian
  *   per pocket, the Root and the heart, in node order. Each guardian holds Thorns and Spores (`guards`,
  *   id order) and its layout counts; caps are capEff(count) = min(60, floor(count × guard.capPct / 100)).
  *   Capturing the Root starves the heart (guardian.fed = false): it wilts to its starved caps, newest first.
@@ -47,8 +75,9 @@
  *   nodeStatus(world, node)         prize, extractors, extraction/min, buffer, backedUp, noRoute, route level/capacity.
  *   routeCapacityPerMin(world, lvl) units/min a route of that level carries.
  *   queueStatus(world)              unpaid orders, reserved ore, active build progress.
- *   yardStatus(world)               Yards block: per type on/off, unlocked, progress, cost, component, state
- *                                   ('building' | 'off' | 'needsComponent' | 'needsOre' | 'ready'); rally; probe mining.
+ *   yardStatus(world)               Yards block: per type on/off, unlocked (resource delivered here), researched (design),
+ *                                   progress, cost, component, state ('building' | 'needsDesign' | 'noSource' | 'off' |
+ *                                   'needsComponent' | 'needsOre' | 'ready'); rally; probe mining.
  *   assemblerStatus(world)          Assembly block: per component stock/cap, recipe, progress, state
  *                                   ('making' | 'full' | 'needsInput' | 'needsOre' | 'ready').
  *   guardianStatus(world, node)     a guarded node's sheet: prize, slots, rate, guard rows per type (count, cap,
@@ -56,7 +85,7 @@
  *                                   Strong/Even/Weak per ship type (guard-hp-weighted, integer, division last).
  *   weightedMultPct(tun, ship, counts), counterTag(tun, ship, counts), tagFor(ship, pct)
  *                                   the tag math for any guard mix (bots pass capEff counts).
- *   supplyStatus(world)             Root alive, fed/starved, Root cut tick, the heart's fed and starved caps/regrow/repair.
+ *   supplyStatus(world)             hasRoot, Root alive, fed/starved, Root cut tick, the heart's fed and starved caps/regrow/repair.
  *   systemStatus(world)             layout index, id and name ("Frost Gate"), Root cut tick and second.
  *   combatRates(world, node, fleet) guards stripped per s ×10 for a fleet {drone, lancer, flak} vs regrowth per s ×10.
  *   battleStatus(world, node)       the battle running at that node with live guard counts and rates, or null.
@@ -66,6 +95,18 @@
  *                                   world.lastBattle is the latest at any node.
  *   runSummary(world)               heart capture time, capture order, ships built/lost by type, waves, ore spent,
  *                                   layout, Root cut, withered, delivered and first-delivered per resource, per target.
+ *                                   Every `…Sec` is area-relative (since the landing); `…Tick` fields are world ticks.
+ *   campaignStatus(world, data)     overworld HUD: active area, stockpile, shipPerMinX10, shipping, reclaimed count,
+ *                                   wonTick, research levels.
+ *   areaStatus(world, data, area)   area sheet: id, name, tier, x/y, state ('locked' | 'open' | 'reclaimed' | 'active'),
+ *                                   lanes, haul, export, guarded nodes (caps, starved caps), hasRoot, heartTags
+ *                                   {lancer, flak} with `researched`, and the visit record.
+ *   researchStatus(world, data)     research sheet rows: level/max, next cost (after research.costPct), affordable,
+ *                                   missing {resources, items, areas}, canBuy, effect and nextEffect (numbers).
+ *   landingEffects(world)           openingOre, rigNodes, extractPct, yardTimePct, designs (the landing notice).
+ *   campaignSummary(world, data)    win panel / bots: per area records, reclaim order, research order, total play
+ *                                   ticks, ships built/lost, hauled and shipped.
+ *   isAreaOpen(world, data, area), isWon(world), yardBuildTicks(world, type), extractPct(world), yardTimePct(world).
  *   nodeDistance(world, a, b)       integer distance used for routes and travel.
  *   heartIndex(world), rootIndex(world), PROBE   node index of the heart / the Root / the probe (always 0).
  *   guardianAt(world, node), isGuarded(world, node)   the guardian at a node (or null) / is it alive.
@@ -96,7 +137,9 @@ export {
   GUARD_CAP_MAX,
   GUARD_TYPES,
   RAW_RESOURCES,
+  RESEARCH_IDS,
   RESOURCES,
+  RIG_NODES,
   SHIP_COMPONENT,
   SHIP_TYPES,
   TUNABLE_KEYS,
@@ -106,8 +149,17 @@ export {
   tunableMeta,
 } from './data.ts';
 export type {
+  AreaHeart,
+  AreaLayout,
   Component,
   GuardMix,
+  MapArea,
+  MapLane,
+  ResearchId,
+  ResearchItem,
+  ResearchKind,
+  ResearchRequirement,
+  ResourceTriple,
   GuardType,
   LayoutHeart,
   LayoutPocket,
@@ -126,6 +178,34 @@ export type {
   Tunables,
 } from './data.ts';
 export {
+  MIN_BUILD_TICKS,
+  areaIndex,
+  campaignWorld,
+  designResearched,
+  extractPct,
+  isAreaOpen,
+  isReclaimed,
+  isWon,
+  laneNeighbours,
+  researchIndex,
+  scaledCost,
+  yardBuildTicks,
+  yardTimePct,
+} from './campaign.ts';
+export type { CampaignStart } from './campaign.ts';
+export { areaStatus, campaignStatus, campaignSummary, landingEffects, researchEffect, researchStatus } from './overworld.ts';
+export type {
+  AreaGuardedNode,
+  AreaState,
+  AreaStatus,
+  CampaignStatus,
+  CampaignSummary,
+  HeartTag,
+  LandingEffects,
+  ReclaimEntry,
+  ResearchRow,
+} from './overworld.ts';
+export {
   PROBE,
   capEff,
   chooseVariant,
@@ -136,10 +216,14 @@ export {
   heartIndex,
   isGuarded,
   nodeDistance,
+  researchLevel,
   rootIndex,
 } from './world.ts';
 export type {
   ActiveBuild,
+  AreaRecord,
+  Campaign,
+  ResearchPurchase,
   Assembler,
   Battle,
   BattleOutcome,

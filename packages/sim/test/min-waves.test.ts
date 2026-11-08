@@ -13,6 +13,11 @@ declare const console: { log(...args: unknown[]): void };
  * column from the h3-sim DESIGN.md H3 "Layouts"; `sim` is what the sim gives.
  * Pinned on the fixture, these check the rules, not the calibration.
  * The shipped (calibrated) numbers are reported at the end of this file.
+ *
+ * h4-sim acceptance 6 ("The Deep at defaults plays like H3"): since H4 the
+ * worlds here are The Deep, landed at tick 0 from campaignWorld (baseWorld →
+ * h3World → campaignWorld with every other area reclaimed and both designs
+ * bought), and the H3 numbers below are unchanged.
  */
 
 type Row = [drones: number, lancers: number, flak: number, mix: number];

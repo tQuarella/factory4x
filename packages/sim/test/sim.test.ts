@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEND_ALL,
-  createWorld,
   deserializeWorld,
   nextU32,
   replayHashes,
@@ -13,6 +12,7 @@ import {
   type World,
 } from '../src/index.ts';
 import { N, data, networkStep } from './helpers.ts';
+import { h3World } from './h3-world.ts';
 
 describe('rng', () => {
   it('produces a fixed sequence for a fixed seed', () => {
@@ -33,7 +33,7 @@ describe('rng', () => {
 
 /** A busy game: network script, the drone yard, a wave at a pocket at minute 6, some tuning. */
 function busyGame(ticks: number): World {
-  const w = createWorld(7, data);
+  const w = h3World(7, data);
   for (let i = 0; i < ticks; i++) {
     const inputs: Input[] = [];
     const next = networkStep(w);
@@ -72,13 +72,13 @@ describe('world', () => {
   });
 
   it('hash is independent of key insertion order', () => {
-    const w = createWorld(3, data);
+    const w = h3World(3, data);
     const reordered = Object.fromEntries(Object.entries(w).reverse()) as unknown as World;
     expect(worldHash(reordered)).toEqual(worldHash(w));
   });
 
   it('step and replayHashes refuse data of another version', () => {
-    const w = createWorld(1, data);
+    const w = h3World(1, data);
     const other = { ...data, dataVersion: 1 };
     expect(() => step(w, other, [])).toThrow(/data version/);
     expect(() => replayHashes({ seed: 1, dataVersion: 1, inputs: [] }, data, 10, 5)).toThrow(/data version/);
@@ -105,7 +105,7 @@ describe('autosave', () => {
   });
 
   it('round trip keeps the yard turn (rule 5b round-robin), which is in the hash and decides the next start', () => {
-    const w = createWorld(1, data);
+    const w = h3World(1, data);
     w.yards.drone.on = false;
     w.yards.lancer.on = true;
     w.yards.flak.on = true;
@@ -130,14 +130,14 @@ describe('autosave', () => {
 
   it('refuses a save without a valid yard turn', () => {
     for (const bad of [undefined, -1, 2, 0.5, '1']) {
-      const s = JSON.parse(serializeWorld(createWorld(1, data))) as { world: Record<string, unknown> };
+      const s = JSON.parse(serializeWorld(h3World(1, data))) as { world: Record<string, unknown> };
       s.world.yardTurn = bad;
       expect(deserializeWorld(JSON.stringify(s), data), String(bad)).toMatchObject({ ok: false, reason: 'corrupt' });
     }
   });
 
   it('refuses a save from another data version', () => {
-    const w = createWorld(1, data);
+    const w = h3World(1, data);
     const text = serializeWorld(w);
     const r = deserializeWorld(text, { ...data, dataVersion: data.dataVersion + 1 });
     expect(r).toEqual({ ok: false, reason: 'dataVersion', saveDataVersion: data.dataVersion });
@@ -148,10 +148,10 @@ describe('autosave', () => {
     expect(deserializeWorld('null', data)).toMatchObject({ ok: false, reason: 'corrupt' });
     expect(deserializeWorld(JSON.stringify({ format: 1, dataVersion: 4, world: { tick: 1 } }), data)).toMatchObject({ ok: false, reason: 'corrupt' });
     // An H2-shaped world (stock a number, one shipyard) stamped with version 4 is corrupt, not loaded.
-    const w = JSON.parse(serializeWorld(createWorld(1, data))) as { world: Record<string, unknown> };
+    const w = JSON.parse(serializeWorld(h3World(1, data))) as { world: Record<string, unknown> };
     w.world.stock = 30;
     expect(deserializeWorld(JSON.stringify(w), data)).toMatchObject({ ok: false, reason: 'corrupt' });
-    const g = JSON.parse(serializeWorld(createWorld(1, data))) as { world: { guardians: unknown[] } };
+    const g = JSON.parse(serializeWorld(h3World(1, data))) as { world: { guardians: unknown[] } };
     g.world.guardians.pop();
     expect(deserializeWorld(JSON.stringify(g), data)).toMatchObject({ ok: false, reason: 'corrupt' });
   });

@@ -71,6 +71,9 @@ export function shipsText(c: Readonly<ShipTypeCounts>): string {
 
 const YARD_STATE_TEXT: Record<YardState, (component: string | null) => string> = {
   building: () => 'building',
+  // H4 states (h4-sim kept the client compiling; h4-client owns the wording and when the row shows).
+  needsDesign: () => 'design not researched',
+  noSource: (c) => `no ${c ?? 'component'} source in this area`,
   off: () => 'off',
   needsComponent: (c) => `idle: needs ${c ?? 'a component'}`,
   needsOre: () => 'idle: needs ore',
