@@ -5,6 +5,7 @@ import {
   GUARD_TYPES,
   SHIP_COMPONENT,
   YARD_ORDER,
+  YARD_ROTATION,
   type GuardType,
   type RawResource,
   type ShipType,
@@ -193,26 +194,44 @@ function newShip(world: World, type: ShipType): Ship {
   return ship;
 }
 
-/** Rule 5b: lancer, flak, then drone. */
-function yards(world: World): void {
+/** Starts a build at an idle, switched-on yard if ore (net of reservations) and its component allow. Returns true if it started. */
+function startShip(world: World, type: ShipType): boolean {
   const t = world.tun;
+  const yard = world.yards[type];
+  if (!yard.on || yard.ticksLeft !== 0) return false;
+  const cost = t[`ship.${type}.cost`];
+  const comp = SHIP_COMPONENT[type];
+  // Recomputed per yard: reservedOre doesn't change here, but stock does.
+  if (world.stock.ore - reservedOre(world) < cost) return false;
+  if (comp !== null && world.stock[comp] < 1) return false;
+  world.stock.ore -= cost;
+  if (comp !== null) world.stock[comp] -= 1;
+  world.stats.oreSpentShips += cost;
+  yard.ticksLeft = t[`ship.${type}.buildTicks`];
+  return true;
+}
+
+/**
+ * Rule 5b. Builds in progress tick down and finished ships spawn in the order
+ * lancer, flak, drone. Then idle yards start: the component yards first, in
+ * turn from `world.yardTurn` (each start passes the turn to the yard after
+ * it), then the drone yard.
+ */
+function yards(world: World): void {
   for (const type of YARD_ORDER) {
     const yard = world.yards[type];
     if (yard.ticksLeft > 0) {
       yard.ticksLeft -= 1;
       if (yard.ticksLeft === 0) newShip(world, type);
     }
-    if (!yard.on || yard.ticksLeft !== 0) continue;
-    const cost = t[`ship.${type}.cost`];
-    const comp = SHIP_COMPONENT[type];
-    // Recomputed per yard: reservedOre doesn't change here, but stock does.
-    if (world.stock.ore - reservedOre(world) < cost) continue;
-    if (comp !== null && world.stock[comp] < 1) continue;
-    world.stock.ore -= cost;
-    if (comp !== null) world.stock[comp] -= 1;
-    world.stats.oreSpentShips += cost;
-    yard.ticksLeft = t[`ship.${type}.buildTicks`];
   }
+  const n = YARD_ROTATION.length;
+  const first = world.yardTurn;
+  for (let i = 0; i < n; i++) {
+    const k = (first + i) % n;
+    if (startShip(world, YARD_ROTATION[k]!)) world.yardTurn = (k + 1) % n;
+  }
+  startShip(world, 'drone');
 }
 
 /** Rule 6. */

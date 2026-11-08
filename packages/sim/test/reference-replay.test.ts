@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { createWorld, isValidInput, step, type BattleResult, type Input } from '../src/index.ts';
+import { capEff, createWorld, defaultData as data, isValidInput, step, type BattleResult, type Input } from '../src/index.ts';
 import { referenceReplay } from '../../bots/src/reference-replay.ts';
 import { applyInput } from '../src/inputs.ts';
-import { N, clone, data } from './helpers.ts';
+import { N } from './helpers.ts';
+
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 /**
  * h3-sim acceptance 6: the reference replay (determinism gate and browser
- * cross-engine check) captures a pocket, assembles a component, builds flak,
- * cuts the Root (wilt and starvation) and captures the heart, all before tick
- * 3000; and every input type in it does something.
+ * cross-engine check) captures both light pockets, assembles both
+ * components, builds lancers and flak, cuts the Root (wilt and starvation)
+ * and captures the heart, all before tick 3000; and every input type in it
+ * does something. It runs on the shipped data, as the gate and the browser
+ * do, so a calibration that breaks the script shows here: regenerate the
+ * replay then. The wilt numbers are read from the shipped layout.
  */
 describe('reference replay', () => {
   const w = createWorld(referenceReplay.seed, data);
@@ -39,27 +44,37 @@ describe('reference replay', () => {
     expect(w.system.id).toBe('frost');
   });
 
-  it('before tick 3000: a wave repelled at p2, p1 captured, plating and flak built, the Root cut with the wilt, then the starved heart captured with flak in the wave', () => {
+  it('before tick 3000: a wave repelled at p2, p1 and p2 captured, plating and flak built, the Root cut with the wilt, then the starved heart captured by lancers and flak', () => {
     expect(battles.map((b) => [b.node, b.outcome])).toEqual([
       [N.p2, 'repelled'],
       [N.p1, 'captured'],
+      [N.p2, 'captured'],
       [N.root, 'captured'],
       [N.heart, 'captured'],
     ]);
-    expect(w.stats.captures.map((c) => c.node)).toEqual([N.p1, N.root, N.heart]);
+    expect(w.stats.captures.map((c) => c.node)).toEqual([N.p1, N.p2, N.root, N.heart]);
     // The ice route delivers, the plating assembler runs, and the flak yard builds, before the Root fight.
     expect(w.stats.firstDeliveredTick.ice!).toBeLessThan(firstComponentTick!);
     expect(firstComponentTick!).toBeLessThan(firstFlakTick!);
-    expect(firstFlakTick!).toBeLessThan(w.capturedTick!);
-    // The heart started full (10 Thorns, 14 Spores) and wilts to its starved caps at guard.capPct 50: 3 and 3.
-    expect(battles[2]!.wilt).toEqual({ from: { thorn: 10, spore: 14 }, to: { thorn: 3, spore: 3 } });
-    expect(w.stats.guardsWithered).toBe(18);
+    expect(firstFlakTick!).toBeLessThan(w.stats.rootCutTick!);
+    // The heart started full at its layout counts and wilts to its starved caps at guard.capPct 50.
+    const h = data.map.layouts[0]!.heart;
+    const to = { thorn: capEff(h.starvedThorns, 50), spore: capEff(h.starvedSpores, 50) };
+    expect(battles[3]!.wilt).toEqual({ from: { thorn: h.thorns, spore: h.spores }, to });
+    expect(w.stats.guardsWithered).toBe(h.thorns - to.thorn + (h.spores - to.spore));
     expect(w.stats.rootCutTick!).toBeLessThan(w.capturedTick!);
-    // Starved regrowth (multiplier tuned to 1) acted during the heart fight: more guards killed than the 6 it had.
-    expect(battles[3]!.guardsKilled).toBeGreaterThan(6);
-    expect(battles[3]!.engagedByType.flak).toBeGreaterThan(0);
+    // Starved regrowth (multiplier tuned to 1) acted during the heart fight: more guards killed than it had.
+    expect(battles[4]!.guardsKilled).toBeGreaterThan(to.thorn + to.spore);
+    expect(battles[4]!.engagedByType.flak).toBeGreaterThan(0);
+    expect(battles[4]!.engagedByType.lancer).toBeGreaterThan(0);
     expect(flakAtHeartCapture).toBeGreaterThan(0);
     expect(w.capturedTick!).toBeLessThan(3000);
+  });
+
+  it('runs both component yards, so the rule 5b round-robin is in the determinism hashes', () => {
+    expect(w.stats.componentsBuilt.lens).toBeGreaterThan(0);
+    expect(w.stats.shipsBuilt.lancer).toBeGreaterThanOrEqual(2);
+    expect(w.stats.shipsBuilt.flak).toBeGreaterThanOrEqual(2);
   });
 
   it('uses every input type, with exactly one deliberately invalid input', () => {

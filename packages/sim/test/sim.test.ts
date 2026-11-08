@@ -104,6 +104,38 @@ describe('autosave', () => {
     expect(worldHash(r.world)).toBe(worldHash(w));
   });
 
+  it('round trip keeps the yard turn (rule 5b round-robin), which is in the hash and decides the next start', () => {
+    const w = createWorld(1, data);
+    w.yards.drone.on = false;
+    w.yards.lancer.on = true;
+    w.yards.flak.on = true;
+    w.stock = { ore: 0, ice: 0, crystal: 0, lens: 5, plating: 5 };
+    w.tun['economy.probeOrePerMin'] = 0;
+    w.yardTurn = 1;
+    const other = { ...w, yardTurn: 0 };
+    expect(worldHash(other)).not.toBe(worldHash(w));
+    const r = deserializeWorld(serializeWorld(w), data);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.world.yardTurn).toBe(1);
+    expect(worldHash(r.world)).toBe(worldHash(w));
+    // Ore for one ship: the restored world starts flak, as the original does.
+    for (const x of [w, r.world]) {
+      x.stock.ore = w.tun['ship.flak.cost'];
+      step(x, data, []);
+    }
+    expect([r.world.yards.flak.ticksLeft > 0, r.world.yards.lancer.ticksLeft]).toEqual([true, 0]);
+    expect(worldHash(r.world)).toBe(worldHash(w));
+  });
+
+  it('refuses a save without a valid yard turn', () => {
+    for (const bad of [undefined, -1, 2, 0.5, '1']) {
+      const s = JSON.parse(serializeWorld(createWorld(1, data))) as { world: Record<string, unknown> };
+      s.world.yardTurn = bad;
+      expect(deserializeWorld(JSON.stringify(s), data), String(bad)).toMatchObject({ ok: false, reason: 'corrupt' });
+    }
+  });
+
   it('refuses a save from another data version', () => {
     const w = createWorld(1, data);
     const text = serializeWorld(w);

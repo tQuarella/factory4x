@@ -317,7 +317,7 @@ Selection:
   - the node's `buffer` holds its prize resource (asteroids: ore; heart: ore).
 - **Pod:** gains `res` (`ore | ice | crystal`), copied from the source node. On delivery it adds to `stock[res]`.
 - **Assemblers:** `assemblers: {lens: {ticksLeft}, plating: {ticksLeft}}`, at the probe. There is no input: they always run (see rules).
-- **Yards:** `yards: {drone: {on, ticksLeft}, lancer: {on, ticksLeft}, flak: {on, ticksLeft}}`. They replace `shipyard`.
+- **Yards:** `yards: {drone: {on, ticksLeft}, lancer: {on, ticksLeft}, flak: {on, ticksLeft}}`. They replace `shipyard`. `yardTurn` (0 or 1) says whether lancer or flak is tried first for the next start (rule 5b).
 - **Ship:** gains `type` (`drone | lancer | flak`). The hp comes from its type.
 - **Guardian:** one per guarded node (`p1`–`p4`, `root`, `heart`) in node-index order.
   - `thorns[]` becomes `guards[]` (`{id, type: thorn | spore, hp}`, ascending id).
@@ -350,11 +350,13 @@ The rule numbers are H1's. Anything not listed is unchanged.
     - `stock[component] < component.stockCap`;
     - `stock.ore − reservedOre ≥ component.<c>.ore`, where `reservedOre = Σ queue[].cost`;
     - `stock[res] ≥ component.<c>.<res>`.
-- **5b. Yards (replaces rule 5).** For each type, in the fixed order lancer, flak, drone:
-  - If `ticksLeft > 0`, decrement it. At 0, spawn a ship of that type at `probe` with `ship.<type>.hp`. If `rally ≠ probe`, it starts transit to `rally`.
-  - Then, if the yard is on and idle, `stock.ore − reservedOre ≥ ship.<type>.cost` and (for lancer and flak) `stock[component] ≥ 1`: pay both and set `ticksLeft = ship.<type>.buildTicks`.
+- **5b. Yards (replaces rule 5; starts round-robin since h3-design-data).**
+  - **Finish.** For each type, in the fixed order lancer, flak, drone: if `ticksLeft > 0`, decrement it. At 0, spawn a ship of that type at `probe` with `ship.<type>.hp`. If `rally ≠ probe`, it starts transit to `rally`.
+  - **Start.** A yard *can start* if it is on and idle, `stock.ore − reservedOre ≥ ship.<type>.cost` and (for lancer and flak) `stock[component] ≥ 1`. Starting pays both and sets `ticksLeft = ship.<type>.buildTicks`. Yards are tried in this order:
+    1. lancer and flak, **round-robin**: starting with the one `yardTurn` names (0 lancer, 1 flak), then the other. Whenever one of them starts, `yardTurn` passes to the other. So the component yard that started least recently goes first, and a yard that can't start (no component, off, or no ore) keeps its turn until it does;
+    2. then drone. A drone start never changes `yardTurn`.
 
-  Queued builds still reserve their ore ahead of assemblers and yards. Lancers and flak go first, so a scarce component is never starved by drones.
+  `yardTurn` is world state (an integer, 0 at the start, saved and hashed). Queued builds still reserve their ore ahead of assemblers and yards. Lancers and flak still go before drones, so a scarce component is never starved by drones. With ore for one ship at a time, lancer and flak now alternate, where the old fixed order gave every ship to the lancer yard and starved flak.
 - **7. Combat** (per living guardian, on round ticks, ships `at` its node, resolved together from start-of-round state):
   - **Player damage.**
     - For each ship type present, in the order lancer, flak, drone, pool `base = count × ship.<type>.damage`.
@@ -613,6 +615,8 @@ Answers to the open questions:
    - **(b) Bot target choice.** The bots pick targets by `need / prizeWeight` and ignore their own fleet's counters, so the order doesn't react to which door was taken.
 
    Every data lever I tried (Root swaps, light-pocket mixes, lens cost, Thorn repair, Spore regrowth) moved flag 4 by seconds, not structurally. Proposed sim fix: serve idle yards **round-robin** (the yard that started a ship least recently goes first), not in fixed order. Proposed bot fix: choose targets by the estimated fleet needed *with the current types*.
+
+   **Sim fix done (h3-design-data, engineering):** rule 5b now serves lancer and flak round-robin. On the same v5 data, ice-first's lead of about 2 min is gone: the two doors finish within 13-26 s of each other in every layout (flag 3 gaps 1-2%), with crystal-first a hair faster in all three, so flag 4 is still missed, now on a knife edge. The bot fix is not done. Numbers are in DECISIONS.md.
 4. **Drones as the fallback.** They finish every layout, 26-52% slower. They lose about as many ships as the counter strategies, because the bots misuse counters too (all-in waves include lancers sent against Spores). `ship.drone.damage` stays at 2.
 5. **Spore regrowth at 20 ticks.** Fine. No repelled-trickle problems, and no wave was repelled except one bot misread.
 6. **Combat order.** The lancer-first combat order isn't the issue. The yard order (3a) is.

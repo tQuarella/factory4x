@@ -250,8 +250,15 @@ export interface World {
   activeBuild: ActiveBuild | null;
   /** Rule 5a; run in the order lens, plating. */
   assemblers: Record<Component, Assembler>;
-  /** Rule 5b; run in the order lancer, flak, drone. */
+  /** Rule 5b; ships finish in the order lancer, flak, drone. */
   yards: Record<ShipType, Yard>;
+  /**
+   * Rule 5b round-robin: index into YARD_ROTATION (0 lancer, 1 flak) of the
+   * component yard tried first for the next start. When a component yard
+   * starts a build it moves to the yard after it, so the one that started
+   * least recently goes first. Starts at 0.
+   */
+  yardTurn: number;
   rally: number;
   nodes: Node[];
   routes: Route[];
@@ -411,6 +418,7 @@ export function createWorld(seed: number, data: SimData): World {
     assemblers: { lens: { ticksLeft: 0 }, plating: { ticksLeft: 0 } },
     // As in H1, the drone yard starts on (the first ship early matters); lancer and flak wait for their components.
     yards: { drone: { on: true, ticksLeft: 0 }, lancer: { on: false, ticksLeft: 0 }, flak: { on: false, ticksLeft: 0 } },
+    yardTurn: 0,
     rally: PROBE,
     nodes: data.map.nodes.map((n, index) => {
       const pocket = n.kind === 'pocket' ? layout.pockets[n.id]! : null;
