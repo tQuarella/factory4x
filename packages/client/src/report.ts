@@ -120,6 +120,7 @@ export function feedsBloomText(world: Readonly<World>, heartCaptured: boolean): 
 /** The line under the heart's guard count on its sheet. */
 export function supplyLine(world: Readonly<World>): string {
   const s = supplyStatus(world);
+  if (!s.hasRoot) return '';
   if (!s.rootAlive) return 'Starved: Root cut';
   const v = s.starvedHeart;
   return `Fed by the Root (cut it: ${mixText(v.caps)}, 1 / ${secs(v.regrowTicks.thorn, world.tickRate)} s)`;
@@ -260,10 +261,10 @@ export function purchaseNotice(row: Pick<ResearchRow, 'id' | 'name' | 'level' | 
 }
 
 /** Why a research button is disabled, from `researchStatus`: items, then areas, then the shortest missing resource. */
-export function researchBlock(row: ResearchRow, itemName: (id: string) => string, areaName: (id: string) => string): string {
+export function researchBlock(row: ResearchRow, itemLabel: (id: string, level: number) => string, areaName: (id: string) => string): string {
   if (row.cost === null) return 'Max';
   const item = row.missing.items[0];
-  if (item) return `Needs ${itemName(item.id)} ${item.level}`;
+  if (item) return `Needs ${itemLabel(item.id, item.level)}`;
   const area = row.missing.areas[0];
   if (area) return `Needs ${areaName(area)} reclaimed`;
   let best: RawResource | null = null;

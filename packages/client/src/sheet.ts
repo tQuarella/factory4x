@@ -72,7 +72,7 @@ export function shipsText(c: Readonly<ShipTypeCounts>): string {
 }
 
 
-const YARD_STATE_TEXT: Record<YardState, (component: string | null) => string> = {
+export const YARD_STATE_TEXT: Record<YardState, (component: string | null) => string> = {
   building: () => 'building',
   needsDesign: () => 'Design not researched (Research, on the overworld)',
   noSource: (c) => (c === 'lens' || c === 'plating' ? `No ${COMPONENT_SOURCE[c]} here: no ${c} source in this area` : 'No component source in this area'),
@@ -508,8 +508,9 @@ export class Sheet {
             : `Prize: ${RES_NAME[g.prize]} · ${g.slots} slots · ${g.prizePerMinPerExtractor}/min each${unlock}`,
         );
       }
-      if (isHeart) setText(supply, supplyLine(w));
-      else setHidden(supply, true);
+      const supplyText = isHeart ? supplyLine(w) : '';
+      setText(supply, supplyText);
+      setHidden(supply, supplyText === '');
       if (feeds) setText(feeds, feedsBloomText(w, isCaptured(w)));
       for (const r of guardRows) {
         const row = g.guards[r.type];

@@ -20,6 +20,8 @@ const MIN_HIT = 22;
 /** Gap between a node's rim and the lane end, px. */
 const RIM_GAP = 2;
 const LABEL_FONT = '600 11px ui-monospace, Menlo, Consolas, monospace';
+/** px under (or over) a node that its two label lines need. */
+const LABEL_ROOM = 36;
 const EXPORT_FONT = '600 10px ui-monospace, Menlo, Consolas, monospace';
 
 /** Resource shown at the node's centre: the non-ore haul that is larger (ice or crystal), else ore. The Deep shows the probe core. */
@@ -111,6 +113,7 @@ export function labelSides(centers: readonly { x: number; y: number }[], lanes: 
 }
 
 interface Cache {
+  world: World;
   key: string;
   statuses: AreaStatus[];
   lanes: LaneDraw[];
@@ -126,6 +129,10 @@ export class WorldView {
   private stars: Array<{ x: number; y: number; r: number; bright: boolean }> = [];
   private sides: Array<'above' | 'below'> = [];
   private cache: Cache | null = null;
+  /** Vertical shift (px) that keeps the selected area above an overlaying sheet; eases toward its target. */
+  private pan = 0;
+  /** Px of the canvas's bottom covered by a sheet right now (portrait overlay), set by the host each frame. */
+  cover = 0;
 
   constructor(canvas: HTMLCanvasElement, app: { session: Session }) {
     this.canvas = canvas;
@@ -152,7 +159,7 @@ export class WorldView {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const areas = this.session.data.map.areas;
     this.fit = fitOverworld(areas, AREA_R_SU, this.w, this.h);
-    const centers = areas.map((_, i) => this.areaPos(i));
+    const centers = areas.map((_, i) => this.basePos(i));
     const ids = areas.map((a) => a.id);
     const lanes = this.session.data.map.lanes.map(([x, y]): [number, number] => [ids.indexOf(x), ids.indexOf(y)]);
     this.sides = labelSides(centers, lanes, this.nodeR, this.w, this.h);
@@ -169,10 +176,24 @@ export class WorldView {
     }));
   }
 
-  /** Area centre in CSS px relative to the canvas. */
+  /** Area centre in CSS px relative to the canvas, with the pan. */
   areaPos(a: number): { x: number; y: number } {
+    const p = this.basePos(a);
+    return { x: p.x, y: p.y + this.pan };
+  }
+
+  private basePos(a: number): { x: number; y: number } {
     const area = this.session.data.map.areas[a]!;
     return { x: this.fit.ox + area.x * this.fit.scale, y: this.fit.oy + area.y * this.fit.scale };
+  }
+
+  /** The pan that puts the selected area, its ring and its label inside the part of the canvas no sheet covers; 0 with none. */
+  private panTarget(selected: number | null): number {
+    if (selected === null || this.cover <= 0) return 0;
+    const y = this.basePos(selected).y;
+    const free = this.h - this.cover;
+    const below = y + this.nodeR + LABEL_ROOM;
+    return Math.min(0, free - 6 - below);
   }
 
   /** The area under a tap at canvas-relative (px, py), or null. Nearest centre wins among areas in reach. */
@@ -195,8 +216,8 @@ export class WorldView {
     const world = this.session.world;
     const data = this.session.data;
     const key = `${world.tick}:${world.tun['guard.capPct']}`;
-    if (this.cache === null || this.cache.key !== key) {
-      this.cache = { key, statuses: data.map.areas.map((_, i) => areaStatus(world, data, i)), lanes: laneDraws(world, data) };
+    if (this.cache === null || this.cache.world !== world || this.cache.key !== key) {
+      this.cache = { world, key, statuses: data.map.areas.map((_, i) => areaStatus(world, data, i)), lanes: laneDraws(world, data) };
     }
     return this.cache;
   }
@@ -214,6 +235,8 @@ export class WorldView {
     }
     const { statuses, lanes } = this.status();
     const rr = this.nodeR;
+    const target = this.panTarget(selected);
+    this.pan = Math.abs(target - this.pan) < 0.5 ? target : this.pan + (target - this.pan) * 0.3;
 
     for (const lane of lanes) {
       const p = this.areaPos(lane.from);
@@ -270,12 +293,14 @@ export class WorldView {
         ctx.font = k === 0 ? LABEL_FONT : EXPORT_FONT;
         const wd = ctx.measureText(text).width + 8;
         const ly = top + 12 + k * 14;
+        // Keep the pill inside the canvas whatever the text width.
+        const lx = Math.min(w - wd / 2 - 2, Math.max(wd / 2 + 2, l.x));
         ctx.fillStyle = 'rgba(5, 7, 13, 0.78)';
         ctx.beginPath();
-        ctx.roundRect(l.x - wd / 2, ly - 11, wd, 14, 4);
+        ctx.roundRect(lx - wd / 2, ly - 11, wd, 14, 4);
         ctx.fill();
         ctx.fillStyle = k === 0 ? (l.reclaimed ? palette.probe : l.dim ? '#707b90' : '#cfe8ff') : palette.probe;
-        ctx.fillText(text, l.x, ly);
+        ctx.fillText(text, lx, ly);
       });
     }
     ctx.restore();

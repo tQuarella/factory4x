@@ -255,8 +255,10 @@ export class ResearchSheet {
     this.root.hidden = true;
   }
 
-  private itemName(id: string): string {
-    return this.host.session.data.research.find((r) => r.id === id)?.name ?? id;
+  /** "Extraction 1", or just "Lancer design" for a one-level item. */
+  private itemLabel(id: string, level: number): string {
+    const item = this.host.session.data.research.find((r) => r.id === id);
+    return item && item.levels.length > 1 ? `${item.name} ${level}` : (item?.name ?? id);
   }
 
   private areaName(id: string): string {
@@ -304,7 +306,7 @@ export class ResearchSheet {
         const parts = item.requires.map((q) => {
           if ('item' in q) {
             const ok = (world.campaign.research[q.item] ?? 0) >= q.level;
-            return `${this.itemName(q.item)}${q.level > 1 ? ` ${q.level}` : ''}${ok ? ' ✓' : ''}`;
+            return `${this.itemLabel(q.item, q.level)}${ok ? ' ✓' : ''}`;
           }
           const idx = this.host.session.data.map.areas.findIndex((a) => a.id === q.area);
           const ok = world.campaign.areas[idx]?.reclaimedTick != null;
@@ -322,7 +324,7 @@ export class ResearchSheet {
     return {
       set: (r) => {
         const can = r.canBuy;
-        const label = can ? verb : r.cost === null ? 'Maxed' : researchBlock(r, (id) => this.itemName(id), (id) => this.areaName(id));
+        const label = can ? verb : r.cost === null ? 'Maxed' : researchBlock(r, (id, level) => this.itemLabel(id, level), (id) => this.areaName(id));
         b.set(label, can);
         toggleClass(b.el, 'blocked', !can);
       },

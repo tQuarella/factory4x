@@ -340,7 +340,7 @@ function refreshUi(): void {
     toggleClass(el.arrow, 'up', dir === 'up');
     toggleClass(el.arrow, 'down', dir === 'down');
     hud.update(w);
-    setText(el.pause, s.paused ? 'Play' : 'Pause');
+    el.pause.setAttribute('aria-label', s.paused ? 'Play' : 'Pause');
     toggleClass(el.pause, 'on', s.paused);
     for (const b of document.querySelectorAll<HTMLElement>('.speed')) toggleClass(b, 'on', Number(b.dataset.speed) === s.speed);
   }
@@ -427,6 +427,16 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', saveNow);
 
+/** Px of the canvas's bottom that the area sheet covers (portrait: the sheet is an overlay), so the map can pan the selected area clear of it. */
+function sheetCover(): number {
+  const el = $('sheet');
+  if (el.hidden || !el.classList.contains('world')) return 0;
+  const s = el.getBoundingClientRect();
+  const c = canvas.getBoundingClientRect();
+  if (s.left >= c.right - 1 || s.right <= c.left + 1) return 0;
+  return Math.max(0, c.bottom - s.top);
+}
+
 // --- main loop ------------------------------------------------------------------------------------
 let last = performance.now();
 let uiAcc = 0;
@@ -434,7 +444,10 @@ function frame(now: number): void {
   const dt = now - last;
   last = now;
   app.session.advance(dt);
-  if (app.session.onOverworld) worldView.draw(now, areaSheet.selected);
+  if (app.session.onOverworld) {
+    worldView.cover = sheetCover();
+    worldView.draw(now, areaSheet.selected);
+  }
   else view.draw(now, sheet.selected);
   uiAcc += dt;
   if (uiAcc >= 100) {
