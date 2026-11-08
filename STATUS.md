@@ -23,11 +23,14 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 5 | core-engineer | h5-sim | launch | Build (green, 93699f3). Director accepts its out-of-scope one-line smoke edit (H3 play-through sets fleet.cap 0) and the interim H4 bots at cap 0 |
 | 6 | critic | h5-sim | launch | Review round 1: APPROVE; green branch CI on 93395d6; merged 8799be2 |
 | 7 | engineer | h5-client | launch | Build (green, bd32246; smoke 96/96) |
-| 9 | critic | h5-client | launch | Review round 1 |
-| 8 | engineer | h5-bots | launch | Build |
+| 9 | critic | h5-client | launch | Review round 1: REJECT (fleet chip wraps to its own HUD row at 375 px) |
+| r5 | engineer | h5-client | resume | Fix round 1 |
+| 8 | engineer | h5-bots | launch | Build (41ef624): bots gate red only because v8 lights are closed at L0; merges together with h5-design-data (see DECISIONS) |
+| 10 | critic | h5-bots | launch | Review round 1 (code; gate red on data is expected) |
+| r6 | designer | h5-design-data | resume | Calibrate on a branch cut from task/h5-bots |
 | r4 | critic | h5-art | resume | Review round 1: APPROVE (f522965); green branch CI on 29a12ee; merged |
 
-Launches: 9 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 4.
+Launches: 10 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 6.
 
 ## Iteration 4 ledger
 
