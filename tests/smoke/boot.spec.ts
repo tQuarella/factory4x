@@ -372,6 +372,21 @@ test('tapping an asteroid opens its sheet; queuing an extractor changes the queu
   expect(errors).toEqual([]);
 });
 
+test('the asteroid sheet shows the Extraction-boosted rate (12.5/min each at level 1), even with a wide font', async ({ page }) => {
+  const errors = watchErrors(page);
+  await ready(page);
+  await startCampaign(page, { research: { extract: 1, rigs: 1 }, land: 'landfall' });
+  await page.addStyleTag({ content: '#sheet, #sheet * { font-family: "Courier New", monospace !important; font-size: 17px !important; letter-spacing: 1px !important; }' });
+  const a1 = await page.evaluate(() => window.__factory4x!.nodeIndex('a1'));
+  await tapNode(page, a1);
+  await expect(page.locator('#sheet')).toBeVisible();
+  // Seed rigs gives a1 one extractor: 10/min base, +25% from Extraction 1.
+  await expect(page.locator('#sheet')).toContainText('12.5/min each');
+  await expect(page.locator('#sheet')).toContainText('+12.5/min');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+  expect(errors).toEqual([]);
+});
+
 test('the Root sheet opens with the Feeds the Heart box; the heart sheet says fed; the probe names the layout', async ({ page }) => {
   const errors = watchErrors(page);
   await ready(page);

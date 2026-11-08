@@ -269,8 +269,8 @@ export class Sheet {
       });
       const queued = st.extractorsCommitted - st.extractors;
       setText(pipText, `${st.extractors}/${st.slots}${queued > 0 ? ` (+${queued} queued)` : ''}`);
-      setText(yields.val, st.prize ? `${RES_NAME[st.prize]} · ${st.perExtractorPerMin}/min each` : '-');
-      setText(extract.val, `+${st.extractPerMin}/min`);
+      setText(yields.val, st.prize ? `${RES_NAME[st.prize]} · ${fmt10(st.perExtractorPerMinX10)}/min each` : '-');
+      setText(extract.val, `+${fmt10(st.extractPerMinX10)}/min`);
       if (st.route) {
         const up = st.route.pendingUpgrades > 0 ? ` (+${st.route.pendingUpgrades} queued)` : '';
         setText(route.val, `L${st.route.level}/${st.route.maxLevel} · carries ${st.route.capacityPerMin}/min${up}`);
@@ -505,7 +505,7 @@ export class Sheet {
           prize,
           isHeart
             ? `Prize: ${RES_NAME[g.prize]} · ${g.slots} slots`
-            : `Prize: ${RES_NAME[g.prize]} · ${g.slots} slots · ${g.prizePerMinPerExtractor}/min each${unlock}`,
+            : `Prize: ${RES_NAME[g.prize]} · ${g.slots} slots · ${fmt10(g.prizePerMinPerExtractorX10)}/min each${unlock}`,
         );
       }
       const supplyText = isHeart ? supplyLine(w) : '';
