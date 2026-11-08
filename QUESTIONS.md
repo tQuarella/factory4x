@@ -4,31 +4,35 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
-## Build build-20261108-1 is ready (2026-11-07): H2, two ways to take the Bloom
+## Build build-20261108-2 is ready (2026-11-07): H3, the Counter web
 
-Play: https://factory4x.pages.dev (on your phone, portrait). Plan on about 20 minutes for **two runs**: use 2x/4x once your economy is built, and tap New run after the first capture. Your old save is from an older data version, so the game will start fresh.
+Play: https://factory4x.pages.dev (on your phone, portrait). Plan on one 30–40 minute session; 2x/4x is fine once your economy is running. Your old save is from an older data version, so the game starts fresh.
 
 What changed:
-- The Bloom now drinks from the Root, a smaller guarded stalk joined to it by a pink vine. Cut the Root first and the Bloom drops to 8 thorns and regrows 5× slower, so a smaller wave can take it. Or skip it and overwhelm the Bloom at full strength.
-- Every run is one of three systems: Thin Root, Knotted Root and Deep Root. How strong the Root is changes which line is better, and New run moves you to the next system.
-- Clearer battles: each battle line names its node, the Root and Bloom sheets show the Bloom fed and starved side by side, the result panel names the system and when you cut the Root, and taps on guarded nodes are easier to hit.
+- A new 16-node field in three layouts (Frost Gate, Glass Thicket, Twin Seams). Ice and crystal sit in guarded pockets across it: take a pocket, route its prize to the Probe, and it unlocks a new component and ship type.
+- Two counter ships join the drone. Lancers (built with lenses, from crystal) pierce armoured Thorns; Flak (built with plating, from ice) shreds Spore swarms. Each hits its prey twice as hard and the other guard type at a quarter strength.
+- Read a pocket before you commit: a two-colour ring shows its Thorn/Spore mix, its sheet tags your ships Strong, Even or Weak, and "Choose…" sends exactly the mix you want. The Root still feeds the Heart.
 
-Try this: build up as before, then open both the Root's sheet and the Bloom's sheet before you attack, and decide whether to cut the Root first. After you take the Bloom, tap New run. The next system has a different Root; look again before you commit. (The bots found that cutting the Root first wins on Thin, the big wave wins on Deep, and Knotted is a trade-off: a little faster, but a few more ships lost.)
+Try this: build your asteroid economy, then open the sheets of two or three pockets and pick your first one by its prize and its ring. When its prize reaches the Probe, a notice tells you which ship unlocked: turn that yard on at the Probe. Before each next pocket, check the Strong/Weak tags and use "Choose…" to send a mix. If you have time, tap New run after the Heart for a different layout.
 
-Fun questions (the H2 hypothesis):
-1. Before your big attack, did you weigh cutting the Root against hitting the Bloom head-on? What tipped it, and did it feel like a real choice or an obvious one?
-2. Your second run had a different Root. Did you change plan? Could you tell from the numbers on the sheets which way was better, or was it a guess? Did the new system make the replay feel fresh?
-3. When the Root fell and the Bloom wilted, did that feel like a payoff in itself, or like a chore on the way to the real fight?
+Fun questions (the H3 hypothesis):
+1. After your first pocket, did you have more than one sensible next target? What decided it?
+2. Did the ring and the Strong/Weak tags tell you which ships to bring? Did you ever send the wrong ships, and did it sting?
+3. Did unlocking a new ship type feel like a payoff? Did the game feel like one fixed sequence, or like a path you chose?
+
+Known from the bots (not hidden from you): the game is a little faster than designed (the bots take the Heart in about 19–22 minutes, the spec aimed for 20–35). Ice-first and crystal-first openings finish within 1–2% of each other, though crystal-first is a few seconds ahead on every layout. On Twin Seams the tags read "Even" for both counter ships at the Root and Heart, so they give little guidance in that final fight.
 
 Feedback: plain answers in chat work best. The speech-bubble button also opens a prefilled GitHub issue with a replay of your session.
 
-Also open: Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection). None blocks anything.
+Also open (none blocks anything): Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
 
-Protected files changed this build: none. Every merge passed the protected-files gate.
-
-**Answer (owner, 2026-11-07, in chat):** "Attacking the root first felt like the obvious choice.  Both runs felt the same: max economy then shift to building ships and attack once you have enough. Cutting the root was satisfying"
+Protected files changed this build: VISION.md (Q14, owner-approved: long persistent game, pillar 1 wording). Every merge passed the protected-files gate.
 
 ## Blocking
+
+None.
+
+## Answered
 
 ### Q14. Two VISION.md edits for the asteroid-field direction (2026-11-07, Designer)
 
@@ -63,7 +67,30 @@ Steelman this."
 
 Status: the Designer is steelmanning this direction (DESIGN.md). Parts of it may change VISION.md fixed decisions (for example run length), which would come back to you for approval.
 
-## Answered
+### build-20261108-1 handoff (2026-11-07): H2, two ways to take the Bloom
+
+Play: https://factory4x.pages.dev (on your phone, portrait). Plan on about 20 minutes for **two runs**: use 2x/4x once your economy is built, and tap New run after the first capture. Your old save is from an older data version, so the game will start fresh.
+
+What changed:
+- The Bloom now drinks from the Root, a smaller guarded stalk joined to it by a pink vine. Cut the Root first and the Bloom drops to 8 thorns and regrows 5× slower, so a smaller wave can take it. Or skip it and overwhelm the Bloom at full strength.
+- Every run is one of three systems: Thin Root, Knotted Root and Deep Root. How strong the Root is changes which line is better, and New run moves you to the next system.
+- Clearer battles: each battle line names its node, the Root and Bloom sheets show the Bloom fed and starved side by side, the result panel names the system and when you cut the Root, and taps on guarded nodes are easier to hit.
+
+Try this: build up as before, then open both the Root's sheet and the Bloom's sheet before you attack, and decide whether to cut the Root first. After you take the Bloom, tap New run. The next system has a different Root; look again before you commit. (The bots found that cutting the Root first wins on Thin, the big wave wins on Deep, and Knotted is a trade-off: a little faster, but a few more ships lost.)
+
+Fun questions (the H2 hypothesis):
+1. Before your big attack, did you weigh cutting the Root against hitting the Bloom head-on? What tipped it, and did it feel like a real choice or an obvious one?
+2. Your second run had a different Root. Did you change plan? Could you tell from the numbers on the sheets which way was better, or was it a guess? Did the new system make the replay feel fresh?
+3. When the Root fell and the Bloom wilted, did that feel like a payoff in itself, or like a chore on the way to the real fight?
+
+Feedback: plain answers in chat work best. The speech-bubble button also opens a prefilled GitHub issue with a replay of your session.
+
+Also open: Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection). None blocks anything.
+
+Protected files changed this build: none. Every merge passed the protected-files gate.
+
+**Answer (owner, 2026-11-07, in chat):** "Attacking the root first felt like the obvious choice.  Both runs felt the same: max economy then shift to building ships and attack once you have enough. Cutting the root was satisfying"
+
 
 ### build-20261106-2 handoff (Milestone 1 first playable, H1)
 

@@ -6,6 +6,12 @@ Player-facing changes per build. Three plain lines per build, written by the Dir
 
 Nothing yet.
 
+## build-20261108-2 (2026-11-07, commit a4096a7) · Milestone 2, H3: Counter web
+
+- A new 16-node field in three layouts (Frost Gate, Glass Thicket, Twin Seams). Ice and crystal sit in guarded pockets across it: take a pocket, route its prize to the Probe, and it unlocks a new component and ship type.
+- Two counter ships join the drone. Lancers (built with lenses, from crystal) pierce armoured Thorns; Flak (built with plating, from ice) shreds Spore swarms. Each hits its prey twice as hard and the other guard type at a quarter strength.
+- Read a pocket before you commit: a two-colour ring shows its Thorn/Spore mix, its sheet tags your ships Strong, Even or Weak, and "Choose…" sends exactly the mix you want. The Root still feeds the Heart.
+
 ## build-20261108-1 (2026-11-07, commit 13201db) · Milestone 1, H2: decision depth
 
 - The Bloom now drinks from the Root, a smaller guarded stalk joined to it by a pink vine. Cut the Root first and the Bloom drops to 8 thorns and regrows 5× slower, so a smaller wave can take it. Or skip it and overwhelm the Bloom at full strength.

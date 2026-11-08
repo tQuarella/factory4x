@@ -3,10 +3,10 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
-**State:** Iteration 3 Build step. Owner approved the Q14 VISION edits (applied b3b7a86) and chose H3 Counter web. Spec in DESIGN.md (e83c3aa), tasks in BACKLOG.md (625d9ca). h3-sim, h3-bots, h3-art merged. h3-client in Critic review. h3-design-data: calibrated (data v5); core-engineer fixing pinned tests and yard order on the same branch.
+**State:** Awaiting owner feedback on build-20261108-2 (M2 H3: Counter web). Only Can wait work until feedback arrives.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
-**Last build:** build-20261108-1 (H2 decision depth), commit 13201db, live and passing the live smoke test.
+**Last build:** build-20261108-2 (H3 Counter web), commit a4096a7, live (CI gates and deploy green; site shows a4096a7).
 **Last updated:** 2026-11-07 (desktop)
 
 ## Iteration 2 (H2) ledger (closed)
@@ -95,15 +95,19 @@ Launches: 4. Resumes: 0. Both tasks done. Follow-ups from the reviews (not block
 | 8 | critic | h3-bots | launch | Round 1: APPROVE (85effbe); merged 3585322 |
 | r5 | designer | h3-design-data | resume | Calibration to data v5 (12a8fca): pace met (18–28 min), tags 35/36 accurate; flag 4 now missed (ice-first wins every layout ~2 min, yard order starves flak); 42 tests pinned to v4 values fail the `test` gate |
 | 9 | critic | h3-client | launch | Round 1 review of 357e85d |
-| 10 | core-engineer | h3-design-data | launch | Decouple tests from shipped data (frozen fixture); round-robin yard service (rule 5b) for flag 4 |
+| 10 | core-engineer | h3-design-data | launch | Decouple tests from shipped data (frozen fixture); round-robin yard service (rule 5b) for flag 4 (cb49da3) |
+| r6 | engineer | h3-client | resume | Fix round 1 after Critic REJECT (ring size, wide-font stress, unlock notice, text) (f9ea031) |
+| r7 | critic | h3-client | resume | Round 2: APPROVE; green CI on 8edf987; merged 76186f6 |
+| r8 | core-engineer | h3-design-data | resume | Merged main (705c747) |
+| 11 | critic | h3-design-data | launch | Round 1: REJECT (docs only: stale numbers, tag count) |
+| r9 | core-engineer | h3-design-data | resume | Doc fix round (97afe69) |
+| r10 | critic | h3-design-data | resume | Round 2: APPROVE; green CI on 1dbe987; merged a4096a7. Release gates passed; deployed; handed off as build-20261108-2 |
 
-Launches: 10 / 12. Resumes: 5. h3-art merged 4929fe6 after green CI on 31d61a2. Remaining: Critic h3-design-data (launch 11). One spare. Follow-up (not this build): bots pick targets without regard to their own counters (Designer note). Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
+Launches: 11 / 12. Resumes: 10. Iteration closed except the retro. h3-art merged 4929fe6 after green CI on 31d61a2. Remaining: Critic h3-design-data (launch 11). One spare. Follow-up (not this build): bots pick targets without regard to their own counters (Designer note). Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
 
 ## Next step
 
-1. When h3-sim and h3-art report green: one Critic each (branch + task id only). h3-art is browser-facing: merge main into it, push, green CI on that commit before `merge-task`. h3-sim touches `packages/client/` compile fixes, so treat it as browser-facing too.
-2. After h3-sim merges: launch h3-client (engineer) and h3-bots (engineer) in parallel, then Critics.
-3. h3-design-data after h3-bots reports. Then release gates, `/handoff`, `/retro`.
+Waiting on the owner's playtest of build-20261108-2 (handoff block at the top of QUESTIONS.md). When feedback arrives: record it verbatim in PLAYTEST_LOG.md, then the Designer triages it and plans H4 (Factories and reach, per DESIGN.md M2 plan). The iteration 3 retro runs right after this handoff. Can wait candidates are in BACKLOG.md.
 
 ## Moving to another machine
 

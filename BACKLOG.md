@@ -245,6 +245,15 @@ Owner chose this slice on 2026-11-07 (Q13, Q14). Where this backlog and the spec
 
 ## Can wait (allowed while waiting on the owner)
 
+- **cw-h3-review-notes** (Designer to judge, then engineer; from the H3 Critic reviews, 2026-11-07):
+  - Pace: bots take the heart at 19–22 min with counters, short of the spec's 20–35 (and 35–45 for drones-only). The bot suite caps games at 30 min, which limits how slow calibration can go; raise the cap first if pace is retuned.
+  - Twin Seams reads Even/Even for both counters at its Root and heart; 4 of 42 tags misread near the thresholds. A time-to-clear tag formula (sim selector) would be sturdier than the hp-weighted one.
+  - Depth flag 4 still missed by 13–26 s (crystal-first faster on every layout). Bots pick targets without regard to their own fleet's counters; make target choice fleet-aware before trusting flag 4.
+  - With a sheet open at 375x667 the map is ~190 px tall and label pills stack; a battle report replaces an untapped unlock notice.
+  - Smoke test pins `extractor.cost` = 20 in the tuning panel check.
+- **cw-palette-followups** (art-direction; Critic notes on cw-palette-sync-test): the palette test is one-way (a stale table row with no key isn't flagged), and the "Dim star" row isn't marked low-contrast though it's on the allow-list.
+- **cw-gates-output** (needs owner approval: `scripts/gates/` is protected): have `reports/gates-latest.json` keep the tail of a failing gate's output, so a flaky test is named the first time (Critic note on cw-flaky-test).
+
 - **cw-raid-regroup** (Designer to decide, then engineer): after cutting the Root, raid-supply moves the Root survivors to a5 but leaves ships built meanwhile at the probe. It is harmless at today's numbers, but would matter if Roots get weaker or starved Blooms stronger. The fix would be one `sendShips(probe, a5, 0)` after the cut (Critic note on h2-bots).
 
 - **cw-flaky-test** (engineer): during the h2-art round 2 review, `npm run gates` failed the `test` gate once (28.5 s against the usual 10–14 s) and passed on rerun. Which test failed wasn't captured. Find it (likely a timing-sensitive test under load) and make it deterministic. A flaky gate weakens the gate.
