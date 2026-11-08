@@ -32,3 +32,30 @@ Notes (not blocking):
 This is round 1.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+Scope of this round: the Director chose the merge path (DECISIONS.md d68b8e7, BACKLOG.md 9f42873 on `main`). h5-design-data is stacked on `task/h5-bots`, and the two merge together through `merge-task h5-design-data` only when both are approved and every gate on the stacked branch is green. h5-bots is never merged alone. This round judges everything except the bots gate's softlock result on untuned v8. That result moves to the h5-design-data review, where the stacked branch must turn it green.
+
+Pillar fit: unchanged from round 1. The bots follow the spec, and nothing is retuned.
+
+Quality: the round 1 fix is small and correct (5280732).
+- `decideComposer` sets the rally to a5 from the landing, before the economy return. A ship a yard starts on the landing tick now goes to a5 instead of the probe.
+- Every idle ship regroups at a5 from any node except a5 and living guarded nodes. `isGuarded` means the guardian is alive, and `shipCounts().at` excludes ships in transit, so waves in progress aren't pulled back.
+- The two new base-limit tests fail on the round 1 code. I checked by restoring the 2054918 `strategies.ts`: 2 failed, 53 passed. They pass on the fix.
+- The forced-visit test kills the non-heart guardians directly to reach the heart-only state. That's acceptable for a premise, and it's stated.
+- The report column heading is reworded as I suggested.
+
+Evidence the engine now plays forced visits out: in my gate run, every gated run shows 176 built and 156 lost, against 31 and 0 in round 1. Every forced visit attacks and still can't take the Frost Shelf heart within the visit cap, as the probe predicts (best mix 13, drones alone 19, against a limit of 12). So the DECISIONS claim that the remaining red result comes from the data now holds.
+
+Gates (`npm run gates -- --base main` on 5280732): typecheck PASS, lint PASS, test PASS (10.1 s), determinism PASS, protected-files PASS. bots FAIL (65.9 s), and every line under Failures is a softlock of `composer`, `ice-first` or `crystal-first` on v8. There's no crash and no tick-budget overrun (tick p95 at most 0.008 ms). The committed `reports/archive/h5-bots-data-v8.*` matches my run.
+
+Required changes: none for h5-bots.
+
+Conditions:
+- This approval covers the h5-bots code only. It does **not** approve merging `task/h5-bots` on its own. The red bots gate still blocks that, and `merge-task` will refuse it.
+- The bots gate's no-softlock result is judged on the stacked h5-design-data branch. h5-design-data's review must see `npm run gates` fully green there, the bots gate included, before either branch reaches `main`.
+
+This is round 2.
+
+VERDICT: APPROVE
