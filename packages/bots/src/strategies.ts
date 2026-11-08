@@ -20,11 +20,10 @@ import {
  * given (read-only, through the sim's selectors), so a strategy is a pure
  * function of the state. They issue Input commands only.
  *
- * INTERIM (h3-sim): the H1/H2 strategies (rush, turtle, raid-supply) cannot
- * play the H3 map, so these two minimal strategies keep the bot gate honest
- * (no crash, no softlock, tick budget) until h3-bots lands the four spec
- * strategies (DESIGN.md H3 "Bot checks"). They follow the spec's shared rules
- * in their simplest form.
+ * The four H3 strategies (DESIGN.md H3 "Bot checks") share one engine
+ * (`decideH3`): the H1 turtle economy plan on a1-a5, then rally at a5, build
+ * out every captured node, and attack the cheapest living target by estimate.
+ * They differ only in which yards they run and in the first door they take.
  */
 export interface Strategy {
   name: string;
@@ -101,6 +100,18 @@ export function fleetPower(world: Readonly<World>, node: number, fleet: Readonly
   return p;
 }
 
+/**
+ * The first door: the light pocket (fewer than 3 slots) holding `prize`, while it is alive.
+ * Every layout has exactly one light ice pocket and one light crystal pocket.
+ */
+export function firstDoor(world: Readonly<World>, prize: 'ice' | 'crystal'): number | null {
+  for (const g of world.guardians) {
+    const n = world.nodes[g.node]!;
+    if (g.alive && n.kind === 'pocket' && n.slots < 3 && n.prize === prize) return g.node;
+  }
+  return null;
+}
+
 /** The living guarded node with the lowest need / prizeWeight; the heart only when it is the last one. */
 export function nextTarget(world: Readonly<World>): number | null {
   let best: number | null = null;
@@ -136,22 +147,29 @@ function waveInFlight(world: Readonly<World>): boolean {
   return false;
 }
 
-function interimDecide(world: Readonly<World>, useCounters: boolean): Input[] {
+export interface H3Plan {
+  /** Run the lancer and flak yards once their component is unlocked (drones-only never does). */
+  counters: boolean;
+  /** Take the light pocket with this prize first, before the greedy rule applies. */
+  door: 'ice' | 'crystal' | null;
+}
+
+export function decideH3(world: Readonly<World>, plan: H3Plan): Input[] {
   const inputs: Input[] = [];
   const a5 = nodeIndex(world, 'a5');
-  const plan = buildPlan(world, ['a1', 'a2', 'a3', 'a4', 'a5'].map((id) => nodeIndex(world, id)));
-  if (!plan.done) {
+  const econ = buildPlan(world, ['a1', 'a2', 'a3', 'a4', 'a5'].map((id) => nodeIndex(world, id)));
+  if (!econ.done) {
     if (world.yards.drone.on) inputs.push({ type: 'setShipyard', shipType: 'drone', on: false });
-    if (plan.order) inputs.push(plan.order);
+    if (econ.order) inputs.push(econ.order);
     return inputs;
   }
   const unlocked = unlockStatus(world).ships;
   for (const t of SHIP_TYPES) {
-    const want = t === 'drone' || (useCounters && unlocked[t]);
+    const want = t === 'drone' || (plan.counters && unlocked[t]);
     if (world.yards[t].on !== want) inputs.push({ type: 'setShipyard', shipType: t, on: want });
   }
   if (world.rally !== a5) inputs.push({ type: 'setRally', node: a5 });
-  // Build out captured pockets and the heart in capture order.
+  // After a capture: extractors up to the slots, a route, up to 2 upgrades (nextEconomyOrder), in capture order.
   const owned = world.stats.captures.map((c) => c.node).filter((n) => world.nodes[n]!.kind !== 'root');
   const out = buildPlan(world, owned);
   if (out.order) inputs.push(out.order);
@@ -161,7 +179,8 @@ function interimDecide(world: Readonly<World>, useCounters: boolean): Input[] {
     if (c.at[cap.node]! > 0) inputs.push({ type: 'sendShips', from: cap.node, to: a5, counts: SEND_ALL });
   }
   if (waveInFlight(world)) return inputs;
-  const target = nextTarget(world);
+  const door = plan.door === null ? null : firstDoor(world, plan.door);
+  const target = door ?? nextTarget(world);
   if (target === null || !isGuarded(world, target)) return inputs;
   const fleet = c.atByType[a5]!;
   if (fleet.drone + fleet.lancer + fleet.flak > 0 && readyToAttack(world, target, fleetPower(world, target, fleet))) {
@@ -173,12 +192,22 @@ function interimDecide(world: Readonly<World>, useCounters: boolean): Input[] {
 export const strategies: Strategy[] = [
   {
     name: 'drones-only',
-    description: 'INTERIM (h3-sim): turtle economy a1-a5, then only drones; takes the cheapest target by estimate (heart last) when power × 3 ≥ need + 20.',
-    decide: (w) => interimDecide(w, false),
+    description: 'Turtle economy a1-a5, then only the drone yard; takes the cheapest guarded node by estimate (need / prize weight, heart last) when power × 3 ≥ need + 20.',
+    decide: (w) => decideH3(w, { counters: false, door: null }),
+  },
+  {
+    name: 'ice-first',
+    description: 'Economy plan, then drones take the light ice pocket first; flak on when ice arrives, lancer when crystal arrives; greedy after that.',
+    decide: (w) => decideH3(w, { counters: true, door: 'ice' }),
+  },
+  {
+    name: 'crystal-first',
+    description: 'As ice-first, with the light crystal pocket first.',
+    decide: (w) => decideH3(w, { counters: true, door: 'crystal' }),
   },
   {
     name: 'greedy',
-    description: 'INTERIM (h3-sim): as drones-only, with every unlocked yard on and the counter tags in the estimate.',
-    decide: (w) => interimDecide(w, true),
+    description: 'Economy plan, then always the cheapest next target by estimate with every unlocked yard on and the counter tags in the power estimate.',
+    decide: (w) => decideH3(w, { counters: true, door: null }),
   },
 ];
