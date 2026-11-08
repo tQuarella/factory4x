@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
-**State:** Iteration 3 Build step. Owner approved the Q14 VISION edits (applied b3b7a86) and chose H3 Counter web. Spec in DESIGN.md (e83c3aa), tasks in BACKLOG.md (625d9ca). h3-sim merged (9bb36ae). h3-art in fix round 1 after a Critic reject. h3-client and h3-bots building in parallel.
+**State:** Iteration 3 Build step. Owner approved the Q14 VISION edits (applied b3b7a86) and chose H3 Counter web. Spec in DESIGN.md (e83c3aa), tasks in BACKLOG.md (625d9ca). h3-sim (9bb36ae) and h3-bots (3585322) merged. h3-art approved round 2, waiting on branch CI. h3-client building; h3-design-data calibrating.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-1 (H2 decision depth), commit 13201db, live and passing the live smoke test.
@@ -90,9 +90,12 @@ Launches: 4. Resumes: 0. Both tasks done. Follow-ups from the reviews (not block
 | r3 | art-direction | h3-art | resume | Fix round 1 |
 | 5 | critic | h3-sim | launch | Round 1: APPROVE (reviewed local 2104a1a). Force-push of the cleaned history is denied by settings, so origin's WIP history was kept via an ours-merge (tree unchanged); green CI on 14634e4; merged 9bb36ae |
 | 6 | engineer | h3-client | launch | Build (worktree, `task/h3-client`); may use `h3-art-shim.ts` until h3-art merges |
-| 7 | engineer | h3-bots | launch | Build (worktree, `task/h3-bots`) |
+| 7 | engineer | h3-bots | launch | Build (worktree, `task/h3-bots`); green e0a2997. Flags 2–6 met, flag 1 (pace) missed: heart at 12–16 min |
+| r4 | critic | h3-art | resume | Round 2: APPROVE (79b9393). Fix commit c8fed7a pushed by art-direction, which never sent a final report |
+| 8 | critic | h3-bots | launch | Round 1: APPROVE (85effbe); merged 3585322 |
+| r5 | designer | h3-design-data | resume | Calibration: pace, tag accuracy, flag margins (branch `task/h3-design-data`) |
 
-Launches: 7 / 12. Resumes: 3. Remaining plan: Critic h3-art r2 (resume), Critic h3-client, Critic h3-bots, h3-design-data (designer resume). That's 2 more launches, leaving 3 spare. Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
+Launches: 8 / 12. Resumes: 5. Remaining: Critic h3-client, Critic h3-design-data. h3-art merging after green CI on 5f06ea9. Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
 
 ## Next step
 
