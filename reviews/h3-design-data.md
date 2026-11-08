@@ -44,3 +44,33 @@ Non-blocking notes (not conditions of approval):
 This is round 1 on this task.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-07
+
+Reviewed `origin/task/h3-design-data` at 97afe69, in a fresh detached worktree.
+
+Scope since round 1: `git diff --stat 705c747 HEAD` lists only `DECISIONS.md`, `DESIGN.md` and my own `reviews/h3-design-data.md`. No data, code or tests changed, so the round-1 findings on the restructure, the round-robin yards, determinism, saves and the reference replay still hold.
+
+Gates: `npm ci`; `npm run gates -- --base main` passes all 6 (typecheck, lint, test, determinism, bots, protected-files). The test gate includes the DESIGN.md table-parsing tests, so the edited tables still match `data/sim.json`. `npm run bots -- --seeds 3` meets flags 1, 2, 3, 5 and 6 and misses flag 4: crystal-first is faster in frost, glass and twin. The tag report test prints "Tags that match the waves: 38 of 42", with the misreads at Twin Seams p1 flak, p2 flak, Root flak and starved-heart lancer.
+
+Round-1 required changes, each checked against that output:
+- [x] DESIGN.md "Tag accuracy": now says 33 of 36 at full caps and 38 of 42 with the starved heart, and names its source. It lists all four misreads with the right numbers: 23 against 20, 28 against 26, and 21 against 27. It marks which ones the Designer judged close enough and which still need a Designer judgment. It also records the note that Twin Seams reads Even/Even at its Root and heart.
+- [x] DECISIONS.md: a dated correction entry with the true count. The earlier entry is left as written.
+- [x] DESIGN.md "Calibration result": the bot table now gives the current numbers, and every cell matches `reports/bots-latest.md`:
+  - drones-only 25:17 / 27:51 / 25:27;
+  - ice-first 20:40 / 21:58 / 19:42;
+  - crystal-first 20:27 / 21:45 / 19:16;
+  - greedy 19:33 / 21:45 / 19:42.
+
+  The flag table has a labelled current column. I recomputed its figures: flag 2 is 28-32% later (1517/1173, 1671/1305, 1527/1156) with ship losses 52/57/51 against 42/47/38; flag 3 gaps are 1-2%; and the flag 4 direction is right. The pre-round-robin numbers are kept and labelled.
+- [x] Answer 2: "far more lancers than flak" is replaced. The current lancer/flak losses (5/6, 4/7, 2/9 and 9/6, 6/4, 10/1) match the JSON report, and item 3a is marked as fixed. Answers 1 and 4 are updated to the current ranges.
+
+The reported depth flags and tag accuracy now say truthfully what the game on this branch does. Flag 4 stays missed and openly reported. It is a report line, not a gate, and the remaining levers (bot target choice, layout asymmetry) are named as follow-ups.
+
+Merge condition, per PROCESS.md (this branch touches `packages/client/test/`): branch CI run 42441291003 for 97afe69 was still in progress at review time, and this review commit will start another. The Director must see the CI run for the branch's head commit green before `merge-task`. That is a standing process check, not a deferred fix.
+
+Non-blocking notes from round 1 still stand: the follow-up on pace targets and the bot 30-minute cap, and the Designer's judgment on Twin Seams' Even/Even tags.
+
+This is round 2 on this task.
+
+VERDICT: APPROVE
