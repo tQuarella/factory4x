@@ -763,6 +763,65 @@ The engineers report the numbers and don't retune; h5-design-data retunes.
 3. **Bump `dataVersion` to 9** if any value changes, and update the pin.
 4. **Update every table** the data tests read, with the data, and search DESIGN.md for stale statements of what changed.
 
+#### Calibration result (h5-design-data, data v9)
+
+Sources:
+- **Before:** `reports/archive/h5-bots-data-v8.md`, the h5-bots report on v8, regenerated after the stranded-ship fix (5280732).
+- **After:** `reports/archive/h5-design-data-v9.md`, the current data.
+- **Tags and pocket waves:** the shipped-data report in `packages/sim/test/min-waves.test.ts`, run on v9.
+
+Both bot reports are `npm run bots -- --seeds 3`. The seeds pick The Deep's layout: 1 Glass Thicket, 2 Twin Seams, 3 Frost Gate. Times are game minutes of play.
+
+**What changed (guards only).** Hauls, exports, research costs and the three H5 tunables are unchanged from v8. `dataVersion` goes from 8 to 9.
+
+| Where | Change (T/S) | Why |
+| --- | --- | --- |
+| Frost Shelf heart | 2/12 → 0/8 | Tier 1 must fall to drones alone at L0 (v8: 19 drones). A single-type heart keeps the area's theme (Spores on the ice side) and falls to 9. |
+| Glass Shoal heart | 6/4 → 2/0 | The same, Thorns on the crystal side (v8: 20 drones; v9: 8). 2 Thorns also pass the bots' attack estimate with 12 drones: need 40 + 20 = 60 ≤ 3 × 24. |
+| Spore Veil heart | 1/50 (starved 0/25) → 4/34 (4/20) | Fed: one type alone (Flak 16) no longer fits L1. Starved: drones alone need more than 18. |
+| Thorn Garden heart | 24/13 (starved 11/5) → 14/9 (9/5) | Fed mix 25 → 16 (fits L1); starved mix 11 → 9 (fits L0). |
+| Spore Veil p1 / Thorn Garden p1 | 2/6 → 0/6; 1/12 → 0/5 | You land with no components, so a medium's first pocket must fall to drones within L0. By the bots' attack estimate, 12 drones give 3 × 24 = 72 against need + 20: 96 for 2/6 and 112 for 1/12 fail, while 56 for 0/6 and 50 for 0/5 pass. |
+| The Deep hearts (fed only) | Frost Gate 23/27 → 18/21; Glass Thicket 29/16 → 21/11; Twin Seams 12/42 → 10/34 | Fed: closed at L1, fits at L2. Starved caps unchanged. |
+| The Deep pockets (all three layouts) | 2/21 → 1/15; 6/6 and 8/6 → 3/2; 4/10 → 2/6; 4/37 → 3/26; 18/8 → 13/6 | The first pocket falls to drones within L1: 18 drones give 3 × 36 = 108 against need + 20 of 92 (3/2) or 96 (2/6), and the shipped min-wave report gives 13 and 15 drones. The heavy pockets are about 30% smaller, so the composer's first wave at the limit is not repelled. |
+
+**Flags, before → after** (each flag is judged across all three seeds; per-seed detail is in the reports):
+
+| Flag | v8 (`h5-bots-data-v8`) | v9 (`h5-design-data-v9`) |
+| --- | --- | --- |
+| 1. No softlock | missed: all 9 winning runs softlock at 70.2 min, with only Landfall reclaimed | met: all 9 runs bought the core |
+| 2. Drones don't fit | missed: Spore Veil starved, drones 15 against 18 | met: drones starved 20 / 20 (mediums) and 33 / 27 / 30 (The Deep); `drones-only` reclaims Landfall, Glass Shoal and Frost Shelf only, on every seed |
+| 3. The best local mix fits | missed: Frost Shelf drones 19, Glass Shoal 20, Thorn Garden starved mix 11, Thorn Garden fed 25, The Deep fed 30 / 24 / 28 | met |
+| 4. Both counters needed | missed: Spore Veil Flak alone 16; Thorn Garden mix 25 | met: Spore Veil d/l/f 34/37/26, mix 16; Thorn Garden 37/24/47, mix 16 |
+| 5. A raise opens an area | missed: The Deep fed doesn't fit L2 | met; `no-command` softlocks on every seed with Landfall, Glass Shoal, Frost Shelf and Thorn Garden reclaimed |
+| 6. Composition varies | met (gaps 93 / 88 / 88 pp) | met (gaps 43 / 38 / 38 pp) |
+| 7. Determinism and replay | met | met |
+
+**Probe after** (`h5-design-data-v9.md`, "Probe"; limits L0 12, L1 18, L2 24):
+
+| Heart | State | d / l / f | Best mix (d/l/f) |
+| --- | --- | --- | --- |
+| Frost Shelf | fed | 9 / 15 / 3 | 3 (0/0/3) |
+| Glass Shoal | fed | 8 / 3 / 15 | 3 (0/3/0) |
+| Spore Veil | fed | 34 / 37 / 26 | 16 (0/8/8) |
+| Spore Veil | starved | 20 / 18 / 14 | 9 (0/5/4) |
+| Thorn Garden | fed | 37 / 24 / 47 | 16 (0/14/2) |
+| Thorn Garden | starved | 20 / 11 / 23 | 9 (0/8/1) |
+| The Deep, Glass Thicket | fed / starved | 50 / 29 / 63; 33 / 17 / 40 | 22 (0/20/2); 15 (0/14/1) |
+| The Deep, Twin Seams | fed / starved | 45 / 40 / 41; 27 / 21 / 23 | 20 (0/13/7); 13 (0/9/4) |
+| The Deep, Frost Gate | fed / starved | 50 / 35 / 58; 30 / 18 / 31 | 22 (0/19/3); 14 (0/11/3) |
+
+**Runs after:**
+- **The winners** (`composer`, `ice-first`, `crystal-first`) buy the core at 40:04–40:22 on every seed. Visits: Glass Shoal 5:59–6:03, Frost Shelf 6:27–6:32, Spore Veil 8:45, Thorn Garden 6:50, The Deep 11:44–12:01. Command limit levels 1, 2 and 3 land at about 12:42, 21:28 and 28:19.
+- **The cap-off reference** (`greedy`, `fleet.cap` 0) takes 41:32, 40:10 and 40:51.
+- **v8, for comparison:** greedy took 45:48, 44:01 and 43:56.
+
+What the numbers say:
+- **The windows hold, at the edges.** Spore Veil and Thorn Garden fed, and Glass Thicket and Frost Gate fed, sit exactly on "fits" (16 at L1, 22 at L2). A one-guard change can flip a flag.
+- **Every winning run follows the same order after the light areas** (Spore Veil, Thorn Garden, The Deep), and cuts every Root before its heart. The bots solve the limit with Root cuts, not mixes. Their capturing waves are often one type: Spore Veil 15 flak and The Deep 19 lancers on seed 1. The "both counters needed" window applies to *fed* hearts, which the bots never fight. Whether a player fights fed hearts (to skip a cut) or cuts every time is the owner's call in play.
+- **The bots' attack estimate is more pessimistic than the sim for mixed nodes.** `no-command` marks Spore Veil closed at L0 although its starved heart's best mix is 9. The probe, not the bot, is the measure of what is possible.
+- **The H5 limit doesn't make the run longer than cap-off.** Winners take 40:04–40:22 against cap-off 40:10–41:32. The guards were lowered so drones take the first pockets, which helps both.
+- **Pace, not flagged:** a full run is about 40 game minutes against H4's 45:47–50:47 (`reports/archive/h4-design-data-v7.md`).
+
 #### Success criteria (the owner, one 30–40 minute phone session; 4x is fine)
 
 1. The owner reclaims at least 4 areas, counting Landfall.
@@ -859,23 +918,23 @@ Totals: haul 2120 / 340 / 340 (data v8), which covers every research level (2100
 
 *Updated 2026-11-08 by h5-sim (data v8):* the `veil`, `garden` and `deep` hauls rose from 300 / 60 / 40, 300 / 40 / 60 and 720 / 60 / 60 (v7, calibrated by h4-design-data; totals then 1680 / 240 / 240 against 1660 / 220 / 220) to cover the H5 Command limit levels (H5 spec, "Command limit"). The prose below is the record of what H4 tested at v7.
 
-**Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). First derived from the H3 layouts at about 20% (light) and 60% (medium) and pushed toward each side's theme, then calibrated by h4-design-data (see "Calibration result (h4-design-data, data v7)"). The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
+**Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). First derived from the H3 layouts at about 20% (light) and 60% (medium) and pushed toward each side's theme, then calibrated by h4-design-data (see "Calibration result (h4-design-data, data v7)"), and recalibrated for the fleet limit by h5-design-data (data v9; see H5 "Calibration result (h5-design-data, data v9)"). The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
 
 | Area | Node | Prize | Slots | Guards (T/S) | Tags l / f |
 | --- | --- | --- | --- | --- | --- |
 | landfall | heart | ore | 4 | 0 / 0 | none (no guards: the first ship to arrive reclaims it) |
 | shelf | p1 | ice | 2 | 0 / 4 | Weak (25) / Strong (200) |
-| shelf | heart | ore | 4 | 2 / 12 | Even (87) / Even (137) |
+| shelf | heart | ore | 4 | 0 / 8 | Weak (25) / Strong (200) |
 | shoal | p1 | crystal | 2 | 0 / 4 | Weak / Strong |
-| shoal | heart | ore | 4 | 6 / 4 | Strong (170) / Weak (54) |
-| veil | p1 | ice | 2 | 2 / 6 | Even (117) / Even (107) |
-| veil | p2 | crystal | 2 | 2 / 6 | Even / Even |
+| shoal | heart | ore | 4 | 2 / 0 | Strong (200) / Weak (25) |
+| veil | p1 | ice | 2 | 0 / 6 | Weak (25) / Strong (200) |
+| veil | p2 | crystal | 2 | 2 / 6 | Even (117) / Even (107) |
 | veil | root | none | 0 | 0 / 16 | Weak / Strong |
-| veil | heart | ore | 4 | 1 / 50, starved 0 / 25 | Weak (35) / Strong (189); starved Weak (25) / Strong (200) |
-| garden | p1 | crystal | 2 | 1 / 12 | Weak (63) / Strong (161) |
+| veil | heart | ore | 4 | 4 / 34, starved 4 / 20 | Weak (74) / Strong (150); starved Even (95) / Even (130) |
+| garden | p1 | crystal | 2 | 0 / 5 | Weak (25) / Strong (200) |
 | garden | p2 | ice | 2 | 4 / 3 | Strong (167) / Weak (57) |
 | garden | root | none | 0 | 9 / 0 | Strong / Weak |
-| garden | heart | ore | 4 | 24 / 13, starved 11 / 5 | Strong (175) / Weak (49); starved Strong (179) / Weak (46) |
+| garden | heart | ore | 4 | 14 / 9, starved 9 / 5 | Strong (171) / Weak (53); starved Strong (175) / Weak (50) |
 | deep | all | as H3 | as H3 | the H3 layout tables | as H3 |
 
 How an H3 field is cut down:
@@ -891,6 +950,7 @@ Why these areas:
 - **Research decides the cheap medium.** The ice haul from the Shelf buys the Flak design, the crystal haul from the Shoal buys the Lancer design. So your first light area and your first design decide which medium is cheap. It's the owner's H3 read ("the heart is spore-heavy so go win the easiest flak node") one level up. Both mediums have both light pockets, so either design can be built in either.
 - **The probe core needs both designs and The Deep** (see Research), so every run crosses sides at some point; the order is yours.
 - **You can skip one area, if you go light on Fast yards.** Both designs and the core need 160 ice and 160 crystal. Skipping a medium leaves 180–200 of each from hauls alone; skipping a light area leaves exactly 160 of its resource. Fast yards costs 20 then 40 more of each, so a player who buys both levels needs all six areas (hauls total 240 of each, plus shipments). Skipping is a trade-off between yard speed and one fewer area. Four areas never do: one side's resource stops at 100. In the h4-design-data bot report every strategy buys both yard levels before the core and so takes all six areas (`reports/archive/h4-design-data-v7.md`, "Skipped" column).
+  - *Superseded at data v8 (H5) and still true at v9:* hauls now total 340 ice and 340 crystal, exactly the cost of every research level, Command limit included. The core still needs only the two designs and The Deep (160 of each). Skipping one light area or one medium leaves at least 250 of each resource from hauls alone: enough for the designs, the core and Command limit 1 and 2 (60 of each), but not for every level. Skipping a medium also rules out Command limit 3, which needs both mediums. The Deep can't be skipped. Whether a bot skips is in the "Skipped" column of `reports/archive/h5-design-data-v9.md`.
 
 #### Area lifecycle
 
@@ -1318,53 +1378,53 @@ There are 15 asteroid slots, 150 ore/min at full build: the same ore ceiling as 
 
 #### Layouts (data `map.layouts`; chosen like the H2 variants)
 
-Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per type after the Root is cut. Slots apply to the pocket after capture. **Calibrated by h3-design-data (data v5).** The wave columns are measured on the real sim: the minimum simultaneous wave of one type that wins, as drones / lancers / flak. The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (weighted multiplier in brackets).
+Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per type after the Root is cut. Slots apply to the pocket after capture. **Calibrated by h3-design-data (data v5); the pockets and fed hearts were recalibrated by h5-design-data (data v9, see H5 "Calibration result").** The wave columns are measured on the real sim: the minimum simultaneous wave of one type that wins, as drones / lancers / flak. The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (weighted multiplier in brackets).
 
 **Layout 0: Frost Gate**
 
 | Node | Prize | Slots | Guards (T/S) | Min wave d / l / f | Tags l / f |
 | --- | --- | --- | --- | --- | --- |
-| p1 | ice | 2 | 2 / 21 | 23 / 27 / 18 | Weak (67) / Strong (157) |
-| p2 | crystal | 2 | 6 / 6 | 22 / 17 / 28 | Strong (159) / Weak (65) |
-| p3 | ice | 3 | 18 / 8 | 43 / 25 / 56 | Strong / Weak |
-| p4 | crystal | 3 | 4 / 37 | 36 / 39 / 26 | Weak (71) / Strong (153) |
+| p1 | ice | 2 | 1 / 15 | 17 / 22 / 9 | Weak (56) / Strong (168) |
+| p2 | crystal | 2 | 3 / 2 | 13 / 10 / 19 | Strong (170) / Weak (54) |
+| p3 | ice | 3 | 13 / 6 | 34 / 20 / 44 | Strong (178) / Weak (46) |
+| p4 | crystal | 3 | 3 / 26 | 28 / 31 / 22 | Weak (73) / Strong (151) |
 | root | none | 0 | 0 / 25 | 18 / 27 / 8 | Weak / Strong |
-| heart | ore | 4 | 23 / 27, starved 12 / 14 | 63 / 42 / 70; starved 30 / 18 / 31 | Strong (154) / Weak (70) |
+| heart | ore | 4 | 18 / 21, starved 12 / 14 | 50 / 35 / 58; starved 30 / 18 / 31 | Strong (154) / Weak (70) |
 
 **Layout 1: Glass Thicket**
 
 | Node | Prize | Slots | Guards (T/S) | Min wave d / l / f | Tags l / f |
 | --- | --- | --- | --- | --- | --- |
-| p1 | crystal | 2 | 2 / 21 | 23 / 27 / 18 | Weak / Strong |
-| p2 | ice | 2 | 8 / 6 | 25 / 18 / 33 | Strong (167) / Weak (57) |
-| p3 | ice | 3 | 4 / 37 | 36 / 39 / 26 | Weak / Strong |
-| p4 | crystal | 3 | 18 / 8 | 43 / 25 / 56 | Strong / Weak |
+| p1 | crystal | 2 | 1 / 15 | 17 / 22 / 9 | Weak / Strong |
+| p2 | ice | 2 | 3 / 2 | 13 / 10 / 19 | Strong (170) / Weak (54) |
+| p3 | ice | 3 | 3 / 26 | 28 / 31 / 22 | Weak / Strong |
+| p4 | crystal | 3 | 13 / 6 | 34 / 20 / 44 | Strong / Weak |
 | root | none | 0 | 12 / 0 | 27 / 11 / 39 | Strong / Weak |
-| heart | ore | 4 | 29 / 16, starved 16 / 8 | 67 / 38 / >80; starved 33 / 17 / 40 | Strong (175) / Weak (49) |
+| heart | ore | 4 | 21 / 11, starved 16 / 8 | 50 / 29 / 63; starved 33 / 17 / 40 | Strong (176) / Weak (48) |
 
 **Layout 2: Twin Seams**
 
 | Node | Prize | Slots | Guards (T/S) | Min wave d / l / f | Tags l / f |
 | --- | --- | --- | --- | --- | --- |
-| p1 | ice | 2 | 4 / 10 | 20 / 20 / 23 | Even (125) / Even (100) |
-| p2 | crystal | 2 | 4 / 10 | 20 / 20 / 23 | Even / Even |
-| p3 | crystal | 3 | 4 / 37 | 36 / 39 / 26 | Weak / Strong |
-| p4 | ice | 3 | 18 / 8 | 43 / 25 / 56 | Strong / Weak |
+| p1 | ice | 2 | 2 / 6 | 15 / 16 / 17 | Even (117) / Even (107) |
+| p2 | crystal | 2 | 2 / 6 | 15 / 16 / 17 | Even / Even |
+| p3 | crystal | 3 | 3 / 26 | 28 / 31 / 22 | Weak / Strong |
+| p4 | ice | 3 | 13 / 6 | 34 / 20 / 44 | Strong / Weak |
 | root | none | 0 | 6 / 12 | 26 / 22 / 28 | Even (134) / Even (90) |
-| heart | ore | 4 | 12 / 42, starved 8 / 21 | 52 / 47 / 47; starved 27 / 21 / 23 | Even (110) / Even (114) |
+| heart | ore | 4 | 10 / 34, starved 8 / 21 | 45 / 40 / 41; starved 27 / 21 / 23 | Even (111) / Even (113) |
 
-**Tag accuracy at these numbers.** Say a type's tag is "right" when Strong means it needs at most 80% of the drones' wave, Weak means it needs more than the drones, and Even is anything in between. By that test (as measured by the report in `packages/sim/test/min-waves.test.ts`), 33 of the 36 tags at full caps are right, and 38 of 42 when the starved heart is included. The four misreads, all in Twin Seams:
-- **p1 flak:** needs 23 against the drones' 20 (15% more) and reads Even; by the test it should read Weak. The Designer's calibration called this close enough.
-- **p2 flak:** the same mix as p1, so the same numbers and the same misread.
-- **Root flak:** needs 28 against the drones' 26 (8% more) and reads Even; it should read Weak. Not covered by the earlier "close enough" call; needs a Designer judgment.
-- **Starved heart lancer:** needs 21 against the drones' 27 (78%) and reads Even; it should read Strong. It is just past the 80% line, in the final fight; needs a Designer judgment (or the tag-formula follow-up below).
+**Tag accuracy at these numbers (data v9).** Say a type's tag is "right" when Strong means it needs at most 80% of the drones' wave, Weak means it needs more than the drones, and Even is anything in between. By that test (the shipped-data report in `packages/sim/test/min-waves.test.ts`, run on v9), 31 of the 36 tags at full caps are right, and 36 of 42 when the starved heart is included (v5: 33 of 36 and 38 of 42). The six misreads, all in Twin Seams:
+- **p1 lancer and p1 flak:** they need 16 and 17 against the drones' 15 and read Even; by the test both should read Weak. h5-design-data shrank p1 and p2 from 4 / 10 to 2 / 6, so the first pocket falls to drones within the fleet limit, and drones are relatively stronger against small mixed nodes.
+- **p2 lancer and p2 flak:** the same mix as p1, so the same numbers and the same misreads.
+- **Root flak:** needs 28 against the drones' 26 (8% more) and reads Even; it should read Weak. Unchanged since v5.
+- **Starved heart lancer:** needs 21 against the drones' 27 (78%) and reads Even; it should read Strong. Unchanged since v5.
 
 Twin Seams reads Even/Even for both counters at its Root and at its heart, fed and starved, so there the tags give no guidance in the final fight. Whether that is intended for the symmetric layout is a Designer follow-up (Critic note).
 
 The H2-era mixes are kept in git history (data v4).
 
 Why these layouts:
-- **Every first move is a light pocket taken with drones**, about 13–14 of them. There are two doors, one per resource.
+- **Every first move is a light pocket taken with drones**, about 13–14 of them. There are two doors, one per resource. *At data v9 (H5), in The Deep: the Thorn-mixed light pocket falls to 13 drones, the Spore-heavy one to 17, and each Twin Seams light pocket to 15 (`min-waves.test.ts` shipped report), so one of them always fits the fleet limit at Command limit 1 (18).*
 - **Each heavy pocket wants one counter.** In each layout, one tier 1 resource gives a cheap path to the heavy pocket holding the *other* resource, or to more of the same. Which path is cheap flips between layouts.
 - **Light pockets are not all the same.**
   - In Frost Gate and Glass Thicket, one light pocket is Spore-heavy (flak-friendly) and the other is Thorn-mixed. The resource behind each is swapped between the two layouts.

@@ -5,6 +5,8 @@ import {
   campaignWorld,
   createWorld,
   isWon,
+  heartIndex,
+  rootIndex,
   runSummary,
   step,
   throughputPerMin,
@@ -12,10 +14,12 @@ import {
   type CampaignStart,
   type Input,
   type ResourceTriple,
+  type ShipTypeCounts,
   type SimData,
   type World,
 } from '@factory4x/sim';
-import { decideArea, decideOverworld, type CampaignStrategy } from './strategies.ts';
+import { decideArea, decideComposer, decideOverworld, closedKey, WINNING_STRATEGIES, type CampaignStrategy } from './strategies.ts';
+import { closedAt, fitsAt, singleClosedAt, singleFitsAt, type HeartProbe, type ProbeLimits } from './waves.ts';
 
 /** won = the probe core was bought; timeout = the campaign cap ran out; softlock = nothing left to do or a second visit timeout. */
 export type Outcome = 'won' | 'timeout' | 'softlock' | 'crash';
@@ -33,10 +37,19 @@ export interface Visit {
   /** Game ticks played in the visit (landing to capture, or to the withdraw). */
   playTicks: number;
   result: 'reclaimed' | 'withdrawn';
+  /** Withdrawn at once because nothing passed the attack test at the limit (a closed area), not a visit timeout. */
+  closed: boolean;
+  /** The landing was forced: every open area was recorded closed. */
+  forced: boolean;
   /** Ticks from the landing until route deliveries first reached OPENING_ORE_PER_MIN; null if never in the visit. */
   openingTicks: number | null;
   shipsBuilt: number;
   shipsLost: number;
+  shipsRecycled: number;
+  /** The Root was cut before the heart fell (reclaimed visits): null when the area has no Root. */
+  rootCutBeforeHeart: boolean | null;
+  /** The ships that fought the capturing battle at the heart, by type (reclaimed visits), else null. */
+  wave: ShipTypeCounts | null;
 }
 
 export interface ResearchBuy {
@@ -66,6 +79,7 @@ export interface CampaignResult {
   research: ResearchBuy[];
   shipsBuilt: number;
   shipsLost: number;
+  shipsRecycled: number;
   hauled: ResourceTriple;
   shipped: ResourceTriple;
   /** Shipped units over hauled + shipped units, in percent (integer); 0 if neither. */
@@ -86,18 +100,12 @@ export interface RunOptions {
   campaignCapTicks: number;
   /** Stop (outcome 'won' is not set; the caller reads the visits) after this many reclaims in this run. */
   stopAfterReclaims?: number;
-  /** H5: set `fleet.cap` to this with a setTunable on the first step (undefined: the data's default). */
+  /** Set `fleet.cap` to this with a setTunable on the first step, overriding the strategy's own (undefined: the strategy's, else the data's default). */
   fleetCap?: number;
 }
 
-/**
- * h5-sim: the H4 strategies play H4's rules, so they run with fleet.cap 0 (no fleet limit; DESIGN.md H5
- * "The A/B switch"). h5-bots replaces them with the H5 composer strategies, which play the limit.
- */
-export const H4_FLEET_CAP = 0;
-
 export function defaultRunOptions(data: SimData, visitCapTicks: number): RunOptions {
-  return { visitCapTicks, campaignCapTicks: CAMPAIGN_CAP_MIN * 60 * data.tickRate, fleetCap: H4_FLEET_CAP };
+  return { visitCapTicks, campaignCapTicks: CAMPAIGN_CAP_MIN * 60 * data.tickRate };
 }
 
 function percentile(sorted: Float64Array, p: number): number {
@@ -129,14 +137,17 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
   const visits: Visit[] = [];
   const research: ResearchBuy[] = [];
   const timeouts = new Map<number, number>();
-  let visit: { area: number; startTick: number; openingTicks: number | null } | null = null;
+  const closedRecords = new Map<number, string>();
+  let visit: { area: number; startTick: number; openingTicks: number | null; forced: boolean } | null = null;
+  let nextForced = false;
   let loggedResearch = camp.researchLog.length;
   let reclaims = 0;
   let outcome: Outcome = 'timeout';
   let error: string | undefined;
-  let firstInputs: Input[] = opts.fleetCap === undefined ? [] : [{ type: 'setTunable', key: 'fleet.cap', value: opts.fleetCap }];
+  const cap0 = opts.fleetCap ?? strategy.fleetCap;
+  let firstInputs: Input[] = cap0 === undefined ? [] : [{ type: 'setTunable', key: 'fleet.cap', value: cap0 }];
 
-  const finishVisit = (result: 'reclaimed' | 'withdrawn'): void => {
+  const finishVisit = (result: 'reclaimed' | 'withdrawn', closed = false): void => {
     if (visit === null) return;
     const rec = camp.areas[visit.area]!;
     const s = runSummary(world);
@@ -145,9 +156,14 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
       startTick: visit.startTick,
       playTicks: result === 'reclaimed' ? (rec.reclaimPlayTicks ?? world.tick - visit.startTick) : world.tick - visit.startTick,
       result,
+      closed,
+      forced: visit.forced,
       openingTicks: visit.openingTicks,
       shipsBuilt: s.shipsBuilt,
       shipsLost: s.shipsLost,
+      shipsRecycled: s.shipsRecycled,
+      rootCutBeforeHeart: result === 'reclaimed' && rootIndex(world) >= 0 ? s.rootCutTick !== null : null,
+      wave: result === 'reclaimed' && world.lastBattle !== null && world.lastBattle.node === heartIndex(world) ? { ...world.lastBattle.engagedByType } : null,
     });
     if (result === 'reclaimed') reclaims++;
     visit = null;
@@ -164,7 +180,7 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
       let inputs: Input[];
       const inArea = camp.active !== null;
       if (inArea) {
-        if (visit === null) visit = { area: camp.active!, startTick: camp.areaStartTick, openingTicks: null };
+        if (visit === null) visit = { area: camp.active!, startTick: camp.areaStartTick, openingTicks: null, forced: nextForced };
         if (world.capturedTick !== null) {
           finishVisit('reclaimed');
           inputs = [{ type: 'leaveArea' }];
@@ -178,10 +194,21 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
           }
           inputs = [{ type: 'leaveArea' }];
         } else {
-          inputs = decideArea(world);
+          if (strategy.engine === 'h3') inputs = decideArea(world);
+          else {
+            const d = decideComposer(world, data, { dronesOnly: strategy.dronesOnly === true, forced: visit.forced });
+            if (d.closed) {
+              const a = camp.active!;
+              finishVisit('withdrawn', true);
+              closedRecords.set(a, closedKey(world));
+              inputs = [{ type: 'leaveArea' }];
+            } else inputs = d.inputs;
+          }
         }
       } else {
-        const input = decideOverworld(world, data, strategy);
+        const dec = decideOverworld(world, data, strategy, closedRecords);
+        const input = dec.input;
+        nextForced = dec.forced;
         if (input === null) {
           outcome = 'softlock';
           break;
@@ -234,6 +261,7 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
     research,
     shipsBuilt: sum.shipsBuilt,
     shipsLost: sum.shipsLost,
+    shipsRecycled: sum.shipsRecycled,
     hauled: sum.hauled,
     shipped: sum.shipped,
     shippedSharePct: hauledUnits + shippedUnits === 0 ? 0 : Math.floor((shippedUnits * 100) / (hauledUnits + shippedUnits)),
@@ -256,8 +284,6 @@ export function runSeeds(strategy: CampaignStrategy, seeds: number, data: SimDat
 export const mmss = (sec: number | null): string => (sec === null ? 'never' : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`);
 /** Ticks as m:ss. */
 export const tickMmss = (ticks: number | null, tickRate: number): string => (ticks === null ? 'never' : mmss(Math.floor(ticks / tickRate)));
-/** True when a and b differ by at most pct percent of the smaller (integers). */
-const within = (a: number, b: number, pct: number): boolean => Math.abs(a - b) * 100 <= pct * Math.min(a, b);
 
 /** The visit that reclaimed `area`, or null. */
 export function reclaimVisit(r: Pick<CampaignResult, 'visits'>, area: string): Visit | null {
@@ -265,211 +291,134 @@ export function reclaimVisit(r: Pick<CampaignResult, 'visits'>, area: string): V
   return null;
 }
 
-/** Opening time (ticks) of the visit that reclaimed `area`; a visit that never reached the rate counts as its whole length. */
-function openingOf(r: CampaignResult, area: string): number | null {
-  const v = reclaimVisit(r, area);
-  return v === null ? null : (v.openingTicks ?? v.playTicks);
-}
-
-/** The first tier-1 area an area order reclaims. */
-function firstLight(r: CampaignResult): string | null {
-  return r.reclaimOrder.find((id) => id === 'shelf' || id === 'shoal') ?? null;
-}
-
-/** The flag 4 probe runs: ticks the greedy engine needed to reclaim the area, null if it didn't. */
-export interface Flag4Probes {
-  veilFlak: number | null;
-  veilLancer: number | null;
-  gardenLancer: number | null;
-  gardenFlak: number | null;
-}
-
-/**
- * Flag 4's four games (seed 1): from a constructed campaign with Landfall, Frost Shelf and Glass Shoal reclaimed
- * and opening 1, extraction 1 bought, plus one design, the in-area engine reclaims Spore Veil or Thorn Garden.
- */
-export function runFlag4Probes(data: SimData, visitCapTicks: number, seed = 1): Flag4Probes {
-  const probe = (area: string, design: 'lancer' | 'flak'): number | null => {
-    const strategy: CampaignStrategy = { name: `probe-${area}-${design}`, description: '', kit: 'none', route: [area] };
-    const r = runCampaign(strategy, seed, data, {
-      start: { reclaimed: ['landfall', 'shelf', 'shoal'], research: { opening: 1, extract: 1, [design]: 1 } },
-      visitCapTicks,
-      campaignCapTicks: visitCapTicks,
-      stopAfterReclaims: 1,
-      fleetCap: H4_FLEET_CAP,
-    });
-    return reclaimVisit(r, area)?.playTicks ?? null;
-  };
-  return {
-    veilFlak: probe('veil', 'flak'),
-    veilLancer: probe('veil', 'lancer'),
-    gardenLancer: probe('garden', 'lancer'),
-    gardenFlak: probe('garden', 'flak'),
-  };
-}
-
 /** One flag line: `pass` is a report marker, never a gate. */
-export interface H4Flag {
+export interface H5Flag {
   name: string;
   pass: boolean;
   detail: string;
 }
 
-/** Spec target windows for an area's reclaiming visit, in game seconds (DESIGN.md H4 flag 2). */
-export const AREA_TIME_TARGETS: Readonly<Record<string, readonly [number, number]>> = {
-  landfall: [0, 60],
-  shelf: [4 * 60, 9 * 60],
-  shoal: [4 * 60, 9 * 60],
-  veil: [6 * 60, 13 * 60],
-  garden: [6 * 60, 13 * 60],
-  deep: [8 * 60, 16 * 60],
-};
-/** Flag 2 window for the best strategy's full run, in game minutes. */
-export const RUN_MIN_MIN = 45;
-export const RUN_MAX_MIN = 75;
-
-/** Mean reclaiming-visit seconds per area over the results that reclaimed it (integer), or null. */
-export function meanAreaSeconds(results: readonly CampaignResult[], area: string, tickRate: number): number | null {
-  const xs: number[] = [];
-  for (const r of results) {
-    const v = reclaimVisit(r, area);
-    if (v !== null) xs.push(v.playTicks);
-  }
-  return xs.length === 0 ? null : Math.floor(xs.reduce((a, b) => a + b, 0) / xs.length / tickRate);
+/** What the flags need besides the runs and the probe: tick rate, the tier of each area id, the probe's limits. */
+export interface FlagContext {
+  tickRate: number;
+  tiers: Readonly<Record<string, number>>;
+  limits: ProbeLimits;
+  seeds: number;
 }
 
-/** Results of one seed. */
-const ofSeed = (results: readonly CampaignResult[], seed: number): CampaignResult[] => results.filter((r) => r.seed === seed);
-const wonOnly = (rs: readonly CampaignResult[]): CampaignResult[] => rs.filter((r) => r.outcome === 'won');
-const best = (rs: readonly CampaignResult[]): CampaignResult | null => wonOnly(rs).reduce<CampaignResult | null>((b, r) => (b === null || r.playTicks < b.playTicks ? r : b), null);
+/** The strategies flag 1 covers (the ones meant to win). */
+const WINNERS = WINNING_STRATEGIES;
+const GAP_PP = 30;
+
+/** Lancer share of a probe row's best mix, in whole percent (integer), or null without a mix. */
+export function lancerSharePct(row: Pick<HeartProbe, 'mix' | 'mixFleet'>): number | null {
+  if (row.mix === null || row.mixFleet === null || row.mix === 0) return null;
+  return Math.floor((row.mixFleet.lancer * 100) / row.mix);
+}
 
 /**
- * The seven H4 flags (DESIGN.md H4 "Bots: campaign strategies") as report lines. `probes` is flag 4's four runs
- * (null if not run); `seeds` how many seeds were played; the determinism result comes from the CLI.
+ * The seven H5 flags (DESIGN.md H5 "Bots: strategies and the probe") as report lines. Each measures what can or
+ * can't be done at a limit, never a time gap. `probe` is the minimum-wave probe (null if not run).
  */
-export function computeH4Flags(
+export function computeH5Flags(
   results: readonly CampaignResult[],
-  probes: Flag4Probes | null,
-  data: Pick<SimData, 'tickRate'>,
-  seeds: number,
+  probe: readonly HeartProbe[] | null,
+  ctx: FlagContext,
   determinismOk: boolean,
   determinismDetail = '',
-): H4Flag[] {
-  const tr = data.tickRate;
-  const sec = (ticks: number | null): number | null => (ticks === null ? null : Math.floor(ticks / tr));
-  const mins = (ticks: number | null): string => (ticks === null ? 'never' : (ticks / tr / 60).toFixed(1));
-  const seedList = Array.from({ length: seeds }, (_, i) => i + 1);
-  const flags: H4Flag[] = [];
-
-  // 1. No softlock.
-  const f1 = `No softlock: every strategy buys the probe core on every seed within ${CAMPAIGN_CAP_MIN} game minutes of play`;
-  const bad = results.filter((r) => r.outcome !== 'won' || r.playTicks > CAMPAIGN_CAP_MIN * 60 * tr);
-  flags.push({
-    name: f1,
-    pass: results.length > 0 && bad.length === 0,
-    detail: bad.length === 0 ? `all ${results.length} runs bought the core` : `not won: ${bad.map((r) => `${r.strategy}/${r.seed} ${r.outcome}`).join(', ')}`,
+): H5Flag[] {
+  const { limits: L, tiers, tickRate: tr } = ctx;
+  const seedList = Array.from({ length: ctx.seeds }, (_, i) => i + 1);
+  const flags: H5Flag[] = [];
+  const NO_PROBE = 'probe not run';
+  const rowsOf = (tier: number, state: 'fed' | 'starved'): HeartProbe[] => (probe ?? []).filter((r) => r.tier === tier && r.state === state);
+  const label = (r: HeartProbe): string => `${r.area}${r.layout !== null ? `/${r.layout}` : ''} ${r.state}`;
+  const n = (v: number | null): string => (v === null ? '>80' : String(v));
+  /** Pass if `rows` is non-empty and every row satisfies `ok`; the detail lists each. */
+  const every = (rows: HeartProbe[], ok: (r: HeartProbe) => boolean, show: (r: HeartProbe) => string): { pass: boolean; detail: string } => ({
+    pass: rows.length > 0 && rows.every(ok),
+    detail: rows.length === 0 ? 'no rows' : rows.map((r) => `${label(r)} ${show(r)} ${ok(r) ? 'ok' : 'MISS'}`).join('; '),
   });
 
-  // 2. Run length and area times.
-  const f2 = `Run length: the best strategy's full run is ${RUN_MIN_MIN}-${RUN_MAX_MIN} game minutes on every seed, and mean area times are inside their windows`;
+  // 1. No softlock.
   {
-    const parts: string[] = [];
-    let okRun = true;
-    for (const s of seedList) {
-      const b = best(ofSeed(results, s));
-      if (b === null || b.playTicks < RUN_MIN_MIN * 60 * tr || b.playTicks > RUN_MAX_MIN * 60 * tr) okRun = false;
-      parts.push(`seed ${s} best ${b === null ? 'none' : `${b.strategy} ${mins(b.playTicks)} min`}`);
-    }
-    const areaParts: string[] = [];
-    let okAreas = true;
-    for (const [id, [lo, hi]] of Object.entries(AREA_TIME_TARGETS)) {
-      const m = meanAreaSeconds(results, id, tr);
-      const ok = m !== null && m >= lo && m <= hi;
-      if (!ok) okAreas = false;
-      areaParts.push(`${id} ${m === null ? 'never' : mmss(m)} (${mmss(lo)}-${mmss(hi)}${ok ? '' : ' MISS'})`);
-    }
-    flags.push({ name: f2, pass: okRun && okAreas, detail: `${parts.join('; ')}; run ${okRun ? 'inside' : 'OUTSIDE'} the window; mean area times ${areaParts.join(', ')}` });
-  }
-
-  // 3. Two viable sides.
-  const f3 = 'Two viable sides: ice-line and crystal-line finish within 15% of each other on at least 2 of 3 seeds';
-  {
-    let close = 0;
-    const parts: string[] = [];
-    for (const s of seedList) {
-      const i = ofSeed(results, s).find((r) => r.strategy === 'ice-line');
-      const c = ofSeed(results, s).find((r) => r.strategy === 'crystal-line');
-      if (!i || !c || i.outcome !== 'won' || c.outcome !== 'won') {
-        parts.push(`seed ${s}: ice ${i?.outcome ?? 'missing'}, crystal ${c?.outcome ?? 'missing'}`);
-        continue;
-      }
-      const ok = within(i.playTicks, c.playTicks, 15);
-      if (ok) close++;
-      const gap = Math.round((Math.abs(i.playTicks - c.playTicks) * 100) / Math.min(i.playTicks, c.playTicks));
-      parts.push(`seed ${s}: ice ${mins(i.playTicks)}, crystal ${mins(c.playTicks)}, gap ${gap}% (${ok ? 'within' : 'outside'})`);
-    }
-    flags.push({ name: f3, pass: close >= 2, detail: `${close} of ${seeds} within 15%; ${parts.join('; ')}` });
-  }
-
-  // 4. The design decides the cheap medium.
-  const f4 = 'The design decides the cheap medium: Spore Veil is at least 20% faster with Flak only than Lancer only, Thorn Garden at least 20% faster with Lancer only than Flak only (seed 1, four probe runs)';
-  if (probes === null) flags.push({ name: f4, pass: false, detail: 'probe runs not performed' });
-  else {
-    // fast is at least 20% faster than slow: fast * 100 <= slow * 80 (a slow run that never finished is infinitely slow).
-    const faster = (fast: number | null, slow: number | null): boolean => fast !== null && (slow === null || fast * 100 <= slow * 80);
-    const veil = faster(probes.veilFlak, probes.veilLancer);
-    const garden = faster(probes.gardenLancer, probes.gardenFlak);
-    const pct = (fast: number | null, slow: number | null): string => (fast === null || slow === null ? 'n/a' : `${Math.round(((slow - fast) * 100) / slow)}% faster`);
+    const rs = results.filter((r) => WINNERS.includes(r.strategy));
+    const bad = rs.filter((r) => r.outcome !== 'won' || r.playTicks > CAMPAIGN_CAP_MIN * 60 * tr);
     flags.push({
-      name: f4,
-      pass: veil && garden,
-      detail: `Veil: flak ${mmss(sec(probes.veilFlak))}, lancer ${mmss(sec(probes.veilLancer))} (flak ${pct(probes.veilFlak, probes.veilLancer)}, ${veil ? 'met' : 'missed'}); Garden: lancer ${mmss(sec(probes.gardenLancer))}, flak ${mmss(sec(probes.gardenFlak))} (lancer ${pct(probes.gardenLancer, probes.gardenFlak)}, ${garden ? 'met' : 'missed'})`,
+      name: `No softlock: ${WINNERS.join(', ')} buy the probe core on every seed within ${CAMPAIGN_CAP_MIN} game minutes of play`,
+      pass: rs.length === WINNERS.length * ctx.seeds && bad.length === 0,
+      detail: bad.length === 0 ? `all ${rs.length} runs bought the core` : `not won: ${bad.map((r) => `${r.strategy}/${r.seed} ${r.outcome} at ${(r.playTicks / tr / 60).toFixed(1)} min`).join(', ')}`,
     });
   }
 
-  // 5. Research matters, and openings shrink.
-  const f5 = 'Research matters: no-research takes at least 25% longer than the best strategy on every seed, and every researching strategy opens its last area in at most 60% of the time of its first light area';
+  // 2. Drones don't fit.
   {
-    const parts: string[] = [];
-    let okSlow = true;
-    for (const s of seedList) {
-      const rs = ofSeed(results, s);
-      const nr = rs.find((r) => r.strategy === 'no-research');
-      const b = best(rs.filter((r) => r.strategy !== 'no-research'));
-      if (!nr || nr.outcome !== 'won' || !b || nr.playTicks * 100 < b.playTicks * 125) okSlow = false;
-      const gap = nr && b ? Math.round(((nr.playTicks - b.playTicks) * 100) / b.playTicks) : null;
-      parts.push(`seed ${s}: no-research ${mins(nr?.playTicks ?? null)} vs best ${b ? `${b.strategy} ${mins(b.playTicks)}` : 'none'} min (${gap === null ? 'n/a' : `+${gap}%`})`);
-    }
-    const openParts: string[] = [];
-    let okOpen = true;
-    for (const r of results.filter((x) => x.strategy !== 'no-research')) {
-      const light = firstLight(r);
-      const last = r.reclaimOrder.at(-1) ?? null;
-      const a = light === null ? null : openingOf(r, light);
-      const b = last === null ? null : openingOf(r, last);
-      const lastVisit = last === null ? null : reclaimVisit(r, last);
-      // A last-area visit that never reached the rate has no opening time to compare.
-      const ok = a !== null && b !== null && lastVisit?.openingTicks !== null && b * 100 <= a * 60;
-      if (!ok) okOpen = false;
-      openParts.push(`${r.strategy}/${r.seed} ${last ?? '-'} ${tickMmss(lastVisit?.openingTicks ?? null, tr)} vs ${light ?? '-'} ${tickMmss(a, tr)}${ok ? '' : ' MISS'}`);
-    }
-    flags.push({ name: f5, pass: okSlow && okOpen, detail: `${parts.join('; ')}; openings (last area vs first light area): ${openParts.join(', ')}` });
+    const name = "Drones don't fit: every tier 2 and tier 3 heart is closed to drones alone at the tier's limit (starved: tier 2 at L1, tier 3 at L2), and drones-only reclaims no tier 2 or tier 3 area on any seed";
+    const t2 = every(rowsOf(2, 'starved'), (r) => singleClosedAt(r.drones, L.l1), (r) => `drones ${n(r.drones)} vs L1 ${L.l1}`);
+    const t3 = every(rowsOf(3, 'starved'), (r) => singleClosedAt(r.drones, L.l2), (r) => `drones ${n(r.drones)} vs L2 ${L.l2}`);
+    const dr = results.filter((r) => r.strategy === 'drones-only');
+    const heavy = dr.flatMap((r) => r.reclaimOrder.filter((id) => (tiers[id] ?? 0) >= 2).map((id) => `${r.seed}:${id}`));
+    const probeOk = probe !== null && t2.pass && t3.pass;
+    flags.push({
+      name,
+      pass: probeOk && dr.length === ctx.seeds && heavy.length === 0,
+      detail: `${probe === null ? NO_PROBE : `${t2.detail}; ${t3.detail}`}; drones-only: ${dr.length === 0 ? 'no runs' : heavy.length === 0 ? `no tier 2/3 area reclaimed (reclaimed: ${dr.map((r) => `seed ${r.seed} ${r.reclaimOrder.join('>') || '-'}`).join(', ')})` : `reclaimed ${heavy.join(', ')}`}`,
+    });
   }
 
-  // 6. Order varies.
-  const f6 = 'Order varies: at least two different area orders finish within 15% of the best full-run time on every seed';
+  // 3. The best local mix fits.
   {
+    const name = 'The best local mix fits: tier 1 at L0 with drones, tier 2 starved at L0 and fed at L1, tier 3 starved at L1 and fed at L2';
+    const parts = [
+      every(rowsOf(1, 'fed'), (r) => singleFitsAt(r.drones, L.l0), (r) => `drones ${n(r.drones)} vs L0-2 ${L.l0 - 2}`),
+      every(rowsOf(2, 'starved'), (r) => fitsAt(r.mix, L.l0), (r) => `mix ${n(r.mix)} vs L0-2 ${L.l0 - 2}`),
+      every(rowsOf(2, 'fed'), (r) => fitsAt(r.mix, L.l1), (r) => `mix ${n(r.mix)} vs L1-2 ${L.l1 - 2}`),
+      every(rowsOf(3, 'starved'), (r) => fitsAt(r.mix, L.l1), (r) => `mix ${n(r.mix)} vs L1-2 ${L.l1 - 2}`),
+      every(rowsOf(3, 'fed'), (r) => fitsAt(r.mix, L.l2), (r) => `mix ${n(r.mix)} vs L2-2 ${L.l2 - 2}`),
+    ];
+    flags.push({ name, pass: probe !== null && parts.every((p) => p.pass), detail: probe === null ? NO_PROBE : parts.map((p) => p.detail).join('; ') });
+  }
+
+  // 4. Both counters needed.
+  {
+    const name = "Both counters needed: no single type fits either medium's fed heart at L1, and the best mix does";
+    const p = every(
+      rowsOf(2, 'fed'),
+      (r) => ![r.drones, r.lancers, r.flak].some((v) => singleFitsAt(v, L.l1)) && fitsAt(r.mix, L.l1),
+      (r) => `d/l/f ${n(r.drones)}/${n(r.lancers)}/${n(r.flak)}, mix ${n(r.mix)}, fit means <= ${L.l1 - 2}`,
+    );
+    flags.push({ name, pass: probe !== null && p.pass, detail: probe === null ? NO_PROBE : p.detail });
+  }
+
+  // 5. A raise opens an area.
+  {
+    const name = "A raise opens an area: every medium's fed heart is closed at L0, every Deep layout's fed heart is closed at L1 and fits at L2, and no-command does not buy the core on any seed";
+    const med = every(rowsOf(2, 'fed'), (r) => closedAt(r.mix, L.l0), (r) => `mix ${n(r.mix)} vs L0 ${L.l0}`);
+    const deep = every(rowsOf(3, 'fed'), (r) => closedAt(r.mix, L.l1) && fitsAt(r.mix, L.l2), (r) => `mix ${n(r.mix)} vs L1 ${L.l1} / L2-2 ${L.l2 - 2}`);
+    const nc = results.filter((r) => r.strategy === 'no-command');
+    const bought = nc.filter((r) => r.research.some((b) => b.item === 'core'));
+    flags.push({
+      name,
+      pass: probe !== null && med.pass && deep.pass && nc.length === ctx.seeds && bought.length === 0,
+      detail: `${probe === null ? NO_PROBE : `${med.detail}; ${deep.detail}`}; no-command: ${nc.length === 0 ? 'no runs' : nc.map((r) => `seed ${r.seed} ${r.outcome}, reclaimed ${r.reclaimOrder.join('>') || '-'}${r.research.some((b) => b.item === 'core') ? ' (bought the core)' : ''}`).join(', ')}`,
+    });
+  }
+
+  // 6. Composition varies.
+  {
+    const name = `Composition varies: on every seed, the lancer share of the best mix differs by at least ${GAP_PP} percentage points between at least two tier 2 or 3 hearts (fed or starved)`;
     const parts: string[] = [];
-    let all = true;
+    let all = probe !== null && ctx.seeds > 0;
     for (const s of seedList) {
-      const rs = ofSeed(results, s);
-      const b = best(rs);
-      const orders = new Set<string>();
-      if (b !== null) for (const r of wonOnly(rs)) if (within(r.playTicks, b.playTicks, 15)) orders.add(r.reclaimOrder.join('>'));
-      if (orders.size < 2) all = false;
-      parts.push(`seed ${s}: ${orders.size} order${orders.size === 1 ? '' : 's'}`);
+      const rows = (probe ?? []).filter((r) => r.tier >= 2 && (r.tier === 2 || r.seed === s));
+      const shares = rows.map((r) => ({ r, pct: lancerSharePct(r) })).filter((x): x is { r: HeartProbe; pct: number } => x.pct !== null);
+      const lo = shares.reduce<(typeof shares)[number] | null>((b, x) => (b === null || x.pct < b.pct ? x : b), null);
+      const hi = shares.reduce<(typeof shares)[number] | null>((b, x) => (b === null || x.pct > b.pct ? x : b), null);
+      const gap = lo && hi ? hi.pct - lo.pct : null;
+      if (gap === null || gap < GAP_PP) all = false;
+      parts.push(`seed ${s}: ${gap === null ? 'no mixes' : `${lo!.pct}% ${label(lo!.r)} to ${hi!.pct}% ${label(hi!.r)}, gap ${gap} pp`}`);
     }
-    flags.push({ name: f6, pass: all && seeds > 0, detail: parts.join('; ') });
+    flags.push({ name, pass: all, detail: probe === null ? NO_PROBE : parts.join('; ') });
   }
 
   flags.push({ name: 'Determinism and the reference replay pass', pass: determinismOk, detail: determinismDetail });

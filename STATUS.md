@@ -32,10 +32,12 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 10 | critic | h5-bots | launch | Review round 1: REJECT (stranded probe ship freezes forced visits; red gate) |
 | r7 | engineer | h5-bots | resume | Fix round 1 (5280732): stranded ship fixed; v8 red is data |
 | r9 | critic | h5-bots | resume | Review round 2: APPROVE code (561a42b); merges only with h5-design-data |
-| r6 | designer | h5-design-data | resume | Calibrate on a branch cut from task/h5-bots |
+| r6 | designer | h5-design-data | resume | Calibrated (f062009): data v9, all 7 flags met, bots gate green |
+| r12 | critic | h5-design-data | resume | Review round 1: REJECT (record only: bring in the h5-bots approval); Director merged 561a42b, gates green (d6eb972) |
+| r13 | critic | h5-design-data | resume | Review round 2: APPROVE (6f364ce); merged with h5-bots |
 | r4 | critic | h5-art | resume | Review round 1: APPROVE (f522965); green branch CI on 29a12ee; merged |
 
-Launches: 10 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 11.
+Launches: 10 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 13.
 
 ## Iteration 4 ledger
 
