@@ -82,3 +82,21 @@ Required changes:
 If round 3 is rejected, that is this task's third rejection, and PROCESS.md parks it. Both fixes are one line each.
 
 VERDICT: REJECT
+
+## Round 3 · 2026-11-08
+
+Reviewed head 8705399 (`git diff 6e964d7..8705399`: one DESIGN.md sentence and one test title), fixed by the core-engineer, reassigned under the deadlock rule. This is the third review round. Round 2 was the second rejection.
+
+Pillar fit: Unchanged since round 1. The calibrated values are the same and the play feel stays within spec. The ice and crystal sides finish 34 s apart on every seed. The design decides the cheap medium (Veil Flak 44% faster, Garden Lancer 35% faster). Research matters, at +42% to 44%. The best runs take 45.8 to 47.6 min, and every mean area time is in its band.
+
+Quality: Both round 2 items are fixed:
+- The DESIGN.md sentence now gives Thorn Garden 26 → 37 guards (+42%) and Spore Veil 33 → 51 (+55%). Both match the calibration table (17/9 → 24/13 and 3/30 → 1/50). 37/26 = 1.42 and 51/33 = 1.55.
+- `data-h4.test.ts:125` is now titled `'is data version 7'`, which matches its assertion.
+
+Nothing else changed. The data, the v7 archive and the rest of the docs are what I approved in substance in round 2.
+
+Gates: I ran `npm run gates -- --base main` on 8705399, and all six passed: typecheck 6.8 s, lint 2.2 s, test 6.4 s, determinism 0.8 s, bots 20.9 s, and protected-files (no protected files). The report header says "Data version 7", and flags 1 to 7 are all MET. The task touches nothing under `packages/client/` or `tests/smoke/`, so it is not browser-facing.
+
+Required changes: none.
+
+VERDICT: APPROVE
