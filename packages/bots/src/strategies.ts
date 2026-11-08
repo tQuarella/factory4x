@@ -3,35 +3,34 @@ import {
   PROBE,
   SEND_ALL,
   SHIP_TYPES,
+  areaStatus,
+  designResearched,
   guardianStatus,
+  isAreaOpen,
   isGuarded,
   nodeStatus,
+  researchLevel,
+  researchStatus,
   routeCapacityPerMin,
   shipCounts,
   unlockStatus,
   weightedMultPct,
   type Input,
+  type ResearchId,
+  type SimData,
   type World,
 } from '@factory4x/sim';
 
 /**
- * A strategy looks at the world each tick and returns that tick's inputs.
  * Strategies are stateless: every decision is derived from the world they are
  * given (read-only, through the sim's selectors), so a strategy is a pure
  * function of the state. They issue Input commands only.
  *
- * The four H3 strategies (DESIGN.md H3 "Bot checks") share one engine
- * (`decideH3`): the H1 turtle economy plan on a1-a5, then rally at a5, build
- * out every captured node, and attack the cheapest living target by estimate.
- * They differ only in which yards they run and in the first door they take.
+ * H4 (DESIGN.md "Bots: campaign strategies"): a campaign strategy chooses what to buy on the overworld and
+ * which area to land in (`decideOverworld`); inside an area every strategy plays the same engine
+ * (`decideArea`, the H3 engine): the economy plan, rally at a5, build out captured nodes, attack the
+ * cheapest living target by estimate.
  */
-export interface Strategy {
-  name: string;
-  description: string;
-  /** Placeholder with no behavior; the report labels it and skips tuning flags. */
-  stub?: boolean;
-  decide(world: Readonly<World>): Input[];
-}
 
 /** Node index by map id ('a1', 'heart'); -1 if the map lacks it. */
 function nodeIndex(world: Readonly<World>, id: string): number {
@@ -100,18 +99,6 @@ export function fleetPower(world: Readonly<World>, node: number, fleet: Readonly
   return p;
 }
 
-/**
- * The first door: the light pocket (fewer than 3 slots) holding `prize`, while it is alive.
- * Every layout has exactly one light ice pocket and one light crystal pocket.
- */
-export function firstDoor(world: Readonly<World>, prize: 'ice' | 'crystal'): number | null {
-  for (const g of world.guardians) {
-    const n = world.nodes[g.node]!;
-    if (g.alive && n.kind === 'pocket' && n.slots < 3 && n.prize === prize) return g.node;
-  }
-  return null;
-}
-
 /** The living guarded node with the lowest need / prizeWeight; the heart only when it is the last one. */
 export function nextTarget(world: Readonly<World>): number | null {
   let best: number | null = null;
@@ -136,6 +123,8 @@ export function nextTarget(world: Readonly<World>): number | null {
 
 /** Ready to attack: power × 3 ≥ (need + 20) × (5/4)^(waves already sent there). */
 export function readyToAttack(world: Readonly<World>, node: number, power: number): boolean {
+  // An unguarded heart (Landfall) falls to the first ship.
+  if (guardNeed(world, node) === 0) return power > 0;
   const k = Math.min(12, world.guardians.find((g) => g.node === node)!.wavesSent);
   return power * 3 * 4 ** k >= (guardNeed(world, node) + 20) * 5 ** k;
 }
@@ -147,17 +136,25 @@ function waveInFlight(world: Readonly<World>): boolean {
   return false;
 }
 
-export interface H3Plan {
-  /** Run the lancer and flak yards once their component is unlocked (drones-only never does). */
-  counters: boolean;
-  /** Take the light pocket with this prize first, before the greedy rule applies. */
-  door: 'ice' | 'crystal' | null;
-}
+/** The economy asteroids the plan builds on, in order (areas leave some out). */
+const ECONOMY_NODES = ['a1', 'a2', 'a3', 'a4', 'a5'] as const;
 
-export function decideH3(world: Readonly<World>, plan: H3Plan): Input[] {
+/**
+ * The in-area engine (the H3 engine): the economy plan on the area's asteroids, rally at a5 (present in every
+ * area), build out every captured node, and attack the cheapest living target by estimate. A researched yard
+ * runs once its component's resource has arrived. An area whose guards are all zero (Landfall) skips the
+ * economy and sends the first ship.
+ */
+export function decideArea(world: Readonly<World>): Input[] {
   const inputs: Input[] = [];
   const a5 = nodeIndex(world, 'a5');
-  const econ = buildPlan(world, ['a1', 'a2', 'a3', 'a4', 'a5'].map((id) => nodeIndex(world, id)));
+  const trivial = world.guardians.length > 0 && world.guardians.every((g) => guardNeed(world, g.node) === 0);
+  const econ = trivial
+    ? { done: true, order: null }
+    : buildPlan(
+        world,
+        ECONOMY_NODES.map((id) => nodeIndex(world, id)).filter((n) => n >= 0),
+      );
   if (!econ.done) {
     if (world.yards.drone.on) inputs.push({ type: 'setShipyard', shipType: 'drone', on: false });
     if (econ.order) inputs.push(econ.order);
@@ -165,10 +162,10 @@ export function decideH3(world: Readonly<World>, plan: H3Plan): Input[] {
   }
   const unlocked = unlockStatus(world).ships;
   for (const t of SHIP_TYPES) {
-    const want = t === 'drone' || (plan.counters && unlocked[t]);
+    const want = t === 'drone' || (unlocked[t] && designResearched(world, t));
     if (world.yards[t].on !== want) inputs.push({ type: 'setShipyard', shipType: t, on: want });
   }
-  if (world.rally !== a5) inputs.push({ type: 'setRally', node: a5 });
+  if (a5 >= 0 && world.rally !== a5) inputs.push({ type: 'setRally', node: a5 });
   // After a capture: extractors up to the slots, a route, up to 2 upgrades (nextEconomyOrder), in capture order.
   const owned = world.stats.captures.map((c) => c.node).filter((n) => world.nodes[n]!.kind !== 'root');
   const out = buildPlan(world, owned);
@@ -179,8 +176,7 @@ export function decideH3(world: Readonly<World>, plan: H3Plan): Input[] {
     if (c.at[cap.node]! > 0) inputs.push({ type: 'sendShips', from: cap.node, to: a5, counts: SEND_ALL });
   }
   if (waveInFlight(world)) return inputs;
-  const door = plan.door === null ? null : firstDoor(world, plan.door);
-  const target = door ?? nextTarget(world);
+  const target = nextTarget(world);
   if (target === null || !isGuarded(world, target)) return inputs;
   const fleet = c.atByType[a5]!;
   if (fleet.drone + fleet.lancer + fleet.flak > 0 && readyToAttack(world, target, fleetPower(world, target, fleet))) {
@@ -189,25 +185,132 @@ export function decideH3(world: Readonly<World>, plan: H3Plan): Input[] {
   return inputs;
 }
 
-export const strategies: Strategy[] = [
+/** The research policy's order, as (item, level). */
+export const RESEARCH_POLICY: ReadonlyArray<readonly [ResearchId, number]> = [
+  ['core', 1],
+  ['lancer', 1],
+  ['flak', 1],
+  ['opening', 1],
+  ['extract', 1],
+  ['rigs', 1],
+  ['yards', 1],
+  ['extract', 2],
+  ['opening', 2],
+  ['rigs', 2],
+  ['yards', 2],
+  ['extract', 3],
+  ['opening', 3],
+];
+/** How many leading policy entries (the core and both designs) the no-research strategy buys. */
+export const DESIGNS_ONLY_ENTRIES = 3;
+
+export type ResearchKit = 'full' | 'designs' | 'none';
+
+/** The first item the policy would buy now: the first in its list whose next level the sim says can be bought. Null if none. */
+export function nextPurchase(world: Readonly<World>, data: SimData, kit: ResearchKit): ResearchId | null {
+  const entries = kit === 'none' ? [] : kit === 'designs' ? RESEARCH_POLICY.slice(0, DESIGNS_ONLY_ENTRIES) : RESEARCH_POLICY;
+  const rows = researchStatus(world, data);
+  for (const [item, level] of entries) {
+    const row = rows.find((r) => r.id === item)!;
+    if (row.level === level - 1 && row.canBuy) return item;
+  }
+  return null;
+}
+
+/** The greedy estimate of an area: its heart's need (Σ caps × hp) and the best per-ship power ×100 among drones and the researched designs. */
+export function areaEstimate(world: Readonly<World>, data: SimData, area: number): { need: number; powerX100: number } {
+  const heart = areaStatus(world, data, area).guarded.find((g) => g.kind === 'heart')!;
+  let need = 0;
+  for (const t of GUARD_TYPES) need += heart.caps[t] * world.tun[`guard.${t}.hp`];
+  let powerX100 = 0;
+  for (const t of SHIP_TYPES) {
+    if (!designResearched(world, t)) continue;
+    powerX100 = Math.max(powerX100, world.tun[`ship.${t}.damage`] * weightedMultPct(world.tun, t, heart.caps));
+  }
+  return { need, powerX100 };
+}
+
+/** Open areas in data order. */
+export function openAreas(world: Readonly<World>, data: SimData): number[] {
+  const out: number[] = [];
+  for (let a = 0; a < data.map.areas.length; a++) if (isAreaOpen(world, data, a)) out.push(a);
+  return out;
+}
+
+/** The open area with the lowest estimate (need / power, compared by cross-multiplying), the lowest index on ties; null if none is open. */
+export function cheapestOpenArea(world: Readonly<World>, data: SimData): number | null {
+  let best: number | null = null;
+  let be = { need: 0, powerX100: 1 };
+  for (const a of openAreas(world, data)) {
+    const e = areaEstimate(world, data, a);
+    if (best === null || e.need * be.powerX100 < be.need * e.powerX100) {
+      best = a;
+      be = e;
+    }
+  }
+  return best;
+}
+
+/**
+ * A campaign strategy: what to buy on the overworld and which area to land in. Both are functions of the
+ * world. Inside the area every strategy plays `decideArea`.
+ */
+export interface CampaignStrategy {
+  name: string;
+  description: string;
+  /** 'full' buys by the research policy, 'designs' only the core and the designs, 'none' nothing (the flag 4 probes). */
+  kit: ResearchKit;
+  /** Area ids in the order to take them while open; after the list (or when the next isn't open) the cheapest open area. */
+  route: readonly string[];
+}
+
+/** The area the strategy lands in next, or null if none is open. */
+export function chooseArea(world: Readonly<World>, data: SimData, s: CampaignStrategy): number | null {
+  for (const id of s.route) {
+    const a = data.map.areas.findIndex((x) => x.id === id);
+    if (a >= 0 && isAreaOpen(world, data, a)) return a;
+  }
+  return cheapestOpenArea(world, data);
+}
+
+/** The next overworld input: buy the policy's next item, else land in the chosen area, else nothing (stuck). */
+export function decideOverworld(world: Readonly<World>, data: SimData, s: CampaignStrategy): Input | null {
+  const item = nextPurchase(world, data, s.kit);
+  if (item !== null) return { type: 'buyResearch', item: data.research.findIndex((r) => r.id === item) };
+  const area = chooseArea(world, data, s);
+  return area === null ? null : { type: 'enterArea', area };
+}
+
+export const strategies: CampaignStrategy[] = [
   {
-    name: 'drones-only',
-    description: 'Turtle economy a1-a5, then only the drone yard; takes the cheapest guarded node by estimate (need / prize weight, heart last) when power × 3 ≥ need + 20.',
-    decide: (w) => decideH3(w, { counters: false, door: null }),
+    name: 'ice-line',
+    description: 'Landfall, Frost Shelf, Spore Veil, The Deep, then the cheapest open area until the core is bought. Research policy.',
+    kit: 'full',
+    route: ['landfall', 'shelf', 'veil', 'deep'],
   },
   {
-    name: 'ice-first',
-    description: 'Economy plan, then drones take the light ice pocket first; flak on when ice arrives, lancer when crystal arrives; greedy after that.',
-    decide: (w) => decideH3(w, { counters: true, door: 'ice' }),
+    name: 'crystal-line',
+    description: 'Landfall, Glass Shoal, Thorn Garden, The Deep, then the cheapest open area until the core is bought. Research policy.',
+    kit: 'full',
+    route: ['landfall', 'shoal', 'garden', 'deep'],
   },
   {
-    name: 'crystal-first',
-    description: 'As ice-first, with the light crystal pocket first.',
-    decide: (w) => decideH3(w, { counters: true, door: 'crystal' }),
+    name: 'full-kit',
+    description: 'Landfall, Frost Shelf, Glass Shoal, Spore Veil, Thorn Garden, The Deep. Research policy.',
+    kit: 'full',
+    route: ['landfall', 'shelf', 'shoal', 'veil', 'garden', 'deep'],
   },
   {
     name: 'greedy',
-    description: 'Economy plan, then always the cheapest next target by estimate with every unlocked yard on and the counter tags in the power estimate.',
-    decide: (w) => decideH3(w, { counters: true, door: null }),
+    description: 'After Landfall always the open area with the lowest estimate (heart need / best per-ship power). Research policy.',
+    kit: 'full',
+    route: [],
+  },
+  {
+    name: 'no-research',
+    description: "Greedy's area choice, but buys only the designs and the core.",
+    kit: 'designs',
+    route: [],
   },
 ];
+
