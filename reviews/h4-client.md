@@ -25,3 +25,30 @@ Required changes:
 - [ ] Branch CI green on the fixed commit.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+Reviewed 2246c80 (round 1 fixes), compared with 124155c.
+
+Round 1 items:
+- [x] Pause button on phone: the duplicated, mis-indented rules are gone from the `max-width: 480px` block. Only `#controls .ctl { width: 46px; }` and `#controls .ctl#b-research { width: auto; }` remain. The research override now beats `#controls .ctl` on specificity, which it did not before. The global `#b-pause` icon rules apply at every width.
+- [x] Smoke check: `375x667 portrait › pause and play icons swap on each tap of the pause button` checks computed display and box size of both icons over two pause/play cycles. It passes on desktop and phone.
+- [x] `worldview.ts` label colours now use `palette.areaLocked` and `palette.starBright`.
+- [ ] Branch CI: the Director runs it after merging main. It still has to be green before `merge-task`.
+
+New problem found (not from the round 1 diff, but in this branch's code, and it makes the release smoke suite flaky):
+
+1. **A tap on the overworld in the first ~100 ms after a withdraw or return gets undone.** When the game is running, `leaveArea` is queued and applied inside `Session.advance()` in `frame()`. `refreshUi()`, and so `modeTransition()`, runs only on the 100 ms UI cadence (`uiAcc >= 100` in `main.ts`). In that gap `session.onOverworld` is already true, so the canvas click handler opens the area sheet. Then the next `refreshUi()` sees the screen changed and runs `closeWorldSheets()`, `resizeViews()` and shows the return notice, which also resizes the canvas. The sheet the player just opened disappears, and a tap in that window used positions from before the re-fit.
+   - **Reproduced:** `npm run smoke` on 2246c80 failed `[desktop] withdraw asks first; Stay keeps the area; Withdraw resets it` (71 passed, 1 failed). Rerunning it with `--repeat-each 5` failed 1 of 10. The failure: `#sheet button.land` resolved, then "element was detached from the DOM, retrying" until the 30 s timeout. The page snapshot shows the sheet closed and the "Withdrew from Landfall" toast up, so the transition closed the sheet after the tap opened it. The test taps right after `onOverworld()` turns true, which is exactly that window.
+   - For a player this is a lost tap now and then. For the team it is a release-smoke flake, which is the kind of thing cw-flaky-test was raised to stamp out. Hiding it with CI's single retry is not acceptable.
+
+Gates: `npm run gates -- --base main` on 2246c80: typecheck, lint, test, determinism, bots and protected-files all PASS. `npm run build && npm run smoke`: 71 of 72 passed. The one failure is the flake above, and it reproduces 1 in 10.
+
+Required changes:
+- [ ] Run the screen-change handling as soon as the active area changes, not on the next 100 ms UI tick. For example, call `refreshUi()` (or `modeTransition()`) from `frame()` right after `advance()` whenever `session.world.campaign.active` differs from what was last seen. Then no tap can reach a screen whose transition has not yet run. Do not fix this by adding a wait to the smoke test.
+- [ ] Add a regression check: withdraw while the game is running, then tap Landfall as soon as `onOverworld()` is true. The sheet must stay open, and Land must work. Run the withdraw smoke test with `--repeat-each 10` on both projects and report all passing in the commit message or in DECISIONS.md.
+- [ ] Branch CI green on the fixed commit.
+
+Note for the Director: this is round 2. If round 3 is rejected, the task is parked per PROCESS.md.
+
+VERDICT: REJECT
