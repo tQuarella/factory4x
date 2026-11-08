@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
-**State:** Iteration 3 Build step. Owner approved the Q14 VISION edits (applied b3b7a86) and chose H3 Counter web. Spec in DESIGN.md (e83c3aa), tasks in BACKLOG.md (625d9ca). h3-sim (core-engineer) and h3-art (art-direction) building in parallel.
+**State:** Iteration 3 Build step. Owner approved the Q14 VISION edits (applied b3b7a86) and chose H3 Counter web. Spec in DESIGN.md (e83c3aa), tasks in BACKLOG.md (625d9ca). h3-sim (core-engineer) building; h3-art in fix round 1 after a Critic reject.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-1 (H2 decision depth), commit 13201db, live and passing the live smoke test.
@@ -85,9 +85,11 @@ Launches: 4. Resumes: 0. Both tasks done. Follow-ups from the reviews (not block
 | r1 | designer | H3 steelman of owner direction | resume | Owner asked for the asteroid-field direction instead (Q13); steelman + M2 plan + Q14 (1159e74) |
 | r2 | designer | H3 spec | resume | Owner approved Q14 and Counter web; full spec (e83c3aa) |
 | 2 | core-engineer | h3-sim | launch | Build (worktree, branch `task/h3-sim`) |
-| 3 | art-direction | h3-art | launch | Build (worktree, branch `task/h3-art`), parallel with h3-sim |
+| 3 | art-direction | h3-art | launch | Build (worktree, branch `task/h3-art`), parallel with h3-sim; green 8847e96 |
+| 4 | critic | h3-art | launch | Round 1: REJECT (draw bounds on lancer/flak/plating, gallery rows overflow, labels, tidy) |
+| r3 | art-direction | h3-art | resume | Fix round 1 |
 
-Launches: 3 / 12. Resumes: 2. Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
+Launches: 4 / 12. Resumes: 3. Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
 
 ## Next step
 
