@@ -36,3 +36,29 @@ Required changes:
 - [ ] Branch CI green on the fixed commit.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-07
+
+Reviewed fix commit c8fed7a in a fresh detached worktree at origin/task/h3-art (not the author's worktree). As in round 1, I rebuilt the gallery, served it with Vite, screenshotted every row in Chromium at 375 px wide (DPR 3), and re-measured each new draw's furthest painted pixel (alpha > 8) on an offscreen canvas at r = 50.
+
+Round 1 required changes:
+- [x] Every draw stays within radius r. Measured: drone 0.85r, lancer 0.98 to 1.006r across headings 0, 0.4, 0.7 and 2.3, flak 0.91r, spore 1.004r at four times and two hp levels, guard ring 1.012r, pocket 0.98r alive and 0.77r captured, and icons ore 0.91r, ice 0.95r, crystal 0.99r, lens 0.89r, plating 0.95r. Everything above 1.0r is anti-aliasing. The three ships still read apart by shape in the 24 px greyscale strip: chevron, finned needle, and block with ring. The smaller flak is still clearly a block.
+- [x] Guard ring splits row: at 96 px it spans ±84.5 px, inside the 180 px cell (±90). The 48 px and 24 px cells scale down with it. In the screenshot, all twelve rings sit inside their cells with no overlap or clipping, and every split (100/0, 50/50, 25/25, 10/40) reads correctly.
+- [x] Pocket vs Bloom heart row: at 96 px it spans -61.5 to +88.5 px, inside the cell, and no cell clips or collides. The pocket is clearly smaller than the heart and not a round coral.
+- [x] The two strip rows are labelled without the "(24 / 48 / 96)" suffix.
+- [x] `gallery.ts` now uses single quotes, `strip` no longer takes the unused parameter, and `type ResourceKind` is the first import.
+- [x] Branch CI is green on c8fed7a (run 42435628843, success). The two earlier runs were cancelled because newer pushes replaced them.
+
+Also changed: the plating icon is now three stacked flat diamonds with dark edges. This answers my round-1 note that it looked like a menu glyph. It reads as layered plates at 24 px and in greyscale, stays distinct from the lens ring and the ice flake, and fits the spec's "a stacked plate". ART_STYLE.md's H3 table and its within-r note are updated to match. No palette values changed, and the palette-sync test (49 checks) still passes. DESIGN.md and BACKLOG.md on main now call `drawShip`'s third argument the heading, which resolves my round-1 contract note.
+
+Pillar fit: unchanged from round 1. The art serves the counter-web claim, and nothing changes play beyond the spec's slightly smaller drone.
+
+Quality: the fix is small and focused. It touches only `placeholders.ts`, `gallery.ts` and `ART_STYLE.md`, and adds no dead code. The gallery shows no console errors and doesn't scroll sideways at 375 px.
+
+Gates: `npm ci`, then `npm run gates -- --base main` on c8fed7a (Windows 11, Node 26). Typecheck, lint, test, determinism, bots and protected-files all PASS. No protected files touched.
+
+Required changes: none.
+
+Non-blocking (unchanged from round 1): the greyscale strip uses `ctx.filter`, so Safari shows that row in colour. The check is done in Chromium.
+
+VERDICT: APPROVE
