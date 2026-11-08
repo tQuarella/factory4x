@@ -241,7 +241,7 @@ Owner chose this slice on 2026-11-07 (Q13, Q14). Where this backlog and the spec
 
 **Files:** `data/sim.json` (values only, bump `dataVersion` if a default changes), `DESIGN.md`.
 
-**Acceptance:** answer the spec's open calibration questions using the h3-bots report; retune layouts and defaults so as many depth flags as possible are met, with the reasoning in `DECISIONS.md`. Re-run the bot suite and gates; report which flags hold. The reference replay still passes (re-baseline only if the sim engineer's tooling requires it, and say so).
+**Acceptance:** answer the spec's open calibration questions using the h3-bots report; retune layouts and defaults so as many depth flags as possible are met, with the reasoning in `DECISIONS.md`. Re-run the bot suite and gates; report which flags hold. Also in scope (Critic notes on h3-sim): (a) at defaults the hp-weighted Strong/Even/Weak tag misleads, e.g. flak reads Even at Frost Gate p1 though it needs 8 ships vs 13 drones, and both counters read Even at the Frost Gate heart; success criterion 3 relies on the tags, so fix the thresholds, the weighting or the mixes until the tag matches the real minimum waves; (b) interim bots take the heart in 12–16 min against the spec's 20–35, so calibrate pace too. The reference replay still passes (re-baseline only if the sim engineer's tooling requires it, and say so).
 
 ## Can wait (allowed while waiting on the owner)
 
