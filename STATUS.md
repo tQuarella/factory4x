@@ -2,12 +2,20 @@
 
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
-**Milestone:** 2 — The asteroid field (iteration 5, hypothesis H5: Fleet cap)
-**State:** Awaiting owner feedback on build-20261108-4 (M2 H5: Fleet cap). Only Can wait work until feedback arrives. Retro done; team stopped until the owner answers the three H5 fun questions in QUESTIONS.md. Can wait candidates: cw-worktree-prune, cw-veil-starved-tag.
+**Milestone:** 2 — The asteroid field (iteration 6, hypothesis H6: Open frontier, Root removed)
+**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Spec (designer resumed). Q20 (pillar 3 wording) is Can wait.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-4 (H5 Fleet cap), commit f9ddf20, live (CI gates and deploy green; site shows f9ddf20 · data v9).
 **Last updated:** 2026-11-08 (desktop), after the iteration 4 retro
+
+## Iteration 6 ledger
+
+Launches: 1 / 12.
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | triage build-20261108-4; H6 candidates | launch | Plan (done, 62ac82b; owner picked A + remove the Root, f1c56f2) |
 
 ## Iteration 5 ledger
 
