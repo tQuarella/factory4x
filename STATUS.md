@@ -27,7 +27,8 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r5 | engineer | h5-client | resume | Fix round 1 (942fcd1): wide-font Deep still 3 rows |
 | r8 | engineer | h5-client | resume | Director layout call before re-review: shorter phone resource chips, keep ≤2 rows (dc899e8) |
 | r10 | critic | h5-client | resume | Review round 2: REJECT (ship chips off-screen in landscape/desktop) |
-| r11 | core-engineer | h5-client | resume | Fix round 2, reassigned per deadlock rule (resumed the h5-sim core-engineer); round 3 reject parks it |
+| r11 | core-engineer | h5-client | resume | Fix round 2, reassigned per deadlock rule (resumed the h5-sim core-engineer); 0f29bec, green branch CI 42509986848 |
+| r14 | critic | h5-client | resume | Review round 3: APPROVE (00f424d); merged 0984b7f |
 | 8 | engineer | h5-bots | launch | Build (41ef624): bots gate red only because v8 lights are closed at L0; merges together with h5-design-data (see DECISIONS) |
 | 10 | critic | h5-bots | launch | Review round 1: REJECT (stranded probe ship freezes forced visits; red gate) |
 | r7 | engineer | h5-bots | resume | Fix round 1 (5280732): stranded ship fixed; v8 red is data |
@@ -37,7 +38,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r13 | critic | h5-design-data | resume | Review round 2: APPROVE (6f364ce); merged with h5-bots |
 | r4 | critic | h5-art | resume | Review round 1: APPROVE (f522965); green branch CI on 29a12ee; merged |
 
-Launches: 10 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 13.
+Launches: 10 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 14.
 
 ## Iteration 4 ledger
 

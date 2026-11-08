@@ -618,3 +618,7 @@ Report of record: `reports/archive/h5-design-data-v9.{md,json}`. Before: `report
 - **The windows are met at their edges.** Both mediums' fed mixes are exactly 16 (L1 − 2), and Glass Thicket's and Frost Gate's fed mixes are exactly 22 (L2 − 2). A one-guard change flips a flag. That's intended: each sits just past the previous limit.
 - **What the bots show, candidly:** all three winning strategies take the same order after the light areas (Spore Veil, Thorn Garden, The Deep), cut every Root before its heart, and often capture with one type (Spore Veil 15 flak). So the bots meet the limit with Root cuts, and the "both counters" window, which is about fed hearts, isn't exercised by any bot. The owner's play is the real test of whether mixes matter. Winners take 40:04–40:22 against the cap-off reference's 40:10–41:32. The limit doesn't lengthen a run that uses Root cuts.
 - **Not changed:** bots code, the reference replay and the determinism baselines. Flag 7 and the replay pass on v9 as is.
+
+## 2026-11-08 · Director · Correction to the h5-client HUD entry
+
+The h5-client entry says the "/min" suffix comes off the ice and crystal chip rates on portrait phones only. In the shipped code (`packages/client/src/hud.ts`) it is dropped in every layout, so desktop also shows "+12". The tooltip keeps "/min" everywhere. Noted by the Critic in the h5-client round 3 review; no code change.
