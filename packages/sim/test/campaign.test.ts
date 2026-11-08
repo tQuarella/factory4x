@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEND_ALL,
+  guardianStatus,
+  nodeStatus,
   areaStatus,
   campaignStatus,
   campaignSummary,
@@ -305,6 +307,48 @@ describe('research effects in an area', () => {
     q.tun['research.extract.stepPct'] = 10;
     run(q, T);
     expect(q.nodes[at(q, 'a1')]!.buffer).toBe(12);
+  });
+
+  it('node sheet and guardian sheet rates show Extraction research (regression: owner saw the unboosted rate)', () => {
+    const w = extracting(1, 'a1');
+    w.guardians[0]!.alive = false;
+    w.nodes[at(w, 'p1')]!.extractors = 2;
+    // Asteroid 10/min at +25%: 12.5 each; pocket 6/min: 7.5 each, two extractors 15.
+    expect(nodeStatus(w, at(w, 'a1'))).toMatchObject({ perExtractorPerMin: 12, perExtractorPerMinX10: 125, extractPerMin: 12, extractPerMinX10: 125 });
+    expect(nodeStatus(w, at(w, 'p1'))).toMatchObject({ perExtractorPerMinX10: 75, extractPerMin: 15, extractPerMinX10: 150 });
+    expect(guardianStatus(w, at(w, 'p1')).prizePerMinPerExtractorX10).toBe(75);
+    // Level 0 is the base rate, and the shown rate matches what a minute of ticks actually yields.
+    expect(nodeStatus(extracting(0, 'a1'), at(w, 'a1'))).toMatchObject({ perExtractorPerMinX10: 100, extractPerMin: 10 });
+    const l3 = extracting(3, 'a1');
+    const shown = nodeStatus(l3, at(l3, 'a1')).extractPerMin;
+    run(l3, T);
+    expect(l3.nodes[at(l3, 'a1')]!.buffer).toBe(shown);
+  });
+
+  it('the shown total equals the ore produced in a minute for every extractable kind, including rates that do not divide into tenths', () => {
+    // Heart 25/min, 4 extractors: 125 at level 1 (31.25 each, shown 31.2), 175 at level 3.
+    for (const [level, x10] of [[1, 1250], [3, 1750]] as const) {
+      const w = extracting(level, 'a1');
+      w.tun['node.bufferCap'] = 100000;
+      w.nodes[at(w, 'heart')]!.extractors = 4;
+      const st = nodeStatus(w, at(w, 'heart'));
+      expect(st).toMatchObject({ extractPerMinX10: x10, extractPerMin: x10 / 10, perExtractorPerMinX10: Math.floor((25 * (100 + 25 * level)) / 10) });
+      run(w, T);
+      expect(w.nodes[at(w, 'heart')]!.buffer).toBe(st.extractPerMin);
+    }
+    // Odd base rates through the tuning panel: asteroid 9/min x 3 extractors (11.25 each), pocket 7/min x 2.
+    for (const level of [0, 1, 2, 3]) {
+      const w = extracting(level, 'a1');
+      w.tun['node.bufferCap'] = 100000;
+      w.tun['extractor.orePerMin'] = 9;
+      w.tun['pocket.resourcePerMin'] = 7;
+      w.guardians[0]!.alive = false;
+      w.nodes[at(w, 'a1')]!.extractors = 3;
+      w.nodes[at(w, 'p1')]!.extractors = 2;
+      const shown = ['a1', 'p1'].map((id) => nodeStatus(w, at(w, id)).extractPerMin);
+      run(w, T);
+      expect(['a1', 'p1'].map((id) => w.nodes[at(w, id)]!.buffer)).toEqual(shown);
+    }
   });
 
   it('extraction does not boost probe mining', () => {
