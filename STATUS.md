@@ -23,16 +23,18 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 6 | critic | h4-sim | launch | Review round 1: APPROVE; green branch CI on 4f01607; merged caa81b1 |
 | 7 | engineer | h4-client | launch | Build |
 | 8 | engineer | h4-bots | launch | Build (green, 234c1b0; flags 1,5,7 met, 2,3,4,6 missed on uncalibrated data) |
-| 10 | critic | h4-client | launch | Review round 1 (h4-client green, 2aa138a; smoke 70/70) |
+| 10 | critic | h4-client | launch | Review round 1: REJECT (phone pause icon blank when paused; palette literals) |
+| r8 | engineer | h4-client | resume | Fix round 1 |
 | 9 | critic | h4-bots | launch | Review round 1: REJECT (runner tests pinned to shipped data) |
 | r3 | engineer | h4-bots | resume | Fix round 1 (22c9396) |
 | r4 | critic | h4-bots | resume | Review round 2: REJECT (15-campaign unit test ~16 s, near 30 s limit) |
 | r5 | core-engineer | h4-bots | resume | Fix round 2, reassigned per deadlock rule (resumed the h4-sim core-engineer to stay within launch budget); 57d789f, test gate 6.4 s |
 | r6 | critic | h4-bots | resume | Review round 3: APPROVE; merged ab8bd65 (not browser-facing) |
 | r7 | designer | h4-design-data | resume | Calibrated (349b8b8): all 7 flags met |
-| 11 | critic | h4-design-data | launch | Review round 1 |
+| 11 | critic | h4-design-data | launch | Review round 1: REJECT (bump dataVersion to 7; unsourced numbers) |
+| r9 | designer | h4-design-data | resume | Fix round 1 (scope widened to one test line for the v7 bump) |
 
-Launches: 11 / 12. Resumes: 7. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 11 / 12. Resumes: 9. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 
