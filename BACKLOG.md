@@ -219,7 +219,7 @@ Owner chose this slice on 2026-11-07 (Q13, Q14). Where this backlog and the spec
 **Files:** `packages/client/src/placeholders.ts`, `packages/client/src/palette.ts`, the art gallery files, `ART_STYLE.md`. Nothing else in the client.
 
 **Acceptance:**
-1. The draw contract in the spec's "Flavor and art needs" exists with these exact signatures: `drawShip(ctx, r, t, type)`, `drawSpore(ctx, r, t, hpFrac)`, `drawGuardRing(ctx, r, thornShare, sporeShare, t)`, `drawPocket(ctx, r, t, alive, prize)`, `drawResourceIcon(ctx, r, kind)` for `ore | ice | crystal | lens | plating`. Existing draw functions keep working.
+1. The draw contract in the spec's "Flavor and art needs" exists with these exact signatures: `drawShip(ctx, r, heading, type)` (heading in radians), `drawSpore(ctx, r, t, hpFrac)`, `drawGuardRing(ctx, r, thornShare, sporeShare, t)`, `drawPocket(ctx, r, t, alive, prize)`, `drawResourceIcon(ctx, r, kind)` for `ore | ice | crystal | lens | plating`. Existing draw functions keep working.
 2. Drone, lancer and flak are distinguishable by shape alone at 24 px (show a greyscale row in the gallery). Spore is round and clearly distinct from Thorn; its palette entry is in the mob family, at least 4.5:1 on `space`, and not amber, teal or player blue.
 3. Ice and crystal icons are cool-family and distinct from each other, ore teal and mob pinks. The guard ring reads at 24 px and stays within radius r plus the existing ring margin.
 4. Every new palette key has a matching row in the ART_STYLE.md Palette table (the palette-sync test enforces this) and passes the contrast test or is on its documented allow-list.

@@ -511,7 +511,7 @@ The rules from H1 and H2 hold: 375 px portrait, no hover, every target at least 
 - **Component icons:** **lens** (a ring with a dot) and **plating** (a stacked plate).
 
 Draw contract, so h3-client can call these before h3-art merges, with placeholders until then:
-- `drawShip(ctx, r, t, type)`;
+- `drawShip(ctx, r, heading, type)`, where `heading` is the ship's heading in radians (not the clock), as the existing caller passes it;
 - `drawSpore(ctx, r, t, hpFrac)`;
 - `drawGuardRing(ctx, r, thornShare, sporeShare, t)`;
 - `drawPocket(ctx, r, t, alive, prize)`;
