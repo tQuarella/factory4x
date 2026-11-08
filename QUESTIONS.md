@@ -32,6 +32,10 @@ Protected files changed this build: none. Every merge passed the protected-files
 
 ## Blocking
 
+None.
+
+## Answered
+
 ### Q17. Which slice should the next build test? (2026-11-08, Designer)
 
 Your H4 feedback has one root cause: every choice so far costs only time (ships are unlimited, so enough drones take anything). I steelmanned your open-world idea before agreeing. It fixes "linear" only if getting stronger means something you unlock; without a ship limit it makes "max economy then swarm" bigger. So I'd test your ship limit first. Details: DESIGN.md → "Owner direction 2026-11-08b" and "H5 candidates".
@@ -41,6 +45,8 @@ Your H4 feedback has one root cause: every choice so far costs only time (ships 
 - **C. Both, lite:** A plus 2–3 extra areas, two of which grant a cap raise instead of resources. Likely over one iteration's budget, and harder to read if it fails.
 
 Answer with a letter. Default if unanswered: A.
+
+**Answer (owner, 2026-11-08, in chat with the Director):** A. Fleet cap.
 
 ### Q18. Pillar 1 wording, only if a fleet cap ships (2026-11-08, Designer)
 
@@ -54,7 +60,7 @@ with
 
 Approve, edit or reject. It applies only if you pick A or C in Q17. Default if unanswered: no edit; the cap ships as an experiment under the current wording, with this question still open.
 
-## Answered
+**Answer (owner, 2026-11-08, in chat with the Director):** No edit yet. The cap ships as an experiment; revisit the pillar after play.
 
 ### Build build-20261108-2 handoff (2026-11-07): H3, the Counter web
 
