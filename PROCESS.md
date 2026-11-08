@@ -32,8 +32,10 @@ Slash commands: `/resume`, `/iterate`, `/handoff`, `/retro`.
 ## Review cycle and deadlock
 
 1. Critic rejects → task goes back to the same engineer with the review file.
-2. Second rejection → Director reassigns the task to the Core Engineer (Opus).
+2. Second rejection → Director reassigns the task to the Core Engineer (Opus). If a Core Engineer from this iteration has finished its own task, resume it (a resume, not a launch) rather than launching a new one; in H4 one resumed core-engineer fixed h4-bots, h4-client and h4-design-data, and all three passed round 3. The brief names the task id, the branch, `reviews/<id>.md`, and how to commit: if `task/<id>` is checked out in another worktree, the agent works on a local alias branch started from `origin/task/<id>` and pushes with `git push origin HEAD:task/<id>`. `merge-task` merges `origin/task/<id>` when the local ref is behind it, so the Director doesn't move local refs by hand.
 3. Third rejection → task is parked. Director writes a Blocking question in `QUESTIONS.md` summarizing the disagreement and moves on.
+
+Before launching or resuming the Critic, the Director reads the author's report for anything it left undone because it was outside its files, and routes it first (widen the scope in `BACKLOG.md` and resume the author, or hand it to the agent with that scope). h4-design-data round 2 was rejected for a one-word test title the Designer had logged as "a later fix".
 
 ## Before merging
 
@@ -50,7 +52,7 @@ Slash commands: `/resume`, `/iterate`, `/handoff`, `/retro`.
 
 ## Usage budget
 
-- Per iteration: at most 12 subagent launches. The Retrospective counts as one. Plan for the Designer, one builder and one Critic per task, the Retrospective, and 2 spare for rework or a broken-`main` fix. Every task gets a Critic in the plan, including a Designer data or calibration task. H3's plan counted 9 launches because it left out the h3-design-data review; with that review and one rework launch, the iteration used all 12. With five tasks there is no spare, so plan follow-on work as a resume of an agent that already has the context (as the Designer was resumed for h3-design-data), or split into at most four tasks. Per task: at most 2 Critic reviews before escalation per the deadlock rule.
+- Per iteration: at most 12 subagent launches. The Retrospective counts as one. Plan for the Designer, one builder and one Critic per task, the Retrospective, and 2 spare for rework or a broken-`main` fix. Every task gets a Critic in the plan, including a Designer data or calibration task. H3's plan counted 9 launches because it left out the h3-design-data review; with that review and one rework launch, the iteration used all 12. With five tasks there is no spare, so plan follow-on work as a resume of an agent that already has the context (as the Designer was resumed for h3-design-data), or split into at most four tasks. The Plan and Spec steps are one Designer: the spec is a resume of the Designer that did the triage, not a new launch. H3 did this; H4 launched the spec Designer fresh, which spent the one spare launch the plan had kept. Per task: at most 2 Critic reviews before escalation per the deadlock rule.
 - A launch is a new agent (the Agent tool). A resume is any later turn sent to a running or finished agent with SendMessage (a stall nudge, a fix round, a later review round). Resumes are not launches, but they still use usage, so count them too. Resuming is preferred over a fresh launch for fix rounds and later review rounds, because the agent keeps its context.
 - Track spend in `STATUS.md` as a ledger with one line per run (agent, task, launch or resume, and why), plus the totals. Updating the totals alone hid runs in M1. When the budget or a usage limit is hit: checkpoint (commit WIP to the task branch with a `WIP:` prefix, update `STATUS.md`), then stop. Never rush a gate to fit the budget.
 
@@ -78,7 +80,7 @@ While a build awaits feedback, only Can wait work is allowed: tech debt, test co
 ## Conventions
 
 - Branches: `task/<id>`. Commits: imperative, one logical change. WIP commits prefixed `WIP:` and never merged as-is.
-- Every tunable number goes in `data/`. Bump `dataVersion` in `data/sim.json` whenever a default changes.
+- Every tunable number goes in `data/`. Bump `dataVersion` in `data/sim.json` whenever a default changes, including a values-only calibration: every green `main` deploys, so the old version has shipped. A data task's file list in `BACKLOG.md` includes the test that pins `dataVersion` (in H4, `packages/sim/test/data-h4.test.ts`, the "is data version N" test), so the bump doesn't need a scope change. h4-design-data round 1 was rejected for skipping the bump, and rounds 1 and 2 needed the scope widened for that test.
 - Every sim change that alters behavior updates the reference replay if needed, and the inline RNG snapshot only if the RNG itself changed (which breaks all old replays; log it).
 - Build tags: `build-YYYYMMDD-<n>` on the commit that was handed off.
 

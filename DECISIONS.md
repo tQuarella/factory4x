@@ -492,3 +492,35 @@ The Critic rejected round 1 (`reviews/h4-design-data.md`). This entry corrects t
 - **The report of record is `reports/archive/h4-design-data-v7.{md,json}`.** The v6 copies are removed. The v7 numbers are identical to round 1's, since only the version stamp changed. All seven flags are met.
 - **Unsourced numbers removed.** Shelf at 3/12 and "under a minute" were from uncommitted intermediate runs. DESIGN.md now cites only the two committed reports and marks the intermediate-run attribution as such. The run-length margin is 0.9 min on seed 2 (45:54) and 0.8 min on seed 3 (45:47).
 - **The stale full-run length** in DESIGN.md "Save" now quotes the v7 report: 45:47–67:46 game minutes, about 82–122k ticks.
+
+## 2026-11-08 · Retrospective · build-20261108-3 (M2 H4, Reclaim ladder)
+
+Scope: `git log build-20261108-2..build-20261108-3`, `reviews/h4-*.md`, the "Iteration 4 ledger" in `STATUS.md`, `BACKLOG.md` (Milestone 2, iteration 4), `PROCESS.md`, `.claude/agents/*.md`, `scripts/merge-task.mjs` and the 2026-11-08 entries above.
+
+**Went well**
+- **All five tasks shipped, and nothing was parked.** h4-sim passed on its first review. h4-art passed on round 2. The three tasks that reached a second rejection (h4-bots, h4-client, h4-design-data) all passed round 3 under the Core Engineer.
+- **Every reject was right, and the Critic measured instead of trusting.** It timed the 16.3 s unit test against the 30 s limit (h4-bots r2). It reproduced the withdraw flake 1 in 10 and showed that the regression test failed 8 of 10 on the unfixed client (h4-client r2, r3). It computed the blank phone pause button's CSS specificity in Chromium (h4-client r1). It traced the missing `dataVersion` bump to production already serving v6 (h4-design-data r1). These checks stay.
+- **Last retro's changes held.** No force-push or history rewrite, and every author reported. `main` stayed still while branch CI ran. The Q15 docs-only exception saved one CI cycle (h4-art).
+- **Resuming one Core Engineer for all three escalations** kept the iteration inside 12 launches, with no loss of quality.
+
+**Didn't go well**
+- **Retune-proofing again (h4-bots r1, r2).** Runner tests asserted tuned outcomes on shipped data, the same lesson as H3: h3-design-data had broken 42 pinned tests, and the fixture fix lives in DECISIONS.md but not in `engineer.md`. Round 2 swapped that for a 15-campaign test (16 s, growing with run length). Round 1's own wording ("a won outcome for every strategy") invited it, but the engineer had no rule to measure test time.
+- **A smoke flake reached review (h4-client r2).** The engineer's smoke run passed by chance. Nothing asked for repeat runs of new smoke tests.
+- **Designer doc sourcing, again (h4-design-data r1, r2), after last retro's sourcing rule.** That rule covered "measured numbers", but the misses were neighbouring kinds: numbers from uncommitted exploration runs, an arithmetic margin (0.8 vs 0.9 min), a stale run-length sentence elsewhere in DESIGN.md, a false derived claim ("more than half" for +42%), and a skipped `dataVersion` bump. The bump was skipped partly because the task's files excluded the test that pins the version, and BACKLOG said no test changes. The one-word test title left as "a later fix" cost a whole round, because the Director sent the task to review without routing the leftover first.
+- **Branch refs.** Escalated work happened on alias branches (`h4-bots-core`, `h4-client-core`, `h4-dd-core`) because each `task/<id>` was checked out in the original author's worktree. `merge-task` read only the local `task/<id>`, so the Director had to move local refs by hand before each merge.
+- **Budget:** 12 / 12 launches and 15 resumes (10 in H3). The plan's one spare launch went on launching the spec Designer fresh instead of resuming the triage Designer (ledger rows 1 and 2). The extra resumes are the three third rounds.
+- **Owner questions:** only Q16 (pick H4 among A/B/C), which was the owner's call. None needed this retro.
+
+**Changes made**
+1. **`.claude/agents/engineer.md`** (also used by core-engineer and art-direction):
+   - A Build rule: tuned-outcome tests run on `fixtureData` with explicit premises, and shipped-data tests assert only calibration-proof facts. No test over about 5 s, and no test whose runtime grows with game length; check with `vitest --reporter=verbose`. Evidence: h4-bots r1 and r2, h3-design-data's 42 pinned tests.
+   - A Finish rule: run new or changed smoke tests with `--repeat-each 5` on both projects. A failure is fixed at its cause, never with a wait. Evidence: h4-client r2.
+2. **`.claude/agents/designer.md`:** a pre-report checklist for data tasks: bump `dataVersion` on any value change (every green `main` deploys); don't cite exploration runs; recompute derived claims; search for stale prose; put out-of-scope leftovers at the top of the report as blockers, not "later". Evidence: h4-design-data r1 and r2. These are the neighbours of last retro's sourcing rule, which held for what it covered.
+3. **`PROCESS.md`:**
+   - Review cycle step 2 now says a deadlock reassignment resumes this iteration's Core Engineer when one is free, and says how to commit when `task/<id>` is checked out elsewhere. Evidence: ledger r5, r12 and r14 all passed. The Director asked whether this was allowed; the old text didn't say.
+   - Before a Critic run, the Director routes any out-of-scope leftover the author reports. Evidence: h4-design-data r2.
+   - Usage budget: the spec is a resume of the triage Designer. Evidence: ledger rows 1 and 2.
+   - Conventions: a values-only calibration bumps `dataVersion`, and a data task's file list includes the version-pin test. Evidence: h4-design-data r1, and the scope widenings in r1 and r2.
+4. **`scripts/merge-task.mjs`** (not protected, and not a gate): it fetches, then merges the newer of `task/<id>` and `origin/task/<id>`. It refuses if they have diverged, warns if local has unpushed commits, and reads the review from the commit it merges. A `--dry-run` flag prints the ref, sha and verdict and changes nothing. Approval, a clean `main` and all gates on the merged result are still required, so nothing is loosened, and the commit merged is now the pushed one CI ran on. I tested it with dry runs on h4-sim, h4-bots, h4-client and h4-design-data, plus temporary refs for the behind, ahead and diverged cases (removed after). Evidence: the hand-moved refs for h4-bots, h4-client and h4-design-data. On Windows, `rev-parse` runs without a shell, because cmd.exe strips the `^` in `^{commit}`.
+
+**Not changed:** no gate, guardrail or protected file, and nothing in `critic.md`. The 12-launch budget stays: H4 fit with resumes, and the wasted launch is fixed by the spec-resume rule. No resume cap, because all 15 resumes were productive. The CSS specificity bug (h4-client r1) was a one-off, caught by the Critic, so it gets no rule. No new owner questions.
