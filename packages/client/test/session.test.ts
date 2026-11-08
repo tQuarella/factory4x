@@ -3,9 +3,11 @@ import { SEND_ALL, createWorld, defaultData, lastBattle, replayHashes, rootIndex
 import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
-import { bannerLines, battleReport, feedsBloomText, regrowChange, supplyLine } from '../src/report.ts';
+import { bannerLines, battleReport, feedsBloomText, regrowChange, repelHint, supplyLine, unlockHint } from '../src/report.ts';
+import { byTypeText, captureOrderText } from '../src/panels.ts';
+import { shipsText } from '../src/sheet.ts';
 import { clampInt, fmt10, mmss, shortVersion, stepFor, ticksText } from '../src/format.ts';
-import { guardedReach, ringGeom } from '../src/view.ts';
+import { guardRingOuter, guardedReach, ringGeom } from '../src/view.ts';
 import { fitMap } from '../src/fit.ts';
 import { podTotalTicks, progressFrac } from '../src/interp.ts';
 
@@ -265,13 +267,59 @@ describe('helpers', () => {
     }
   });
 
-  it('battle report names the reason for a failed wave', () => {
+  it('battle report names the reason for a failed wave, with the counter hint', () => {
     const s = new Session(defaultData, { seed: 1 });
     const text = battleReport(s.world, result({ node: 15, outcome: 'repelled', shipsEngaged: 6, shipsLost: 6, guardsKilled: 2 }));
-    expect(text).toContain('Heart held: 6 sent, 6 lost, 2 guards stripped');
+    expect(text).toContain('Heart held: 6 sent, 6 lost.');
     expect(text).toMatch(/Regrowth outpaced|Too few ships/);
     expect(battleReport(s.world, result({ node: 15, outcome: 'captured', shipsEngaged: 30, shipsLost: 12, guardsKilled: 12 }))).toBe('Heart taken: 30 sent, 12 lost');
-    expect(battleReport(s.world, result({ node: 10, outcome: 'captured', shipsEngaged: 14, shipsLost: 3, guardsKilled: 9 }))).toBe('P1 taken: 14 sent, 3 lost');
+  });
+
+  it('a pocket capture names its prize, and the unlock only until that prize has been delivered', () => {
+    const w = createWorld(3, defaultData);
+    const pockets = w.nodes.filter((n) => n.kind === 'pocket');
+    const ice = pockets.find((n) => n.prize === 'ice')!;
+    const text = battleReport(w, result({ node: ice.index, outcome: 'captured', shipsEngaged: 12, shipsLost: 3, guardsKilled: 9 }));
+    expect(text).toBe('Ice pocket taken: 12 sent, 3 lost. Route its ice to the Probe to unlock Plating and Flak.');
+    w.stats.firstDeliveredTick.ice = 5;
+    expect(battleReport(w, result({ node: ice.index, outcome: 'captured', shipsEngaged: 12, shipsLost: 3, guardsKilled: 9 }))).toBe('Ice pocket taken: 12 sent, 3 lost.');
+    const crystal = pockets.find((n) => n.prize === 'crystal')!;
+    expect(battleReport(w, result({ node: crystal.index, outcome: 'captured', shipsEngaged: 8, shipsLost: 0, guardsKilled: 4 }))).toContain('unlock Lens and Lancers');
+  });
+
+  it('the repelled hint names the dominant guard type and any Weak ship type that was sent', () => {
+    const w = idleWorld();
+    const base = result({ node: 11, outcome: 'repelled', shipsEngaged: 10, shipsLost: 10, guardsKilled: 0 });
+    const hint = (guards: { thorn: number; spore: number }, sent: { drone: number; lancer: number; flak: number }): string =>
+      repelHint(w, { ...base, guardsAtStart: guards, engagedByType: sent });
+    expect(hint({ thorn: 1, spore: 10 }, { drone: 0, lancer: 10, flak: 0 })).toBe('Mostly Spores; Lancers are weak here.');
+    expect(hint({ thorn: 10, spore: 1 }, { drone: 0, lancer: 0, flak: 10 })).toBe('Mostly Thorns; Flak is weak here.');
+    expect(hint({ thorn: 8, spore: 2 }, { drone: 10, lancer: 0, flak: 0 })).toBe('Mostly Thorns.');
+    expect(hint({ thorn: 8, spore: 2 }, { drone: 4, lancer: 6, flak: 0 })).toBe('Mostly Thorns.');
+    expect(hint({ thorn: 5, spore: 5 }, { drone: 4, lancer: 6, flak: 0 })).toBe('An even mix of Thorns and Spores.');
+  });
+
+  it('capture order and per-type lines for the result panel', () => {
+    const caps = [
+      { node: 10, id: 'p1', kind: 'pocket', prize: 'ice', tick: 7500, sec: 250 },
+      { node: 13, id: 'p4', kind: 'pocket', prize: 'crystal', tick: 20700, sec: 690 },
+      { node: 14, id: 'root', kind: 'root', prize: null, tick: 27060, sec: 902 },
+      { node: 15, id: 'heart', kind: 'heart', prize: 'ore', tick: 35550, sec: 1185 },
+    ] as const;
+    expect(captureOrderText(caps)).toBe('Ice (P1) 4:10 → Crystal (P4) 11:30 → Root 15:02 → Heart 19:45');
+    expect(byTypeText({ drone: 6, lancer: 0, flak: 2 })).toBe('6 Drone · 2 Flak');
+    expect(byTypeText({ drone: 0, lancer: 0, flak: 0 })).toBe('0');
+    expect(shipsText({ drone: 1, lancer: 2, flak: 0 })).toBe('1 Drone, 2 Lancers');
+    expect(shipsText({ drone: 0, lancer: 0, flak: 0 })).toBe('none');
+    expect(unlockHint('lancer')).toBe('Take a crystal pocket to unlock Lancers');
+  });
+
+  it('a pocket draws only the guard ring, so its tap reach is the ring and at least 44 px', () => {
+    for (const rr of [14, 18, 30]) {
+      expect(guardRingOuter(rr, 8, false)).toBe(ringGeom(rr, 8).ringR);
+      expect(guardRingOuter(rr, 8, true)).toBeGreaterThan(guardRingOuter(rr, 8, false));
+      expect(guardedReach(rr, 8, false)).toBeGreaterThanOrEqual(22);
+    }
   });
 });
 
@@ -303,7 +351,7 @@ function idleWorld(): World {
   return w;
 }
 
-describe('supply readouts (interim H3 text)', () => {
+describe('supply readouts', () => {
   it('the Feeds the Heart box and the heart-sheet line come from live tunables', () => {
     const w = idleWorld();
     expect(feedsBloomText(w, false)).toBe(
@@ -332,7 +380,7 @@ describe('supply readouts (interim H3 text)', () => {
   it('a Root held report and a Root repelled reason name the Root', () => {
     const w = idleWorld();
     const text = battleReport(w, result({ node: rootIndex(w), outcome: 'repelled', shipsEngaged: 10, shipsLost: 10, guardsKilled: 2 }));
-    expect(text).toContain('Root held: 10 sent, 10 lost, 2 guards stripped');
+    expect(text).toContain('Root held: 10 sent, 10 lost.');
     expect(text).toContain('Root regrows');
   });
 

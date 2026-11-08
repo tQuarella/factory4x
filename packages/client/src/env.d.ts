@@ -18,6 +18,14 @@ interface Window {
     inputCount(): number;
     /** Idle ships at a node. */
     shipsAt(node: number): number;
+    /** Ships parked at a node, by type. */
+    shipsAtByType(node: number): { drone: number; lancer: number; flak: number };
+    /** Node index of the first pocket with this prize, or -1. */
+    pocketNode(prize: 'ice' | 'crystal'): number;
+    /** Has the player captured this node? */
+    owned(node: number): boolean;
+    /** The last logged input, as JSON text (or "null"). */
+    lastInput(): string;
     /** Run stat: attack waves sent at the guarded Bloom. */
     wavesSent(): number;
     /** Writes the autosave now. */
@@ -27,7 +35,7 @@ interface Window {
     /** Shows the battle banner and a sample toast (or hides them), to check layout. */
     debugShowNotices(on: boolean): void;
     debugShowResult(): void;
-    /** The run's system name ("Thin Root"). */
+    /** The run's system name ("Frost Gate"). */
     systemName(): string;
     /** Node index of the Root. */
     rootNode(): number;

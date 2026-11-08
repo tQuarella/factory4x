@@ -264,7 +264,7 @@ test('paused "Attack with all" from two sources is one press, one tick, one wave
   // Stage ships at A5 (node 5), then let more gather at the Probe (node 0).
   await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
   await tapNode(page, 5);
-  await page.locator('#sheet button', { hasText: /^From Probe/ }).click();
+  await page.locator('#sheet button', { hasText: /^Send all from Probe/ }).click();
   await expect
     .poll(() => page.evaluate(() => [window.__factory4x!.shipsAt(5) > 0, window.__factory4x!.shipsAt(0) > 0].join()), { timeout: 30_000 })
     .toBe('true,true');
@@ -274,7 +274,7 @@ test('paused "Attack with all" from two sources is one press, one tick, one wave
   await tapNode(page, HEART);
   const t0 = await page.evaluate(() => window.__factory4x!.tick());
   expect(await page.evaluate(() => window.__factory4x!.wavesSent())).toBe(0);
-  await page.locator('#sheet button', { hasText: /^Attack with all/ }).click();
+  await page.locator('#sheet button', { hasText: /^Attack with all sources/ }).click();
   expect(await page.evaluate(() => window.__factory4x!.tick())).toBe(t0 + 1);
   expect(await page.evaluate(() => window.__factory4x!.wavesSent())).toBe(1);
   expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
@@ -315,5 +315,189 @@ test.describe('375x667 portrait', () => {
 
   test('banner and toast never cover the heart, even with a wide font', async ({ page }) => {
     await noticesClearOfBloom(page, true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H3: the counter web through the UI. One play-through. Unstressed text would hide layout bugs, so every
+// H3 surface runs with a wide serif font and wide letter spacing, as the notices tests above do.
+
+const WIDE_H3_FONT =
+  '#sheet *, #sendpanel *, #result *, #chips *, .card * { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.15em !important; line-height: 1.5 !important; }';
+
+/** Sets sim tunables through the tuning panel, then starts a New run (startStock applies there). Leaves the game at 4x. */
+async function startTunedRun(page: Page, values: Record<string, number>): Promise<void> {
+  await page.locator('#b-tune').click();
+  for (const [key, value] of Object.entries(values)) {
+    const field = page.getByLabel(key, { exact: true });
+    await field.fill(String(value));
+    await field.dispatchEvent('change');
+  }
+  await page.locator('#tuning button', { hasText: 'New run' }).click();
+  await page.locator('.card button', { hasText: 'Yes, new run' }).click();
+  await expect(page.locator('#tuning')).toBeHidden();
+  await page.locator('#b-s4').click();
+}
+
+/** Every visible control inside `root` is at least 44 px and nothing sticks out sideways. */
+async function expectControlsFit(page: Page, root: string, label: string): Promise<void> {
+  const bad = await page.evaluate((sel) => {
+    const out: string[] = [];
+    const w = window.innerWidth;
+    for (const r of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
+      for (const e of Array.from(r.querySelectorAll<HTMLElement>('button, input, .card, .tag-badge, .chip, .capture-order'))) {
+        if (e.offsetParent === null || e.closest('[hidden]')) continue;
+        const b = e.getBoundingClientRect();
+        const name = `${e.tagName}.${e.className} "${(e.textContent ?? '').slice(0, 24)}"`;
+        if (b.right > w + 1 || b.left < -1) out.push(`${name} sticks out: ${Math.round(b.left)}..${Math.round(b.right)} of ${w}`);
+        if ((e.tagName === 'BUTTON' || e.tagName === 'INPUT') && (b.height < 43.5 || b.width < 43.5)) out.push(`${name} is ${Math.round(b.width)}x${Math.round(b.height)}`);
+      }
+    }
+    if (document.documentElement.scrollWidth > w) out.push('page scrolls sideways');
+    return out;
+  }, root);
+  expect(bad, label).toEqual([]);
+}
+
+async function h3PlayThrough(page: Page): Promise<void> {
+  const errors = watchErrors(page);
+  await ready(page);
+  await page.addStyleTag({ content: WIDE_H3_FONT });
+  // Frost Gate, cheap and quick, soft guards, and a pocket that pays fast, so the whole chain fits in a few seconds at 4x.
+  await startTunedRun(page, {
+    'system.variant': 1,
+    'economy.startStock': 200,
+    'guard.capPct': 25,
+    'ship.drone.cost': 5,
+    'ship.drone.buildTicks': 15,
+    'ship.lancer.cost': 5,
+    'ship.lancer.buildTicks': 30,
+    'component.buildTicks': 30,
+    'pocket.resourcePerMin': 40,
+  });
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.systemName())).toBe('Frost Gate');
+
+  // The HUD starts simple: ore and drone chips only.
+  await expect(page.locator('#chip-ore')).toBeVisible();
+  await expect(page.locator('#chip-drone')).toBeVisible();
+  for (const hidden of ['ice', 'crystal', 'lens', 'plating', 'lancer', 'flak']) await expect(page.locator(`#chip-${hidden}`)).toBeHidden();
+  await expectControlsFit(page, '#bars', 'HUD at the start');
+
+  // Take the crystal pocket with drones.
+  const crystal = await page.evaluate(() => window.__factory4x!.pocketNode('crystal'));
+  const ice = await page.evaluate(() => window.__factory4x!.pocketNode('ice'));
+  expect(crystal).toBeGreaterThan(0);
+  expect(ice).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 20_000 }).toBeGreaterThanOrEqual(3);
+  // Stop the drone yard so the start stock is left for components and lancers.
+  await tapNode(page, 0);
+  const droneRow = page.locator('#sheet [data-yard="drone"]');
+  await expect(droneRow.locator('button.tog')).toHaveText('ON');
+  await droneRow.locator('button.tog').click();
+  await expect(droneRow.locator('button.tog')).toHaveText('OFF');
+  await tapNode(page, crystal);
+  await expect(page.locator('#sheet h2')).toContainText(/Pocket P\d · Crystal/);
+  await expect(page.locator('#sheet .prize-line')).toContainText(/Prize: Crystal · \d slots · \d+\/min each · unlocks Lens → Lancer/);
+  await expect(page.locator('#sheet [data-ship="drone"] .tag-badge')).toHaveText('Even');
+  await expect(page.locator('#sheet [data-ship="lancer"]')).toBeHidden();
+  await expectControlsFit(page, '#sheet', 'pocket sheet');
+  await page.locator('#sheet button', { hasText: /^Attack with all from Probe/ }).click();
+  await expect.poll(() => page.evaluate((n) => window.__factory4x!.owned(n), crystal), { timeout: 20_000 }).toBe(true);
+
+  // The captured pocket is a producer: route its crystal to the probe, and the crystal chip and the Lancer yard appear.
+  await expect(page.locator('#sheet h2')).toContainText('Crystal');
+  await page.locator('#sheet button', { hasText: /^Route to probe/ }).click();
+  await expect(page.locator('#chip-crystal')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#chip-lens')).toBeVisible();
+
+  // The probe sheet: Yards (Lancer row unlocked, off at first), Assembly (lens).
+  await tapNode(page, 0);
+  const lancerRow = page.locator('#sheet [data-yard="lancer"]');
+  await expect(lancerRow).toBeVisible();
+  await expect(page.locator('#sheet [data-yard="flak"]')).toBeHidden();
+  await expect(page.locator('#sheet')).toContainText('Take an ice pocket to unlock Flak');
+  await expect(lancerRow).toContainText(/5 ore \+ 1 Lens/i);
+  await expect(page.locator('#sheet [data-assembler="lens"]')).toBeVisible();
+  await expect(page.locator('#sheet [data-assembler="lens"]')).toContainText(/5 ore \+ 4 crystal/);
+  await expect(page.locator('#sheet [data-assembler="plating"]')).toBeHidden();
+  await expectControlsFit(page, '#sheet', 'probe sheet with yards and assembly');
+  await lancerRow.locator('button.tog').click();
+  await expect(lancerRow.locator('button.tog')).toHaveText('ON');
+  await expect(page.locator('#chip-lancer')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#chip-lancer b')).not.toHaveText('0', { timeout: 30_000 });
+  await expectControlsFit(page, '#bars', 'HUD with chips');
+
+  // Wait for a mixed fleet at the probe, then open the ice pocket and choose ships.
+  await expect
+    .poll(() => page.evaluate(() => {
+      const c = window.__factory4x!.shipsAtByType(0);
+      return c.drone > 0 && c.lancer > 0;
+    }), { timeout: 30_000 })
+    .toBe(true);
+  await tapNode(page, ice);
+  await expect(page.locator('#sheet .prize-line')).toContainText(/Prize: Ice · \d slots · \d+\/min each · unlocks Plating → Flak/);
+  await expect(page.locator('#sheet [data-ship="lancer"] .tag-badge')).toHaveText(/Weak|Even|Strong/);
+  await expect(page.locator('#sheet [data-ship="drone"] .tag-badge')).toHaveText('Even');
+  await expect(page.locator('#sheet [data-ship="lancer"]')).toContainText('Strong vs Thorns, Weak vs Spores');
+  await expectControlsFit(page, '#sheet', 'ice pocket sheet with tags and send rows');
+  await page.locator('#sheet .send-row', { hasText: 'from Probe' }).locator('button.choose-btn').click();
+  const panel = page.locator('#sendpanel');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('[data-ship="drone"]')).toBeVisible();
+  await expect(panel.locator('[data-ship="lancer"]')).toBeVisible();
+  await expect(panel.locator('[data-ship="flak"]')).toBeHidden();
+  await expectControlsFit(page, '#sendpanel', 'send panel');
+  const sendBtn = panel.locator('button.primary');
+  const sendBox = (await sendBtn.boundingBox())!;
+  const vp = page.viewportSize()!;
+  expect(sendBox.y + sendBox.height, 'Send stays on screen').toBeLessThanOrEqual(vp.height);
+  const shown = async (type: string): Promise<number> => Number((await panel.locator(`[data-ship="${type}"] .sp-count`).innerText()).split('/')[0]);
+  const drones = await shown('drone');
+  const lancers = await shown('lancer');
+  expect(drones).toBeGreaterThan(0);
+  expect(lancers).toBeGreaterThan(0);
+  await panel.getByLabel('Fewer Drone').click();
+  expect(await shown('drone')).toBe(drones - 1);
+  await panel.getByLabel('All Drone').click();
+  expect(await shown('drone')).toBeGreaterThanOrEqual(drones);
+  await panel.getByLabel('Fewer Lancer').click();
+  expect(await shown('lancer')).toBe(lancers - 1);
+  await panel.getByLabel('More Lancer').click();
+  expect(await shown('lancer')).toBe(lancers);
+  const wave0 = await page.evaluate(() => window.__factory4x!.wavesSent());
+  await sendBtn.click();
+  await expect(panel).toBeHidden();
+  const input = JSON.parse(await page.evaluate(() => window.__factory4x!.lastInput())) as { type: string; from: number; to: number; counts: Record<string, number> };
+  expect(input.type).toBe('sendShips');
+  expect(input.from).toBe(0);
+  expect(input.to).toBe(ice);
+  expect(input.counts.lancer).toBe(lancers);
+  expect(input.counts.drone).toBeGreaterThan(0);
+  expect(input.counts.flak).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.wavesSent())).toBe(wave0 + 1);
+
+  // The result panel lists the capture order (the heart is not taken, so it ends with the pocket).
+  await page.evaluate(() => window.__factory4x!.debugShowResult());
+  await expect(page.locator('#result .capture-order')).toContainText(/Crystal \(P\d\) \d+:\d\d/);
+  await expect(page.locator('#result')).toContainText('Frost Gate');
+  await expect(page.locator('#result')).toContainText('Ships lost');
+  await expectControlsFit(page, '#result', 'result panel');
+  await page.locator('#result button', { hasText: 'Keep playing' }).click();
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
+  expect(errors).toEqual([]);
+}
+
+test('H3: capture a pocket, unlock Lancers, send a mixed fleet through the send panel', async ({ page }) => {
+  test.setTimeout(90_000);
+  await h3PlayThrough(page);
+});
+
+test.describe('H3 at 375x667 portrait', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('capture a pocket, unlock Lancers, send a mixed fleet through the send panel', async ({ page }) => {
+    test.setTimeout(90_000);
+    await h3PlayThrough(page);
   });
 });

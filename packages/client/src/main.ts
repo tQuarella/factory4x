@@ -12,6 +12,7 @@ import {
   type BattleResult,
   replayHashes,
   shipCounts,
+  shipsAtByType,
   throughputPerMin,
   worldHash,
   type Input,
@@ -277,6 +278,10 @@ window.__factory4x = {
   inputCount: () => app.session.log.length,
   shipsAt: (node) => shipCounts(app.session.world).at[node] ?? 0,
   wavesSent: () => app.session.world.stats.wavesSent,
+  shipsAtByType: (node) => ({ ...shipsAtByType(app.session.world, node) }),
+  pocketNode: (prize) => app.session.world.nodes.find((n) => n.kind === 'pocket' && n.prize === prize)?.index ?? -1,
+  owned: (node) => app.session.world.nodes[node]!.owned,
+  lastInput: () => JSON.stringify(app.session.log[app.session.log.length - 1]?.input ?? null),
   saveNow,
   replayMatchesLive: () => {
     const s = app.session;
