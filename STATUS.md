@@ -14,9 +14,10 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | triage build-20261108-3 feedback; steelman ship cap and open world | launch | Plan |
-| 2 | engineer | fix-extract-rate (owner bug) | launch | Build |
+| 2 | engineer | fix-extract-rate (owner bug) | launch | Build (c7df834): display-only bug in nodeStatus/guardianStatus; bots now upgrade routes sooner, best run 43:35 (below H4's 45-min floor) |
+| 3 | critic | fix-extract-rate | launch | Review round 1 |
 
-Launches: 2 / 12. Resumes: 0.
+Launches: 3 / 12. Resumes: 0.
 
 ## Iteration 4 ledger
 
