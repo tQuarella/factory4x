@@ -1159,6 +1159,84 @@ test('H5: a v7 save (before the fleet limit) starts fresh with the toast', async
   expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
 });
 
+// The chips a mid-visit HUD shows. Unlocks come from deliveries, so the states are set in one synchronous evaluate
+// (the next refresh puts the real state back) and measured at once, with values longer than the game produces.
+const HUD_STATES = [
+  { name: 'Frost Shelf mid-visit', show: ['ore', 'ice', 'plating', 'drone', 'flak'], fleet: 'Fleet 12/12', full: false },
+  { name: 'Frost Shelf mid-visit, full', show: ['ore', 'ice', 'plating', 'drone', 'flak'], fleet: 'Fleet 12/12', full: true },
+  { name: 'The Deep, everything unlocked', show: ['ore', 'ice', 'crystal', 'lens', 'plating', 'drone', 'lancer', 'flak'], fleet: 'Fleet 30/30', full: false },
+  { name: 'The Deep, everything unlocked, full', show: ['ore', 'ice', 'crystal', 'lens', 'plating', 'drone', 'lancer', 'flak'], fleet: 'Fleet 30/30', full: true },
+];
+type HudState = (typeof HUD_STATES)[number];
+
+/** Lands in The Deep (wide or normal font), shows exactly the state's chips with long values, and measures them against #bars. */
+async function hudInState(page: Page, state: HudState, wide: boolean) {
+  if (wide) await ready(page);
+  else {
+    await page.goto('/');
+    await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
+  }
+  await startCampaign(page, DEEP_START);
+  await expect(page.locator('#chip-fleet')).toBeVisible();
+  return page.evaluate((s) => {
+    for (const e of Array.from(document.querySelectorAll<HTMLElement>('#chips .chip'))) {
+      const id = e.id.replace('chip-', '');
+      e.hidden = id !== 'fleet' && !s.show.includes(id);
+      if (id === 'ice' || id === 'crystal') (e.querySelector('small') as HTMLElement).textContent = '+12.5';
+      if (/^(ore|ice|crystal|lens|plating)$/.test(id)) (e.querySelector('b') as HTMLElement).textContent = '999';
+      if (/^(drone|lancer|flak)$/.test(id)) (e.querySelector('b') as HTMLElement).textContent = '30';
+    }
+    const fleet = document.getElementById('chip-fleet')!;
+    (fleet.querySelector('b') as HTMLElement).textContent = s.fleet;
+    fleet.classList.toggle('full', s.full);
+    const centre = (e: Element): number => {
+      const r = e.getBoundingClientRect();
+      return r.top + r.height / 2;
+    };
+    const chips = Array.from(document.querySelectorAll<HTMLElement>('#chips .chip')).filter((e) => !e.hidden);
+    const ships = chips.filter((e) => /^chip-(drone|lancer|flak)$/.test(e.id));
+    const rows = new Set(chips.map((e) => Math.round(centre(e) / 12)));
+    const bars = document.getElementById('bars')!.getBoundingClientRect();
+    return {
+      fleetY: centre(fleet),
+      boxes: chips.map((e) => {
+        const r = e.getBoundingClientRect();
+        return `${e.id}:${Math.round(r.left)}..${Math.round(r.right)},${Math.round(r.top)}`;
+      }),
+      shipYs: ships.map(centre),
+      rows: rows.size,
+      right: Math.max(...chips.map((e) => e.getBoundingClientRect().right)),
+      left: Math.min(...chips.map((e) => e.getBoundingClientRect().left)),
+      barsLeft: bars.left,
+      barsRight: bars.right,
+      visible: chips.length,
+      statsBottom: document.getElementById('stats')!.getBoundingClientRect().bottom,
+      ctlTop: document.getElementById('controls')!.getBoundingClientRect().top,
+    };
+  }, state);
+}
+
+// The landscape and desktop layout (min-aspect-ratio 1/1): #bars is a 132-156 px column on the left. Every visible chip,
+// the ship group and the fleet chip included, must lie inside it horizontally (h5-client round 2 drew them at negative x).
+for (const vp of [
+  { name: 'desktop 1280x720', width: 1280, height: 720 },
+  { name: 'phone landscape 667x375', width: 667, height: 375 },
+]) {
+  test.describe(`H5 HUD chips in the column layout, ${vp.name}`, () => {
+    test.use({ viewport: { width: vp.width, height: vp.height } });
+    for (const wide of [true, false]) {
+      for (const state of HUD_STATES) {
+        test(`${state.name}, ${wide ? 'wide font' : 'normal font'}: every chip lies inside #bars`, async ({ page }) => {
+          const m = await hudInState(page, state, wide);
+          expect(m.visible).toBe(state.show.length + 1);
+          expect(m.left, `chips vs #bars ${JSON.stringify(m)}`).toBeGreaterThanOrEqual(m.barsLeft - 0.5);
+          expect(m.right, `chips vs #bars ${JSON.stringify(m)}`).toBeLessThanOrEqual(m.barsRight + 0.5);
+        });
+      }
+    }
+  });
+}
+
 test.describe('H5 at 375x667 portrait', () => {
   test.use({ viewport: { width: 375, height: 667 } });
 
@@ -1172,53 +1250,10 @@ test.describe('H5 at 375x667 portrait', () => {
     await expectHudNoWrap(page, 'area HUD with a 16 px fleet chip');
   });
 
-  // The chips a mid-visit HUD shows. Unlocks come from deliveries, so the states are set in one synchronous evaluate
-  // (the next refresh puts the real state back) and measured at once.
-  const HUD_STATES = [
-    { name: 'Frost Shelf mid-visit', show: ['ore', 'ice', 'plating', 'drone', 'flak'], fleet: 'Fleet 12/12', full: false },
-    { name: 'Frost Shelf mid-visit, full', show: ['ore', 'ice', 'plating', 'drone', 'flak'], fleet: 'Fleet 12/12', full: true },
-    { name: 'The Deep, everything unlocked', show: ['ore', 'ice', 'crystal', 'lens', 'plating', 'drone', 'lancer', 'flak'], fleet: 'Fleet 30/30', full: false },
-    { name: 'The Deep, everything unlocked, full', show: ['ore', 'ice', 'crystal', 'lens', 'plating', 'drone', 'lancer', 'flak'], fleet: 'Fleet 30/30', full: true },
-  ];
   for (const wide of [true, false]) {
     for (const state of HUD_STATES) {
       test(`HUD chips: ${state.name}, ${wide ? 'wide font' : 'normal font'}: the fleet chip shares the ships' row, two rows at most`, async ({ page }) => {
-        if (wide) await ready(page);
-        else {
-          await page.goto('/');
-          await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
-        }
-        await startCampaign(page, DEEP_START);
-        await expect(page.locator('#chip-fleet')).toBeVisible();
-        const m = await page.evaluate((s) => {
-          for (const e of Array.from(document.querySelectorAll<HTMLElement>('#chips .chip'))) {
-            const id = e.id.replace('chip-', '');
-            e.hidden = id !== 'fleet' && !s.show.includes(id);
-            if (id === 'ice' || id === 'crystal') (e.querySelector('small') as HTMLElement).textContent = '+12.5';
-            if (/^(ore|ice|crystal|lens|plating)$/.test(id)) (e.querySelector('b') as HTMLElement).textContent = '999';
-          }
-          const fleet = document.getElementById('chip-fleet')!;
-          (fleet.querySelector('b') as HTMLElement).textContent = s.fleet;
-          fleet.classList.toggle('full', s.full);
-          const centre = (e: Element): number => {
-            const r = e.getBoundingClientRect();
-            return r.top + r.height / 2;
-          };
-          const chips = Array.from(document.querySelectorAll<HTMLElement>('#chips .chip')).filter((e) => !e.hidden);
-          const ships = chips.filter((e) => /^chip-(drone|lancer|flak)$/.test(e.id));
-          const rows = new Set(chips.map((e) => Math.round(centre(e) / 12)));
-          return {
-            fleetY: centre(fleet),
-            boxes: chips.map((e) => { const r = e.getBoundingClientRect(); return `${e.id}:${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}`; }),
-            shipYs: ships.map(centre),
-            rows: rows.size,
-            right: Math.max(...chips.map((e) => e.getBoundingClientRect().right)),
-            left: Math.min(...chips.map((e) => e.getBoundingClientRect().left)),
-            fleetRight: fleet.getBoundingClientRect().right,
-            statsBottom: document.getElementById('stats')!.getBoundingClientRect().bottom,
-            ctlTop: document.getElementById('controls')!.getBoundingClientRect().top,
-          };
-        }, state);
+        const m = await hudInState(page, state, wide);
         expect(m.shipYs.length).toBeGreaterThanOrEqual(2);
         for (const y of m.shipYs) expect(Math.abs(y - m.fleetY), `fleet chip row vs ship chip row ${JSON.stringify(m)}`).toBeLessThanOrEqual(6);
         // Two rows: resources, then ships and the fleet. The one extreme (all five resources with rates at the wide stress: about
