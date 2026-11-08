@@ -112,3 +112,17 @@ Owned by the Designer. Each entry: date, build, who (owner or friend name), the 
 
 **Interpretation (Director):** the owner marked this "for later". It is a candidate direction for after H5 (and the open-world H6), not a change to the current iteration. It touches the VISION fixed decision "Logistics are abstract routes between nodes, not tile-by-tile belts", which a node-level layout puzzle would need to revisit, and pillar 1 ("Throughput is the throttle"), which it would deepen.
 **Action:** parked. The Designer steelmans it (including the VISION conflict) when the next direction after H5 is chosen.
+
+### 2026-11-08 · build build-20261108-4 (M2 H5, Fleet cap) · owner
+
+> 1 yes and yes
+> 2 yes
+> 3 no
+>
+> Bug: The top bar content started oscillating while gaining and spending resources
+>
+> When an asteroid buffer is full the toast warming shows and hides rapidly, shifting the buttons under them.
+
+(Answers the three H5 fun questions in order, in chat: 1 "Did the ship limit make you think about which ships to build? Did you ever recycle ships to change your mix?" 2 "Was there an area you couldn't take until a limit raise, a better mix or a Root cut? Did that area feel stronger?" 3 "Did a limit raise feel like a big step?")
+
+**Interpretation:** pending Designer triage (iteration 6).
