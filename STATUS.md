@@ -16,9 +16,10 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 1 | designer | triage build-20261108-2 feedback + overworld steelman | launch | Plan (done, e782443; owner picked A) |
 | 2 | designer | H4 spec (Reclaim ladder) | launch | Spec (done, ba817ea) |
 | 3 | core-engineer | h4-sim | launch | Build |
-| 4 | art-direction | h4-art | launch | Build |
+| 4 | art-direction | h4-art | launch | Build (green, 08f1399) |
+| 5 | critic | h4-art | launch | Review round 1 |
 
-Launches: 4 / 12. Resumes: 0. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 5 / 12. Resumes: 0. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 
