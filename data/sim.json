@@ -1,5 +1,5 @@
 {
-  "dataVersion": 3,
+  "dataVersion": 4,
   "tickRate": 30,
   "tunables": {
     "economy.startStock": { "default": 30, "min": 0, "max": 200 },
@@ -17,24 +17,43 @@
     "route.upgradeCostPerLevel": { "default": 20, "min": 5, "max": 100 },
     "route.maxLevel": { "default": 5, "min": 1, "max": 10 },
     "build.queueMax": { "default": 4, "min": 1, "max": 8 },
-    "ship.cost": { "default": 15, "min": 5, "max": 60 },
-    "ship.buildTicks": { "default": 90, "min": 15, "max": 900 },
-    "ship.hp": { "default": 10, "min": 1, "max": 100 },
-    "ship.damage": { "default": 2, "min": 1, "max": 20 },
+    "ship.drone.cost": { "default": 15, "min": 5, "max": 60 },
+    "ship.drone.buildTicks": { "default": 90, "min": 15, "max": 900 },
+    "ship.drone.hp": { "default": 10, "min": 1, "max": 100 },
+    "ship.drone.damage": { "default": 2, "min": 1, "max": 20 },
+    "ship.lancer.cost": { "default": 15, "min": 5, "max": 60 },
+    "ship.lancer.buildTicks": { "default": 120, "min": 15, "max": 900 },
+    "ship.lancer.hp": { "default": 12, "min": 1, "max": 100 },
+    "ship.lancer.damage": { "default": 4, "min": 1, "max": 20 },
+    "ship.flak.cost": { "default": 15, "min": 5, "max": 60 },
+    "ship.flak.buildTicks": { "default": 120, "min": 15, "max": 900 },
+    "ship.flak.hp": { "default": 12, "min": 1, "max": 100 },
+    "ship.flak.damage": { "default": 4, "min": 1, "max": 20 },
     "ship.speedSu": { "default": 4, "min": 1, "max": 20 },
-    "guardian.cap": { "default": 12, "min": 1, "max": 40 },
-    "guardian.thornHp": { "default": 20, "min": 1, "max": 200 },
-    "guardian.thornDamage": { "default": 3, "min": 0, "max": 30 },
-    "guardian.regrowTicks": { "default": 60, "min": 15, "max": 1800 },
-    "guardian.repairPerRound": { "default": 2, "min": 0, "max": 20 },
-    "root.capBonus": { "default": 0, "min": -14, "max": 20 },
-    "root.regrowTicks": { "default": 60, "min": 15, "max": 1800 },
-    "bloom.starvedCap": { "default": 8, "min": 1, "max": 40 },
-    "bloom.starvedRegrowTicks": { "default": 300, "min": 15, "max": 1800 },
+    "counter.strongPct": { "default": 200, "min": 100, "max": 400 },
+    "counter.weakPct": { "default": 25, "min": 10, "max": 100 },
+    "guard.thorn.hp": { "default": 20, "min": 1, "max": 200 },
+    "guard.thorn.damage": { "default": 3, "min": 0, "max": 30 },
+    "guard.thorn.repairPerRound": { "default": 2, "min": 0, "max": 20 },
+    "guard.thorn.regrowTicks": { "default": 60, "min": 15, "max": 1800 },
+    "guard.spore.hp": { "default": 6, "min": 1, "max": 100 },
+    "guard.spore.damage": { "default": 1, "min": 0, "max": 30 },
+    "guard.spore.repairPerRound": { "default": 0, "min": 0, "max": 20 },
+    "guard.spore.regrowTicks": { "default": 20, "min": 5, "max": 1800 },
+    "guard.capPct": { "default": 100, "min": 25, "max": 300 },
+    "bloom.starvedRegrowMul": { "default": 5, "min": 1, "max": 30 },
     "bloom.starvedRepairPerRound": { "default": 0, "min": 0, "max": 20 },
     "combat.roundTicks": { "default": 30, "min": 10, "max": 90 },
-    "rich.orePerMin": { "default": 25, "min": 10, "max": 80 },
-    "rich.freeExtractors": { "default": 1, "min": 0, "max": 4 },
+    "pocket.resourcePerMin": { "default": 6, "min": 1, "max": 40 },
+    "pocket.freeExtractors": { "default": 1, "min": 0, "max": 3 },
+    "heart.orePerMin": { "default": 25, "min": 10, "max": 80 },
+    "heart.freeExtractors": { "default": 1, "min": 0, "max": 4 },
+    "component.lens.ore": { "default": 5, "min": 0, "max": 60 },
+    "component.lens.crystal": { "default": 4, "min": 1, "max": 40 },
+    "component.plating.ore": { "default": 5, "min": 0, "max": 60 },
+    "component.plating.ice": { "default": 4, "min": 1, "max": 40 },
+    "component.buildTicks": { "default": 90, "min": 15, "max": 900 },
+    "component.stockCap": { "default": 5, "min": 1, "max": 50 },
     "system.variant": { "default": 0, "min": 0, "max": 3 },
     "stats.throughputWindowSec": { "default": 60, "min": 60, "max": 60 },
     "client.autosaveSec": { "default": 5, "min": 2, "max": 60 }
@@ -42,18 +61,59 @@
   "map": {
     "nodes": [
       { "id": "probe", "kind": "probe", "x": 500, "y": 1180, "r": 70, "slots": 0 },
-      { "id": "a1", "kind": "asteroid", "x": 330, "y": 1000, "r": 45, "slots": 2 },
-      { "id": "a2", "kind": "asteroid", "x": 700, "y": 1010, "r": 50, "slots": 3 },
-      { "id": "a3", "kind": "asteroid", "x": 220, "y": 760, "r": 50, "slots": 3 },
-      { "id": "a4", "kind": "asteroid", "x": 790, "y": 720, "r": 55, "slots": 3 },
-      { "id": "a5", "kind": "asteroid", "x": 480, "y": 560, "r": 60, "slots": 4 },
-      { "id": "rich", "kind": "rich", "x": 500, "y": 230, "r": 90, "slots": 4 },
-      { "id": "root", "kind": "root", "x": 850, "y": 420, "r": 45, "slots": 0 }
+      { "id": "a1", "kind": "asteroid", "x": 300, "y": 1010, "r": 45, "slots": 2 },
+      { "id": "a2", "kind": "asteroid", "x": 700, "y": 1010, "r": 45, "slots": 2 },
+      { "id": "a3", "kind": "asteroid", "x": 120, "y": 850, "r": 40, "slots": 1 },
+      { "id": "a4", "kind": "asteroid", "x": 880, "y": 850, "r": 40, "slots": 1 },
+      { "id": "a5", "kind": "asteroid", "x": 500, "y": 650, "r": 55, "slots": 3 },
+      { "id": "a6", "kind": "asteroid", "x": 170, "y": 640, "r": 45, "slots": 2 },
+      { "id": "a7", "kind": "asteroid", "x": 830, "y": 640, "r": 45, "slots": 2 },
+      { "id": "a8", "kind": "asteroid", "x": 100, "y": 250, "r": 40, "slots": 1 },
+      { "id": "a9", "kind": "asteroid", "x": 900, "y": 250, "r": 40, "slots": 1 },
+      { "id": "p1", "kind": "pocket", "x": 360, "y": 850, "r": 50, "slots": 0 },
+      { "id": "p2", "kind": "pocket", "x": 640, "y": 850, "r": 50, "slots": 0 },
+      { "id": "p3", "kind": "pocket", "x": 250, "y": 440, "r": 60, "slots": 0 },
+      { "id": "p4", "kind": "pocket", "x": 750, "y": 440, "r": 60, "slots": 0 },
+      { "id": "root", "kind": "root", "x": 500, "y": 450, "r": 45, "slots": 0 },
+      { "id": "heart", "kind": "heart", "x": 500, "y": 220, "r": 90, "slots": 4 }
     ],
-    "variants": [
-      { "id": "thin", "name": "Thin Root", "x": 820, "y": 110, "rootCap": 4 },
-      { "id": "knotted", "name": "Knotted Root", "x": 850, "y": 420, "rootCap": 9 },
-      { "id": "deep", "name": "Deep Root", "x": 160, "y": 480, "rootCap": 14 }
+    "layouts": [
+      {
+        "id": "frost",
+        "name": "Frost Gate",
+        "pockets": {
+          "p1": { "prize": "ice", "slots": 2, "thorns": 1, "spores": 8 },
+          "p2": { "prize": "crystal", "slots": 2, "thorns": 3, "spores": 3 },
+          "p3": { "prize": "ice", "slots": 3, "thorns": 9, "spores": 4 },
+          "p4": { "prize": "crystal", "slots": 3, "thorns": 2, "spores": 18 }
+        },
+        "root": { "thorns": 6, "spores": 0 },
+        "heart": { "thorns": 10, "spores": 14, "starvedThorns": 6, "starvedSpores": 7 }
+      },
+      {
+        "id": "glass",
+        "name": "Glass Thicket",
+        "pockets": {
+          "p1": { "prize": "crystal", "slots": 2, "thorns": 1, "spores": 8 },
+          "p2": { "prize": "ice", "slots": 2, "thorns": 3, "spores": 3 },
+          "p3": { "prize": "ice", "slots": 3, "thorns": 2, "spores": 18 },
+          "p4": { "prize": "crystal", "slots": 3, "thorns": 9, "spores": 4 }
+        },
+        "root": { "thorns": 0, "spores": 12 },
+        "heart": { "thorns": 14, "spores": 8, "starvedThorns": 8, "starvedSpores": 4 }
+      },
+      {
+        "id": "twin",
+        "name": "Twin Seams",
+        "pockets": {
+          "p1": { "prize": "ice", "slots": 2, "thorns": 2, "spores": 5 },
+          "p2": { "prize": "crystal", "slots": 2, "thorns": 2, "spores": 5 },
+          "p3": { "prize": "crystal", "slots": 3, "thorns": 2, "spores": 18 },
+          "p4": { "prize": "ice", "slots": 3, "thorns": 9, "spores": 4 }
+        },
+        "root": { "thorns": 3, "spores": 6 },
+        "heart": { "thorns": 6, "spores": 20, "starvedThorns": 4, "starvedSpores": 10 }
+      }
     ]
   }
 }

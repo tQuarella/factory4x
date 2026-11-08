@@ -1,10 +1,24 @@
-import { ROOT_CAP_MAX, SIM_TUNABLE_KEYS, type NodeKind, type SimData, type Tunables } from './data.ts';
+import {
+  GUARD_CAP_MAX,
+  GUARD_TYPES,
+  SIM_TUNABLE_KEYS,
+  type Component,
+  type GuardType,
+  type MapLayout,
+  type NodeKind,
+  type RawResource,
+  type Resource,
+  type ShipType,
+  type SimData,
+  type Tunables,
+} from './data.ts';
 import { isqrt } from './math.ts';
 
 /**
- * World state (DESIGN.md H1 "Entities and state", with the H2 changes). Plain JSON data only: no
- * classes, no Maps, no undefined fields (absent values are null), so
- * JSON.stringify round-trips it exactly and the hash covers all of it.
+ * World state (DESIGN.md H1 "Entities and state", with the H2 and H3
+ * changes). Plain JSON data only: no classes, no Maps, no undefined fields
+ * (absent values are null), so JSON.stringify round-trips it exactly and the
+ * hash covers all of it.
  *
  * Storage: each entity type is a dense array kept sorted by ascending id.
  * Ids come from one counter (`nextId`), new entities are appended, and dead
@@ -19,18 +33,21 @@ export interface Node {
   x: number;
   y: number;
   r: number;
+  /** Extractor slots (pockets: from the layout). */
   slots: number;
+  /** What the node yields and its buffer holds: ore for asteroids and the heart, ice or crystal for pockets, null for the probe and the Root. */
+  prize: RawResource | null;
   owned: boolean;
   extractors: number;
-  /** Ore waiting for pickup, ≤ node.bufferCap. */
+  /** Units of `prize` waiting for pickup, ≤ node.bufferCap. */
   buffer: number;
-  /** Extraction accumulator in ore·ticks/min units; 1 ore per T. */
+  /** Extraction accumulator in units·ticks/min; 1 unit per T. */
   accum: number;
 }
 
 export type BuildKind = 'extractor' | 'route' | 'upgrade';
 
-/** An unpaid build order. `cost` is locked when queued. */
+/** An unpaid build order. `cost` (ore) is locked when queued. */
 export interface BuildOrder {
   kind: BuildKind;
   node: number;
@@ -44,6 +61,8 @@ export interface ActiveBuild {
 }
 
 export interface Pod {
+  /** What it carries, copied from the source node. */
+  res: RawResource;
   amount: number;
   ticksLeft: number;
 }
@@ -69,6 +88,7 @@ export interface Transit {
 
 export interface Ship {
   id: number;
+  type: ShipType;
   hp: number;
   /** Node index when parked; null while in transit. */
   at: number | null;
@@ -77,10 +97,27 @@ export interface Ship {
   engagedIn: number;
 }
 
-export interface Thorn {
+export interface Guard {
   id: number;
+  type: GuardType;
   hp: number;
 }
+
+/** A count per guard type. */
+export interface GuardCounts {
+  thorn: number;
+  spore: number;
+}
+
+/** A count per ship type. */
+export interface ShipTypeCounts {
+  drone: number;
+  lancer: number;
+  flak: number;
+}
+
+/** Everything at the probe: one integer per resource. */
+export type Stock = Record<Resource, number>;
 
 /** Combat state at one guarded node. */
 export interface Battle {
@@ -89,74 +126,111 @@ export interface Battle {
   /** The guarded node it is fought at. */
   node: number;
   startTick: number;
+  /** Guards alive when the battle started, by type (the repelled toast names the dominant one). */
+  guardsAtStart: GuardCounts;
+  /** Distinct ships that fought a round here, total and by type. */
   shipsEngaged: number;
+  engagedByType: ShipTypeCounts;
   shipsLost: number;
-  thornsKilled: number;
+  lostByType: ShipTypeCounts;
+  guardsKilled: number;
+  killedByType: GuardCounts;
 }
 
 export type BattleOutcome = 'captured' | 'repelled' | 'withdrew';
 
-/** The Bloom's wilt when the Root is cut: thorn count before and after (from - to thorns withered). */
+/** The heart's wilt when the Root is cut: guard counts per type before and after. */
 export interface Wilt {
-  from: number;
-  to: number;
+  from: GuardCounts;
+  to: GuardCounts;
 }
 
 export interface BattleResult extends Battle {
   endTick: number;
   outcome: BattleOutcome;
-  /** Set on the Root's `captured` result when the Bloom was alive (to = from if it was already at or below the starved cap); otherwise null. */
+  /** Set on the Root's `captured` result when the heart was alive (to = from if it was already at or below its starved caps); otherwise null. */
   wilt: Wilt | null;
 }
 
 /**
- * One guardian per guarded node (DESIGN.md H2 "Guardians"): the Bloom on the
- * rich node and the Root on the root node. `world.guardians` is in node-index
- * order and never changes length, so the systems loop over it in that order.
+ * One guardian per guarded node (pockets, the Root, the heart), in
+ * node-index order. `world.guardians` never changes length, so the systems
+ * loop over it in that order.
  */
 export interface Guardian {
   /** The node it guards. */
   node: number;
   alive: boolean;
-  /** Oldest first (ascending id). */
-  thorns: Thorn[];
-  regrowProgress: number;
+  /** Ascending id (oldest first), both types mixed. */
+  guards: Guard[];
+  /** Ticks toward the next guard of each type. */
+  regrowProgress: GuardCounts;
+  /** The layout's guard counts for this node (before guard.capPct). */
+  counts: GuardCounts;
+  /** The heart's starved counts (before guard.capPct); null for other nodes. */
+  starvedCounts: GuardCounts | null;
+  /** The heart: true until the Root is cut. Other nodes: null. */
+  fed: boolean | null;
   /** The battle running at this node, or null. */
   battle: Battle | null;
   /** The last finished battle at this node, or null. */
   lastBattle: BattleResult | null;
   /** Attacks ordered at this node while it was guarded (at most one per tick). */
   wavesSent: number;
-  /** Ships lost and thorns killed in battles at this node. */
+  /** Ships lost and guards killed in battles at this node. */
   shipsLost: number;
-  thornsKilled: number;
+  guardsKilled: number;
 }
 
-/** The system chosen at world creation (DESIGN.md H2 "Map variation"). Fixed for the run. */
+/** The layout chosen at world creation (DESIGN.md H3 "Layouts"). Fixed for the run. */
 export interface SystemInfo {
-  /** Index into data `map.variants` (0 thin, 1 knotted, 2 deep in the shipped data). */
+  /** Index into data `map.layouts` (0 frost, 1 glass, 2 twin in the shipped data). */
   variant: number;
   id: string;
   name: string;
-  /** The variant's base Root cap, before `root.capBonus`. */
-  rootCap: number;
+}
+
+export interface Capture {
+  node: number;
+  tick: number;
 }
 
 export interface Stats {
-  /** Ore delivered by routes per game second, ring buffer indexed by (tick / tickRate) mod length. */
+  /** Ore delivered by routes per game second, ring buffer indexed by (tick / tickRate) mod length (the headline ore/min). */
   deliveredBuckets: number[];
+  /** The same ring buffers for ice and crystal (shown small under their chips). */
+  prizeBuckets: { ice: number[]; crystal: number[] };
+  /** Total delivered by routes, per resource. */
+  delivered: Record<RawResource, number>;
+  /** Tick each resource was first delivered by a route, or null. Unlocks the chips and the lancer/flak rows. */
+  firstDeliveredTick: Record<RawResource, number | null>;
   peakPerMin: number;
-  shipsBuilt: number;
-  shipsLost: number;
-  thornsKilled: number;
+  shipsBuilt: ShipTypeCounts;
+  shipsLost: ShipTypeCounts;
+  componentsBuilt: Record<Component, number>;
+  guardsKilled: GuardCounts;
+  /** Heart guards removed by the wilt (not kills). */
+  guardsWithered: number;
   wavesSent: number;
   firstShipTick: number | null;
   oreSpentShips: number;
   oreSpentEconomy: number;
+  oreSpentComponents: number;
   /** Tick the Root was captured, or null. */
   rootCutTick: number | null;
-  /** Bloom thorns removed by the wilt (not kills). */
-  thornsWithered: number;
+  /** Every capture, in order. The heart's also sets `world.capturedTick`. */
+  captures: Capture[];
+}
+
+export interface Yard {
+  on: boolean;
+  /** 0 = idle. */
+  ticksLeft: number;
+}
+
+export interface Assembler {
+  /** 0 = idle. */
+  ticksLeft: number;
 }
 
 export interface World {
@@ -167,37 +241,33 @@ export interface World {
   nextId: number;
   /** Live sim tunables. Starts from data defaults; `setTunable` changes it. */
   tun: Tunables;
-  /** Ore at the probe. */
-  stock: number;
+  /** Resources at the probe. */
+  stock: Stock;
+  /** Probe mining accumulator (ore only). */
   probeAccum: number;
   /** Unpaid build orders, FIFO. */
   queue: BuildOrder[];
   activeBuild: ActiveBuild | null;
-  /** ticksLeft = 0 means idle. */
-  shipyard: { on: boolean; ticksLeft: number };
+  /** Rule 5a; run in the order lens, plating. */
+  assemblers: Record<Component, Assembler>;
+  /** Rule 5b; run in the order lancer, flak, drone. */
+  yards: Record<ShipType, Yard>;
   rally: number;
   nodes: Node[];
   routes: Route[];
   ships: Ship[];
-  /** Bloom then Root (node-index order). */
+  /** One per guarded node, in node-index order. */
   guardians: Guardian[];
   /** The most recent finished battle at any node (`node` says which). Per node: `guardians[i].lastBattle`. */
   lastBattle: BattleResult | null;
   stats: Stats;
-  /** Tick the Bloom (rich node) was captured, or null. */
+  /** Tick the heart was captured, or null. */
   capturedTick: number | null;
   system: SystemInfo;
 }
 
 /** The probe is always node 0 (enforced by parseSimData). */
 export const PROBE = 0;
-
-/** Index of the rich node. */
-export function richIndex(world: Readonly<World>): number {
-  const nodes = world.nodes;
-  for (let i = 0; i < nodes.length; i++) if (nodes[i]!.kind === 'rich') return i;
-  throw new Error('world has no rich node');
-}
 
 /** Integer distance between two node centers: floor(sqrt(dx² + dy²)). Routes and ship travel use it. */
 export function nodeDistance(world: Readonly<World>, a: number, b: number): number {
@@ -219,11 +289,25 @@ export function ticksPerMin(world: Readonly<World>): number {
   return world.tickRate * 60;
 }
 
-/** Index of the Root node. */
-export function rootIndex(world: Readonly<World>): number {
+function indexOfKind(world: Readonly<World>, kind: NodeKind): number {
   const nodes = world.nodes;
-  for (let i = 0; i < nodes.length; i++) if (nodes[i]!.kind === 'root') return i;
-  throw new Error('world has no root node');
+  for (let i = 0; i < nodes.length; i++) if (nodes[i]!.kind === kind) return i;
+  throw new Error(`world has no ${kind} node`);
+}
+
+/** Index of the Bloom heart (H1's rich node). */
+export function heartIndex(world: Readonly<World>): number {
+  return indexOfKind(world, 'heart');
+}
+
+/** Index of the Root. */
+export function rootIndex(world: Readonly<World>): number {
+  return indexOfKind(world, 'root');
+}
+
+/** True for the kinds that have a guardian: pockets, the Root and the heart. */
+export function isGuardedKind(kind: NodeKind): boolean {
+  return kind === 'pocket' || kind === 'root' || kind === 'heart';
 }
 
 /** The guardian at `node`, or null if the node isn't a guarded node. */
@@ -238,55 +322,81 @@ export function isGuarded(world: Readonly<World>, node: number): boolean {
   return g !== null && g.alive;
 }
 
-/** True while the Root lives: the Bloom is fed and behaves as in H1. */
-export function bloomFed(world: Readonly<World>): boolean {
-  return guardianAt(world, rootIndex(world))!.alive;
+/** Effective cap for a layout count n: min(60, floor(n × guard.capPct / 100)). */
+export function capEff(n: number, capPct: number): number {
+  return Math.min(GUARD_CAP_MAX, Math.floor((n * capPct) / 100));
 }
 
-/** Cap, regrowth and repair a guardian uses at the current tunables (DESIGN.md H2 "Effective parameters"). */
-export interface GuardianParams {
-  cap: number;
-  regrowTicks: number;
-  repairPerRound: number;
+/** True while `g` is the heart's guardian and the Root has been cut. */
+export function isStarved(g: Readonly<Guardian>): boolean {
+  return g.fed === false;
 }
 
-/** The Bloom's parameters while fed (`fed = true`) or starved. */
-export function bloomParams(world: Readonly<World>, fed: boolean): GuardianParams {
-  const t = world.tun;
-  return fed
-    ? { cap: t['guardian.cap'], regrowTicks: t['guardian.regrowTicks'], repairPerRound: t['guardian.repairPerRound'] }
-    : { cap: t['bloom.starvedCap'], regrowTicks: t['bloom.starvedRegrowTicks'], repairPerRound: t['bloom.starvedRepairPerRound'] };
+/** The counts `g` regrows to now (before capEff): the layout's, or the heart's starved counts once the Root is cut. */
+function baseCounts(g: Readonly<Guardian>): GuardCounts {
+  return isStarved(g) && g.starvedCounts !== null ? g.starvedCounts : g.counts;
 }
 
-/** The Root's effective cap: clamp(variant rootCap + root.capBonus, 0, 40). */
-export function rootCap(world: Readonly<World>): number {
-  return Math.max(0, Math.min(ROOT_CAP_MAX, world.system.rootCap + world.tun['root.capBonus']));
+/** Effective cap per type for guardian `g` now (rule 9). */
+export function guardCaps(world: Readonly<World>, g: Readonly<Guardian>): GuardCounts {
+  const b = baseCounts(g);
+  const pct = world.tun['guard.capPct'];
+  return { thorn: capEff(b.thorn, pct), spore: capEff(b.spore, pct) };
 }
 
-/** Effective parameters of guardian `g` now. */
-export function guardianParams(world: Readonly<World>, g: Readonly<Guardian>): GuardianParams {
-  if (world.nodes[g.node]!.kind === 'root') {
-    return { cap: rootCap(world), regrowTicks: world.tun['root.regrowTicks'], repairPerRound: world.tun['guardian.repairPerRound'] };
+/** Regrowth period of one guard type at `g` now: guard.<type>.regrowTicks, × bloom.starvedRegrowMul for the starved heart. */
+export function guardRegrowTicks(world: Readonly<World>, g: Readonly<Guardian>, type: GuardType): number {
+  const base = world.tun[`guard.${type}.regrowTicks`];
+  return isStarved(g) ? base * world.tun['bloom.starvedRegrowMul'] : base;
+}
+
+/** Repair per round of one guard type at `g` now: guard.<type>.repairPerRound, or bloom.starvedRepairPerRound for the starved heart. */
+export function guardRepair(world: Readonly<World>, g: Readonly<Guardian>, type: GuardType): number {
+  return isStarved(g) ? world.tun['bloom.starvedRepairPerRound'] : world.tun[`guard.${type}.repairPerRound`];
+}
+
+/** Living guards of `g` by type. */
+export function countGuards(g: Readonly<Guardian>): GuardCounts {
+  const c: GuardCounts = { thorn: 0, spore: 0 };
+  for (const gd of g.guards) c[gd.type] += 1;
+  return c;
+}
+
+/** Appends a full-hp guard of `type` with a new id. */
+export function addGuard(world: World, g: Guardian, type: GuardType): void {
+  g.guards.push({ id: world.nextId++, type, hp: world.tun[`guard.${type}.hp`] });
+}
+
+/** The layout index a new world uses: `forced - 1` when `forced > 0` (system.variant), else ((seed mod n) + n) mod n. */
+export function chooseVariant(seed: number, forced: number, layoutCount: number): number {
+  if (forced > 0) return Math.min(forced, layoutCount) - 1;
+  return (((seed | 0) % layoutCount) + layoutCount) % layoutCount;
+}
+
+function guardianFor(layout: MapLayout, n: Node): Pick<Guardian, 'counts' | 'starvedCounts' | 'fed'> {
+  if (n.kind === 'pocket') {
+    const p = layout.pockets[n.id]!;
+    return { counts: { thorn: p.thorns, spore: p.spores }, starvedCounts: null, fed: null };
   }
-  return bloomParams(world, bloomFed(world));
+  if (n.kind === 'root') return { counts: { thorn: layout.root.thorns, spore: layout.root.spores }, starvedCounts: null, fed: null };
+  const h = layout.heart;
+  return {
+    counts: { thorn: h.thorns, spore: h.spores },
+    starvedCounts: { thorn: h.starvedThorns, spore: h.starvedSpores },
+    fed: true,
+  };
 }
 
-function addThorn(world: World, g: Guardian): void {
-  g.thorns.push({ id: world.nextId++, hp: world.tun['guardian.thornHp'] });
-}
-
-/** The variant index a new world uses: `forced - 1` when `forced > 0` (system.variant), else ((seed mod n) + n) mod n. */
-export function chooseVariant(seed: number, forced: number, variantCount: number): number {
-  if (forced > 0) return Math.min(forced, variantCount) - 1;
-  return (((seed | 0) % variantCount) + variantCount) % variantCount;
-}
+const zeroShips = (): ShipTypeCounts => ({ drone: 0, lancer: 0, flak: 0 });
 
 /** A fresh world at tick 0 from the given (validated) data. */
 export function createWorld(seed: number, data: SimData): World {
   const tun = {} as Tunables;
   for (const k of SIM_TUNABLE_KEYS) tun[k] = data.tunables[k].default;
-  const variantIndex = chooseVariant(seed, tun['system.variant'], data.map.variants.length);
-  const variant = data.map.variants[variantIndex]!;
+  const variant = chooseVariant(seed, tun['system.variant'], data.map.layouts.length);
+  const layout = data.map.layouts[variant]!;
+  const window = data.tunables['stats.throughputWindowSec'].default;
+  const ring = (): number[] => new Array<number>(window).fill(0);
   const world: World = {
     tick: 0,
     rng: seed | 0,
@@ -294,67 +404,76 @@ export function createWorld(seed: number, data: SimData): World {
     tickRate: data.tickRate,
     nextId: 1,
     tun,
-    stock: tun['economy.startStock'],
+    stock: { ore: tun['economy.startStock'], ice: 0, crystal: 0, lens: 0, plating: 0 },
     probeAccum: 0,
     queue: [],
     activeBuild: null,
-    shipyard: { on: true, ticksLeft: 0 },
+    assemblers: { lens: { ticksLeft: 0 }, plating: { ticksLeft: 0 } },
+    // As in H1, the drone yard starts on (the first ship early matters); lancer and flak wait for their components.
+    yards: { drone: { on: true, ticksLeft: 0 }, lancer: { on: false, ticksLeft: 0 }, flak: { on: false, ticksLeft: 0 } },
     rally: PROBE,
-    nodes: data.map.nodes.map((n, index) => ({
-      index,
-      id: n.id,
-      kind: n.kind,
-      // The Root's position comes from the variant; map.nodes holds a placeholder.
-      x: n.kind === 'root' ? variant.x : n.x,
-      y: n.kind === 'root' ? variant.y : n.y,
-      r: n.r,
-      slots: n.slots,
-      owned: n.kind === 'probe',
-      extractors: 0,
-      buffer: 0,
-      accum: 0,
-    })),
+    nodes: data.map.nodes.map((n, index) => {
+      const pocket = n.kind === 'pocket' ? layout.pockets[n.id]! : null;
+      return {
+        index,
+        id: n.id,
+        kind: n.kind,
+        x: n.x,
+        y: n.y,
+        r: n.r,
+        slots: pocket ? pocket.slots : n.slots,
+        prize: pocket ? pocket.prize : n.kind === 'asteroid' || n.kind === 'heart' ? 'ore' : null,
+        owned: n.kind === 'probe',
+        extractors: 0,
+        buffer: 0,
+        accum: 0,
+      };
+    }),
     routes: [],
     ships: [],
     guardians: [],
     lastBattle: null,
     stats: {
-      deliveredBuckets: new Array<number>(data.tunables['stats.throughputWindowSec'].default).fill(0),
+      deliveredBuckets: ring(),
+      prizeBuckets: { ice: ring(), crystal: ring() },
+      delivered: { ore: 0, ice: 0, crystal: 0 },
+      firstDeliveredTick: { ore: null, ice: null, crystal: null },
       peakPerMin: 0,
-      shipsBuilt: 0,
-      shipsLost: 0,
-      thornsKilled: 0,
+      shipsBuilt: zeroShips(),
+      shipsLost: zeroShips(),
+      componentsBuilt: { lens: 0, plating: 0 },
+      guardsKilled: { thorn: 0, spore: 0 },
+      guardsWithered: 0,
       wavesSent: 0,
       firstShipTick: null,
       oreSpentShips: 0,
       oreSpentEconomy: 0,
+      oreSpentComponents: 0,
       rootCutTick: null,
-      thornsWithered: 0,
+      captures: [],
     },
     capturedTick: null,
-    system: { variant: variantIndex, id: variant.id, name: variant.name, rootCap: variant.rootCap },
+    system: { variant, id: layout.id, name: layout.name },
   };
-  // One guardian per guarded node, in node-index order (Bloom 6, Root 7).
   for (const n of world.nodes) {
-    if (n.kind !== 'rich' && n.kind !== 'root') continue;
+    if (!isGuardedKind(n.kind)) continue;
     world.guardians.push({
       node: n.index,
       alive: true,
-      thorns: [],
-      regrowProgress: 0,
+      guards: [],
+      regrowProgress: { thorn: 0, spore: 0 },
+      ...guardianFor(layout, n),
       battle: null,
       lastBattle: null,
       wavesSent: 0,
       shipsLost: 0,
-      thornsKilled: 0,
+      guardsKilled: 0,
     });
   }
-  // Each starts at its cap; thorn ids are handed out in guardian order.
+  // Guardians start full. Ids go in guardian order, Thorns before Spores.
   for (const g of world.guardians) {
-    const cap = guardianParams(world, g).cap;
-    for (let i = 0; i < cap; i++) addThorn(world, g);
+    const caps = guardCaps(world, g);
+    for (const type of GUARD_TYPES) for (let i = 0; i < caps[type]; i++) addGuard(world, g, type);
   }
   return world;
 }
-
-export { addThorn };
