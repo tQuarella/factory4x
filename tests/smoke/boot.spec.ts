@@ -1187,7 +1187,10 @@ async function hudInState(page: Page, state: HudState, wide: boolean) {
       if (/^(drone|lancer|flak)$/.test(id)) (e.querySelector('b') as HTMLElement).textContent = '30';
     }
     const fleet = document.getElementById('chip-fleet')!;
-    (fleet.querySelector('b') as HTMLElement).textContent = s.fleet;
+    // The numbers have their own span (the column layout drops the word); before that, the whole label was the b.
+    const numbers = fleet.querySelector<HTMLElement>('.fl-n');
+    if (numbers) numbers.textContent = s.fleet.replace(/^Fleet /, '');
+    else (fleet.querySelector('b') as HTMLElement).textContent = s.fleet;
     fleet.classList.toggle('full', s.full);
     const centre = (e: Element): number => {
       const r = e.getBoundingClientRect();
@@ -1197,6 +1200,7 @@ async function hudInState(page: Page, state: HudState, wide: boolean) {
     const ships = chips.filter((e) => /^chip-(drone|lancer|flak)$/.test(e.id));
     const rows = new Set(chips.map((e) => Math.round(centre(e) / 12)));
     const bars = document.getElementById('bars')!.getBoundingClientRect();
+    const inked = chips.flatMap((e) => [e, ...Array.from(e.querySelectorAll('*'))]).map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
     return {
       fleetY: centre(fleet),
       boxes: chips.map((e) => {
@@ -1205,8 +1209,9 @@ async function hudInState(page: Page, state: HudState, wide: boolean) {
       }),
       shipYs: ships.map(centre),
       rows: rows.size,
-      right: Math.max(...chips.map((e) => e.getBoundingClientRect().right)),
-      left: Math.min(...chips.map((e) => e.getBoundingClientRect().left)),
+      // The chips and everything drawn inside them (a label can overflow a chip that fits).
+      right: Math.max(...inked.map((r) => r.right)),
+      left: Math.min(...inked.map((r) => r.left)),
       barsLeft: bars.left,
       barsRight: bars.right,
       visible: chips.length,

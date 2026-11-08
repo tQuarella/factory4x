@@ -233,6 +233,10 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 .capture-order b { display: block; color: var(--teal); margin-top: 2px; overflow-wrap: anywhere; }
 @media (min-aspect-ratio: 1/1) {
   #chips { flex: none; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 2px; padding: 0 4px 6px; }
+  /* H5: in the column the ship and fleet chips stack like the resource chips (a no-wrap row spilled out of the 132-156 px column),
+     and the fleet chip shows its icon and "9/12" without the word, which doesn't fit 132 px (the tooltip keeps it). */
+  .chip-row.ships { display: contents; }
+  .chip.fleet .fl-word { display: none; }
 }
 
 /* ---- H4: overworld HUD, area and research sheets, win panel ---- */

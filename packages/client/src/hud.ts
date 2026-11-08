@@ -30,7 +30,7 @@ function makeChip(root: HTMLElement, id: string, label: string, icon: (parent: H
 export class Hud {
   private readonly res = new Map<Resource, Chip>();
   private readonly ships = new Map<ShipType, Chip>();
-  private readonly fleet: Chip & { icon: HTMLCanvasElement; full: boolean };
+  private readonly fleet: Chip & { icon: HTMLCanvasElement; full: boolean; numbers: HTMLElement };
 
   constructor(root: HTMLElement) {
     // Two rows, so the fleet chip always sits with the ship chips it counts: resources, then ships and the fleet.
@@ -47,14 +47,19 @@ export class Hud {
     const chip = makeChip(shipRow, 'chip-fleet', 'Fleet limit', (p) => (icon = fleetIcon(p, 26, false)), false);
     chip.el.classList.add('fleet');
     chip.el.hidden = true;
-    this.fleet = { ...chip, icon, full: false };
+    // "Fleet " and "9/12" are separate spans (the text stays "Fleet 9/12"), so the narrow landscape column can drop the
+    // word and keep the icon and the numbers, as the ship chips do.
+    chip.count.textContent = '';
+    h('span', 'fl-word', 'Fleet ', chip.count);
+    const numbers = h('span', 'fl-n', '', chip.count);
+    this.fleet = { ...chip, icon, full: false, numbers };
   }
 
   update(world: Readonly<World>, data: SimData): void {
     const f = fleetStatus(world, data);
     setHidden(this.fleet.el, f.cap === null);
     if (f.cap !== null) {
-      setText(this.fleet.count, fleetChipText(f.count, f.cap));
+      setText(this.fleet.numbers, fleetChipText(f.count, f.cap).replace(/^Fleet /, ''));
       this.fleet.el.title = fleetLine({ count: f.count, cap: f.cap, level: f.level, maxLevel: f.maxLevel });
       toggleClass(this.fleet.el, 'full', f.full);
       // The chip's edge is the probe amber at the limit (palette.probe), and the icon's bracket closes.
