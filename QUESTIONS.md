@@ -32,6 +32,10 @@ Protected files changed this build: VISION.md (Q14, owner-approved: long persist
 
 ## Blocking
 
+None.
+
+## Answered
+
 ### Q16. Which part of the overworld should the next build test first? (2026-11-08, Designer)
 
 Your overworld idea fits VISION.md as written (no edit needed). Steelman: DESIGN.md → "Owner direction 2026-11-08: the overworld (steelman)"; details: "H4 candidates (awaiting the owner's pick)". Each is one build, reusing the H3 field inside every area:
@@ -42,9 +46,7 @@ Your overworld idea fits VISION.md as written (no edit needed). Steelman: DESIGN
 
 Answer with a letter. Default if unanswered: A.
 
-**Answer:**
-
-## Answered
+**Answer (owner, 2026-11-08, in chat with the Director):** A. Reclaim ladder.
 
 ### Q15. Skip a repeat branch CI run when `main` moved only in status files? (2026-11-07, Retrospective)
 
