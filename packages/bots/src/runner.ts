@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import { createWorld, lastBattle, runSummary, type RunSummary, step, throughputPerMin, worldHash, type BattleOutcome, type SimData } from '@factory4x/sim';
+import { createWorld, lastBattle, runSummary, type RunSummary, step, throughputPerMin, worldHash, type BattleOutcome, type RawResource, type ShipTypeCounts, type SimData } from '@factory4x/sim';
 import type { Strategy } from './strategies.ts';
 
 /** won = the heart was captured; timeout = still uncaptured at the tick cap. */
@@ -34,6 +34,12 @@ export interface GameResult {
   /** The layout (DESIGN.md H3): id ('frost', 'glass', 'twin') and name. */
   variantId: string;
   variantName: string;
+  /** Ships lost by type, as of capture (end of the run if never captured). */
+  shipsLostByType: ShipTypeCounts;
+  /** Capture order up to the heart, with game seconds (p1, p4, root, heart). */
+  captureOrder: { id: string; prize: RawResource | null; sec: number }[];
+  /** Game seconds each resource was first delivered, or null. */
+  firstDeliveredSec: Record<RawResource, number | null>;
   /** Game seconds when the Root was cut; null if it was left standing. */
   rootCutSec: number | null;
   /** Ships lost at the Root, heart guards withered by the cut, and waves sent at the Root and the heart (as of capture). */
@@ -142,6 +148,9 @@ export function runGame(strategy: Strategy, seed: number, data: SimData, maxTick
     peakPerMin: end.peakPerMin,
     shipsBuilt: s.shipsBuilt,
     shipsLost: s.shipsLost,
+    shipsLostByType: s.shipsLostByType,
+    captureOrder: s.captures.map((c) => ({ id: c.id, prize: c.prize, sec: c.sec })),
+    firstDeliveredSec: end.firstDeliveredSec,
     wavesSent: atCapture ? wavesSentAtCapture : s.wavesSent,
     wavesRepelled: atCapture ? repelledAtCapture : wavesRepelled,
     firstWaveOutcome,
@@ -179,12 +188,118 @@ export interface DepthFlag {
 
 /** The layouts the H3 report compares (seeds 1-3 cover them: glass, twin, frost). */
 export const VARIANT_IDS = ['frost', 'glass', 'twin'] as const;
+export const H3_STRATEGIES = ['drones-only', 'ice-first', 'crystal-first', 'greedy'] as const;
+
+/** Flag 1 window: heart capture between 15 and 45 game minutes. */
+export const CAPTURE_MIN_SEC = 15 * 60;
+export const CAPTURE_MAX_SEC = 45 * 60;
+
+/** One comparison row per layout: the lowest seed that played it, per strategy. */
+export interface LayoutRow {
+  variantId: string;
+  variantName: string;
+  seed: number;
+  byStrategy: Record<string, GameResult>;
+}
+
+/** Group results by layout (the lowest seed per layout), in VARIANT_IDS order. */
+export function layoutRows(results: readonly GameResult[]): LayoutRow[] {
+  const rows: LayoutRow[] = [];
+  for (const id of VARIANT_IDS) {
+    const mine = results.filter((r) => r.variantId === id);
+    if (mine.length === 0) continue;
+    const seed = Math.min(...mine.map((r) => r.seed));
+    const byStrategy: Record<string, GameResult> = {};
+    for (const r of mine) if (r.seed === seed) byStrategy[r.strategy] = r;
+    rows.push({ variantId: id, variantName: mine[0]!.variantName, seed, byStrategy });
+  }
+  return rows;
+}
+
+/** Game seconds as m:ss. */
+export const mmss = (sec: number | null): string => (sec === null ? 'never' : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`);
+/** True when a and b differ by at most pct percent of the smaller (integers). */
+const within = (a: number, b: number, pct: number): boolean => Math.abs(a - b) * 100 <= pct * Math.min(a, b);
 
 /**
- * Depth flags as report lines. The H2 flags compared turtle and raid-supply,
- * which no longer exist; the six H3 flags (DESIGN.md H3 "Bot checks") land
- * with h3-bots. Until then there are none.
+ * The six H3 depth flags (DESIGN.md H3 "Bot checks") as report lines. Flags
+ * 1-5 read one game per layout and strategy (the lowest seed that plays the
+ * layout); flag 6 takes the determinism result from the CLI. Ships lost and
+ * capture times are as of the heart capture.
  */
-export function computeDepthFlags(): DepthFlag[] {
-  return [];
+export function computeDepthFlags(results: readonly GameResult[], determinismOk: boolean, determinismDetail = ''): DepthFlag[] {
+  const rows = layoutRows(results);
+  const complete = rows.length === VARIANT_IDS.length && rows.every((r) => H3_STRATEGIES.every((s) => r.byStrategy[s] !== undefined));
+  const need = (name: string): DepthFlag => ({ name, pass: false, detail: 'needs all four strategies on all three layouts (run with --seeds 3 or more)' });
+  const flags: DepthFlag[] = [];
+
+  const f1 = 'Every strategy captures the heart in every layout within 15-45 game minutes, no softlock';
+  if (!complete) flags.push(need(f1));
+  else {
+    const bad: string[] = [];
+    for (const row of rows) {
+      for (const s of H3_STRATEGIES) {
+        const r = row.byStrategy[s]!;
+        if (r.outcome === 'softlock' || r.outcome === 'crash') bad.push(`${s}/${row.variantId} ${r.outcome}`);
+        else if (r.captureSec === null) bad.push(`${s}/${row.variantId} never captured`);
+        else if (r.captureSec < CAPTURE_MIN_SEC || r.captureSec > CAPTURE_MAX_SEC) bad.push(`${s}/${row.variantId} ${mmss(r.captureSec)}`);
+      }
+    }
+    flags.push({ name: f1, pass: bad.length === 0, detail: bad.length === 0 ? 'all 12 games inside the window' : `outside: ${bad.join(', ')}` });
+  }
+
+  const f2 = 'Counters matter: in every layout drones-only loses at least 40% more ships than the best strategy, or captures at least 20% later';
+  if (!complete) flags.push(need(f2));
+  else {
+    const parts: string[] = [];
+    let all = true;
+    for (const row of rows) {
+      const d = row.byStrategy['drones-only']!;
+      const others = H3_STRATEGIES.filter((s) => s !== 'drones-only').map((s) => row.byStrategy[s]!);
+      const bestLost = Math.min(...others.map((r) => r.shipsLost));
+      const caps = others.map((r) => r.captureSec).filter((v): v is number => v !== null);
+      const bestCap = caps.length ? Math.min(...caps) : null;
+      const moreLost = d.shipsLost > bestLost && d.shipsLost * 100 >= bestLost * 140;
+      const later = d.captureSec !== null && bestCap !== null && d.captureSec * 100 >= bestCap * 120;
+      if (!(moreLost || later)) all = false;
+      parts.push(`${row.variantId}: lost ${d.shipsLost} vs best ${bestLost} (${moreLost ? 'yes' : 'no'}), ${mmss(d.captureSec)} vs best ${mmss(bestCap)} (${later ? 'yes' : 'no'})`);
+    }
+    flags.push({ name: f2, pass: all, detail: parts.join('; ') });
+  }
+
+  const f3 = 'Two viable first doors: in at least 2 of 3 layouts ice-first and crystal-first capture the heart within 15% of each other';
+  const f4 = 'No fixed best opening: the faster of ice-first and crystal-first is not the same in all three layouts';
+  if (!complete) {
+    flags.push(need(f3), need(f4));
+  } else {
+    let close = 0;
+    const parts: string[] = [];
+    const winners: string[] = [];
+    for (const row of rows) {
+      const i = row.byStrategy['ice-first']!.captureSec;
+      const c = row.byStrategy['crystal-first']!.captureSec;
+      if (i === null || c === null) {
+        parts.push(`${row.variantId}: ice ${mmss(i)}, crystal ${mmss(c)}`);
+        winners.push(i === null && c === null ? 'none' : i === null ? 'crystal' : 'ice');
+        continue;
+      }
+      const ok = within(i, c, 15);
+      if (ok) close++;
+      const gap = i === c ? 0 : Math.round((Math.abs(i - c) * 100) / Math.min(i, c));
+      parts.push(`${row.variantId}: ice ${mmss(i)}, crystal ${mmss(c)}, gap ${gap}% (${ok ? 'within' : 'outside'})`);
+      winners.push(i === c ? 'tie' : i < c ? 'ice' : 'crystal');
+    }
+    flags.push({ name: f3, pass: close >= 2, detail: `${close} of 3 within 15%; ${parts.join('; ')}` });
+    flags.push({ name: f4, pass: new Set(winners).size > 1, detail: `faster door: ${rows.map((r, k) => `${r.variantId} ${winners[k]}`).join(', ')}` });
+  }
+
+  const f5 = 'Order varies: the greedy capture order is different in each layout';
+  if (!complete) flags.push(need(f5));
+  else {
+    const orders = rows.map((r) => r.byStrategy['greedy']!.captureOrder.map((c) => c.id).join(' > '));
+    flags.push({ name: f5, pass: new Set(orders).size === orders.length, detail: rows.map((r, k) => `${r.variantId}: ${orders[k]}`).join('; ') });
+  }
+
+  flags.push({ name: 'Determinism and the reference replay pass', pass: determinismOk, detail: determinismDetail });
+  return flags;
 }

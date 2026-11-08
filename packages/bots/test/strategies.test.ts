@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createWorld, defaultData, guardianStatus, isValidInput, step, type World } from '@factory4x/sim';
-import { fleetPower, guardNeed, nextEconomyOrder, nextTarget, nodeFinished, readyToAttack, strategies } from '../src/strategies.ts';
+import { firstDoor, fleetPower, guardNeed, nextEconomyOrder, nextTarget, nodeFinished, readyToAttack, strategies } from '../src/strategies.ts';
 
 const N = { probe: 0, a1: 1, a2: 2, a3: 3, a4: 4, a5: 5, p1: 10, p2: 11, p3: 12, p4: 13, root: 14, heart: 15 } as const;
 /** Seed 0 is Frost Gate. */
@@ -44,12 +44,28 @@ describe('economy planner', () => {
   });
 });
 
-describe('interim H3 strategies (h3-sim; h3-bots replaces them)', () => {
-  it('are drones-only and greedy, neither a stub', () => {
+describe('H3 strategies', () => {
+  it('are the spec four, none a stub', () => {
     expect(strategies.map((s) => [s.name, s.stub === true])).toEqual([
       ['drones-only', false],
+      ['ice-first', false],
+      ['crystal-first', false],
       ['greedy', false],
     ]);
+  });
+
+  it('firstDoor is the light pocket with that prize in every layout, and null once it is dead', () => {
+    for (let seed = 0; seed < 3; seed++) {
+      const w = createWorld(seed, defaultData);
+      for (const prize of ['ice', 'crystal'] as const) {
+        const n = firstDoor(w, prize)!;
+        expect(w.nodes[n]!.kind).toBe('pocket');
+        expect(w.nodes[n]!.slots).toBe(2);
+        expect(w.nodes[n]!.prize).toBe(prize);
+        w.guardians.find((g) => g.node === n)!.alive = false;
+        expect(firstDoor(w, prize)).toBeNull();
+      }
+    }
   });
 
   it('estimate need as Σ capEff × hp, and power with the weighted counter multiplier', () => {
@@ -80,7 +96,7 @@ describe('interim H3 strategies (h3-sim; h3-bots replaces them)', () => {
     expect(guardianStatus(w, N.p1).guards.thorn.cap * 20 + guardianStatus(w, N.p1).guards.spore.cap * 6).toBe(need);
   });
 
-  for (const name of ['drones-only', 'greedy']) {
+  for (const name of ['drones-only', 'ice-first', 'crystal-first', 'greedy']) {
     it(`${name}: only issues inputs the sim accepts, and keeps its yards as described`, () => {
       const w = fresh();
       let flakSeen = false;
@@ -90,8 +106,36 @@ describe('interim H3 strategies (h3-sim; h3-bots replaces them)', () => {
         step(w, defaultData, inputs);
         if (w.yards.flak.on || w.yards.lancer.on) flakSeen = true;
       }
-      expect(flakSeen).toBe(name === 'greedy');
+      expect(flakSeen).toBe(name !== 'drones-only');
       expect(w.stats.captures.length).toBeGreaterThan(0);
     });
   }
+});
+
+describe('first door', () => {
+  /** Run until the first guarded node is captured; return that node's prize. */
+  function firstCapturePrize(name: string, seed: number): string | null {
+    const w = createWorld(seed, defaultData);
+    for (let i = 0; i < 30 * 60 * 14 && w.stats.captures.length === 0; i++) step(w, defaultData, by(name).decide(w));
+    const c = w.stats.captures[0];
+    return c ? (w.nodes[c.node]!.prize ?? null) : null;
+  }
+
+  it('ice-first takes the ice pocket and crystal-first the crystal pocket first, in every layout', () => {
+    for (const seed of [0, 1, 2]) {
+      expect(firstCapturePrize('ice-first', seed), `ice-first seed ${seed}`).toBe('ice');
+      expect(firstCapturePrize('crystal-first', seed), `crystal-first seed ${seed}`).toBe('crystal');
+    }
+  });
+
+  it('runs flak only once ice has arrived and lancers only once crystal has', () => {
+    const w = createWorld(0, defaultData);
+    for (let i = 0; i < 30 * 60 * 12; i++) {
+      step(w, defaultData, by('ice-first').decide(w));
+      const f = w.stats.firstDeliveredTick;
+      if (f.crystal === null) expect(w.yards.lancer.on).toBe(false);
+      if (f.ice === null) expect(w.yards.flak.on).toBe(false);
+    }
+    expect(w.yards.flak.on).toBe(true);
+  });
 });
