@@ -35,8 +35,8 @@ function h5Table(from: string): string[][] {
 const H5_KEYS = ['fleet.cap', 'fleet.recycleRefundPct', 'research.fleet.step'];
 
 describe('data/sim.json (shipped) at H5', () => {
-  it('is data version 8', () => {
-    expect(defaultData.dataVersion).toBe(8);
+  it('is data version 9', () => {
+    expect(defaultData.dataVersion).toBe(9);
   });
 
   it('matches the "Tunables (H5, data/sim.json, all integers)" table; all three are live sim tunables', () => {
