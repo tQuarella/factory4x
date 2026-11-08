@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SEND_ALL, campaignWorld, defaultData, lastBattle, replayHashes, rootIndex, shipCounts, step, worldHash, type BattleResult, type Input, type World } from '@factory4x/sim';
-import { INTERIM_START, Session, dataWithDefaults, replayData } from '../src/session.ts';
+import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
 import { bannerLines, battleReport, feedsBloomText, regrowChange, regrowText, repelHint, supplyLine, unlockHint, unlockNotice } from '../src/report.ts';
@@ -13,10 +13,12 @@ import { podTotalTicks, progressFrac } from '../src/interp.ts';
 // The frozen v4 test fixture: tests that pin rule outcomes (guard counts, wilt text) run on it, so calibration doesn't break them.
 import { fixtureData } from '../../sim/test/fixture.ts';
 // H4: createWorld starts on the overworld; an H3 game is The Deep from a constructed campaign.
-import { h3World } from '../../sim/test/h3-world.ts';
+import { DEEP_START, h3World } from '../../sim/test/h3-world.ts';
 
-/** The interim start's two logged inputs (lancer and flak yards off; see INTERIM_START in session.ts). */
-const INTERIM_INPUTS = 2;
+/** The H3 game as a session: The Deep from a constructed campaign (the start is part of the replay). */
+function deep(seed: number, data = defaultData): Session {
+  return new Session(data, { seed, start: DEEP_START });
+}
 
 function mem(): StorageLike & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -47,7 +49,7 @@ const script: Record<number, Input[]> = {
 
 describe('session replay log', () => {
   it('replay of seed + log reproduces the live hash', () => {
-    const s = new Session(defaultData, { seed: 7 });
+    const s = deep(7);
     play(s, 1500, script);
     expect(s.log.length).toBeGreaterThanOrEqual(4);
     const h = replayHashes(s.replay(), defaultData, s.world.tick, s.world.tick)[0];
@@ -55,25 +57,25 @@ describe('session replay log', () => {
   });
 
   it('drops invalid inputs without logging them', () => {
-    const s = new Session(defaultData, { seed: 7 });
+    const s = deep(7);
     expect(s.send({ type: 'buildExtractor', node: 15 })).toBe(false);
     expect(s.log.length).toBe(0);
   });
 
   it('paused sends apply at once and are logged', () => {
-    const s = new Session(defaultData, { seed: 7 });
+    const s = deep(7);
     s.paused = true;
     s.send({ type: 'buildExtractor', node: 1 });
     expect(s.world.tick).toBe(1);
-    expect(s.log.slice(INTERIM_INPUTS)).toEqual([{ tick: 0, input: { type: 'buildExtractor', node: 1 } }]);
+    expect(s.log).toEqual([{ tick: 0, input: { type: 'buildExtractor', node: 1 } }]);
     expect(s.advance(1000)).toBe(0);
   });
 
   it('advance steps at the fixed tick and scales with speed', () => {
-    const s = new Session(defaultData, { seed: 1 });
+    const s = deep(1);
     s.advance(200);
     const one = s.world.tick;
-    const t = new Session(defaultData, { seed: 1 });
+    const t = deep(1);
     t.speed = 4;
     t.advance(200);
     expect(one).toBeGreaterThanOrEqual(5);
@@ -83,7 +85,7 @@ describe('session replay log', () => {
 
 /** A session with idle ships at both the Probe (0) and A5 (5), reached by play only, so the replay is valid. */
 function stagedAtProbeAndA5(): Session {
-  const s = new Session(defaultData, { seed: 11 });
+  const s = deep(11);
   s.send({ type: 'setTunable', key: 'ship.drone.cost', value: 5 });
   s.send({ type: 'setTunable', key: 'ship.drone.buildTicks', value: 15 });
   let staged = false;
@@ -132,7 +134,7 @@ describe('one press, one tick (sendAll)', () => {
   });
 
   it('paused: drops invalid inputs, and steps nothing when none is valid', () => {
-    const s = new Session(defaultData, { seed: 3 });
+    const s = deep(3);
     s.paused = true;
     expect(s.sendAll([{ type: 'buildExtractor', node: 15 }])).toBe(0);
     expect(s.world.tick).toBe(0);
@@ -144,14 +146,14 @@ describe('one press, one tick (sendAll)', () => {
       ]),
     ).toBe(2);
     expect(s.world.tick).toBe(1);
-    expect(s.log.slice(INTERIM_INPUTS).map((l) => l.tick)).toEqual([0, 0]);
+    expect(s.log.map((l) => l.tick)).toEqual([0, 0]);
     expect(replayMatches(s)).toBe(true);
   });
 });
 
 describe('autosave', () => {
   it('resume keeps the seed and full log so the replay still matches', () => {
-    const s = new Session(defaultData, { seed: 99 });
+    const s = deep(99);
     play(s, 700, script);
     s.send({ type: 'setShipyard', shipType: 'drone', on: false });
     const out = decodeSave(encodeSave(s), defaultData);
@@ -168,7 +170,7 @@ describe('autosave', () => {
 
   it('writes and loads through storage; discards other data versions', () => {
     const st = mem();
-    const s = new Session(defaultData, { seed: 5 });
+    const s = deep(5);
     play(s, 100);
     expect(writeSave(s, st)).toBe(true);
     expect(loadSave(defaultData, st).kind).toBe('resumed');
@@ -195,19 +197,20 @@ describe('autosave', () => {
       },
     };
     expect(loadSave(defaultData, bad).kind).toBe('none');
-    expect(writeSave(new Session(defaultData, { seed: 1 }), bad)).toBe(false);
+    expect(writeSave(deep(1), bad)).toBe(false);
     expect(loadSettings(defaultData, bad).autosaveSec).toBe(defaultData.tunables['client.autosaveSec'].default);
     expect(decodeSave('not json', defaultData).kind).toBe('discarded');
   });
 });
 
-describe('New run keeps tuning', () => {
+describe('New system keeps tuning', () => {
   it('applies tuned values (startStock) and the replay and save still reproduce the world', () => {
-    const old = new Session(defaultData, { seed: 1 });
+    const old = deep(1);
     old.send({ type: 'setTunable', key: 'economy.startStock', value: 150 });
     old.send({ type: 'setTunable', key: 'guard.capPct', value: 50 });
     old.stepOnce();
-    const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2 });
+    // A real New system starts on the overworld; the tuned start stock applies at the landing, so land in The Deep from a constructed start.
+    const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2, start: DEEP_START });
     expect(s.world.stock.ore).toBe(150);
     // Seed 2 is Twin Seams. Its p1 (the first guardian) starts at floor(count × 50 / 100) per type.
     // This test runs on the shipped data (replayData rebuilds from it), so the count is read from the layout.
@@ -228,7 +231,7 @@ describe('New run keeps tuning', () => {
 
 describe('feedback note', () => {
   it('carries versions, hash and replay, and falls back when long', () => {
-    const s = new Session(defaultData, { seed: 3 });
+    const s = deep(3);
     play(s, 60, script);
     const n = buildNote(s, defaultData, 'too slow', 'dev-abcdef0123456789', { viewport: '375x812', userAgent: 'x' });
     expect(n.text).toContain('dev-abcdef0123456789');
@@ -278,7 +281,7 @@ describe('helpers', () => {
   });
 
   it('battle report names the reason for a failed wave, with the counter hint', () => {
-    const s = new Session(defaultData, { seed: 1 });
+    const s = deep(1);
     const text = battleReport(s.world, result({ node: 15, outcome: 'repelled', shipsEngaged: 6, shipsLost: 6, guardsKilled: 2 }));
     expect(text).toContain('Heart held: 6 sent, 6 lost.');
     expect(text).toMatch(/Regrowth outpaced|Too few ships/);
@@ -286,7 +289,7 @@ describe('helpers', () => {
   });
 
   it('a pocket capture names its prize, and the unlock only until that prize has been delivered', () => {
-    const w = campaignWorld(3, defaultData, INTERIM_START);
+    const w = campaignWorld(3, defaultData, DEEP_START);
     const pockets = w.nodes.filter((n) => n.kind === 'pocket');
     const ice = pockets.find((n) => n.prize === 'ice')!;
     const text = battleReport(w, result({ node: ice.index, outcome: 'captured', shipsEngaged: 12, shipsLost: 3, guardsKilled: 9 }));

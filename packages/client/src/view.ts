@@ -117,7 +117,7 @@ export class MapView {
     this.canvas.width = Math.floor(this.w * dpr);
     this.canvas.height = Math.floor(this.h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.fit = fitMap(this.session.world.nodes, this.w, this.h);
+    if (this.session.world.nodes.length > 0) this.fit = fitMap(this.session.world.nodes, this.w, this.h);
     let seed = 12345;
     const rnd = (): number => {
       seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;

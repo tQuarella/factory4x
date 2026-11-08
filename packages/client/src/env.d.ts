@@ -9,8 +9,22 @@ interface Window {
     replayHashes(ticks: number, every: number, replay: import('@factory4x/sim').Replay): string[];
     /** Node center in client (viewport) pixels. */
     nodeScreenPos(node: number): { x: number; y: number };
+    /** Area centre on the overworld, in client (viewport) pixels. */
+    areaScreenPos(area: number): { x: number; y: number };
     /** Selected node index, or null. */
     selected(): number | null;
+    /** The area whose overworld sheet is open, or null. */
+    selectedArea(): number | null;
+    /** No area is active: the overworld screen. */
+    onOverworld(): boolean;
+    /** Index of the area being played, or null. */
+    activeArea(): number | null;
+    /** campaignStatus(world, data) as JSON text. */
+    campaign(): string;
+    /** Node index by frame id ("a1", "p1", "heart"), or -1. */
+    nodeIndex(id: string): number;
+    /** Replaces the session with a constructed campaign (tests and dev only); the start is part of the replay. */
+    startCampaign(start: import('@factory4x/sim').CampaignStart, tunables?: Record<string, number>): void;
     /** Queued plus active builds. */
     pendingBuilds(): number;
     stock(): number;
@@ -39,6 +53,6 @@ interface Window {
     systemName(): string;
     /** Node index of the Root. */
     rootNode(): number;
-    newRun(): void;
+    newSystem(): void;
   };
 }

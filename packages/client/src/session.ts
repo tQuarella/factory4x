@@ -10,6 +10,7 @@
 import {
   activeBattles,
   campaignWorld,
+  createWorld,
   defaultData,
   tunableMeta,
   isValidInput,
@@ -18,30 +19,10 @@ import {
   type CampaignStart,
   type Input,
   type Replay,
+  type ResourceTriple,
   type SimData,
   type World,
 } from '@factory4x/sim';
-
-/**
- * TEMPORARY (h4-sim, until h4-client builds the overworld screen): the client has no overworld yet, so a
- * new session starts in The Deep from a constructed campaign (every other area reclaimed, both designs
- * bought). That is the H3 game the current UI was built for. The start is part of the replay, so
- * feedback replays and `replayMatchesLive` still reproduce the session.
- */
-export const INTERIM_START: Readonly<CampaignStart> = Object.freeze({
-  reclaimed: ['landfall', 'shelf', 'shoal', 'veil', 'garden'],
-  research: { lancer: 1, flak: 1 },
-  land: 'deep',
-});
-
-/**
- * TEMPORARY with INTERIM_START: an H4 landing switches researched yards on, but the H3 UI expects the lancer
- * and flak yards off until the player turns them on. Sent as the session's first (logged) inputs.
- */
-const INTERIM_YARDS_OFF: readonly Input[] = [
-  { type: 'setShipyard', shipType: 'lancer', on: false },
-  { type: 'setShipyard', shipType: 'flak', on: false },
-];
 
 /** Sim tunable values a run started with, where they differ from the data defaults (New run keeps live tuning). */
 export type StartTunables = Record<string, number>;
@@ -88,10 +69,14 @@ export interface RunFlags {
   /** endTick of the last battle whose report toast was shown, or -1. */
   seenBattleEnd: number;
   resultShown: boolean;
+  /** H4: `campaign.totals.shipped` at the current landing, for the "Shipped while you were in X" notice; null on the overworld. */
+  shippedAtLanding: ResourceTriple | null;
 }
 
 export interface SessionInit {
   seed: number;
+  /** A constructed campaign start (dev hooks and tests only; a real game starts on the overworld at Landfall). Part of the replay. */
+  start?: CampaignStart;
   world?: World;
   log?: LoggedInput[];
   pending?: Input[];
@@ -102,6 +87,7 @@ export interface SessionInit {
 export class Session {
   readonly data: SimData;
   readonly seed: number;
+  readonly start: CampaignStart | undefined;
   world: World;
   log: LoggedInput[];
   pending: Input[];
@@ -117,15 +103,21 @@ export class Session {
   constructor(data: SimData, init: SessionInit) {
     this.data = data;
     this.seed = init.seed;
-    this.world = init.world ?? campaignWorld(init.seed, data, INTERIM_START);
+    this.start = init.start;
+    this.world = init.world ?? (init.start === undefined ? createWorld(init.seed, data) : campaignWorld(init.seed, data, init.start));
     this.log = init.log ?? [];
-    this.pending = init.pending ?? (init.world === undefined ? [...INTERIM_YARDS_OFF] : []);
+    this.pending = init.pending ?? [];
     this.history = init.history ?? [];
-    this.flags = init.flags ?? { seenBattleEnd: -1, resultShown: false };
+    this.flags = init.flags ?? { seenBattleEnd: -1, resultShown: false, shippedAtLanding: null };
   }
 
   get tickMs(): number {
     return 1000 / this.data.tickRate;
+  }
+
+  /** On the overworld nothing runs: the client steps only to apply an input (DESIGN.md H4 "Pause on the overworld"). */
+  get onOverworld(): boolean {
+    return this.world.campaign.active === null;
   }
 
   /** 0..1 into the current tick, for interpolation. Frozen while paused. */
@@ -159,13 +151,14 @@ export class Session {
       this.pending.push(input);
       n++;
     }
-    if (n > 0 && this.paused) this.stepOnce();
+    if (n > 0 && (this.paused || this.onOverworld)) this.stepOnce();
     return n;
   }
 
   /** Advances the fixed-step clock by wall time `dtMs` at the current speed. No-op while paused. Returns ticks stepped. */
   advance(dtMs: number): number {
-    if (this.paused) return 0;
+    if (this.onOverworld) this.acc = 0;
+    if (this.paused || this.onOverworld) return 0;
     this.acc += Math.min(Math.max(dtMs, 0), MAX_FRAME_MS) * this.speed;
     let n = 0;
     while (this.acc >= this.tickMs) {
@@ -195,9 +188,9 @@ export class Session {
     const r: Replay & { startTunables?: StartTunables } = {
       seed: this.seed,
       dataVersion: this.data.dataVersion,
-      start: INTERIM_START,
       inputs: this.log.map((l) => ({ tick: l.tick, input: l.input })),
     };
+    if (this.start !== undefined) r.start = this.start;
     const diff = defaultsDiff(this.data);
     if (Object.keys(diff).length > 0) r.startTunables = diff;
     return r;

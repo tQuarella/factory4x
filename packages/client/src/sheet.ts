@@ -8,6 +8,7 @@ import {
   SHIP_TYPES,
   assemblerStatus,
   battleStatus,
+  campaignStatus,
   combatRates,
   guardianStatus,
   inputCost,
@@ -37,10 +38,12 @@ import { bar, btn, h, setHidden, setText, toggleClass, type Btn } from './dom.ts
 import { fmt10 } from './format.ts';
 import { guardIcon, resourceIcon, shipIcon } from './icons.ts';
 import {
+  COMPONENT_SOURCE,
   COUNTER_PHRASE,
   GUARD_NAME,
   RES_NAME,
   SHIP_NAME,
+  ratesX10Text,
   SHIP_PLURAL,
   TAG_TEXT,
   UNLOCKS,
@@ -71,9 +74,8 @@ export function shipsText(c: Readonly<ShipTypeCounts>): string {
 
 const YARD_STATE_TEXT: Record<YardState, (component: string | null) => string> = {
   building: () => 'building',
-  // H4 states (h4-sim kept the client compiling; h4-client owns the wording and when the row shows).
-  needsDesign: () => 'design not researched',
-  noSource: (c) => `no ${c ?? 'component'} source in this area`,
+  needsDesign: () => 'Design not researched (Research, on the overworld)',
+  noSource: (c) => (c === 'lens' || c === 'plating' ? `No ${COMPONENT_SOURCE[c]} here: no ${c} source in this area` : 'No component source in this area'),
   off: () => 'off',
   needsComponent: (c) => `idle: needs ${c ?? 'a component'}`,
   needsOre: () => 'idle: needs ore',
@@ -154,6 +156,7 @@ export class Sheet {
     this.ups = [];
     this.root.replaceChildren();
     this.root.hidden = false;
+    this.root.classList.remove('world');
     this.root.scrollTop = 0;
 
     const head = h('div', 'sheet-head', '', this.root);
@@ -292,6 +295,13 @@ export class Sheet {
   private probeSections(): void {
     const sys = h('div', 'note sys', '', this.root);
     this.ups.push(() => setText(sys, `System: ${systemStatus(this.world).name}`));
+    const ship = this.row(this.root, 'Shipments');
+    ship.el.classList.add('shipments');
+    this.ups.push(() => {
+      const c = campaignStatus(this.world, this.host.session.data);
+      const rates = ratesX10Text(c.shipPerMinX10);
+      setText(ship.val, c.shipping ? `${rates === 'nothing' ? 'none yet' : `${rates} to the stockpile`}` : isCaptured(this.world) ? 'paused: area reclaimed' : 'paused');
+    });
     const yard = h('section', 'yards', '', this.root);
     h('div', 'lbl', 'Yards', yard);
     const yardRows = SHIP_TYPES.map((type) => this.yardRow(yard, type));
@@ -373,8 +383,9 @@ export class Sheet {
     const progress = bar(wrap, 'yard');
     return {
       update: (y, tickRate) => {
-        setHidden(wrap, !y.unlocked);
-        setHidden(hint, y.unlocked || type === 'drone');
+        const shown = y.unlocked || y.researched;
+        setHidden(wrap, !shown);
+        setHidden(hint, shown || type === 'drone');
         tog.set(y.on ? 'ON' : 'OFF');
         tog.el.setAttribute('aria-label', `${SHIP_NAME[type]} yard ${y.on ? 'on, tap to stop' : 'off, tap to start'}`);
         toggleClass(tog.el, 'on', y.on);

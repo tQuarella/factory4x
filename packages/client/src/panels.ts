@@ -1,10 +1,12 @@
 /** Full-screen panels: tuning, feedback, result, and the New run confirmation. */
-import { SHIP_TYPES, runSummary, tunableMeta, type CaptureEntry, type Input, type ShipTypeCounts, type SimData, type TunableMeta } from '@factory4x/sim';
+import { SHIP_TYPES, areaStatus, campaignSummary, runSummary, tunableMeta, type CaptureEntry, type Input, type ShipTypeCounts, type SimData, type TunableMeta } from '@factory4x/sim';
 import { btn, h, setText, toggleClass, type Btn } from './dom.ts';
 import { buildNote } from './feedback.ts';
 import { clampInt, mmss, shortVersion, stepFor, ticksText } from './format.ts';
 import type { Settings } from './persist.ts';
-import { RES_NAME, SHIP_NAME } from './report.ts';
+import { iconCanvas } from './icons.ts';
+import { drawProbeCore } from './placeholders.ts';
+import { RES_NAME, SHIP_NAME, plusText, tripleText } from './report.ts';
 import type { Session } from './session.ts';
 
 export interface PanelHost {
@@ -16,7 +18,7 @@ export interface PanelHost {
   /** Applies all inputs of one press in the same tick (Session.sendAll). */
   sendAll(inputs: readonly Input[]): void;
   settingsChanged(): void;
-  newRun(): void;
+  newSystem(): void;
 }
 
 /** Modal yes/no. Resolves true on yes. */
@@ -116,15 +118,13 @@ export class TuningPanel {
       host.sendAll(resets);
       this.update();
     });
-    btn(top, 'New run…', () => {
-      void confirmModal('Start over? This run is discarded and a new one begins. Your current tuning is kept; use Reset all in the tuning panel to restore the defaults.', 'Yes, new run', 'Keep playing').then((yes) => {
-        if (yes) {
-          this.close();
-          host.newRun();
-        }
+    btn(top, 'New system…', () => {
+      confirmNewSystem(() => {
+        this.close();
+        host.newSystem();
       });
     }, 'danger');
-    h('div', 'note', `Build ${shortVersion(host.fullVersion)} · data v${host.data.dataVersion}. Changes apply live and are recorded in the replay. New run keeps your tuning.`, this.root);
+    h('div', 'note', `Build ${shortVersion(host.fullVersion)} · data v${host.data.dataVersion}. Changes apply live and are recorded in the replay. New system keeps your tuning.`, this.root);
 
     let section = '';
     for (const meta of tunableMeta(host.data)) {
@@ -136,7 +136,8 @@ export class TuningPanel {
       const row = h('div', 't-row', '', this.root);
       const name = h('div', 't-name', meta.key.slice(meta.section.length + 1), row);
       const info = h('small', '', `${meta.min}–${meta.max} · default ${meta.default}`, name);
-      if (meta.newRunOnly) h('span', 'tag', ' · applies on New run', info);
+      if (meta.newRunOnly) h('span', 'tag', ' · applies on New system', info);
+      if (meta.key === 'economy.startStock') h('span', 'tag', ' · applies at the next landing', info);
       if (meta.scope === 'client') h('span', 'tag', ' · this device', info);
       // Tick values also show game seconds ("60 · 2.0 s"); the system variant lists what its numbers mean.
       let now: HTMLElement | null = null;
@@ -293,41 +294,78 @@ export function byTypeText(c: Readonly<ShipTypeCounts>): string {
   return parts.length > 0 ? parts.join(' · ') : '0';
 }
 
-/** The capture result panel. */
-export function showResult(root: HTMLElement, session: Session, onKeep: () => void, onNewRun: () => void): void {
-  const s = runSummary(session.world);
+const NEW_SYSTEM_CONFIRM = 'Start a new system? This erases your campaign. Your current tuning is kept; use Reset all in the tuning panel to restore the defaults.';
+
+/** Asks, then runs `onYes`: the one confirm every New system button goes through. */
+export function confirmNewSystem(onYes: () => void): void {
+  void confirmModal(NEW_SYSTEM_CONFIRM, 'Yes, new system', 'Keep playing').then((yes) => {
+    if (yes) onYes();
+  });
+}
+
+/** A two-column stat line in a card. */
+function statLine(card: HTMLElement, label: string, value: string): void {
+  const r = h('div', 'stat-line', '', card);
+  h('span', '', label, r);
+  h('b', '', value, r);
+}
+
+/** The area result panel (DESIGN.md H4 "The area result panel"): shown when the active area's heart is captured. */
+export function showAreaResult(root: HTMLElement, session: Session, onBack: () => void, onStay: () => void): void {
+  const world = session.world;
+  const data = session.data;
+  const s = runSummary(world);
+  const st = world.campaign.active === null ? null : areaStatus(world, data, world.campaign.active);
   root.replaceChildren();
   const card = h('div', 'card', '', root);
-  h('h2', '', 'Heart captured', card);
-  h('div', 'note sys', s.variantName, card);
-  const line = (label: string, value: string): void => {
-    const r = h('div', 'stat-line', '', card);
-    h('span', '', label, r);
-    h('b', '', value, r);
-  };
-  line('Time to capture', s.captureSec === null ? '-' : mmss(s.captureSec));
+  h('h2', '', `${st?.name ?? 'Area'} reclaimed`, card);
+  statLine(card, 'Time to reclaim', s.captureSec === null ? '-' : mmss(s.captureSec));
   const order = h('div', 'capture-order', '', card);
   h('span', 'lbl', 'Capture order', order);
   h('b', '', captureOrderText(s.captures), order);
-  line('Peak ore/min', String(s.peakPerMin));
-  line('Ships built', byTypeText(s.shipsBuiltByType));
-  line('Ships lost', byTypeText(s.shipsLostByType));
-  line('Guards withered', String(s.guardsWithered));
-  line('Supply', s.rootCutSec === null ? 'Root left standing' : `Root cut at ${mmss(s.rootCutSec)}`);
-  line('Waves sent', String(s.wavesSent));
+  statLine(card, 'Ships lost', byTypeText(s.shipsLostByType));
+  statLine(card, 'Guards withered', String(s.guardsWithered));
+  const haul = h('div', 'capture-order haul-line', '', card);
+  h('span', 'lbl', 'Hauled to the stockpile', haul);
+  h('b', '', st ? plusText(st.haul) : '-', haul);
   const row = h('div', 'ov-actions', '', card);
-  btn(row, 'Keep playing', () => {
+  btn(row, 'Back to the overworld', () => {
     root.hidden = true;
-    onKeep();
+    onBack();
   }, 'primary');
-  btn(row, 'New run', () => {
-    void confirmModal('Start over? This run is discarded and a new one begins. Your current tuning is kept; use Reset all in the tuning panel to restore the defaults.', 'Yes, new run', 'Keep playing').then((yes) => {
-      if (yes) {
-        root.hidden = true;
-        onNewRun();
-      }
-    });
+  btn(row, 'Keep playing here', () => {
+    root.hidden = true;
+    onStay();
   });
   root.hidden = false;
 }
 
+/** The win panel (DESIGN.md H4 "Win panel"): the whole campaign from `campaignSummary`. */
+export function showWin(root: HTMLElement, session: Session, onNewSystem: () => void): void {
+  const world = session.world;
+  const data = session.data;
+  const sum = campaignSummary(world, data);
+  root.replaceChildren();
+  const card = h('div', 'card', '', root);
+  h('h2', '', 'The new probe launches.', card);
+  const core = h('div', 'win-core', '', card);
+  iconCanvas(core, 72, (ctx, r) => drawProbeCore(ctx, r, 0, 1));
+  statLine(card, 'Total play time', mmss(Math.floor(sum.totalPlayTicks / world.tickRate)));
+  const areas = h('div', 'win-list win-areas', '', card);
+  h('span', 'lbl', 'Areas, in order', areas);
+  h('b', '', sum.reclaimOrder.map((a) => `${a.name} ${a.reclaimPlayTicks === null ? '-' : mmss(Math.floor(a.reclaimPlayTicks / world.tickRate))}`).join(' → ') || '-', areas);
+  const research = h('div', 'win-list win-research', '', card);
+  h('span', 'lbl', 'Research, in order', research);
+  const multi = (id: string): boolean => (data.research.find((r) => r.id === id)?.levels.length ?? 1) > 1;
+  h('b', '', sum.research.map((r) => (multi(r.item) ? `${r.name} ${r.level}` : r.name)).join(' → ') || '-', research);
+  statLine(card, 'Ships lost', `${sum.shipsLost} of ${sum.shipsBuilt}`);
+  const hs = h('div', 'win-list win-hauled', '', card);
+  h('span', 'lbl', 'Hauled', hs);
+  h('b', '', tripleText(sum.hauled), hs);
+  const sh = h('div', 'win-list win-shipped', '', card);
+  h('span', 'lbl', 'Shipped while you played', sh);
+  h('b', '', tripleText(sum.shipped), sh);
+  const row = h('div', 'ov-actions', '', card);
+  btn(row, 'New system', () => confirmNewSystem(onNewSystem), 'primary');
+  root.hidden = false;
+}
