@@ -56,6 +56,49 @@ test('tapping an asteroid opens its sheet; queuing an extractor changes the queu
   expect(errors).toEqual([]);
 });
 
+test('the Root sheet opens with the Feeds the Bloom box; the Bloom sheet says fed; the probe names the system', async ({ page }) => {
+  const errors = watchErrors(page);
+  await ready(page);
+  const root = await page.evaluate(() => window.__factory4x!.rootNode());
+  await tapNode(page, root);
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.selected())).toBe(root);
+  await expect(page.locator('#sheet h2')).toContainText('Root');
+  await expect(page.locator('#sheet')).toContainText('Feeds the Bloom');
+  await expect(page.locator('#sheet')).toContainText('Cut it: 8 thorns, 1 / 10.0 s, no repair');
+  await tapNode(page, 6);
+  await expect(page.locator('#sheet')).toContainText('Fed by the Root');
+  await tapNode(page, 0);
+  const name = await page.evaluate(() => window.__factory4x!.systemName());
+  expect(name).toMatch(/^(Thin|Knotted|Deep) Root$/);
+  await expect(page.locator('#sheet')).toContainText(`System: ${name}`);
+  expect(errors).toEqual([]);
+});
+
+test('the tuning panel shows variant names and tick values in seconds; New run moves to the next system', async ({ page }) => {
+  await ready(page);
+  await page.locator('#b-tune').click();
+  await expect(page.locator('#tuning')).toContainText('0 · by seed / 1 Thin / 2 Knotted / 3 Deep');
+  await expect(page.locator('#tuning')).toContainText('60 · 2.0 s');
+  const before = await page.evaluate(() => window.__factory4x!.systemName());
+  await page.locator('#tuning button', { hasText: 'New run' }).click();
+  await page.locator('.card button', { hasText: 'Yes, new run' }).click();
+  const order = ['Thin Root', 'Knotted Root', 'Deep Root'];
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.systemName())).toBe(order[(order.indexOf(before) + 1) % 3]);
+});
+
+test('forcing system.variant 3 and starting a New run gives the Deep Root, and the replay still matches', async ({ page }) => {
+  await ready(page);
+  await page.locator('#b-tune').click();
+  const field = page.getByLabel('system.variant', { exact: true });
+  await field.fill('3');
+  await field.dispatchEvent('change');
+  await page.locator('#tuning button', { hasText: 'New run' }).click();
+  await page.locator('.card button', { hasText: 'Yes, new run' }).click();
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.systemName())).toBe('Deep Root');
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
+});
+
 test('every control is at least 44 px', async ({ page }) => {
   await ready(page);
   await tapNode(page, 0);
@@ -136,7 +179,7 @@ test('browser sim matches Node sim (cross-engine determinism)', async ({ page })
  * the OS falls back to (CI's Linux font wrapped the toast into the Bloom while
  * Windows' Consolas didn't).
  */
-const WIDE_NOTICE_FONT = '#banner, #toast, #toast::after { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.25em !important; line-height: 1.6 !important; }';
+const WIDE_NOTICE_FONT = '#banner, #toast, #toast::after, #hint { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.25em !important; line-height: 1.6 !important; }';
 
 async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
   await ready(page);
@@ -146,19 +189,25 @@ async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
   await page.evaluate(() => window.__factory4x!.debugShowNotices(true));
   await expect(page.locator('#banner')).toBeVisible();
   await expect(page.locator('#toast')).toBeVisible();
-  const pos = await page.evaluate(() => window.__factory4x!.nodeScreenPos(6));
-  // Generous box around the Bloom: thorn ring, label above it, badges.
+  await expect(page.locator('#banner')).toContainText('BLOOM ·');
+  await expect(page.locator('#banner')).toContainText('ROOT ·');
+  await expect(page.locator('#toast')).toContainText('Root cut:');
+  const rootNode = await page.evaluate(() => window.__factory4x!.rootNode());
   const view = (await page.locator('#view').boundingBox())!;
   // Only the part inside the canvas is ever drawn on.
   // The notices strip is capped, so the map keeps most of its height with both notices up, whatever the font.
   const map = (await page.locator('#map').boundingBox())!;
   expect(view.height, 'map height with both notices').toBeGreaterThanOrEqual(map.height * 0.55 - 1);
   expect((await page.locator('#toast').boundingBox())!.height, 'toast stays tappable').toBeGreaterThanOrEqual(43.5);
-  const bloom = { l: pos.x - 50, r: pos.x + 50, t: Math.max(view.y, pos.y - 62), b: pos.y + 50 };
   for (const sel of ['#banner', '#toast']) {
     const r = (await page.locator(sel).boundingBox())!;
-    const hit = r.x < bloom.r && r.x + r.width > bloom.l && r.y < bloom.b && r.y + r.height > bloom.t;
-    expect(hit, `${sel} overlaps the Bloom`).toBe(false);
+    for (const node of [6, rootNode]) {
+      const pos = await page.evaluate((i) => window.__factory4x!.nodeScreenPos(i), node);
+      // Generous box around each guarded node: thorn ring, label above it, badges.
+      const box = { l: pos.x - 50, r: pos.x + 50, t: Math.max(view.y, pos.y - 62), b: pos.y + 50 };
+      const hit = r.x < box.r && r.x + r.width > box.l && r.y < box.b && r.y + r.height > box.t;
+      expect(hit, `${sel} overlaps node ${node} r=${JSON.stringify(r)} box=${JSON.stringify(box)} view=${JSON.stringify(view)}`).toBe(false);
+    }
     // Notices live in the strip above the canvas, so no text metric can push one onto the map.
     expect(r.y + r.height, `${sel} sits above the map`).toBeLessThanOrEqual(view.y + 1);
   }
@@ -240,7 +289,7 @@ test.describe('375x667 portrait', () => {
 
   test('every visible control is at least 44 px with each sheet open', async ({ page }) => {
     await ready(page);
-    for (const node of [0, 1, 6]) {
+    for (const node of [0, 1, 6, 7]) {
       await tapNode(page, node);
       await expect(page.locator('#sheet')).toBeVisible();
       const small = await page.evaluate(() =>

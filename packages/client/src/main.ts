@@ -4,10 +4,12 @@
  */
 import './style.css';
 import {
-  battleStatus,
+  activeBattles,
   defaultData,
   isCaptured,
-  lastBattle,
+  rootIndex,
+  systemStatus,
+  type BattleResult,
   replayHashes,
   shipCounts,
   shipsPerMinX10,
@@ -15,11 +17,11 @@ import {
   worldHash,
   type Input,
 } from '@factory4x/sim';
-import { setHidden, setText, toggleClass } from './dom.ts';
+import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { fmt10, shortVersion } from './format.ts';
 import { FeedbackPanel, TuningPanel, showResult, type PanelHost } from './panels.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
-import { battleReport } from './report.ts';
+import { bannerLines, battleReport } from './report.ts';
 import { Session, dataWithDefaults, replayData, type Speed } from './session.ts';
 import { Sheet } from './sheet.ts';
 import { MapView } from './view.ts';
@@ -31,6 +33,8 @@ const settings = loadSettings(data);
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 
 const newSeed = (): number => Date.now() % 2147483647;
+/** The seed of the run after `seed`: consecutive runs are consecutive systems. */
+const nextSeed = (seed: number): number => seed + 1;
 
 // --- session: resume silently, or start fresh ------------------------------
 const app: { session: Session } = { session: new Session(data, { seed: newSeed() }) };
@@ -97,9 +101,12 @@ const panelHost: PanelHost = {
 const tuning = new TuningPanel($('tuning'), panelHost);
 const feedback = new FeedbackPanel($('feedback'), panelHost);
 
-/** New run keeps the live tuning: the world is built from default data with the current tuned values as its defaults (so startStock and guardian.cap apply). See DECISIONS.md. */
+/**
+ * New run keeps the live tuning: the world is built from default data with the current tuned values as its defaults (so startStock, guardian.cap and
+ * system.variant apply). Its seed is the old one plus one, so consecutive runs cycle through the three Roots. See DECISIONS.md.
+ */
 function newRun(): void {
-  app.session = new Session(dataWithDefaults(data, app.session.world.tun), { seed: newSeed() });
+  app.session = new Session(dataWithDefaults(data, app.session.world.tun), { seed: nextSeed(app.session.seed) });
   sheet.close();
   toast.hide();
   writeSave(app.session);
@@ -133,7 +140,6 @@ function dismissHint(): void {
   $('hint').hidden = true;
 }
 $('hint-x').addEventListener('click', dismissHint);
-$('hint').hidden = settings.hintDismissed;
 
 // --- time controls (client only) -------------------------------------------------------
 $('b-pause').addEventListener('click', () => {
@@ -160,6 +166,7 @@ const el = {
   pause: $('b-pause'),
   paused: $('paused'),
   banner: $('banner'),
+  hint: $('hint'),
 };
 
 let forceBanner = false;
@@ -182,16 +189,25 @@ function refreshUi(): void {
   setHidden(el.paused, !s.paused);
   for (const b of document.querySelectorAll<HTMLElement>('.speed')) toggleClass(b, 'on', Number(b.dataset.speed) === s.speed);
 
-  const b = battleStatus(w);
-  setHidden(el.banner, !b && !forceBanner);
-  if (!b && forceBanner) setText(el.banner, 'BATTLE · strip 0.8/s · regrow 0.5/s · 6 lost');
-  if (b) setText(el.banner, `BATTLE · strip ${fmt10(b.killPerSecX10)}/s · regrow ${fmt10(b.regrowPerSecX10)}/s · ${b.shipsLost} lost`);
-
-  const lb = lastBattle(w);
-  if (lb && lb.endTick !== s.flags.seenBattleEnd) {
-    s.flags.seenBattleEnd = lb.endTick;
-    toast.show(battleReport(w, lb));
+  const lines = bannerLines(w);
+  const showBanner = lines.length > 0 || forceBanner;
+  setHidden(el.banner, !showBanner);
+  if (lines.length === 0 && forceBanner) lines.push('BLOOM · strip 0.8/s · regrow 0.5/s · 6 lost', 'ROOT · strip 0.8/s · regrow 1/s · 2 lost');
+  if (showBanner && el.banner.dataset.text !== lines.join('|')) {
+    el.banner.dataset.text = lines.join('|');
+    el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
   }
+
+  // Battle reports: every battle that ended since the last look, at any guarded node, oldest first.
+  const ended: BattleResult[] = [];
+  for (const g of w.guardians) if (g.lastBattle && g.lastBattle.endTick > s.flags.seenBattleEnd) ended.push(g.lastBattle);
+  if (ended.length > 0) {
+    ended.sort((a, b) => a.endTick - b.endTick || a.node - b.node);
+    s.flags.seenBattleEnd = ended[ended.length - 1]!.endTick;
+    toast.show(ended.map((r) => battleReport(w, r)).join('\n\n'));
+  }
+  // The first-run hint gives way to battle notices, so the strip keeps room for them.
+  setHidden(el.hint, settings.hintDismissed || showBanner || !toastEl.hidden);
   if (isCaptured(w) && !s.flags.resultShown) {
     s.flags.resultShown = true;
     if (settings.showResult) {
@@ -203,8 +219,9 @@ function refreshUi(): void {
 }
 
 el.banner.addEventListener('click', () => {
-  const rich = app.session.world.nodes.findIndex((n) => n.kind === 'rich');
-  if (rich >= 0) sheet.open(rich);
+  const first = activeBattles(app.session.world)[0];
+  const node = first ? first.node : app.session.world.nodes.findIndex((n) => n.kind === 'rich');
+  if (node >= 0) sheet.open(node);
 });
 
 // --- autosave: every client.autosaveSec of wall time, and when the page is hidden -----------
@@ -268,10 +285,12 @@ window.__factory4x = {
   },
   debugShowNotices: (on) => {
     forceBanner = on;
-    if (on) toast.show('Wave repelled: 18 sent, 18 lost, 5 thorns stripped\nRegrowth outpaced the wave. 18 ships strip 1.2 thorns/s; the Bloom regrows 0.5/s.');
+    if (on) toast.show('Root cut: 15 sent, 3 lost. The Bloom wilts: 12 → 8 thorns, regrows 5× slower.\n\nRoot held: 10 sent, 10 lost, 2 thorns stripped\nRegrowth outpaced the wave. 10 ships strip 0.6 thorns/s; the Root regrows 1/s.');
     else toast.hide();
     refreshUi();
   },
   debugShowResult: () => showResult($('result'), app.session, () => undefined, newRun),
+  systemName: () => systemStatus(app.session.world).name,
+  rootNode: () => rootIndex(app.session.world),
   newRun,
 };

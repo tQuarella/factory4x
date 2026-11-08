@@ -4,9 +4,22 @@
  * placeholders.ts get pixel radii, so line widths and sprites stay crisp at any
  * map scale. Ships and pods interpolate between ticks using session.alpha.
  */
-import { guardianStatus, isCaptured, nodeStatus, shipCounts, type Node } from '@factory4x/sim';
+import { activeBattles, guardianStatus, isCaptured, isRootCut, lastBattle, nodeStatus, rootIndex, richIndex, shipCounts, type Node, type World } from '@factory4x/sim';
 import { palette } from './palette.ts';
-import { drawAsteroid, drawHitFlash, drawPod, drawProbe, drawRallyFlag, drawRichNode, drawRoute, drawShip, drawThorn } from './placeholders.ts';
+import {
+  drawAsteroid,
+  drawHitFlash,
+  drawPod,
+  drawProbe,
+  drawRallyFlag,
+  drawRichNode,
+  drawRoot,
+  drawRoute,
+  drawShip,
+  drawThorn,
+  drawVine,
+  drawWiltingThorn,
+} from './placeholders.ts';
 import { fitMap, type Fit } from './fit.ts';
 import { lerp, podTotalTicks, progressFrac } from './interp.ts';
 import type { Session } from './session.ts';
@@ -14,6 +27,34 @@ import type { Session } from './session.ts';
 /** Smallest touch target radius in CSS px (44 px diameter). */
 const MIN_HIT = 22;
 const FLASH_MS = 450;
+/** The wilt animation: the Bloom's withered thorns fall off for about a second (client only). */
+const WILT_MS = 1000;
+/** Labels keep this many px clear of the canvas top edge (an 11 px font's ascent plus a little). */
+const LABEL_TOP_PAD = 13;
+
+/** Where a guarded node's thorn ring sits, in px around its center, and how big each thorn is. */
+export function ringGeom(rr: number, count: number): { ringR: number; thornR: number } {
+  const ringR = rr * 1.38 + 4;
+  const thornR = Math.max(3.5, Math.min(rr * 0.3, (Math.PI * 2 * ringR) / Math.max(1, count) / 2.3));
+  return { ringR, thornR };
+}
+
+/** Radius that a tap on a guarded node may land in: the whole thorn ring, and at least a 44 px target. */
+export function guardedReach(rr: number, count: number): number {
+  const { ringR, thornR } = ringGeom(rr, count);
+  return Math.max(MIN_HIT, ringR + thornR + 3);
+}
+
+interface WiltAnim {
+  startMs: number;
+  from: number;
+  to: number;
+}
+
+function wiltOf(world: Readonly<World>): { from: number; to: number } | null {
+  const b = lastBattle(world, rootIndex(world));
+  return b && b.outcome === 'captured' && b.wilt && b.wilt.from > b.wilt.to ? b.wilt : null;
+}
 
 export class MapView {
   readonly canvas: HTMLCanvasElement;
@@ -25,6 +66,10 @@ export class MapView {
   private stars: Array<{ x: number; y: number; r: number; bright: boolean }> = [];
   private seenHit = 0;
   private hitAt = -1e9;
+  private hitNodes: number[] = [];
+  private trackedWorld: World | null = null;
+  private seenCut: number | null = null;
+  private wilt: WiltAnim | null = null;
 
   constructor(canvas: HTMLCanvasElement, app: { session: Session }) {
     this.canvas = canvas;
@@ -84,7 +129,8 @@ export class MapView {
       const dx = px - this.sx(n.x);
       const dy = py - this.sy(n.y);
       const d = Math.sqrt(dx * dx + dy * dy);
-      const reach = Math.max(MIN_HIT, this.nodeR(n) + 4);
+      const g = n.kind === 'rich' || n.kind === 'root' ? guardianStatus(this.session.world, n.index) : null;
+      const reach = g && g.alive ? guardedReach(this.nodeR(n), g.thorns) : Math.max(MIN_HIT, this.nodeR(n) + 4);
       if (d <= reach && d < bestD) {
         best = n.index;
         bestD = d;
@@ -109,7 +155,21 @@ export class MapView {
     if (session.hitSeq !== this.seenHit) {
       this.seenHit = session.hitSeq;
       this.hitAt = nowMs;
+      this.hitNodes = activeBattles(world).map((b) => b.node);
     }
+
+    // The wilt animation starts when the Root is cut during play. A new run or a resumed save starts with no animation.
+    const cutTick = world.stats.rootCutTick;
+    if (this.trackedWorld !== world) {
+      this.trackedWorld = world;
+      this.seenCut = cutTick;
+      this.wilt = null;
+    } else if (cutTick !== this.seenCut) {
+      this.seenCut = cutTick;
+      const w = wiltOf(world);
+      this.wilt = w ? { startMs: nowMs, from: w.from, to: w.to } : null;
+    }
+    if (this.wilt && nowMs - this.wilt.startMs >= WILT_MS) this.wilt = null;
 
     // Routes, then pods on them.
     for (const route of world.routes) {
@@ -131,8 +191,14 @@ export class MapView {
       }
     }
 
+    // The vine, under the nodes: pink and pulsing toward the Bloom while the Root lives, grey once it is cut.
+    {
+      const a = this.nodePos(rootIndex(world));
+      const b = this.nodePos(richIndex(world));
+      drawVine(ctx, a.x, a.y, b.x, b.y, t, isRootCut(world));
+    }
+
     const counts = shipCounts(world);
-    const guard = guardianStatus(world);
     for (const n of world.nodes) {
       const { x, y } = this.nodePos(n.index);
       const rr = this.nodeR(n);
@@ -140,26 +206,34 @@ export class MapView {
       ctx.translate(x, y);
       if (n.kind === 'probe') drawProbe(ctx, rr, t);
       else if (n.kind === 'asteroid') drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
+      else if (n.kind === 'root') drawRoot(ctx, rr, t, isRootCut(world));
       else drawRichNode(ctx, rr, t, isCaptured(world));
       ctx.restore();
 
       let labelTop = y - rr - 15;
       let selR = rr + 6;
-      if (n.kind === 'rich' && !isCaptured(world)) {
-        const count = guard.thornHps.length;
-        const ringR = rr * 1.38 + 4;
-        const thornR = Math.max(3.5, Math.min(rr * 0.3, (Math.PI * 2 * ringR) / Math.max(1, count) / 2.3));
+      const guard = n.kind === 'rich' || n.kind === 'root' ? guardianStatus(world, n.index) : null;
+      if (guard && guard.alive) {
+        const wilt = n.kind === 'rich' ? this.wilt : null;
+        const count = wilt ? wilt.from : guard.thorns;
+        const { ringR, thornR } = ringGeom(rr, count);
         for (let i = 0; i < count; i++) {
           const ang = (i / count) * Math.PI * 2 + t * 0.12;
           ctx.save();
           ctx.translate(x + Math.cos(ang) * ringR, y + Math.sin(ang) * ringR);
-          drawThorn(ctx, thornR, t, guard.thornHps[i]! / Math.max(1, guard.thornHp));
+          if (wilt && i >= wilt.to) {
+            // Falls with the angle it had spinning (drawThorn turns at t * 0.8), so it doesn't snap when it starts to wilt.
+            const frac = (nowMs - wilt.startMs) / WILT_MS;
+            ctx.translate(0, frac * thornR * 3);
+            ctx.rotate((wilt.startMs / 1000) * 0.8);
+            drawWiltingThorn(ctx, thornR, frac);
+          } else drawThorn(ctx, thornR, t, guard.thornHps[i]! / Math.max(1, guard.thornHp));
           ctx.restore();
         }
         selR = ringR + thornR + 3;
         labelTop = y - ringR - thornR - 12;
         const age = nowMs - this.hitAt;
-        if (age < FLASH_MS) {
+        if (age < FLASH_MS && this.hitNodes.includes(n.index)) {
           ctx.save();
           ctx.translate(x, y);
           drawHitFlash(ctx, ringR * 0.9, age / FLASH_MS);
@@ -173,7 +247,9 @@ export class MapView {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'alphabetic';
       ctx.fillStyle = '#9fb4d6';
-      ctx.fillText(nodeLabel(n), x, labelTop);
+      // A label that would clip at the top edge goes below the node instead.
+      if (labelTop < LABEL_TOP_PAD) ctx.fillText(nodeLabel(n), x, y + selR + 12);
+      else ctx.fillText(nodeLabel(n), x, labelTop);
       ctx.restore();
 
       if (selected === n.index) {
@@ -233,5 +309,6 @@ export class MapView {
 export function nodeLabel(n: Pick<Node, 'id' | 'kind'>): string {
   if (n.kind === 'probe') return 'PROBE';
   if (n.kind === 'rich') return 'BLOOM';
+  if (n.kind === 'root') return 'ROOT';
   return n.id.toUpperCase();
 }

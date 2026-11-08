@@ -9,12 +9,15 @@ import {
   guardianStatus,
   inputCost,
   isCaptured,
+  isGuarded,
+  isRootCut,
   isValidInput,
   nodeStatus,
   queueStatus,
   shipCounts,
   shipyardStatus,
   shipsPerMinX10,
+  systemStatus,
   type BuildKind,
   type Input,
   type Node,
@@ -22,6 +25,7 @@ import {
 import { palette } from './palette.ts';
 import { bar, btn, h, setHidden, setText, toggleClass, type Btn } from './dom.ts';
 import { fmt10 } from './format.ts';
+import { feedsBloomText, guardName, supplyLine } from './report.ts';
 import type { Session } from './session.ts';
 
 export interface SheetHost {
@@ -35,11 +39,12 @@ export interface SheetHost {
 const KIND_LABEL: Record<BuildKind, string> = { extractor: 'Ext', route: 'Route', upgrade: 'Upg' };
 
 export function shortName(n: Pick<Node, 'id' | 'kind'>): string {
-  return n.kind === 'probe' ? 'Probe' : n.kind === 'rich' ? 'Rich' : n.id.toUpperCase();
+  return n.kind === 'probe' ? 'Probe' : n.kind === 'rich' ? 'Rich' : n.kind === 'root' ? 'Root' : n.id.toUpperCase();
 }
 
-function longName(n: Pick<Node, 'id' | 'kind'>, captured: boolean): string {
+function longName(n: Pick<Node, 'id' | 'kind'>, captured: boolean, rootCut: boolean): string {
   if (n.kind === 'probe') return 'Probe';
+  if (n.kind === 'root') return rootCut ? 'Root (cut)' : 'Root · feeds the Bloom';
   if (n.kind === 'rich') return captured ? 'Rich node (yours)' : 'Rich node · the Bloom';
   return `Asteroid ${n.id.toUpperCase()}`;
 }
@@ -87,7 +92,7 @@ export class Sheet {
   /** Rebuilds when the node's kind of sheet changes (the Bloom falls while its sheet is open). */
   private signature(): string {
     const n = this.world.nodes[this.node]!;
-    return `${this.node}:${n.kind === 'rich' && !isCaptured(this.world) ? 'guarded' : 'open'}`;
+    return `${this.node}:${isGuarded(this.world, n.index) ? 'guarded' : 'open'}`;
   }
 
   private build(): void {
@@ -100,13 +105,14 @@ export class Sheet {
     this.root.scrollTop = 0;
 
     const head = h('div', 'sheet-head', '', this.root);
-    const title = h('h2', '', longName(n, isCaptured(world)), head);
+    const title = h('h2', '', longName(n, isCaptured(world), isRootCut(world)), head);
     const closeBtn = btn(head, '✕', () => this.host.close(), 'close');
     closeBtn.el.setAttribute('aria-label', 'Close');
     void title;
 
     if (n.kind === 'probe') this.probeSections();
-    else if (n.kind === 'rich' && !isCaptured(world)) this.richSections(n);
+    else if (isGuarded(world, n.index)) this.guardedSections(n);
+    else if (n.kind === 'root') this.cutRootSections();
     else this.producerSections(n);
 
     this.sendSection(n);
@@ -230,6 +236,8 @@ export class Sheet {
   // --- probe ---------------------------------------------------------------
 
   private probeSections(): void {
+    const sys = h('div', 'note sys', '', this.root);
+    this.ups.push(() => setText(sys, `System: ${systemStatus(this.world).name}`));
     const yard = h('section', '', '', this.root);
     const yardBtn = btn(yard, '', () => this.host.send({ type: 'setShipyard', on: !this.world.shipyard.on }), 'primary');
     const yardBar = bar(yard, 'yard');
@@ -298,9 +306,34 @@ export class Sheet {
 
   // --- the guarded rich node -----------------------------------------------
 
-  private richSections(n: Node): void {
+  /** The Root sheet's "Feeds the Bloom" box; returns the text element. */
+  private feedsBox(parent: HTMLElement): HTMLElement {
+    const box = h('div', 'feeds-box', '', parent);
+    h('b', '', 'Feeds the Bloom', box);
+    return h('div', '', '', box);
+  }
+
+  /** A cut Root: nothing to build or fight, only a place for ships to stand. */
+  private cutRootSections(): void {
+    const sec = h('section', '', '', this.root);
+    const msg = this.feedsBox(sec);
+    this.ups.push(() => setText(msg, feedsBloomText(this.world, isCaptured(this.world))));
+    const ships = this.row(sec, 'Ships here / en route');
+    const node = this.node;
+    this.ups.push(() => {
+      const c = shipCounts(this.world);
+      setText(ships.val, `${c.at[node]} / ${c.enRoute[node]}`);
+    });
+  }
+
+  /** The Bloom's or the live Root's sheet: thorns, regrowth, ships, the live battle. */
+  private guardedSections(n: Node): void {
+    const isRoot = n.kind === 'root';
+    const name = isRoot ? 'Root' : 'Bloom';
     const sec = h('section', '', '', this.root);
     const thornRow = this.row(sec, 'Thorns');
+    const supply = h('div', 'note supply', '', sec);
+    const feeds = isRoot ? this.feedsBox(sec) : null;
     const ringWrap = h('div', 'regrow', '', sec);
     const ring = h('canvas', 'ring', '', ringWrap);
     ring.width = 56;
@@ -319,11 +352,14 @@ export class Sheet {
 
     this.ups.push(() => {
       const w = this.world;
-      const g = guardianStatus(w);
+      const g = guardianStatus(w, n.index);
       setText(thornRow.val, `${g.thorns} / ${g.cap}`);
+      if (!isRoot) setText(supply, supplyLine(w));
+      else setHidden(supply, true);
+      if (feeds) setText(feeds, feedsBloomText(w, isCaptured(w)));
       const atCap = g.thorns >= g.cap;
       const secX10 = Math.round((g.regrowTicks * 10) / w.tickRate);
-      setText(regrow, atCap ? `Bloom at full strength · regrows 1 thorn / ${fmt10(secX10)} s when hurt` : `Regrows 1 thorn / ${fmt10(secX10)} s`);
+      setText(regrow, atCap ? `${name} at full strength · regrows 1 thorn / ${fmt10(secX10)} s when hurt` : `Regrows 1 thorn / ${fmt10(secX10)} s`);
       drawRing(ring, atCap ? 0 : g.regrowProgress / Math.max(1, g.regrowTicks));
       setText(
         stats,
@@ -332,16 +368,16 @@ export class Sheet {
       const c = shipCounts(w);
       setText(ships.val, `${c.at[n.index]} / ${c.enRoute[n.index]}`);
       const total = c.total;
-      const r = combatRates(w, total);
+      const r = combatRates(w, total, n.index);
       setText(
         hint,
         total === 0
           ? 'No ships yet. Waves must out-strip regrowth.'
-          : `All ${total} ships together: strip ${fmt10(r.killPerSecX10)} thorns/s vs Bloom regrows ${fmt10(r.regrowPerSecX10)}/s.`,
+          : `All ${total} ships together: strip ${fmt10(r.killPerSecX10)} thorns/s vs ${name} regrows ${fmt10(r.regrowPerSecX10)}/s.`,
       );
-      const b = battleStatus(w);
+      const b = battleStatus(w, n.index);
       if (b) {
-        setText(bLine, `Battle: you strip ${fmt10(b.killPerSecX10)} thorns/s · Bloom regrows ${fmt10(b.regrowPerSecX10)}/s`);
+        setText(bLine, `Battle: you strip ${fmt10(b.killPerSecX10)} thorns/s · ${name} regrows ${fmt10(b.regrowPerSecX10)}/s`);
         setText(bLost, `Ships lost so far: ${b.shipsLost} · thorns stripped: ${b.thornsKilled}`);
       } else {
         setText(bLine, 'No battle running.');
@@ -359,7 +395,7 @@ export class Sheet {
     const title = h('div', 'lbl', '', sec);
     const nodes = this.world.nodes;
     const sources: Array<{ node: number; b: Btn }> = [];
-    const attack = (): boolean => n.kind === 'rich' && !isCaptured(this.world);
+    const attack = (): boolean => isGuarded(this.world, n.index);
     for (const m of nodes) {
       if (m.index === n.index) continue;
       const b = btn(sec, '', () => this.host.send({ type: 'sendShips', from: m.index, to: n.index, count: 0 }), 'send-btn');
@@ -386,7 +422,7 @@ export class Sheet {
       setHidden(all.el, live < 2);
       all.set(`${attack() ? 'Attack with all' : 'All'} · ${total}`);
       setHidden(sec, total === 0);
-      setText(title, attack() ? 'Attack the Bloom' : 'Send ships here');
+      setText(title, attack() ? `Attack the ${guardName(this.world, n.index)}` : 'Send ships here');
     });
   }
 

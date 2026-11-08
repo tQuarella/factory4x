@@ -226,3 +226,7 @@ Scope: `git log build-20261106-1..build-20261106-2` (b86ac34..c11124b), the five
 ## 2026-11-07 · Director · Repaired git metadata after a crashed session
 
 The Director session ended abruptly during a commit/push on 2026-11-06 23:37. Two files were left all zero bytes: `.git/config` and `.git/refs/heads/main`. Every object and every other ref was intact (`git fsck` was clean afterwards). `main` was restored to d7fa918, its last reflog entry. The config was rebuilt with the core settings, the `origin` remote and `main` tracking. The zeroed originals were kept in the session scratchpad. Nothing was lost. If git ever reports `bad config line 1`, check for zeroed files first, and restore refs from `.git/logs` rather than recloning.
+
+## h2-client: banner lines, hint, fit margin (2026-11-07)
+
+- Battle banner is one nowrap, ellipsised line per battle (a wrapped two-battle banner in a wide font pushed the toast out of the capped notices strip). The first-run hint moved into that strip and hides while a banner or toast shows. New run seeds with old seed + 1 (no wrap). fit.ts top margin grew by 40 su so the Bloom label does not clip; labels that would still clip go below the node.
