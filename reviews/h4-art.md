@@ -23,3 +23,28 @@ Non-blocking notes (no action required for approval):
 - At 24 px in greyscale, the locked-state spikes (0.35 alpha) almost vanish. In colour they still read, and the spec asks for "low alpha", so this is acceptable.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+Pillar fit: The scope and the look are the same as in round 1. The only rendering change is to the empty probe core. On an unreclaimed Deep it now reads as a cool, pale outlined seed. Before, it was a gold-brown seed, so amber now marks only reclaimed areas and owned lanes, as the criterion requires.
+
+Quality: The round 1 items are resolved.
+- `drawProbeCore` at `frac` 0 draws its glow disc in `starBright` at 0.12 alpha and its inner seed in `starBright` at 0.3 alpha. It uses no `probe` or `probeGlow`. Amber appears once `frac` is above 0, which matches ART_STYLE.md and DECISIONS.md.
+- `h4-art.test.ts` now records `fillStyle`/`strokeStyle` and checks four cases:
+  - `drawProbeCore(..., 0)` never uses `probe`, `probeGlow` or `laneOwned` at several `t`;
+  - locked and open area nodes, at every tier, never use them either;
+  - a full core does use amber;
+  - a reclaimed node does use amber.
+
+  The positive cases keep the negative checks from passing on an empty style list.
+- I re-rendered `gallery.html` in headless Chromium with no page errors. In the 375x667 mock, the locked Deep's centre has no warm tint. In the 24 px strip, the frac 0 core is cool and the 0.5 and 1 cores are amber.
+- The bounds panel now notes that the pixel scan includes antialiasing.
+
+The fix is small and has no dead code. It changed no other draw function, and the bounds tests still pass.
+
+Gates: I ran `npm run gates -- --base main` on `task/h4-art` at cb67a8f, and every gate passed: typecheck, lint, test, determinism, bots and protected-files. No protected files changed. Branch CI run 42486320645 was in progress when I reviewed. Per acceptance 5, it must be green before `merge-task`. That is a precondition of the merge, not deferred work.
+
+Required changes:
+- None.
+
+VERDICT: APPROVE
