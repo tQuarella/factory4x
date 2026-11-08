@@ -147,7 +147,7 @@ describe('recycling through the session', () => {
     // Park two drones at the probe by building them: run until the yard has made some.
     for (let i = 0; i < 4000 && s.world.ships.length < 2; i++) s.stepOnce();
     expect(s.world.ships.length).toBeGreaterThanOrEqual(2);
-    const at = s.world.ships[0]!.at;
+    const at = s.world.ships[0]!.at!;
     const want: ShipTypeCounts = { drone: 2, lancer: 0, flak: 0 };
     const preview = recycleRefund(s.world, want);
     const parked = s.world.ships.filter((x) => x.at === at && x.type === 'drone').length;
