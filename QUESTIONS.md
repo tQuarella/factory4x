@@ -34,6 +34,12 @@ None.
 
 ## Answered
 
+### Q15. Skip a repeat branch CI run when `main` moved only in status files? (2026-11-07, Retrospective)
+
+Before a browser-facing task merges, its branch must pass CI on the exact commit that gets merged. When `main` moves while that CI runs, the Director merges `main` again and waits about 4 more minutes, even if the only new commit on `main` edited `STATUS.md`. The process now asks the Director not to commit during that wait, so this happens less. Proposed on top of that: when the only files changed on `main` since the branch's green CI run are `STATUS.md`, `BACKLOG.md`, `QUESTIONS.md`, `DECISIONS.md`, `CHANGELOG.md`, `PLAYTEST_LOG.md` or `reviews/*`, merge without a new branch CI run. `merge-task` still runs every gate on the merged result, and CI runs again on `main` after the push. `DESIGN.md` and `ART_STYLE.md` would not count, because tests read them. This loosens a merge rule slightly, so it's your call. Default if unanswered: keep the current rule.
+
+**Answer (owner, 2026-11-08, in chat with the Director):** "yes". Applied in PROCESS.md "Before merging".
+
 ### Q14. Two VISION.md edits for the asteroid-field direction (2026-11-07, Designer)
 
 Your Q13 answer (a long, persistent game with factories outside the probe) conflicts with two lines in VISION.md. Steelman and reasoning: DESIGN.md → "Owner direction 2026-11-07: the asteroid field (steelman)". The first build (H3) doesn't depend on these, so it can start either way. Approve, edit or reject each:
@@ -181,12 +187,6 @@ APPROVED-PROTECTED: VISION.md
 **Answer (owner, 2026-11-06):** Cloudflare Pages.
 
 ## Can wait
-
-### Q15. Skip a repeat branch CI run when `main` moved only in status files? (2026-11-07, Retrospective)
-
-Before a browser-facing task merges, its branch must pass CI on the exact commit that gets merged. When `main` moves while that CI runs, the Director merges `main` again and waits about 4 more minutes, even if the only new commit on `main` edited `STATUS.md`. The process now asks the Director not to commit during that wait, so this happens less. Proposed on top of that: when the only files changed on `main` since the branch's green CI run are `STATUS.md`, `BACKLOG.md`, `QUESTIONS.md`, `DECISIONS.md`, `CHANGELOG.md`, `PLAYTEST_LOG.md` or `reviews/*`, merge without a new branch CI run. `merge-task` still runs every gate on the merged result, and CI runs again on `main` after the push. `DESIGN.md` and `ART_STYLE.md` would not count, because tests read them. This loosens a merge rule slightly, so it's your call. Default if unanswered: keep the current rule.
-
-**Answer:**
 
 ### Q10. Let agents list secret names (2026-11-06, Retrospective)
 

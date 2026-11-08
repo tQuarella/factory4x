@@ -376,3 +376,7 @@ Scope: `git log build-20261108-1..build-20261108-2` (13201db..a4096a7, plus the 
 6. **`QUESTIONS.md` Can wait Q15:** skip a repeat branch CI run when `main` moved only in status files (not DESIGN.md or ART_STYLE.md, which tests read). This would loosen a merge rule, so it's the owner's call, and it is not applied. The default is the current rule.
 
 **Not changed:** no gate, guardrail or protected file. No change to `critic.md`. The art checklist stays as written (see above). No resume cap: 10 resumes, all productive.
+
+## 2026-11-08 · Director · Q15 applied: docs-only moves on main skip the repeat branch CI run
+
+The owner answered Q15 "yes". `PROCESS.md` "Before merging" now lets a browser-facing branch merge without a new branch CI run when `main` moved only in status and log files (`STATUS.md`, `BACKLOG.md`, `QUESTIONS.md`, `DECISIONS.md`, `CHANGELOG.md`, `PLAYTEST_LOG.md`, `reviews/`). Why: these files are read by no test or build step, so a fresh run on them proves nothing and costs about 4 minutes each time; in H3 it cost several cycles. `DESIGN.md` and `ART_STYLE.md` stay excluded because tests read them. Safeguards unchanged: `merge-task` runs every gate on the merged result, and CI runs on `main` after the push. No script or gate changed; this is a Director procedure rule.
