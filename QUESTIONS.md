@@ -26,6 +26,8 @@ Also open: Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 
 
 Protected files changed this build: none. Every merge passed the protected-files gate.
 
+**Answer (owner, 2026-11-07, in chat):** "Attacking the root first felt like the obvious choice.  Both runs felt the same: max economy then shift to building ships and attack once you have enough. Cutting the root was satisfying"
+
 ## Blocking
 
 None.

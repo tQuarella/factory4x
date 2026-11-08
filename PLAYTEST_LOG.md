@@ -43,3 +43,12 @@ Owned by the Designer. Each entry: date, build, who (owner or friend name), the 
 
 **Interpretation:** The `ART_STYLE.md` direction (warm amber player geometry, hot-pink spiky guardians, flat vector on deep space) is confirmed as the baseline, and the placeholder silhouettes read on a phone. Recorded by the Director; the build had no gameplay, so there was nothing for the Designer to triage.
 **Action:** none. Keep `ART_STYLE.md` as is; M1 entities follow it.
+
+### 2026-11-07 · build build-20261108-1 (H2 decision depth) · owner
+
+> Attacking the root first felt like the obvious choice.  Both runs felt the same: max economy then shift to building ships and attack once you have enough. Cutting the root was satisfying
+
+(Answers the three H2 fun questions in order; given in chat after two runs.)
+
+**Interpretation:** pending Designer triage.
+**Action:** pending.
