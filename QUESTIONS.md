@@ -32,7 +32,27 @@ Protected files changed this build: none. Every merge passed the protected-files
 
 ## Blocking
 
-None.
+### Q17. Which slice should the next build test? (2026-11-08, Designer)
+
+Your H4 feedback has one root cause: every choice so far costs only time (ships are unlimited, so enough drones take anything). I steelmanned your open-world idea before agreeing. It fixes "linear" only if getting stronger means something you unlock; without a ship limit it makes "max economy then swarm" bigger. So I'd test your ship limit first. Details: DESIGN.md → "Owner direction 2026-11-08b" and "H5 candidates".
+
+- **A. Fleet cap (recommended):** a limit on ships per area (start 12), raised by a Command limit research, plus a Recycle order to refit; areas recalibrated so drones alone can't fit. Same six-area overworld. Setting the cap to 0 in the tuning panel gives you H4 to compare.
+- **B. Open frontier:** about 12 areas on a panned, scouted map; you need only about 7; repeat prizes pay less; an overworld Root that starves its neighbours. No ship limit.
+- **C. Both, lite:** A plus 2–3 extra areas, two of which grant a cap raise instead of resources. Likely over one iteration's budget, and harder to read if it fails.
+
+Answer with a letter. Default if unanswered: A.
+
+### Q18. Pillar 1 wording, only if a fleet cap ships (2026-11-08, Designer)
+
+A fleet cap is a ceiling that throughput doesn't set, so it stretches pillar 1 ("gates everything else"). Replace
+
+"1. **Throughput is the throttle.** The rate your network delivers resources to your factories and shipyards gates everything else."
+
+with
+
+"1. **Throughput is the throttle.** The rate your network delivers resources to your factories and shipyards gates how fast you build and rebuild; your fleet limit, raised by research, sets how much you can field at once."
+
+Approve, edit or reject. It applies only if you pick A or C in Q17. Default if unanswered: no edit; the cap ships as an experiment under the current wording, with this question still open.
 
 ## Answered
 
