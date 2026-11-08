@@ -1,0 +1,2635 @@
+{
+  "generatedAt": "2026-11-08T14:38:13.103Z",
+  "dataVersion": 6,
+  "seeds": 3,
+  "visitCapTicks": 54000,
+  "campaignCapMinutes": 120,
+  "tickBudgetMsP95": 2,
+  "runSeconds": 16.47,
+  "failures": [],
+  "flags": [
+    {
+      "name": "No softlock: every strategy buys the probe core on every seed within 120 game minutes of play",
+      "pass": true,
+      "detail": "all 15 runs bought the core"
+    },
+    {
+      "name": "Run length: the best strategy's full run is 45-75 game minutes on every seed, and mean area times are inside their windows",
+      "pass": true,
+      "detail": "seed 1 best ice-line 47.6 min; seed 2 best ice-line 45.9 min; seed 3 best ice-line 45.8 min; run inside the window; mean area times landfall 0:11 (0:00-1:00), shelf 8:08 (4:00-9:00), shoal 7:41 (4:00-9:00), veil 9:04 (6:00-13:00), garden 10:29 (6:00-13:00), deep 15:42 (8:00-16:00)"
+    },
+    {
+      "name": "Two viable sides: ice-line and crystal-line finish within 15% of each other on at least 2 of 3 seeds",
+      "pass": true,
+      "detail": "3 of 3 within 15%; seed 1: ice 47.6, crystal 48.2, gap 1% (within); seed 2: ice 45.9, crystal 46.5, gap 1% (within); seed 3: ice 45.8, crystal 46.4, gap 1% (within)"
+    },
+    {
+      "name": "The design decides the cheap medium: Spore Veil is at least 20% faster with Flak only than Lancer only, Thorn Garden at least 20% faster with Lancer only than Flak only (seed 1, four probe runs)",
+      "pass": true,
+      "detail": "Veil: flak 9:09, lancer 16:20 (flak 44% faster, met); Garden: lancer 10:39, flak 16:19 (lancer 35% faster, met)"
+    },
+    {
+      "name": "Research matters: no-research takes at least 25% longer than the best strategy on every seed, and every researching strategy opens its last area in at most 60% of the time of its first light area",
+      "pass": true,
+      "detail": "seed 1: no-research 67.8 vs best ice-line 47.6 min (+42%); seed 2: no-research 65.7 vs best ice-line 45.9 min (+43%); seed 3: no-research 65.8 vs best ice-line 45.8 min (+44%); openings (last area vs first light area): ice-line/1 garden 0:56 vs shelf 2:14, ice-line/2 garden 0:56 vs shelf 2:14, ice-line/3 garden 0:56 vs shelf 2:14, crystal-line/1 veil 0:56 vs shoal 2:14, crystal-line/2 veil 0:56 vs shoal 2:14, crystal-line/3 veil 0:56 vs shoal 2:14, full-kit/1 deep 0:56 vs shelf 2:14, full-kit/2 deep 0:56 vs shelf 2:14, full-kit/3 deep 0:56 vs shelf 2:14, greedy/1 deep 0:56 vs shelf 2:14, greedy/2 deep 0:56 vs shelf 2:14, greedy/3 deep 0:56 vs shelf 2:14"
+    },
+    {
+      "name": "Order varies: at least two different area orders finish within 15% of the best full-run time on every seed",
+      "pass": true,
+      "detail": "seed 1: 4 orders; seed 2: 4 orders; seed 3: 4 orders"
+    },
+    {
+      "name": "Determinism and the reference replay pass",
+      "pass": true,
+      "detail": "reference replay matches over 9000 ticks; greedy seed 1 replayed to the same hash"
+    }
+  ],
+  "flag4Probes": {
+    "veilFlak": 16470,
+    "veilLancer": 29400,
+    "gardenLancer": 19170,
+    "gardenFlak": 29370
+  },
+  "results": [
+    {
+      "strategy": "ice-line",
+      "seed": 1,
+      "outcome": "won",
+      "playTicks": 85688,
+      "ticks": 85713,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 16024,
+          "playTicks": 16466,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "deep",
+          "startTick": 32496,
+          "playTicks": 29424,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 69,
+          "shipsLost": 46
+        },
+        {
+          "area": "shoal",
+          "startTick": 61927,
+          "playTicks": 8123,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 17,
+          "shipsLost": 6
+        },
+        {
+          "area": "garden",
+          "startTick": 70052,
+          "playTicks": 15658,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "deep",
+        "shoal",
+        "garden"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32492,
+          "playTicks": 32483
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32493,
+          "playTicks": 32483
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 32494,
+          "playTicks": 32483
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 32495,
+          "playTicks": 32483
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 61922,
+          "playTicks": 61907
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 61923,
+          "playTicks": 61907
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 61924,
+          "playTicks": 61907
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 61925,
+          "playTicks": 61907
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 61926,
+          "playTicks": 61907
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 85712,
+          "playTicks": 85688
+        }
+      ],
+      "shipsBuilt": 176,
+      "shipsLost": 89,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 585,
+        "ice": 205,
+        "crystal": 57
+      },
+      "shippedSharePct": 28,
+      "tickMsP50": 0.002200000000129876,
+      "tickMsP95": 0.004000000000019099,
+      "finalHash": "0177557b"
+    },
+    {
+      "strategy": "ice-line",
+      "seed": 2,
+      "outcome": "won",
+      "playTicks": 82628,
+      "ticks": 82653,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 16024,
+          "playTicks": 16466,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "deep",
+          "startTick": 32496,
+          "playTicks": 26364,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 63,
+          "shipsLost": 39
+        },
+        {
+          "area": "shoal",
+          "startTick": 58867,
+          "playTicks": 8123,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 17,
+          "shipsLost": 6
+        },
+        {
+          "area": "garden",
+          "startTick": 66992,
+          "playTicks": 15658,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "deep",
+        "shoal",
+        "garden"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32492,
+          "playTicks": 32483
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32493,
+          "playTicks": 32483
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 32494,
+          "playTicks": 32483
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 32495,
+          "playTicks": 32483
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 58862,
+          "playTicks": 58847
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 58863,
+          "playTicks": 58847
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 58864,
+          "playTicks": 58847
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 58865,
+          "playTicks": 58847
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 58866,
+          "playTicks": 58847
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 82652,
+          "playTicks": 82628
+        }
+      ],
+      "shipsBuilt": 170,
+      "shipsLost": 82,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 564,
+        "ice": 197,
+        "crystal": 57
+      },
+      "shippedSharePct": 27,
+      "tickMsP50": 0.002100000000154978,
+      "tickMsP95": 0.003500000000030923,
+      "finalHash": "a078b49c"
+    },
+    {
+      "strategy": "ice-line",
+      "seed": 3,
+      "outcome": "won",
+      "playTicks": 82418,
+      "ticks": 82443,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 16024,
+          "playTicks": 16466,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "deep",
+          "startTick": 32496,
+          "playTicks": 26154,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 64,
+          "shipsLost": 42
+        },
+        {
+          "area": "shoal",
+          "startTick": 58657,
+          "playTicks": 8123,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 17,
+          "shipsLost": 6
+        },
+        {
+          "area": "garden",
+          "startTick": 66782,
+          "playTicks": 15658,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "deep",
+        "shoal",
+        "garden"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32492,
+          "playTicks": 32483
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32493,
+          "playTicks": 32483
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 32494,
+          "playTicks": 32483
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 32495,
+          "playTicks": 32483
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 58652,
+          "playTicks": 58637
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 58653,
+          "playTicks": 58637
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 58654,
+          "playTicks": 58637
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 58655,
+          "playTicks": 58637
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 58656,
+          "playTicks": 58637
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 82442,
+          "playTicks": 82418
+        }
+      ],
+      "shipsBuilt": 171,
+      "shipsLost": 85,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 563,
+        "ice": 196,
+        "crystal": 57
+      },
+      "shippedSharePct": 27,
+      "tickMsP50": 0.002199999999902502,
+      "tickMsP95": 0.003699999999753345,
+      "finalHash": "3fb707d5"
+    },
+    {
+      "strategy": "crystal-line",
+      "seed": 1,
+      "outcome": "won",
+      "playTicks": 86708,
+      "ticks": 86733,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shoal",
+          "startTick": 333,
+          "playTicks": 17817,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 30,
+          "shipsLost": 5
+        },
+        {
+          "area": "garden",
+          "startTick": 18154,
+          "playTicks": 19196,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 34,
+          "shipsLost": 20
+        },
+        {
+          "area": "deep",
+          "startTick": 37356,
+          "playTicks": 29424,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 69,
+          "shipsLost": 46
+        },
+        {
+          "area": "shelf",
+          "startTick": 66787,
+          "playTicks": 7673,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 15,
+          "shipsLost": 4
+        },
+        {
+          "area": "veil",
+          "startTick": 74462,
+          "playTicks": 12268,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 28,
+          "shipsLost": 14
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shoal",
+        "garden",
+        "deep",
+        "shelf",
+        "veil"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 18152,
+          "playTicks": 18147
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 18153,
+          "playTicks": 18147
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 37352,
+          "playTicks": 37343
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 37353,
+          "playTicks": 37343
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 37354,
+          "playTicks": 37343
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 37355,
+          "playTicks": 37343
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 66782,
+          "playTicks": 66767
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 66783,
+          "playTicks": 66767
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 66784,
+          "playTicks": 66767
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 66785,
+          "playTicks": 66767
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 66786,
+          "playTicks": 66767
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 86732,
+          "playTicks": 86708
+        }
+      ],
+      "shipsBuilt": 178,
+      "shipsLost": 89,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 552,
+        "ice": 46,
+        "crystal": 191
+      },
+      "shippedSharePct": 26,
+      "tickMsP50": 0.0019999999999527063,
+      "tickMsP95": 0.003499999999803549,
+      "finalHash": "c433c67f"
+    },
+    {
+      "strategy": "crystal-line",
+      "seed": 2,
+      "outcome": "won",
+      "playTicks": 83648,
+      "ticks": 83673,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shoal",
+          "startTick": 333,
+          "playTicks": 17817,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 30,
+          "shipsLost": 5
+        },
+        {
+          "area": "garden",
+          "startTick": 18154,
+          "playTicks": 19196,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 34,
+          "shipsLost": 20
+        },
+        {
+          "area": "deep",
+          "startTick": 37356,
+          "playTicks": 26364,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 63,
+          "shipsLost": 39
+        },
+        {
+          "area": "shelf",
+          "startTick": 63727,
+          "playTicks": 7673,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 15,
+          "shipsLost": 4
+        },
+        {
+          "area": "veil",
+          "startTick": 71402,
+          "playTicks": 12268,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 28,
+          "shipsLost": 14
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shoal",
+        "garden",
+        "deep",
+        "shelf",
+        "veil"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 18152,
+          "playTicks": 18147
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 18153,
+          "playTicks": 18147
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 37352,
+          "playTicks": 37343
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 37353,
+          "playTicks": 37343
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 37354,
+          "playTicks": 37343
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 37355,
+          "playTicks": 37343
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 63722,
+          "playTicks": 63707
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 63723,
+          "playTicks": 63707
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 63724,
+          "playTicks": 63707
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 63725,
+          "playTicks": 63707
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 63726,
+          "playTicks": 63707
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 83672,
+          "playTicks": 83648
+        }
+      ],
+      "shipsBuilt": 172,
+      "shipsLost": 82,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 532,
+        "ice": 46,
+        "crystal": 183
+      },
+      "shippedSharePct": 26,
+      "tickMsP50": 0.0020000000004074536,
+      "tickMsP95": 0.0036000000000058208,
+      "finalHash": "d3dc66f9"
+    },
+    {
+      "strategy": "crystal-line",
+      "seed": 3,
+      "outcome": "won",
+      "playTicks": 83438,
+      "ticks": 83463,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shoal",
+          "startTick": 333,
+          "playTicks": 17817,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 30,
+          "shipsLost": 5
+        },
+        {
+          "area": "garden",
+          "startTick": 18154,
+          "playTicks": 19196,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 34,
+          "shipsLost": 20
+        },
+        {
+          "area": "deep",
+          "startTick": 37356,
+          "playTicks": 26154,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 64,
+          "shipsLost": 42
+        },
+        {
+          "area": "shelf",
+          "startTick": 63517,
+          "playTicks": 7673,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 15,
+          "shipsLost": 4
+        },
+        {
+          "area": "veil",
+          "startTick": 71192,
+          "playTicks": 12268,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 28,
+          "shipsLost": 14
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shoal",
+        "garden",
+        "deep",
+        "shelf",
+        "veil"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 18152,
+          "playTicks": 18147
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 18153,
+          "playTicks": 18147
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 37352,
+          "playTicks": 37343
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 37353,
+          "playTicks": 37343
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 37354,
+          "playTicks": 37343
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 37355,
+          "playTicks": 37343
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 63512,
+          "playTicks": 63497
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 63513,
+          "playTicks": 63497
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 63514,
+          "playTicks": 63497
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 63515,
+          "playTicks": 63497
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 63516,
+          "playTicks": 63497
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 83462,
+          "playTicks": 83438
+        }
+      ],
+      "shipsBuilt": 173,
+      "shipsLost": 85,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 530,
+        "ice": 46,
+        "crystal": 182
+      },
+      "shippedSharePct": 25,
+      "tickMsP50": 0.0020999999997002305,
+      "tickMsP95": 0.0037000000002080924,
+      "finalHash": "6dcf65bb"
+    },
+    {
+      "strategy": "full-kit",
+      "seed": 1,
+      "outcome": "won",
+      "playTicks": 91418,
+      "ticks": 91443,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "shoal",
+          "startTick": 16024,
+          "playTicks": 16436,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 29,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 32465,
+          "playTicks": 15625,
+          "result": "reclaimed",
+          "openingTicks": 2481,
+          "shipsBuilt": 27,
+          "shipsLost": 14
+        },
+        {
+          "area": "garden",
+          "startTick": 48095,
+          "playTicks": 16855,
+          "result": "reclaimed",
+          "openingTicks": 1724,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        },
+        {
+          "area": "deep",
+          "startTick": 64955,
+          "playTicks": 26485,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 68,
+          "shipsLost": 47
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "shoal",
+        "veil",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32462,
+          "playTicks": 32453
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32463,
+          "playTicks": 32453
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 32464,
+          "playTicks": 32453
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 48092,
+          "playTicks": 48078
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 48093,
+          "playTicks": 48078
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 48094,
+          "playTicks": 48078
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 64952,
+          "playTicks": 64933
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 64953,
+          "playTicks": 64933
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 64954,
+          "playTicks": 64933
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 91442,
+          "playTicks": 91418
+        }
+      ],
+      "shipsBuilt": 189,
+      "shipsLost": 89,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 620,
+        "ice": 156,
+        "crystal": 109
+      },
+      "shippedSharePct": 29,
+      "tickMsP50": 0.0020999999997002305,
+      "tickMsP95": 0.0037000000002080924,
+      "finalHash": "2d79ea3f"
+    },
+    {
+      "strategy": "full-kit",
+      "seed": 2,
+      "outcome": "won",
+      "playTicks": 88838,
+      "ticks": 88863,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "shoal",
+          "startTick": 16024,
+          "playTicks": 16436,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 29,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 32465,
+          "playTicks": 15625,
+          "result": "reclaimed",
+          "openingTicks": 2481,
+          "shipsBuilt": 27,
+          "shipsLost": 14
+        },
+        {
+          "area": "garden",
+          "startTick": 48095,
+          "playTicks": 16855,
+          "result": "reclaimed",
+          "openingTicks": 1724,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        },
+        {
+          "area": "deep",
+          "startTick": 64955,
+          "playTicks": 23905,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 63,
+          "shipsLost": 39
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "shoal",
+        "veil",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32462,
+          "playTicks": 32453
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32463,
+          "playTicks": 32453
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 32464,
+          "playTicks": 32453
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 48092,
+          "playTicks": 48078
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 48093,
+          "playTicks": 48078
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 48094,
+          "playTicks": 48078
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 64952,
+          "playTicks": 64933
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 64953,
+          "playTicks": 64933
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 64954,
+          "playTicks": 64933
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 88862,
+          "playTicks": 88838
+        }
+      ],
+      "shipsBuilt": 184,
+      "shipsLost": 81,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 591,
+        "ice": 148,
+        "crystal": 102
+      },
+      "shippedSharePct": 28,
+      "tickMsP50": 0.0020999999997002305,
+      "tickMsP95": 0.0037000000002080924,
+      "finalHash": "70287eda"
+    },
+    {
+      "strategy": "full-kit",
+      "seed": 3,
+      "outcome": "won",
+      "playTicks": 88658,
+      "ticks": 88683,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "shoal",
+          "startTick": 16024,
+          "playTicks": 16436,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 29,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 32465,
+          "playTicks": 15625,
+          "result": "reclaimed",
+          "openingTicks": 2481,
+          "shipsBuilt": 27,
+          "shipsLost": 14
+        },
+        {
+          "area": "garden",
+          "startTick": 48095,
+          "playTicks": 16855,
+          "result": "reclaimed",
+          "openingTicks": 1724,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        },
+        {
+          "area": "deep",
+          "startTick": 64955,
+          "playTicks": 23725,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 64,
+          "shipsLost": 42
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "shoal",
+        "veil",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32462,
+          "playTicks": 32453
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32463,
+          "playTicks": 32453
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 32464,
+          "playTicks": 32453
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 48092,
+          "playTicks": 48078
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 48093,
+          "playTicks": 48078
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 48094,
+          "playTicks": 48078
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 64952,
+          "playTicks": 64933
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 64953,
+          "playTicks": 64933
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 64954,
+          "playTicks": 64933
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 88682,
+          "playTicks": 88658
+        }
+      ],
+      "shipsBuilt": 185,
+      "shipsLost": 84,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 589,
+        "ice": 148,
+        "crystal": 101
+      },
+      "shippedSharePct": 27,
+      "tickMsP50": 0.0020999999997002305,
+      "tickMsP95": 0.003800000000410364,
+      "finalHash": "5d06fc3f"
+    },
+    {
+      "strategy": "greedy",
+      "seed": 1,
+      "outcome": "won",
+      "playTicks": 86048,
+      "ticks": 86073,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 16024,
+          "playTicks": 16466,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "shoal",
+          "startTick": 32496,
+          "playTicks": 10224,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 17,
+          "shipsLost": 5
+        },
+        {
+          "area": "garden",
+          "startTick": 42724,
+          "playTicks": 16856,
+          "result": "reclaimed",
+          "openingTicks": 1724,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        },
+        {
+          "area": "deep",
+          "startTick": 59585,
+          "playTicks": 26485,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 68,
+          "shipsLost": 47
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "shoal",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32492,
+          "playTicks": 32483
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32493,
+          "playTicks": 32483
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 32494,
+          "playTicks": 32483
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 32495,
+          "playTicks": 32483
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 42722,
+          "playTicks": 42707
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 42723,
+          "playTicks": 42707
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 59582,
+          "playTicks": 59563
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 59583,
+          "playTicks": 59563
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 59584,
+          "playTicks": 59563
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 86072,
+          "playTicks": 86048
+        }
+      ],
+      "shipsBuilt": 175,
+      "shipsLost": 89,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 601,
+        "ice": 167,
+        "crystal": 92
+      },
+      "shippedSharePct": 28,
+      "tickMsP50": 0.0020999999997002305,
+      "tickMsP95": 0.0036999999992985977,
+      "finalHash": "3b28f2c8"
+    },
+    {
+      "strategy": "greedy",
+      "seed": 2,
+      "outcome": "won",
+      "playTicks": 83468,
+      "ticks": 83493,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 16024,
+          "playTicks": 16466,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "shoal",
+          "startTick": 32496,
+          "playTicks": 10224,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 17,
+          "shipsLost": 5
+        },
+        {
+          "area": "garden",
+          "startTick": 42724,
+          "playTicks": 16856,
+          "result": "reclaimed",
+          "openingTicks": 1724,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        },
+        {
+          "area": "deep",
+          "startTick": 59585,
+          "playTicks": 23905,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 63,
+          "shipsLost": 39
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "shoal",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32492,
+          "playTicks": 32483
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32493,
+          "playTicks": 32483
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 32494,
+          "playTicks": 32483
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 32495,
+          "playTicks": 32483
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 42722,
+          "playTicks": 42707
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 42723,
+          "playTicks": 42707
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 59582,
+          "playTicks": 59563
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 59583,
+          "playTicks": 59563
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 59584,
+          "playTicks": 59563
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 83492,
+          "playTicks": 83468
+        }
+      ],
+      "shipsBuilt": 170,
+      "shipsLost": 81,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 573,
+        "ice": 159,
+        "crystal": 85
+      },
+      "shippedSharePct": 27,
+      "tickMsP50": 0.0021999999989930075,
+      "tickMsP95": 0.003800000000410364,
+      "finalHash": "9ed44236"
+    },
+    {
+      "strategy": "greedy",
+      "seed": 3,
+      "outcome": "won",
+      "playTicks": 83288,
+      "ticks": 83313,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 333,
+          "playTicks": 15687,
+          "result": "reclaimed",
+          "openingTicks": 4021,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 16024,
+          "playTicks": 16466,
+          "result": "reclaimed",
+          "openingTicks": 3824,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "shoal",
+          "startTick": 32496,
+          "playTicks": 10224,
+          "result": "reclaimed",
+          "openingTicks": 2264,
+          "shipsBuilt": 17,
+          "shipsLost": 5
+        },
+        {
+          "area": "garden",
+          "startTick": 42724,
+          "playTicks": 16856,
+          "result": "reclaimed",
+          "openingTicks": 1724,
+          "shipsBuilt": 40,
+          "shipsLost": 18
+        },
+        {
+          "area": "deep",
+          "startTick": 59585,
+          "playTicks": 23725,
+          "result": "reclaimed",
+          "openingTicks": 1698,
+          "shipsBuilt": 64,
+          "shipsLost": 42
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "shoal",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "opening",
+          "level": 1,
+          "tick": 332,
+          "playTicks": 330
+        },
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 16022,
+          "playTicks": 16017
+        },
+        {
+          "item": "extract",
+          "level": 1,
+          "tick": 16023,
+          "playTicks": 16017
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 32492,
+          "playTicks": 32483
+        },
+        {
+          "item": "rigs",
+          "level": 1,
+          "tick": 32493,
+          "playTicks": 32483
+        },
+        {
+          "item": "extract",
+          "level": 2,
+          "tick": 32494,
+          "playTicks": 32483
+        },
+        {
+          "item": "opening",
+          "level": 2,
+          "tick": 32495,
+          "playTicks": 32483
+        },
+        {
+          "item": "yards",
+          "level": 1,
+          "tick": 42722,
+          "playTicks": 42707
+        },
+        {
+          "item": "rigs",
+          "level": 2,
+          "tick": 42723,
+          "playTicks": 42707
+        },
+        {
+          "item": "yards",
+          "level": 2,
+          "tick": 59582,
+          "playTicks": 59563
+        },
+        {
+          "item": "extract",
+          "level": 3,
+          "tick": 59583,
+          "playTicks": 59563
+        },
+        {
+          "item": "opening",
+          "level": 3,
+          "tick": 59584,
+          "playTicks": 59563
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 83312,
+          "playTicks": 83288
+        }
+      ],
+      "shipsBuilt": 171,
+      "shipsLost": 84,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 571,
+        "ice": 159,
+        "crystal": 84
+      },
+      "shippedSharePct": 27,
+      "tickMsP50": 0.0021999999989930075,
+      "tickMsP95": 0.003800000000410364,
+      "finalHash": "0812debd"
+    },
+    {
+      "strategy": "no-research",
+      "seed": 1,
+      "outcome": "won",
+      "playTicks": 121998,
+      "ticks": 122013,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 332,
+          "playTicks": 18538,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 18873,
+          "playTicks": 20787,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "shoal",
+          "startTick": 39663,
+          "playTicks": 16647,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 16,
+          "shipsLost": 6
+        },
+        {
+          "area": "garden",
+          "startTick": 56312,
+          "playTicks": 25918,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 38,
+          "shipsLost": 20
+        },
+        {
+          "area": "deep",
+          "startTick": 82232,
+          "playTicks": 39778,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 68,
+          "shipsLost": 47
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "shoal",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 18872,
+          "playTicks": 18868
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 39662,
+          "playTicks": 39655
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 122012,
+          "playTicks": 121998
+        }
+      ],
+      "shipsBuilt": 172,
+      "shipsLost": 92,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 890,
+        "ice": 251,
+        "crystal": 139
+      },
+      "shippedSharePct": 37,
+      "tickMsP50": 0.0020999999997002305,
+      "tickMsP95": 0.0036000000000058208,
+      "finalHash": "28b8d579"
+    },
+    {
+      "strategy": "no-research",
+      "seed": 2,
+      "outcome": "won",
+      "playTicks": 118278,
+      "ticks": 118293,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 332,
+          "playTicks": 18538,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 18873,
+          "playTicks": 20787,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "shoal",
+          "startTick": 39663,
+          "playTicks": 16647,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 16,
+          "shipsLost": 6
+        },
+        {
+          "area": "garden",
+          "startTick": 56312,
+          "playTicks": 25918,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 38,
+          "shipsLost": 20
+        },
+        {
+          "area": "deep",
+          "startTick": 82232,
+          "playTicks": 36058,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 61,
+          "shipsLost": 39
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "shoal",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 18872,
+          "playTicks": 18868
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 39662,
+          "playTicks": 39655
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 118292,
+          "playTicks": 118278
+        }
+      ],
+      "shipsBuilt": 165,
+      "shipsLost": 84,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 849,
+        "ice": 241,
+        "crystal": 128
+      },
+      "shippedSharePct": 36,
+      "tickMsP50": 0.00210000000151922,
+      "tickMsP95": 0.0036000000000058208,
+      "finalHash": "93ede3af"
+    },
+    {
+      "strategy": "no-research",
+      "seed": 3,
+      "outcome": "won",
+      "playTicks": 118458,
+      "ticks": 118473,
+      "visits": [
+        {
+          "area": "landfall",
+          "startTick": 0,
+          "playTicks": 330,
+          "result": "reclaimed",
+          "openingTicks": null,
+          "shipsBuilt": 2,
+          "shipsLost": 0
+        },
+        {
+          "area": "shelf",
+          "startTick": 332,
+          "playTicks": 18538,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 23,
+          "shipsLost": 5
+        },
+        {
+          "area": "veil",
+          "startTick": 18873,
+          "playTicks": 20787,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 25,
+          "shipsLost": 14
+        },
+        {
+          "area": "shoal",
+          "startTick": 39663,
+          "playTicks": 16647,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 16,
+          "shipsLost": 6
+        },
+        {
+          "area": "garden",
+          "startTick": 56312,
+          "playTicks": 25918,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 38,
+          "shipsLost": 20
+        },
+        {
+          "area": "deep",
+          "startTick": 82232,
+          "playTicks": 36238,
+          "result": "reclaimed",
+          "openingTicks": 6873,
+          "shipsBuilt": 64,
+          "shipsLost": 43
+        }
+      ],
+      "reclaimOrder": [
+        "landfall",
+        "shelf",
+        "veil",
+        "shoal",
+        "garden",
+        "deep"
+      ],
+      "skipped": [],
+      "entries": {
+        "landfall": 1,
+        "shelf": 1,
+        "shoal": 1,
+        "veil": 1,
+        "garden": 1,
+        "deep": 1
+      },
+      "withdrawals": {
+        "landfall": 0,
+        "shelf": 0,
+        "shoal": 0,
+        "veil": 0,
+        "garden": 0,
+        "deep": 0
+      },
+      "research": [
+        {
+          "item": "flak",
+          "level": 1,
+          "tick": 18872,
+          "playTicks": 18868
+        },
+        {
+          "item": "lancer",
+          "level": 1,
+          "tick": 39662,
+          "playTicks": 39655
+        },
+        {
+          "item": "core",
+          "level": 1,
+          "tick": 118472,
+          "playTicks": 118458
+        }
+      ],
+      "shipsBuilt": 168,
+      "shipsLost": 88,
+      "hauled": {
+        "ore": 1680,
+        "ice": 240,
+        "crystal": 240
+      },
+      "shipped": {
+        "ore": 851,
+        "ice": 241,
+        "crystal": 129
+      },
+      "shippedSharePct": 36,
+      "tickMsP50": 0.00210000000151922,
+      "tickMsP95": 0.003700000001117587,
+      "finalHash": "5cdbf634"
+    }
+  ]
+}

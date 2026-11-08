@@ -447,3 +447,14 @@ The H4 sim (DESIGN.md "H4 … Reclaim ladder"). Choices a reviewer might questio
 ## 2026-11-08 · Core Engineer · h4-bots round 2 fix: correction to the shipped-data runner tests line
 
 Correction to the h4-bots entry above ("Runner tests on shipped data … every strategy wins on 3 seeds with no crash"): crash and softlock on shipped data, for every strategy and seed, are covered by the `bots` gate (it plays all 15 campaigns and fails on either), not by a unit test. The 15-campaign unit test took about 16 s against the 30 s per-test limit and grew with run length, which h4-design-data will stretch (Critic round 2). The remaining shipped-data runner tests (determinism, value-free report shape) stop after a fixed 10 game minutes of play, so a retune can't lengthen them; "runs every seed as its own game" moved to the frozen fixture.
+
+## 2026-11-08 · Designer · h4-design-data: H4 calibration (data v6, values only)
+
+All seven H4 bot flags now hold. Before: `reports/archive/h4-bots-data-v6.md`. After: `reports/archive/h4-design-data-v6.md`. The full table is in DESIGN.md, "Calibration result (h4-design-data, data v6)". Only `map.areas` values changed: no rules, research costs or tunables, and no `dataVersion` bump.
+
+- **Cross-hauls of 40 rather than an earlier design.** The ice side lost because it reached The Deep without Lancers (Deep 22:27–25:32 against 14:01–15:05). Raising Spore Veil's crystal haul to 40, and Thorn Garden's ice haul to match, lets each side buy the other design after its medium. Cheaper designs were the other lever, but that would also have made the first light area's design trivially affordable everywhere. The cross-haul keeps "your side's resource buys your side's design first".
+- **Spore Veil's heart is nearly all Spores (1/50).** Flag 4 needed Flak to beat Lancer there by 20%. With 3 Thorns the Lancer-only run kept up (15%). It's now 44%, and the tag reads Flak Strong (189), so the overworld sheet tells the same story.
+- **Run length came from the early ore hauls, not from guards.** Heavier medium guards moved the bot times by under a minute, because the bots are economy-bound there. A heavier Frost Shelf heart (3/12) pushed it past its band. Smaller Landfall and light-area ore hauls delay the early grind and lengthened every early area. The Deep's ore haul rose so that total ore still covers total research.
+- **Left alone:** The Deep (the H3 layouts unchanged, Glass Thicket at 16:50) and the research costs. The thin margins (best run 45.8 min on seeds 2 and 3) are recorded, not padded.
+- **Side effect to watch:** no bot skips an area now, because the bot policy buys both Fast yards levels before the core. A player can still skip one by going light on Fast yards. DESIGN.md "Why these areas" says so.
+- **Doc fixes from the h4-sim Critic:** research has 13 levels, not 14, and the save grows by about 1.7 KB (capped at 2 KB by a test), not "under 1 KB".
