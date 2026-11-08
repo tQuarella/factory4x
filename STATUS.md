@@ -23,12 +23,15 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r4 | critic | h2-bots | resume | Stalled 600 s waiting on background gates; told to run in foreground |
 | r5 | engineer | h2-client | resume | Stalled 600 s at "Now tests"; told to WIP-commit and continue with time limits |
 | 9 | critic | h2-client | launch | Review round 1 |
+| r6 | critic | h2-client | resume | Stalled 600 s; resumed |
+
+Stall cause (owner, 2026-11-07): the stalls in r4, r5 and r6 came from this computer losing its network connection or going to sleep, not from agent behaviour. The retro should not change agent prompts because of them.
 | 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
 | 4 | critic | h2-art | launch | Review round 1: REJECT (vine/rock contrast, glow bounds, palette table) |
 | r1 | art-direction | h2-art | resume | Fix round 1 (77e159d) |
 | r2 | critic | h2-art | resume | Review round 2: APPROVE; merged 6176e1f after green branch CI. Critic saw one flaky `test` gate run (28.5 s, passed on rerun) |
 
-Launches: 9 / 12. Resumes: 5.
+Launches: 9 / 12. Resumes: 6.
 
 ## Iteration 1 (H1) plan, closed
 
