@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { createWorld, guardianStatus, isValidInput, step, type World } from '@factory4x/sim';
+import { guardianStatus, isValidInput, step, type World } from '@factory4x/sim';
+// H4: an H3 game is The Deep from a constructed campaign (createWorld starts on the overworld).
+import { h3World } from '../../sim/test/h3-world.ts';
 // The frozen v4 test fixture: these tests pin the shared rules' numbers (need, power, thresholds), so they don't move with calibration.
 import { fixtureData as data } from '../../sim/test/fixture.ts';
 import { firstDoor, fleetPower, guardNeed, nextEconomyOrder, nextTarget, nodeFinished, readyToAttack, strategies } from '../src/strategies.ts';
 
 const N = { probe: 0, a1: 1, a2: 2, a3: 3, a4: 4, a5: 5, p1: 10, p2: 11, p3: 12, p4: 13, root: 14, heart: 15 } as const;
 /** Seed 0 is Frost Gate. */
-const fresh = (): World => createWorld(0, data);
+const fresh = (): World => h3World(0, data);
 const by = (name: string) => strategies.find((s) => s.name === name)!;
 
 describe('economy planner', () => {
@@ -58,7 +60,7 @@ describe('H3 strategies', () => {
 
   it('firstDoor is the light pocket with that prize in every layout, and null once it is dead', () => {
     for (let seed = 0; seed < 3; seed++) {
-      const w = createWorld(seed, data);
+      const w = h3World(seed, data);
       for (const prize of ['ice', 'crystal'] as const) {
         const n = firstDoor(w, prize)!;
         expect(w.nodes[n]!.kind).toBe('pocket');
@@ -117,7 +119,7 @@ describe('H3 strategies', () => {
 describe('first door', () => {
   /** Run until the first guarded node is captured; return that node's prize. */
   function firstCapturePrize(name: string, seed: number): string | null {
-    const w = createWorld(seed, data);
+    const w = h3World(seed, data);
     for (let i = 0; i < 30 * 60 * 14 && w.stats.captures.length === 0; i++) step(w, data, by(name).decide(w));
     const c = w.stats.captures[0];
     return c ? (w.nodes[c.node]!.prize ?? null) : null;
@@ -131,7 +133,7 @@ describe('first door', () => {
   });
 
   it('runs flak only once ice has arrived and lancers only once crystal has', () => {
-    const w = createWorld(0, data);
+    const w = h3World(0, data);
     for (let i = 0; i < 30 * 60 * 12; i++) {
       step(w, data, by('ice-first').decide(w));
       const f = w.stats.firstDeliveredTick;

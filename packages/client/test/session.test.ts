@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { SEND_ALL, createWorld, defaultData, lastBattle, replayHashes, rootIndex, shipCounts, step, worldHash, type BattleResult, type Input, type World } from '@factory4x/sim';
-import { Session, dataWithDefaults, replayData } from '../src/session.ts';
+import { SEND_ALL, campaignWorld, defaultData, lastBattle, replayHashes, rootIndex, shipCounts, step, worldHash, type BattleResult, type Input, type World } from '@factory4x/sim';
+import { INTERIM_START, Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
 import { bannerLines, battleReport, feedsBloomText, regrowChange, regrowText, repelHint, supplyLine, unlockHint, unlockNotice } from '../src/report.ts';
@@ -12,6 +12,11 @@ import { fitMap } from '../src/fit.ts';
 import { podTotalTicks, progressFrac } from '../src/interp.ts';
 // The frozen v4 test fixture: tests that pin rule outcomes (guard counts, wilt text) run on it, so calibration doesn't break them.
 import { fixtureData } from '../../sim/test/fixture.ts';
+// H4: createWorld starts on the overworld; an H3 game is The Deep from a constructed campaign.
+import { h3World } from '../../sim/test/h3-world.ts';
+
+/** The interim start's two logged inputs (lancer and flak yards off; see INTERIM_START in session.ts). */
+const INTERIM_INPUTS = 2;
 
 function mem(): StorageLike & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -60,7 +65,7 @@ describe('session replay log', () => {
     s.paused = true;
     s.send({ type: 'buildExtractor', node: 1 });
     expect(s.world.tick).toBe(1);
-    expect(s.log).toEqual([{ tick: 0, input: { type: 'buildExtractor', node: 1 } }]);
+    expect(s.log.slice(INTERIM_INPUTS)).toEqual([{ tick: 0, input: { type: 'buildExtractor', node: 1 } }]);
     expect(s.advance(1000)).toBe(0);
   });
 
@@ -139,7 +144,7 @@ describe('one press, one tick (sendAll)', () => {
       ]),
     ).toBe(2);
     expect(s.world.tick).toBe(1);
-    expect(s.log.map((l) => l.tick)).toEqual([0, 0]);
+    expect(s.log.slice(INTERIM_INPUTS).map((l) => l.tick)).toEqual([0, 0]);
     expect(replayMatches(s)).toBe(true);
   });
 });
@@ -281,7 +286,7 @@ describe('helpers', () => {
   });
 
   it('a pocket capture names its prize, and the unlock only until that prize has been delivered', () => {
-    const w = createWorld(3, defaultData);
+    const w = campaignWorld(3, defaultData, INTERIM_START);
     const pockets = w.nodes.filter((n) => n.kind === 'pocket');
     const ice = pockets.find((n) => n.prize === 'ice')!;
     const text = battleReport(w, result({ node: ice.index, outcome: 'captured', shipsEngaged: 12, shipsLost: 3, guardsKilled: 9 }));
@@ -357,7 +362,7 @@ function ship(w: World, node: number, n: number): void {
 
 /** Seed 3 is Frost Gate; on the v4 fixture: Root 6 Thorns, heart 10/14, starved 6/7. Nothing happens unless a test sets it up. */
 function idleWorld(): World {
-  const w = createWorld(3, fixtureData);
+  const w = h3World(3, fixtureData);
   w.stock.ore = 0;
   w.yards.drone.on = false;
   w.tun['economy.probeOrePerMin'] = 0;

@@ -1,5 +1,18 @@
 import { performance } from 'node:perf_hooks';
-import { createWorld, lastBattle, runSummary, type RunSummary, step, throughputPerMin, worldHash, type BattleOutcome, type RawResource, type ShipTypeCounts, type SimData } from '@factory4x/sim';
+import {
+  campaignWorld,
+  lastBattle,
+  runSummary,
+  step,
+  throughputPerMin,
+  worldHash,
+  type BattleOutcome,
+  type CampaignStart,
+  type RawResource,
+  type RunSummary,
+  type ShipTypeCounts,
+  type SimData,
+} from '@factory4x/sim';
 import type { Strategy } from './strategies.ts';
 
 /** won = the heart was captured; timeout = still uncaptured at the tick cap. */
@@ -64,8 +77,19 @@ function percentile(sorted: Float64Array, p: number): number {
 /** Softlock: this many game seconds without a route delivery or a ship built, before capture. */
 export const SOFTLOCK_SEC = 60 * 5;
 
+/**
+ * Interim bot gate (DESIGN.md H4, h4-sim; h4-bots replaces it with the campaign runner): every game starts
+ * from a campaign with every area but The Deep reclaimed and both designs bought, landed in The Deep at
+ * tick 0. That is an H3 game on the run's layout with the H4 opening (economy.startStock, no other research).
+ */
+export const INTERIM_DEEP_START: Readonly<CampaignStart> = Object.freeze({
+  reclaimed: ['landfall', 'shelf', 'shoal', 'veil', 'garden'],
+  research: { lancer: 1, flak: 1 },
+  land: 'deep',
+});
+
 export function runGame(strategy: Strategy, seed: number, data: SimData, maxTicks: number): GameResult {
-  const world = createWorld(seed, data);
+  const world = campaignWorld(seed, data, INTERIM_DEEP_START);
   const times = new Float64Array(maxTicks);
   let outcome: Outcome = 'timeout';
   let error: string | undefined;

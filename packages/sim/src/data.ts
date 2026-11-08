@@ -1,9 +1,10 @@
 /**
  * Data schema for data/sim.json: tunables (keyed by their dotted name, each
  * with default/min/max), the fixed 16-node map and the hand-made layouts
- * (DESIGN.md H3 "Counter web"). `parseSimData` validates a raw JSON value
- * against the schema, so bad data fails loudly at load time rather than as a
- * desync later.
+ * (DESIGN.md H3 "Counter web"), and the H4 overworld: areas (node subsets of
+ * the map with their own guards, haul and export), lanes and research.
+ * `parseSimData` validates a raw JSON value against the schema, so bad data
+ * fails loudly at load time rather than as a desync later.
  */
 
 /** Ship types, in display order. The sim iterates them only in the fixed orders below. */

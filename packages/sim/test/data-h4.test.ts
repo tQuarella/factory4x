@@ -44,7 +44,6 @@ function h4Table(from: string, until: string): string[][] {
     .map((l) => l.split('|').slice(1, -1).map((c) => c.trim()));
 }
 
-const triple = (cell: string): number[] => cell.split('/').map((x) => Number(x.trim()));
 const strip = (cell: string): string => cell.replace(/`/g, '');
 
 /** Areas in the row form of the DESIGN.md "Areas" table. */

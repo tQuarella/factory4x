@@ -2,9 +2,10 @@ import { RAW_RESOURCES, RESOURCES, SHIP_TYPES, SIM_TUNABLE_KEYS, YARD_ROTATION, 
 import type { World } from './world.ts';
 
 /**
- * Autosave format: a JSON envelope around the plain world. The world is
- * already plain data, so a save is exact: deserialize(serialize(w)) hashes
- * identically to w.
+ * Autosave format: a JSON envelope around the plain world (H4: the campaign
+ * included). The world is already plain data, so a save is exact:
+ * deserialize(serialize(w)) hashes identically to w. A save from another
+ * dataVersion (an H3 save is v5) is refused before any shape check.
  */
 
 const SAVE_FORMAT = 1;
