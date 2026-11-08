@@ -1,5 +1,5 @@
 {
-  "dataVersion": 4,
+  "dataVersion": 5,
   "tickRate": 30,
   "tunables": {
     "economy.startStock": { "default": 30, "min": 0, "max": 200 },
@@ -17,15 +17,15 @@
     "route.upgradeCostPerLevel": { "default": 20, "min": 5, "max": 100 },
     "route.maxLevel": { "default": 5, "min": 1, "max": 10 },
     "build.queueMax": { "default": 4, "min": 1, "max": 8 },
-    "ship.drone.cost": { "default": 15, "min": 5, "max": 60 },
+    "ship.drone.cost": { "default": 18, "min": 5, "max": 60 },
     "ship.drone.buildTicks": { "default": 90, "min": 15, "max": 900 },
     "ship.drone.hp": { "default": 10, "min": 1, "max": 100 },
     "ship.drone.damage": { "default": 2, "min": 1, "max": 20 },
-    "ship.lancer.cost": { "default": 15, "min": 5, "max": 60 },
+    "ship.lancer.cost": { "default": 18, "min": 5, "max": 60 },
     "ship.lancer.buildTicks": { "default": 120, "min": 15, "max": 900 },
     "ship.lancer.hp": { "default": 12, "min": 1, "max": 100 },
     "ship.lancer.damage": { "default": 4, "min": 1, "max": 20 },
-    "ship.flak.cost": { "default": 15, "min": 5, "max": 60 },
+    "ship.flak.cost": { "default": 18, "min": 5, "max": 60 },
     "ship.flak.buildTicks": { "default": 120, "min": 15, "max": 900 },
     "ship.flak.hp": { "default": 12, "min": 1, "max": 100 },
     "ship.flak.damage": { "default": 4, "min": 1, "max": 20 },
@@ -44,7 +44,7 @@
     "bloom.starvedRegrowMul": { "default": 5, "min": 1, "max": 30 },
     "bloom.starvedRepairPerRound": { "default": 0, "min": 0, "max": 20 },
     "combat.roundTicks": { "default": 30, "min": 10, "max": 90 },
-    "pocket.resourcePerMin": { "default": 6, "min": 1, "max": 40 },
+    "pocket.resourcePerMin": { "default": 12, "min": 1, "max": 40 },
     "pocket.freeExtractors": { "default": 1, "min": 0, "max": 3 },
     "heart.orePerMin": { "default": 25, "min": 10, "max": 80 },
     "heart.freeExtractors": { "default": 1, "min": 0, "max": 4 },
@@ -82,37 +82,37 @@
         "id": "frost",
         "name": "Frost Gate",
         "pockets": {
-          "p1": { "prize": "ice", "slots": 2, "thorns": 1, "spores": 8 },
-          "p2": { "prize": "crystal", "slots": 2, "thorns": 3, "spores": 3 },
-          "p3": { "prize": "ice", "slots": 3, "thorns": 9, "spores": 4 },
-          "p4": { "prize": "crystal", "slots": 3, "thorns": 2, "spores": 18 }
+          "p1": { "prize": "ice", "slots": 2, "thorns": 2, "spores": 21 },
+          "p2": { "prize": "crystal", "slots": 2, "thorns": 6, "spores": 6 },
+          "p3": { "prize": "ice", "slots": 3, "thorns": 18, "spores": 8 },
+          "p4": { "prize": "crystal", "slots": 3, "thorns": 4, "spores": 37 }
         },
-        "root": { "thorns": 6, "spores": 0 },
-        "heart": { "thorns": 10, "spores": 14, "starvedThorns": 6, "starvedSpores": 7 }
+        "root": { "thorns": 0, "spores": 25 },
+        "heart": { "thorns": 23, "spores": 27, "starvedThorns": 12, "starvedSpores": 14 }
       },
       {
         "id": "glass",
         "name": "Glass Thicket",
         "pockets": {
-          "p1": { "prize": "crystal", "slots": 2, "thorns": 1, "spores": 8 },
-          "p2": { "prize": "ice", "slots": 2, "thorns": 3, "spores": 3 },
-          "p3": { "prize": "ice", "slots": 3, "thorns": 2, "spores": 18 },
-          "p4": { "prize": "crystal", "slots": 3, "thorns": 9, "spores": 4 }
+          "p1": { "prize": "crystal", "slots": 2, "thorns": 2, "spores": 21 },
+          "p2": { "prize": "ice", "slots": 2, "thorns": 8, "spores": 6 },
+          "p3": { "prize": "ice", "slots": 3, "thorns": 4, "spores": 37 },
+          "p4": { "prize": "crystal", "slots": 3, "thorns": 18, "spores": 8 }
         },
-        "root": { "thorns": 0, "spores": 12 },
-        "heart": { "thorns": 14, "spores": 8, "starvedThorns": 8, "starvedSpores": 4 }
+        "root": { "thorns": 12, "spores": 0 },
+        "heart": { "thorns": 29, "spores": 16, "starvedThorns": 16, "starvedSpores": 8 }
       },
       {
         "id": "twin",
         "name": "Twin Seams",
         "pockets": {
-          "p1": { "prize": "ice", "slots": 2, "thorns": 2, "spores": 5 },
-          "p2": { "prize": "crystal", "slots": 2, "thorns": 2, "spores": 5 },
-          "p3": { "prize": "crystal", "slots": 3, "thorns": 2, "spores": 18 },
-          "p4": { "prize": "ice", "slots": 3, "thorns": 9, "spores": 4 }
+          "p1": { "prize": "ice", "slots": 2, "thorns": 4, "spores": 10 },
+          "p2": { "prize": "crystal", "slots": 2, "thorns": 4, "spores": 10 },
+          "p3": { "prize": "crystal", "slots": 3, "thorns": 4, "spores": 37 },
+          "p4": { "prize": "ice", "slots": 3, "thorns": 18, "spores": 8 }
         },
-        "root": { "thorns": 3, "spores": 6 },
-        "heart": { "thorns": 6, "spores": 20, "starvedThorns": 4, "starvedSpores": 10 }
+        "root": { "thorns": 6, "spores": 12 },
+        "heart": { "thorns": 12, "spores": 42, "starvedThorns": 8, "starvedSpores": 21 }
       }
     ]
   }
