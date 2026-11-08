@@ -9,29 +9,29 @@ import { strategies, type CampaignStrategy } from '../src/strategies.ts';
 const VISIT_CAP = 54000;
 const by = (name: string): CampaignStrategy => strategies.find((s) => s.name === name)!;
 const fxOpts = defaultRunOptions(fx, VISIT_CAP);
-const shippedOpts = defaultRunOptions(defaultData, VISIT_CAP);
+/**
+ * Shipped-data runs stop after a fixed 10 game minutes of play, so their runtime can't grow when a retune
+ * lengthens the campaign (h4-bots round 2). Whole shipped campaigns are played by the `bots` gate.
+ */
+const SHIPPED_PLAY_CAP = 10 * 60 * defaultData.tickRate;
+const shippedOpts = { ...defaultRunOptions(defaultData, VISIT_CAP), campaignCapTicks: SHIPPED_PLAY_CAP };
 
+// Crash and softlock on shipped data, for every strategy and seed, are covered by the `bots` gate (it plays all 15
+// campaigns and fails on either), not by a unit test: a 15-campaign test here took ~16 s and grew with run length.
 describe('campaign runner (shipped data: only what any calibration must keep)', () => {
-  it('every strategy buys the probe core on every seed, with no crash or softlock', () => {
-    for (const s of strategies) {
-      for (const r of runSeeds(s, 3, defaultData, VISIT_CAP)) {
-        expect(r.outcome, `${s.name} seed ${r.seed}`).toBe('won');
-        expect(r.error).toBeUndefined();
-        expect(r.playTicks).toBeLessThanOrEqual(CAMPAIGN_CAP_MIN * 60 * defaultData.tickRate);
-      }
-    }
-  });
-
   it('is deterministic: the same seed and strategy end on the same hash, other seeds differ', () => {
     const a = runCampaign(by('greedy'), 1, defaultData, shippedOpts);
     expect(runCampaign(by('greedy'), 1, defaultData, shippedOpts).finalHash).toBe(a.finalHash);
     expect(runCampaign(by('greedy'), 2, defaultData, shippedOpts).finalHash).not.toBe(a.finalHash);
   });
 
-  it('fills the report shape without depending on values', () => {
+  it('fills the report shape without depending on values (first 10 game minutes)', () => {
     const r = runCampaign(by('full-kit'), 1, defaultData, shippedOpts);
+    expect(r.error).toBeUndefined();
+    expect(r.playTicks).toBeLessThanOrEqual(SHIPPED_PLAY_CAP);
     expect(r.visits.length).toBeGreaterThan(0);
-    expect(r.research.length).toBeGreaterThan(0);
+    expect(Array.isArray(r.research)).toBe(true);
+    // Landfall is undefended: reclaimed within the first 10 minutes under any calibration.
     expect(r.reclaimOrder.length).toBeGreaterThan(0);
     expect(r.shippedSharePct).toBeGreaterThanOrEqual(0);
     expect(r.shippedSharePct).toBeLessThanOrEqual(100);
@@ -40,12 +40,15 @@ describe('campaign runner (shipped data: only what any calibration must keep)', 
     expect(r.ticks).toBeGreaterThan(r.playTicks);
   });
 
-  it('runs every seed as its own game', () => {
-    expect(runSeeds(by('greedy'), 2, defaultData, VISIT_CAP).map((r) => r.seed)).toEqual([1, 2]);
-  });
 });
 
 describe('campaign runner (frozen fixture)', () => {
+  it('runs every seed as its own game', () => {
+    const rs = runSeeds(by('greedy'), 2, fx, VISIT_CAP);
+    expect(rs.map((r) => r.seed)).toEqual([1, 2]);
+    expect(rs[0]!.finalHash).not.toBe(rs[1]!.finalHash);
+  });
+
   it('plays a whole campaign to the probe core and fills every report field', () => {
     const r = runCampaign(by('full-kit'), 1, fx, fxOpts);
     expect(r.outcome).toBe('won');
