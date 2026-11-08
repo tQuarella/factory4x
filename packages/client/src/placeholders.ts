@@ -158,17 +158,289 @@ export function drawThorn(ctx: Ctx, r: number, t: number, hpFrac: number): void 
   ctx.restore();
 }
 
-export function drawShip(ctx: Ctx, r: number, heading: number): void {
+export type ShipType = 'drone' | 'lancer' | 'flak';
+export type ResourceKind = 'ore' | 'ice' | 'crystal' | 'lens' | 'plating';
+
+/**
+ * Player ship, facing right and rotated by `heading` (radians; H1/H2 callers
+ * pass only r and heading, which still works). The three types differ by shape:
+ * drone = small arrowhead, lancer = long thin needle with a bright tip, flak =
+ * short wide block with a ring. Stays within r.
+ */
+export function drawShip(ctx: Ctx, r: number, heading: number, type: ShipType = 'drone'): void {
   ctx.save();
   ctx.rotate(heading);
-  ctx.beginPath();
-  ctx.moveTo(r, 0);
-  ctx.lineTo(-r * 0.7, r * 0.6);
-  ctx.lineTo(-r * 0.4, 0);
-  ctx.lineTo(-r * 0.7, -r * 0.6);
-  ctx.closePath();
   ctx.fillStyle = palette.ship;
+  ctx.beginPath();
+  if (type === 'lancer') {
+    ctx.moveTo(r, 0);
+    ctx.lineTo(r * 0.4, r * 0.12);
+    ctx.lineTo(-r * 0.55, r * 0.14);
+    ctx.lineTo(-r, r * 0.42);
+    ctx.lineTo(-r * 0.8, 0);
+    ctx.lineTo(-r, -r * 0.42);
+    ctx.lineTo(-r * 0.55, -r * 0.14);
+    ctx.lineTo(r * 0.4, -r * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = palette.starBright;
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(r * 0.5, r * 0.11);
+    ctx.lineTo(r * 0.5, -r * 0.11);
+    ctx.closePath();
+    ctx.fill();
+  } else if (type === 'flak') {
+    ctx.moveTo(r * 0.55, -r * 0.45);
+    ctx.lineTo(r * 0.7, -r * 0.2);
+    ctx.lineTo(r * 0.7, r * 0.2);
+    ctx.lineTo(r * 0.55, r * 0.45);
+    ctx.lineTo(-r * 0.6, r * 0.9);
+    ctx.lineTo(-r * 0.8, r * 0.9);
+    ctx.lineTo(-r * 0.8, -r * 0.9);
+    ctx.lineTo(-r * 0.6, -r * 0.9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = palette.space;
+    ctx.lineWidth = Math.max(1.5, r * 0.15);
+    disc(ctx, 0, 0, r * 0.38);
+    ctx.stroke();
+    ctx.fillStyle = palette.starBright;
+    disc(ctx, 0, 0, r * 0.14);
+    ctx.fill();
+  } else {
+    const k = 0.85;
+    ctx.moveTo(r * k, 0);
+    ctx.lineTo(-r * 0.7 * k, r * 0.6 * k);
+    ctx.lineTo(-r * 0.4 * k, 0);
+    ctx.lineTo(-r * 0.7 * k, -r * 0.6 * k);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * Spore: a small round puff with a dotted halo (Thorns are spikes, Spores are
+ * round). hpFrac 0..1 shrinks and dims the body. Stays within r.
+ */
+export function drawSpore(ctx: Ctx, r: number, t: number, hpFrac: number): void {
+  const f = Math.min(1, Math.max(0, hpFrac));
+  ctx.save();
+  ctx.globalAlpha = 0.55 + 0.45 * f;
+  const body = r * (0.38 + 0.27 * f) * (1 + 0.04 * Math.sin(t * 3));
+  ctx.fillStyle = palette.sporeGlow;
+  disc(ctx, 0, 0, r * 0.82);
   ctx.fill();
+  ctx.fillStyle = palette.spore;
+  const dots = 8;
+  const dr = Math.max(1, r * 0.1);
+  for (let i = 0; i < dots; i++) {
+    const a = t * 0.6 + (i / dots) * Math.PI * 2;
+    disc(ctx, Math.cos(a) * (r - dr), Math.sin(a) * (r - dr), dr);
+    ctx.fill();
+  }
+  disc(ctx, 0, 0, body);
+  ctx.fill();
+  ctx.fillStyle = palette.starBright;
+  ctx.globalAlpha *= 0.8;
+  disc(ctx, -body * 0.25, -body * 0.25, body * 0.28);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Guard ring: two arcs around a guarded node, Thorn colour then Spore colour,
+ * each a fraction of the full circle (shares are of full strength, so the ring
+ * shrinks as guards die; if they sum past 1 they are scaled to fit). Drawn
+ * inside radius r (outer edge at r). Starts at 12 o'clock.
+ */
+export function drawGuardRing(ctx: Ctx, r: number, thornShare: number, sporeShare: number, t: number): void {
+  const th = Math.max(0, thornShare);
+  const sp = Math.max(0, sporeShare);
+  const sum = th + sp;
+  if (sum <= 0) return;
+  const scale = sum > 1 ? 1 / sum : 1;
+  const w = Math.max(2.5, r * 0.16);
+  const rad = r - w / 2;
+  const full = Math.PI * 2;
+  const gap = th > 0 && sp > 0 && sum * scale < 0.95 ? 0.12 : 0;
+  const start = -Math.PI / 2 + Math.sin(t * 0.8) * 0.05;
+  ctx.save();
+  ctx.lineWidth = w;
+  ctx.lineCap = 'butt';
+  let a = start;
+  const arc = (share: number, color: string): void => {
+    const len = Math.max(0, share * scale * full - gap);
+    if (len > 0) {
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, rad, a + gap / 2, a + gap / 2 + len);
+      ctx.stroke();
+    }
+    a += share * scale * full;
+  };
+  arc(th, palette.thorn);
+  arc(sp, palette.spore);
+  ctx.restore();
+}
+
+/**
+ * Resource and component icon, centered, within radius r. Shapes differ so
+ * they read in greyscale: ore = faceted chunk (teal), ice = six-spoke flake
+ * (pale cyan), crystal = tall faceted shard (violet), lens = ring with a dot,
+ * plating = stack of three plates.
+ */
+export function drawResourceIcon(ctx: Ctx, r: number, kind: ResourceKind): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (kind === 'ore') {
+    ctx.fillStyle = palette.asteroidOre;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.85, -r * 0.1);
+    ctx.lineTo(-r * 0.3, -r * 0.8);
+    ctx.lineTo(r * 0.55, -r * 0.65);
+    ctx.lineTo(r * 0.9, r * 0.15);
+    ctx.lineTo(r * 0.3, r * 0.8);
+    ctx.lineTo(-r * 0.6, r * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = palette.space;
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.55, -r * 0.65);
+    ctx.lineTo(r * 0.9, r * 0.15);
+    ctx.lineTo(r * 0.3, r * 0.8);
+    ctx.lineTo(r * 0.05, r * 0.05);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === 'ice') {
+    ctx.strokeStyle = palette.ice;
+    ctx.lineWidth = Math.max(1.5, r * 0.2);
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI;
+      ctx.moveTo(Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95);
+      ctx.lineTo(-Math.cos(a) * r * 0.95, -Math.sin(a) * r * 0.95);
+    }
+    ctx.stroke();
+    ctx.lineWidth = Math.max(1, r * 0.13);
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const bx = Math.cos(a) * r * 0.6;
+      const by = Math.sin(a) * r * 0.6;
+      for (const s of [-1, 1]) {
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx + Math.cos(a + s * 0.9) * r * 0.3, by + Math.sin(a + s * 0.9) * r * 0.3);
+      }
+    }
+    ctx.stroke();
+    ctx.fillStyle = palette.ice;
+    polygon(ctx, 6, r * 0.28, 0);
+    ctx.fill();
+  } else if (kind === 'crystal') {
+    ctx.fillStyle = palette.crystal;
+    ctx.beginPath();
+    ctx.moveTo(0, -r);
+    ctx.lineTo(r * 0.55, -r * 0.35);
+    ctx.lineTo(r * 0.4, r * 0.75);
+    ctx.lineTo(0, r);
+    ctx.lineTo(-r * 0.4, r * 0.75);
+    ctx.lineTo(-r * 0.55, -r * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = palette.starBright;
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.moveTo(0, -r);
+    ctx.lineTo(r * 0.55, -r * 0.35);
+    ctx.lineTo(0, -r * 0.2);
+    ctx.lineTo(-r * 0.55, -r * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = palette.space;
+    ctx.lineWidth = Math.max(1, r * 0.09);
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.2);
+    ctx.lineTo(0, r);
+    ctx.stroke();
+  } else if (kind === 'lens') {
+    ctx.strokeStyle = palette.starBright;
+    ctx.lineWidth = Math.max(1.5, r * 0.24);
+    disc(ctx, 0, 0, r * 0.76);
+    ctx.stroke();
+    ctx.fillStyle = palette.starBright;
+    disc(ctx, 0, 0, r * 0.26);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = palette.plating;
+    const h = r * 0.36;
+    for (let i = 0; i < 3; i++) {
+      const y = -r * 0.9 + i * r * 0.64;
+      const inset = i === 1 ? 0 : r * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.9 + inset, y + h);
+      ctx.lineTo(-r * 0.6 + inset, y);
+      ctx.lineTo(r * 0.9 - inset, y);
+      ctx.lineTo(r * 0.6 - inset, y + h);
+      ctx.closePath();
+      ctx.globalAlpha = i === 2 ? 1 : 0.85;
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Pocket: a small guarded (or captured) rock. Alive: dark rock with an edge
+ * and three pink pointed fronds sprouting from the rim (not a round coral,
+ * smaller than the heart), prize icon in the centre. Captured: grey rock with
+ * the prize icon, no fronds and no glow. Stays within r.
+ */
+export function drawPocket(ctx: Ctx, r: number, t: number, alive: boolean, prize: ResourceKind = 'ore'): void {
+  ctx.save();
+  const rock = r * 0.74;
+  if (alive) {
+    const sway = Math.sin(t * 1.8) * 0.08;
+    ctx.fillStyle = palette.bloomGlow;
+    disc(ctx, 0, 0, r * 0.95);
+    ctx.fill();
+    rockPath(ctx, rock, 4, 9, 0.85);
+    ctx.fillStyle = palette.rootRock;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.07);
+    ctx.strokeStyle = palette.rootRockEdge;
+    ctx.stroke();
+    ctx.fillStyle = palette.bloom;
+    for (let i = 0; i < 3; i++) {
+      const a = -Math.PI / 2 + (i - 1) * 1.55 + sway;
+      ctx.save();
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.moveTo(rock * 0.55, -r * 0.2);
+      ctx.quadraticCurveTo(r * 0.82, -r * 0.2, r * 0.98, 0);
+      ctx.quadraticCurveTo(r * 0.82, r * 0.2, rock * 0.55, r * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = palette.space;
+    ctx.globalAlpha = 0.55;
+    disc(ctx, 0, 0, r * 0.46);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  } else {
+    rockPath(ctx, rock, 4, 9, 0.85);
+    ctx.fillStyle = palette.withered;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.06);
+    ctx.strokeStyle = palette.witheredDark;
+    ctx.stroke();
+  }
+  drawResourceIcon(ctx, r * 0.4, prize);
   ctx.restore();
 }
 

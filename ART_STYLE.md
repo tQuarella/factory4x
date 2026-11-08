@@ -40,6 +40,11 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Root rock edge (5:1) | `#94788a` |
 | Vine (alive) | `#d93d78` |
 | Vine pulse | `#ffb3cc` |
+| Spore | `#e056d6` |
+| Spore glow | `rgba(224, 86, 214, 0.28)` |
+| Ice icon | `#bdf3ff` |
+| Crystal icon | `#b79cff` |
+| Plating icon | `#a8b3c7` |
 
 Contrast check: every entity color must read against `#05070d` at 4.5:1 or better.
 
@@ -85,5 +90,29 @@ Draw functions live in `packages/client/src/placeholders.ts`; `packages/client/g
 H2 palette additions: `rootRock` `#4a3a47` (the Root's rock fill; low contrast on purpose, always drawn with an edge), `rootRockEdge` `#94788a` (rock outline, 5:1 on space), `vine` `#d93d78` (vine line), `vinePulse` `#ffb3cc` (same as Bloom highlight; pulses). Cut states reuse `withered`. The Root and its glow stay within radius r in both states.
 
 Root vs Bloom: the Bloom is a round coral with a big glow; the Root is a tall, narrow, upright silhouette with a rock base. Never draw the Root round. The Root's draw is within radius r, with the stalk on the vertical axis (up is -y), so the renderer must not rotate it. The vine is drawn in world coordinates with an untranslated context.
+
+## H3 entities
+
+Counter-web content. Every draw is centred and stays within radius r. The gallery shows each at 24, 48 and 96 px at 375 px width, plus a 24 px strip in colour and in greyscale.
+
+| Entity | Draw | Look | 24 px read |
+| --- | --- | --- | --- |
+| Drone | `drawShip(ctx, r, heading, 'drone')` | the blue arrowhead at 0.85 scale | small chevron |
+| Lancer | `drawShip(..., 'lancer')` | long narrow blue needle, pale bright tip | thin line with a dot at the end |
+| Flak | `drawShip(..., 'flak')` | short wide blue block, dark ring and pale centre dot | chunky block |
+| Spore | `drawSpore(ctx, r, t, hpFrac)` | magenta round puff, pale highlight, ring of 8 dots orbiting at r; hp shrinks and dims it | round dotted disc, never spiky |
+| Guard ring | `drawGuardRing(ctx, r, thornShare, sporeShare, t)` | ring of width 0.16r (min 2.5 px), outer edge at r: Thorn `#ff5d73` arc then Spore `#e056d6` arc, each a share of the full circle (a sum over 1 is scaled to fit), from 12 o'clock | two-colour ring |
+| Pocket (alive) | `drawPocket(ctx, r, t, true, prize)` | dark rock with a pale edge, three pink pointed fronds, faint glow, prize icon on a dark centre; smaller than the heart | rock with pink spikes and a bright icon |
+| Pocket (captured) | `drawPocket(ctx, r, t, false, prize)` | grey rock with the prize icon, no fronds, no glow | grey rock with an icon |
+| Ore icon | `drawResourceIcon(ctx, r, 'ore')` | teal faceted chunk | teal chunk |
+| Ice icon | `'ice'` | pale cyan six-spoke flake | pale snowflake |
+| Crystal icon | `'crystal'` | violet tall faceted shard, pale top facet | violet diamond |
+| Lens icon | `'lens'` | pale ring with a centre dot | ring |
+| Plating icon | `'plating'` | three stacked steel-grey plates | stripes |
+
+Notes:
+- `drawShip`'s third argument is the heading in radians, as in H1 and H2, and the type defaults to `'drone'`, so old callers keep working. Ships are told apart by shape alone: chevron, needle, block.
+- Spore `#e056d6` is a magenta in the mob family (bluer and hotter than Thorn `#ff5d73` and Bloom `#ff4f8b`); it is not amber, teal or player blue. Ice and crystal are the cool family; the crystal violet is lighter and bluer than the Spore magenta.
+- New palette entries: `spore`, `sporeGlow`, `ice`, `crystal`, `plating`. Lens reuses `starBright`; ore reuses `asteroidOre`.
 
 Rules: pink glow and round coral mean the Bloom, spikes mean thorns (shape, not only color). Amber is reserved for the player's probe, rally flag and backed-up routes.
