@@ -17,10 +17,11 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 2 | engineer | fix-extract-rate (owner bug) | launch | Build (c7df834): display-only bug in nodeStatus/guardianStatus; bots now upgrade routes sooner, best run 43:35 (below H4's 45-min floor) |
 | 3 | critic | fix-extract-rate | launch | Review round 1: REJECT (heart total rounds to 124.8 not 125) |
 | r1 | engineer | fix-extract-rate | resume | Fix round 1 (369aaad) |
-| r2 | critic | fix-extract-rate | resume | Review round 2 |
-| r3 | designer | H5 spec (Fleet cap) | resume | Spec (resume of the triage Designer, per PROCESS) |
+| r2 | critic | fix-extract-rate | resume | Review round 2: APPROVE (be4a68d); main merged in, branch CI pending |
+| r3 | designer | H5 spec (Fleet cap) | resume | Spec done (b4830e7) |
+| 4 | art-direction | h5-art | launch | Build |
 
-Launches: 3 / 12. Resumes: 3.
+Launches: 4 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 3.
 
 ## Iteration 4 ledger
 
