@@ -30,6 +30,21 @@ Protected files changed this build: none. Every merge passed the protected-files
 
 ## Blocking
 
+### Q14. Two VISION.md edits for the asteroid-field direction (2026-11-07, Designer)
+
+Your Q13 answer (a long, persistent game with factories outside the probe) conflicts with two lines in VISION.md. Steelman and reasoning: DESIGN.md → "Owner direction 2026-11-07: the asteroid field (steelman)". The first build (H3) doesn't depend on these, so it can start either way. Approve, edit or reject each:
+
+1. Fixed decision. Replace
+   "- A roguelite campaign: each star system is one 20–40 minute run; the campaign spans many sessions."
+   with
+   "- Each star system is one long game, played across many short sessions and kept by autosave. It ends when you launch a new probe; then new game+ in a richer, harder system."
+2. Pillar 1. Replace
+   "1. **Throughput is the throttle.** Delivery rate to the probe gates everything else."
+   with
+   "1. **Throughput is the throttle.** The rate your network delivers resources to your factories and shipyards gates everything else."
+
+**Answer:**
+
 ### Q13. Which idea should the next build test? (2026-11-07, Designer)
 
 Your H2 feedback showed two problems. Every run is the same sequence (build the economy, then ships, then attack), and the trade-offs were too small to feel. Cutting the Root was the fun part. Pick one (details in DESIGN.md → "H3 candidates"):

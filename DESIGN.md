@@ -13,7 +13,7 @@ Answers from the owner, in their words where possible. These shape everything be
 
 | Topic | Direction |
 | --- | --- |
-| Shape | **Roguelite campaign.** Each star system is one run of **20–40 minutes**. The campaign of systems spans many sessions. "Shorter sessions but more capability each time." |
+| Shape | *(Run length superseded by the 2026-11-07 asteroid-field direction, pending QUESTIONS.md Q14.)* **Roguelite campaign.** Each star system is one run of **20–40 minutes**. The campaign of systems spans many sessions. "Shorter sessions but more capability each time." |
 | Carry-forward (NG+) | **Research** carries over, **probe design choices** set your next start, and each new system is **harder** (richer resources, tougher guardians). |
 | Ship control | **Orders to nodes.** Tap a node, assign a fleet to attack, guard or escort a route. Ships act on their own. No unit micro. |
 | Mobs | **Defend only.** They never come for you. |
@@ -33,6 +33,145 @@ Answers from the owner, in their words where possible. These shape everything be
 - **Saves:** the sim is deterministic, so a save can be a compact state snapshot (or seed + command log). Engineering picks; the requirement is that killing a phone tab loses at most a few seconds.
 - **Bots:** with no fail state, bot reports measure time-to-probe and throughput curves instead of win rate. Strategies to keep: rush (attack early), turtle (build economy, attack late), greedy expansion, raid-supply-first.
 
+## Owner direction 2026-11-07: the asteroid field (steelman)
+
+The owner's answer to Q13 (verbatim in QUESTIONS.md) asks for a more radical change, then says "Steelman this". It covers: a longer, persistent game across a large asteroid field; several resource types that combine into components; components that unlock new ship types; Bloom pockets across the field, with stronger Bloom over better resources; progression that feels varied, not a straight line; rock/paper/scissors between ship types and guard types; and deeper logistics (factories outside the probe, a maximum route distance, more). The H3 candidates below are superseded. A lives on as "most of the field is guarded", and B as "a prize is a new resource, not more ore".
+
+This section is the strongest version of that game, the tensions it raises, and the order in which to build it (Milestone 2). It is a direction, not a spec. Each H in the M2 plan gets its own spec when it comes up.
+
+### The pitch
+
+Your probe lands at the edge of a big asteroid field. Plain ore is free. Everything better sits in pockets guarded by the Bloom, and every pocket is guarded differently. The prize in a pocket is a new kind of resource, not just more ore. A new resource lets you make a new component, a component unlocks a new ship type, and each ship type is good against one kind of guard and bad against another. So every pocket you take changes which pockets you can take next. You spread across the field by building outposts, refineries and relays, because routes have a maximum length and components are made where their resources meet. The game is long and persistent, played in short sessions, and it ends when you have the components to launch a new probe.
+
+### The core loop
+
+1. **Scout** a pocket: see its prize and its guard mix.
+2. **Choose** a pocket that your current ship types can crack.
+3. **Build the supply** for that fleet: extract, route, refine, assemble.
+4. **Crack it**: send the right mix, or cut its Root first.
+5. **Connect the prize** to your network. The new resource opens a component, the component opens a ship type, and that ship type changes which pockets are cheap. Back to 1.
+
+H1 and H2 had one loop per run, and it ended at the only prize. Here the loop runs many times per game, and each pass changes what the next one offers. That is what attacks the "max economy, then ships, then attack" sequence: the economy can't be maxed without fighting, and you can't build the right fleet without the economy the last fight gave you.
+
+### The progression web (not a line)
+
+- **Resources by tier.**
+  - Tier 0, free: **ore**.
+  - Tier 1, in light pockets: **ice** and **crystal**.
+  - Tier 2, in heavy pockets: **sap** (taken from Bloom Roots) and **heavy metal**.
+  - The end goal is the **probe core**, which needs both tier 2 resources.
+- **Components are pairs of resources.** For example, plating = ore + ice, lenses = ore + crystal, and later cores from tier 2 pairs. Each ship type needs one component, so which resource you take first decides which ship you can build first.
+- **Why it's a web.**
+  - **Two doors per tier.** Each tier 1 resource sits in at least two pockets with different guard mixes. Each tier 2 pocket can be cracked by at least two fleet mixes, one of which can be built from either tier 1 branch.
+  - **Seeded fields.** The guard mix and position of each pocket are shuffled by the seed, so the cheap first door differs between games.
+  - **Scarcity.** You can't afford every ship type at once, so you specialise, and your specialisation decides which part of the field is cheap for you.
+
+### The counter triangle
+
+- **Ships.** Three ship types, each needing a different component, plus the basic **drone** (ore only), which is weak and neutral:
+  - **Lancer:** heavy single shots. It pierces Thorn armour but is swamped by Spores.
+  - **Flak:** area bursts. It clears Spore swarms but bounces off Thorn armour.
+  - **Warden:** shielded and slow. It outlasts Lash strikes but is ground down by Spores.
+- **Guards.** Three types:
+  - **Thorn:** few, armoured.
+  - **Spore:** many, fragile, fast to replace.
+  - **Lash:** hard-hitting, long reach.
+- **The rule.** Each ship type does about 2× damage against the guard it counters and ½× against the guard that counters it. Exact pairings and numbers are decided at spec time.
+- **Mixed pockets.** Pockets are mixed (for example 70% Thorn, 30% Spore), so the answer is a fleet mix, not one ship type. Guard factories regrow each type separately, and a Root can feed one type.
+- **Reading a pocket before you commit.**
+  - On the map, each pocket wears a ring split into the three guard colours by share. It reads at a glance, even zoomed out.
+  - The pocket's sheet lists guards by type with counts, and marks each of your ship types as *strong here*, *even* or *weak here*.
+  - There is still no "ships needed" number, because estimating is the puzzle. The counter tags make it an informed estimate.
+- **Sending a fleet.** You still pick a target and tap Attack. The send sheet has one +/− stepper per ship type, with "all" shortcuts, so choosing a mix stays a few taps and needs no micro.
+
+### The logistics layer ("where do I build")
+
+- **Factories outside the probe.**
+  - **Refineries and assemblers are built on asteroids**, each with a slot cost. A component is made where its inputs arrive.
+  - **Shipyards are buildings too.** They start at the probe; more can be built at outposts near the front.
+- **Maximum route length.** Routes can't be longer than `route.maxLengthSu`. To reach further you chain through nodes. Empty rocks (no ore, cheap) can hold a **relay**, so the field has a mesh of stepping stones and there are only a few ways to get far.
+- **Route capacity is shared.** A route carries every resource flowing along it, up to its level's capacity, so a busy trunk route becomes the bottleneck you upgrade or bypass. Routes are drawn by tapping two nodes, as now.
+- **Living pockets block routes.** No route may pass through a living pocket's radius. Pockets carve the field into regions, and cracking one opens new paths as well as its prize. That is a payoff you see on the map, not a time saving.
+- **Depots (optional, later).** A depot is a buffer node that smooths lumpy flows. It's useful but not needed for the first slices.
+- **The decision.**
+  - Put the assembler near the probe, and you need long routes for the rare input.
+  - Put it at the frontier, and you need a forward shipyard and relays.
+  - Both work, they cost different things, and the choice shows up on the map.
+
+### H2 lessons applied
+
+- **Choices must differ in what you get, not in minutes.**
+  - Picking a pocket picks a resource, a component and a ship type.
+  - Picking a factory site picks which region you can reach.
+  - Sending the wrong mix loses ships that took a scarce component to build. That loss is felt, because you can't rebuild them at once with ore.
+- **Readable trade-offs, no answer key.** The guard ring and counter tags make the choice informed. There is no ships-needed number.
+- **Keep the cut.** Roots stay. Some pockets are fed by a Root, and cutting it wilts one guard type or a whole cluster. Sap comes from Roots, so cutting is also a prize.
+- **Many decisions per session, not one per run.** Each pocket is a decision. If the field ever offers only one sensible next pocket, that's the H2 failure again. The bots check that at least two first moves are viable on every seed.
+
+### Tensions with VISION.md, and proposed resolutions
+
+| Tension | Resolution | VISION change? |
+| --- | --- | --- |
+| Fixed decision: "A roguelite campaign: each star system is one 20–40 minute run; the campaign spans many sessions." The owner now asks for "a longer, persistent game". | A star system becomes one long game (several hours) played across many short sessions, kept by autosave, ending when you launch the new probe. New game+ still follows: the next system is richer and harder. The owner's earlier "shorter sessions but more capability each time" survives as short sessions within one long game, each with a natural stopping point (a pocket taken). | **Yes.** Proposed wording in QUESTIONS.md Q14. |
+| Pillar 1: "Delivery rate **to the probe** gates everything else." Factories outside the probe break the "to the probe" part. | Throughput still throttles everything, measured into factories and shipyards. | **Yes, a wording change.** Proposed in Q14. |
+| Pillar 5: "Research and probe design carry forward, and each new system is richer and harder." | Unchanged. It works between long games. Within a game, progression is the component web. Research can wait until after M2. | No. |
+| Pillar 4: no clock, no pressure. A long game risks waiting. | No offline progress, so there's no reason to log in on a timer. 4x speed already exists. Every wait should have a decision next to it (scouting, the next site). If waiting dominates, add 8x. | No. |
+| Phone portrait and a large field. | Pinch to zoom and drag to pan (standard touch gestures, not precision dragging). Zoomed out, pockets and regions show as large icons with the guard ring and prize icon. Taps snap to the nearest node, so targets stay at least 44 px at any zoom. A "next decision" list (pockets you can scout or crack, idle factories) lets you play from a list without hunting the map. | No (the fixed decision already says routes between nodes). |
+| Owner's original note: "build components that go back to the probe". | It is a historical note, so leave it. The new direction supersedes it in practice. | No. |
+| "Ships take orders at nodes; no unit micro." | Choosing a fleet mix in the send sheet is an order, not micro. | No. |
+| DESIGN.md "Owner direction (2026-11-06)": run length 20–40 minutes, 3–4 tiers. | Run length superseded by this section, pending Q14. Tiers fit (ore → refined resource → component → ship or probe core). | DESIGN.md only. |
+
+### Biggest risks
+
+1. **The counter triangle gets solved.** "See Thorns, bring Lancers" is obvious again. Mitigations: mixed pockets, scarce components (you can't field everything), and two doors per tier.
+2. **Scope.** This is a new game, not a feature. Hence the thin slices below, each playable on its own.
+3. **Phone readability** of a big field with many resource types. Each new resource or ship type has to pass the 24 px silhouette test.
+4. **A long game is still a fixed sequence**, just a longer one. The bots must show at least two viable first moves and different tier 2 orders across seeds.
+
+### Milestone 2 plan (ordered, one hypothesis per build)
+
+Riskiest claim first: that **pockets + counters + resource prizes make "which pocket next" a real, felt choice that isn't a straight line**. Everything else (big field, factories, route limits, endgame) only matters if that holds.
+
+| H | Build | Fun claim tested | Fun question |
+| --- | --- | --- | --- |
+| **H3** | **Counter web** (below) | Choosing which pocket to take next, given your ship types, is a real choice, and the game doesn't play as one fixed sequence | "After your first pocket, did you have more than one sensible next target? What decided it?" |
+| H4 | **Factories and reach:** refineries, assemblers and shipyards on asteroids; max route length; relays; shared route capacity; pockets block routes | "Where do I build" is a puzzle you enjoy, and the network looks like *your* network | "Did you place a factory somewhere for a reason you could name? Did a route limit ever change your plan?" |
+| H5 | **The big field:** a seeded field of about 40–60 nodes with pan and zoom, scouting, regions, tier 2 pockets and the "next decision" list; a multi-session game | A long, persistent game stays fresh across sessions, and a large field reads on a phone | "Did you want to come back for another session? Could you find your way around the field?" |
+| H6 | **The new probe:** the probe core from tier 2 components, the endgame and win screen, the first new game+ hook | Building toward the probe gives the long game a satisfying arc | "Did launching the probe feel like the end of a story? Do you want the next system?" |
+
+#### H3 slice: Counter web
+
+- **Contains:**
+  - **The field.** One field of about 16 nodes that fits a phone screen with light pan, or none. Three hand-made layouts, shuffled by seed: the H2 lesson was that hand-made layouts compare cleanly.
+  - **Resources:** ore (free), ice and crystal (each only in pockets).
+  - **Components:** two, made at the probe for now: plating (ore + ice) and lenses (ore + crystal).
+  - **Ships:** drone (ore only, neutral), lancer (lenses) and flak (plating).
+  - **Guards and pockets:** two guard types, Thorn and Spore, so it's a counter pair, not yet a triangle. Four or five pockets, each with a guard mix and a prize. There are two doors to each tier 1 resource.
+  - **The finale:** one final mixed pocket (the Bloom heart, fed by a Root) that needs both counters or a lot of drones.
+  - **Readouts:** the guard ring, the counter tags, and the per-type send steppers.
+- **Leaves out:** factories outside the probe, max route length, relays, the big field and zoom, Warden and Lash (the full triangle), tier 2 resources, the new probe, research and new game+.
+- **Why a pair, not the triangle:** two ships against two guards already tests whether counters plus prizes make a choice, and it halves the art and the UI. The third type joins in H4 or H5 if the pair works.
+- **Expected tasks:** about 5.
+  - h3-sim: resources, components, ship types, guard types, counter combat, pockets.
+  - h3-client: multi-resource HUD, build queue per ship type, send steppers, pocket sheet and ring.
+  - h3-art: three ship silhouettes, two guard types, resource icons and the guard ring.
+  - h3-bots: lancer-first, flak-first and drones-only strategies, plus a no-dominance check across layouts.
+  - h3-design-data: the Designer's calibration of costs and counters.
+
+  Four builders, four Critic reviews and one design launch come to 9 of the 12 launches, which leaves room for fix rounds.
+- **Tunables to name at spec time** (proposed defaults, finalised in calibration):
+  - `counter.strongPct` (200, range 100–400)
+  - `counter.weakPct` (50, range 25–100)
+  - `component.<name>.cost` (per resource)
+  - `ship.<type>.hp`, `ship.<type>.damage` and `ship.<type>.component`
+  - `guard.<type>.hp`, `guard.<type>.damage` and `guard.<type>.regrowTicks`
+  - `pocket.<id>.mix` and `pocket.<id>.prizePerMin` (map data, per layout)
+- **Success (one session, about 30–40 minutes):**
+  - the owner takes at least three pockets;
+  - before the second pocket, they can name two sensible targets and why they picked one;
+  - on a second game, their first pick differs or they can say why it shouldn't;
+  - they don't describe the run as "build economy, then ships, then attack".
+
 ## Current mechanics
 
 Built in Milestone 1 (build-20261106-2, spec H1 below):
@@ -49,7 +188,9 @@ H2 (build-20261108-1, spec below) added the Root, a second guarded node that fee
 
 ## Hypotheses
 
-### H3 candidates (iteration 3, awaiting the owner's pick)
+### H3 candidates (iteration 3): superseded
+
+**Superseded (2026-11-07).** The owner didn't pick A, B or C and asked for a bigger direction instead. See "Owner direction 2026-11-07: the asteroid field (steelman)" above. A survives as "most of the field is guarded", B as "a prize is a new resource", and C as seeded fields in H5.
 
 The H2 playtest (PLAYTEST_LOG.md, 2026-11-07) gave three signals. Cutting the Root first felt obvious. Both runs followed the same sequence: max economy, then ships, then attack. Cutting the Root was satisfying. These are the two mechanical causes, and each candidate below attacks one or both:
 - **(a) Fixed sequence.** The economy is a closed, unguarded build-out, and fighting pays nothing until the final prize. So "economy first, fight last" is always right, whatever the guardians look like.
