@@ -1,33 +1,33 @@
 {
-  "generatedAt": "2026-11-08T17:45:59.348Z",
+  "generatedAt": "2026-11-08T17:53:18.155Z",
   "dataVersion": 8,
   "seeds": 3,
   "visitCapTicks": 54000,
   "campaignCapMinutes": 120,
   "tickBudgetMsP95": 2,
-  "runSeconds": 36.54,
-  "probeSeconds": 2.65,
+  "runSeconds": 55.36,
+  "probeSeconds": 3.09,
   "limits": {
     "l0": 12,
     "l1": 18,
     "l2": 24
   },
   "failures": [
-    "composer seed 1: softlock (a second visit timeout or nothing to do, at 70.5 min of play)",
-    "composer seed 2: softlock (a second visit timeout or nothing to do, at 70.5 min of play)",
-    "composer seed 3: softlock (a second visit timeout or nothing to do, at 70.5 min of play)",
-    "ice-first seed 1: softlock (a second visit timeout or nothing to do, at 70.5 min of play)",
-    "ice-first seed 2: softlock (a second visit timeout or nothing to do, at 70.5 min of play)",
-    "ice-first seed 3: softlock (a second visit timeout or nothing to do, at 70.5 min of play)",
-    "crystal-first seed 1: softlock (a second visit timeout or nothing to do, at 70.5 min of play)",
-    "crystal-first seed 2: softlock (a second visit timeout or nothing to do, at 70.5 min of play)",
-    "crystal-first seed 3: softlock (a second visit timeout or nothing to do, at 70.5 min of play)"
+    "composer seed 1: softlock (a second visit timeout or nothing to do, at 70.2 min of play)",
+    "composer seed 2: softlock (a second visit timeout or nothing to do, at 70.2 min of play)",
+    "composer seed 3: softlock (a second visit timeout or nothing to do, at 70.2 min of play)",
+    "ice-first seed 1: softlock (a second visit timeout or nothing to do, at 70.2 min of play)",
+    "ice-first seed 2: softlock (a second visit timeout or nothing to do, at 70.2 min of play)",
+    "ice-first seed 3: softlock (a second visit timeout or nothing to do, at 70.2 min of play)",
+    "crystal-first seed 1: softlock (a second visit timeout or nothing to do, at 70.2 min of play)",
+    "crystal-first seed 2: softlock (a second visit timeout or nothing to do, at 70.2 min of play)",
+    "crystal-first seed 3: softlock (a second visit timeout or nothing to do, at 70.2 min of play)"
   ],
   "flags": [
     {
       "name": "No softlock: composer, ice-first, crystal-first buy the probe core on every seed within 120 game minutes of play",
       "pass": false,
-      "detail": "not won: composer/1 softlock at 70.5 min, composer/2 softlock at 70.5 min, composer/3 softlock at 70.5 min, ice-first/1 softlock at 70.5 min, ice-first/2 softlock at 70.5 min, ice-first/3 softlock at 70.5 min, crystal-first/1 softlock at 70.5 min, crystal-first/2 softlock at 70.5 min, crystal-first/3 softlock at 70.5 min"
+      "detail": "not won: composer/1 softlock at 70.2 min, composer/2 softlock at 70.2 min, composer/3 softlock at 70.2 min, ice-first/1 softlock at 70.2 min, ice-first/2 softlock at 70.2 min, ice-first/3 softlock at 70.2 min, crystal-first/1 softlock at 70.2 min, crystal-first/2 softlock at 70.2 min, crystal-first/3 softlock at 70.2 min"
     },
     {
       "name": "Drones don't fit: every tier 2 and tier 3 heart is closed to drones alone at the tier's limit (starved: tier 2 at L1, tier 3 at L2), and drones-only reclaims no tier 2 or tier 3 area on any seed",
@@ -317,8 +317,8 @@
       "strategy": "composer",
       "seed": 1,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -341,12 +341,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -354,13 +354,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -368,28 +368,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -431,18 +431,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -450,21 +450,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000004059984,
-      "tickMsP95": 0.0020999999999844476,
-      "finalHash": "6e5bebfa"
+      "tickMsP50": 0.001299999999901047,
+      "tickMsP95": 0.0027000000000043656,
+      "finalHash": "3c2e2062"
     },
     {
       "strategy": "composer",
       "seed": 2,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -487,12 +487,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -500,13 +500,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -514,28 +514,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -577,18 +577,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -596,21 +596,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
       "tickMsP50": 0.0011999999996987754,
-      "tickMsP95": 0.002599999999802094,
-      "finalHash": "07082324"
+      "tickMsP95": 0.002399999999852298,
+      "finalHash": "36c82a62"
     },
     {
       "strategy": "composer",
       "seed": 3,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -633,12 +633,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -646,13 +646,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -660,28 +660,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -723,18 +723,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -742,21 +742,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000004059984,
-      "tickMsP95": 0.0018000000000029104,
-      "finalHash": "b48fc3e1"
+      "tickMsP50": 0.001299999999901047,
+      "tickMsP95": 0.002900000000408909,
+      "finalHash": "d4049a51"
     },
     {
       "strategy": "ice-first",
       "seed": 1,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -779,12 +779,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -792,13 +792,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -806,28 +806,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -869,18 +869,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -888,21 +888,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0010999999994965037,
-      "tickMsP95": 0.0018000000000029104,
-      "finalHash": "6e5bebfa"
+      "tickMsP50": 0.0024999999986903276,
+      "tickMsP95": 0.0030999999999039574,
+      "finalHash": "3c2e2062"
     },
     {
       "strategy": "ice-first",
       "seed": 2,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -925,12 +925,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -938,13 +938,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -952,28 +952,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -1015,18 +1015,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -1034,21 +1034,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0010999999994965037,
-      "tickMsP95": 0.0018999999992956873,
-      "finalHash": "07082324"
+      "tickMsP50": 0.0023999999993975507,
+      "tickMsP95": 0.0030000000006111804,
+      "finalHash": "36c82a62"
     },
     {
       "strategy": "ice-first",
       "seed": 3,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -1071,12 +1071,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1084,13 +1084,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1098,28 +1098,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -1161,18 +1161,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -1180,21 +1180,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0010999999994965037,
-      "tickMsP95": 0.0018999999992956873,
-      "finalHash": "b48fc3e1"
+      "tickMsP50": 0.002300000000104774,
+      "tickMsP95": 0.0030000000006111804,
+      "finalHash": "d4049a51"
     },
     {
       "strategy": "crystal-first",
       "seed": 1,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -1217,12 +1217,12 @@
         {
           "area": "shoal",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1230,13 +1230,13 @@
         },
         {
           "area": "shelf",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1244,28 +1244,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -1307,18 +1307,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -1326,21 +1326,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0010999999994965037,
-      "tickMsP95": 0.0018000000000029104,
-      "finalHash": "3d70a706"
+      "tickMsP50": 0.002300000000104774,
+      "tickMsP95": 0.002900000003137393,
+      "finalHash": "27f17b36"
     },
     {
       "strategy": "crystal-first",
       "seed": 2,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -1363,12 +1363,12 @@
         {
           "area": "shoal",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1376,13 +1376,13 @@
         },
         {
           "area": "shelf",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1390,28 +1390,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -1453,18 +1453,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -1472,21 +1472,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000013154931,
-      "tickMsP95": 0.002300000000104774,
-      "finalHash": "2ca69398"
+      "tickMsP50": 0.0023999999975785613,
+      "tickMsP95": 0.0029999999969732016,
+      "finalHash": "c73457ae"
     },
     {
       "strategy": "crystal-first",
       "seed": 3,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -1509,12 +1509,12 @@
         {
           "area": "shoal",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1522,13 +1522,13 @@
         },
         {
           "area": "shelf",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1536,28 +1536,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -1599,18 +1599,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -1618,21 +1618,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000013154931,
-      "tickMsP95": 0.002300000000104774,
-      "finalHash": "f44ffe45"
+      "tickMsP50": 0.0016999999970721547,
+      "tickMsP95": 0.003099999998084968,
+      "finalHash": "1e2d002d"
     },
     {
       "strategy": "no-command",
       "seed": 1,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -1655,12 +1655,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1668,13 +1668,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1682,28 +1682,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -1745,18 +1745,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -1764,21 +1764,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000013154931,
-      "tickMsP95": 0.0018999999992956873,
-      "finalHash": "6e5bebfa"
+      "tickMsP50": 0.0011999999987892807,
+      "tickMsP95": 0.0020000000004074536,
+      "finalHash": "3c2e2062"
     },
     {
       "strategy": "no-command",
       "seed": 2,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -1801,12 +1801,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1814,13 +1814,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1828,28 +1828,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -1891,18 +1891,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -1910,21 +1910,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000013154931,
-      "tickMsP95": 0.00210000000151922,
-      "finalHash": "07082324"
+      "tickMsP50": 0.0011999999987892807,
+      "tickMsP95": 0.002599999999802094,
+      "finalHash": "36c82a62"
     },
     {
       "strategy": "no-command",
       "seed": 3,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -1947,12 +1947,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1960,13 +1960,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -1974,28 +1974,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -2037,18 +2037,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -2056,21 +2056,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000013154931,
-      "tickMsP95": 0.0018000000018218998,
-      "finalHash": "b48fc3e1"
+      "tickMsP50": 0.001799999998183921,
+      "tickMsP95": 0.00450000000273576,
+      "finalHash": "d4049a51"
     },
     {
       "strategy": "drones-only",
       "seed": 1,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -2093,12 +2093,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -2106,13 +2106,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -2120,28 +2120,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -2183,18 +2183,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -2202,21 +2202,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000013154931,
-      "tickMsP95": 0.0018999999992956873,
-      "finalHash": "6e5bebfa"
+      "tickMsP50": 0.0021000000051571988,
+      "tickMsP95": 0.004300000000512227,
+      "finalHash": "3c2e2062"
     },
     {
       "strategy": "drones-only",
       "seed": 2,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -2239,12 +2239,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -2252,13 +2252,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -2266,28 +2266,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -2329,18 +2329,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -2348,21 +2348,21 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000013154931,
-      "tickMsP95": 0.0019000000029336661,
-      "finalHash": "07082324"
+      "tickMsP50": 0.0015999999959603883,
+      "tickMsP95": 0.004000000000814907,
+      "finalHash": "36c82a62"
     },
     {
       "strategy": "drones-only",
       "seed": 3,
       "outcome": "softlock",
-      "playTicks": 126926,
-      "ticks": 126934,
+      "playTicks": 126296,
+      "ticks": 126304,
       "visits": [
         {
           "area": "landfall",
@@ -2385,12 +2385,12 @@
         {
           "area": "shelf",
           "startTick": 333,
-          "playTicks": 9148,
+          "playTicks": 8788,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 4021,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -2398,13 +2398,13 @@
         },
         {
           "area": "shoal",
-          "startTick": 9483,
-          "playTicks": 9448,
+          "startTick": 9123,
+          "playTicks": 9178,
           "result": "withdrawn",
           "closed": true,
           "forced": false,
           "openingTicks": 3981,
-          "shipsBuilt": 9,
+          "shipsBuilt": 8,
           "shipsLost": 0,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
@@ -2412,28 +2412,28 @@
         },
         {
           "area": "shelf",
-          "startTick": 18932,
+          "startTick": 18302,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 3981,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 159,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
         },
         {
           "area": "shelf",
-          "startTick": 72934,
+          "startTick": 72304,
           "playTicks": 54000,
           "result": "withdrawn",
           "closed": false,
           "forced": true,
           "openingTicks": 2509,
-          "shipsBuilt": 12,
-          "shipsLost": 0,
+          "shipsBuilt": 165,
+          "shipsLost": 156,
           "shipsRecycled": 0,
           "rootCutBeforeHeart": null,
           "wave": null
@@ -2475,18 +2475,18 @@
         {
           "item": "extract",
           "level": 1,
-          "tick": 9482,
-          "playTicks": 9478
+          "tick": 9122,
+          "playTicks": 9118
         },
         {
           "item": "rigs",
           "level": 1,
-          "tick": 72933,
-          "playTicks": 72926
+          "tick": 72303,
+          "playTicks": 72296
         }
       ],
-      "shipsBuilt": 31,
-      "shipsLost": 0,
+      "shipsBuilt": 176,
+      "shipsLost": 156,
       "shipsRecycled": 0,
       "hauled": {
         "ore": 100,
@@ -2494,14 +2494,14 @@
         "crystal": 0
       },
       "shipped": {
-        "ore": 281,
+        "ore": 279,
         "ice": 0,
         "crystal": 0
       },
       "shippedSharePct": 73,
-      "tickMsP50": 0.0011000000013154931,
-      "tickMsP95": 0.002300000000104774,
-      "finalHash": "b48fc3e1"
+      "tickMsP50": 0.001600000003236346,
+      "tickMsP95": 0.004000000000814907,
+      "finalHash": "d4049a51"
     },
     {
       "strategy": "greedy",
@@ -2738,8 +2738,8 @@
         "crystal": 85
       },
       "shippedSharePct": 22,
-      "tickMsP50": 0.0022000000026309863,
-      "tickMsP95": 0.005000000004656613,
+      "tickMsP50": 0.0026999999972758815,
+      "tickMsP95": 0.008000000001629815,
       "finalHash": "6d3784b5"
     },
     {
@@ -2977,8 +2977,8 @@
         "crystal": 76
       },
       "shippedSharePct": 21,
-      "tickMsP50": 0.0021000000051571988,
-      "tickMsP95": 0.003700000001117587,
+      "tickMsP50": 0.0023999999975785613,
+      "tickMsP95": 0.007299999997485429,
       "finalHash": "e5e15ec7"
     },
     {
@@ -3216,8 +3216,8 @@
         "crystal": 75
       },
       "shippedSharePct": 21,
-      "tickMsP50": 0.0021999999953550287,
-      "tickMsP95": 0.0038000000058673322,
+      "tickMsP50": 0.0028000000020256266,
+      "tickMsP95": 0.007900000004156027,
       "finalHash": "0375127e"
     }
   ]

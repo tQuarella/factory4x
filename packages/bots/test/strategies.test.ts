@@ -7,6 +7,7 @@ import {
   guardianStatus,
   isValidInput,
   researchLevel,
+  runSummary,
   step,
   weightedMultPct,
   type ShipType,
@@ -60,6 +61,7 @@ const landed = (id: string, seed = 1): World =>
 const place = (w: World, node: number, type: ShipType, n: number): void => {
   for (let i = 0; i < n; i++) w.ships.push({ id: w.nextId++, type, hp: w.tun[`ship.${type}.hp`], at: node, transit: null, engagedIn: -1 });
 };
+const heartOf = (w: World): number => w.nodes.findIndex((n) => n.kind === 'heart');
 const total = (c: ShipTypeCounts): number => c.drone + c.lancer + c.flak;
 
 describe('economy planner', () => {
@@ -303,6 +305,34 @@ describe('composer engine', () => {
       expect(w.yards.flak.ticksLeft).toBe(0);
       expect(w.ships.some((x) => x.type === 'flak')).toBe(false);
     }
+  });
+
+  it('regroups a ship stranded at the probe at a5 (base limit)', () => {
+    const w = landed('landfall');
+    const a5 = idx(w, 'a5');
+    place(w, 0, 'drone', 1);
+    expect(decideComposer(w, data, { dronesOnly: false, forced: false }).inputs).toContainEqual({ type: 'sendShips', from: 0, to: a5, counts: expect.anything() });
+  });
+
+  it('a forced visit at the base limit rallies from the landing, gathers the full allocation at a5 and attacks at least once', () => {
+    // Premise: Frost Shelf at the base limit of 12 is closed (the heart needs more), so the visit is forced and plays out.
+    const w = landed('shelf');
+    expect(chooseTarget(w, 12, ALL)).not.toBeNull(); // the pocket passes first, then the heart does not
+    const a5 = idx(w, 'a5');
+    let strandedAfterEconomy = 0;
+    for (let i = 0; i < 30 * 60 * 30 && runSummary(w).wavesSent === 0; i++) {
+      step(w, data, decideComposer(w, data, { dronesOnly: false, forced: true }).inputs);
+      if (i === 5) expect(w.rally).toBe(a5);
+      if (i > 30 * 60 * 6 && w.ships.some((x) => x.at === 0 && x.transit === null)) strandedAfterEconomy++;
+    }
+    expect(runSummary(w).wavesSent).toBeGreaterThan(0);
+    expect(strandedAfterEconomy).toBe(0);
+    // Now only the heart is left and fails the estimate: the forced visit still sends a full fleet.
+    for (const g of w.guardians) if (g.node !== heartOf(w)) g.alive = false;
+    const before = runSummary(w).wavesSent;
+    for (let i = 0; i < 30 * 60 * 25 && runSummary(w).wavesSent === before; i++) step(w, data, decideComposer(w, data, { dronesOnly: false, forced: true }).inputs);
+    expect(runSummary(w).wavesSent).toBeGreaterThan(before);
+    expect(fleetCount(w)).toBeLessThanOrEqual(12);
   });
 
   it('recycles the surplus parked at a5 when the fleet is full, and nothing when it is not', () => {

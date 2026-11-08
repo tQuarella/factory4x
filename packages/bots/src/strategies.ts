@@ -330,12 +330,13 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
         world,
         ECONOMY_NODES.map((id) => nodeIndex(world, id)).filter((n) => n >= 0),
       );
+  // Rally at a5 from the landing, so a ship a yard starts before the economy plan turns it off doesn't park at the probe.
+  if (a5 >= 0 && world.rally !== a5) inputs.push({ type: 'setRally', node: a5 });
   if (!econ.done) {
     if (world.yards.drone.on) inputs.push({ type: 'setShipyard', shipType: 'drone', on: false });
     if (econ.order) inputs.push(econ.order);
     return { inputs, closed: false };
   }
-  if (a5 >= 0 && world.rally !== a5) inputs.push({ type: 'setRally', node: a5 });
   // The plan builds what can be built now: a type whose component hasn't been delivered here yet waits for its prize
   // (the target test above is optimistic about it, as the capability windows are), so the first waves are drones.
   const unlocked = unlockStatus(world).ships;
@@ -351,8 +352,9 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
   const out = buildPlan(world, owned);
   if (out.order) inputs.push(out.order);
   const c = shipCounts(world);
-  for (const cap2 of world.stats.captures) {
-    if (c.at[cap2.node]! > 0) inputs.push({ type: 'sendShips', from: cap2.node, to: a5, counts: SEND_ALL });
+  // Every idle ship regroups at a5: from captured nodes, the probe, or anywhere else that isn't a living guarded node (a wave).
+  for (const n of world.nodes) {
+    if (n.index !== a5 && c.at[n.index]! > 0 && !isGuarded(world, n.index)) inputs.push({ type: 'sendShips', from: n.index, to: a5, counts: SEND_ALL });
   }
   if (target === null || a5 < 0) return { inputs, closed: false };
   const at = c.atByType[a5]!;

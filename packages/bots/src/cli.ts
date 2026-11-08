@@ -125,7 +125,7 @@ const md = [
   '',
   '## Per run',
   '',
-  '| Strategy | Seed | Outcome | Play time | Area order | Visits (closed = withdrawn at once, timeout = visit cap) | Command limit bought | Root cut before heart | Capturing wave per heart (d/l/f) | Built / lost / recycled | Research (play time) | Hauled vs shipped (o/i/c) | Skipped | Tick p50 / p95 (ms) |',
+  '| Strategy | Seed | Outcome | Play time | Area order | Visits (closed = withdrawn when nothing passes the attack test, timeout = visit cap) | Command limit bought | Root cut before heart | Capturing wave per heart (d/l/f) | Built / lost / recycled | Research (play time) | Hauled vs shipped (o/i/c) | Skipped | Tick p50 / p95 (ms) |',
   '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ...results.map(
     (r) =>
