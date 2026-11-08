@@ -711,7 +711,7 @@ export function drawWiltingThorn(ctx: Ctx, r: number, frac: number): void {
 
 export type AreaNodeState = 'locked' | 'open' | 'reclaimed';
 export type LaneState = 'closed' | 'open' | 'owned';
-export type ResearchIconId = 'lancer' | 'flak' | 'opening' | 'extract' | 'rigs' | 'yards' | 'core';
+export type ResearchIconId = 'lancer' | 'flak' | 'opening' | 'extract' | 'rigs' | 'yards' | 'core' | 'fleet';
 
 /** Four rocks around an open centre (the caller draws the prize icon there). All within 0.7r. */
 const AREA_ROCKS: readonly [number, number, number][] = [
@@ -931,14 +931,15 @@ export function drawStockpileIcon(ctx: Ctx, r: number): void {
  * Research icons, each within r and told apart by silhouette at 24 px:
  * lancer and flak = the ship inside a dashed blueprint square; opening = an
  * ore chip with a plus; extract = a steel drill bit; rigs = an extractor mast
- * on a rock; yards = a chevron with speed lines; core = the probe core.
+ * on a rock; yards = a chevron with speed lines; core = the probe core;
+ * fleet = the fleet icon's three chevrons (no bracket; the square is the frame) in the same dashed square, not one ship.
  */
 export function drawResearchIcon(ctx: Ctx, r: number, id: ResearchIconId): void {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   const lw = Math.max(1.5, r * 0.16);
-  if (id === 'lancer' || id === 'flak') {
+  if (id === 'lancer' || id === 'flak' || id === 'fleet') {
     const h = r * 0.66;
     const bw = Math.max(1.2, r * 0.09);
     ctx.strokeStyle = palette.starBright;
@@ -948,7 +949,8 @@ export function drawResearchIcon(ctx: Ctx, r: number, id: ResearchIconId): void 
     ctx.strokeRect(-h + bw / 2, -h + bw / 2, h * 2 - bw, h * 2 - bw);
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
-    drawShip(ctx, r * 0.48, 0, id);
+    if (id === 'fleet') fleetChevrons(ctx, r * 0.95);
+    else drawShip(ctx, r * 0.48, 0, id);
   } else if (id === 'opening') {
     ctx.save();
     ctx.translate(-r * 0.2, r * 0.2);
@@ -1030,5 +1032,106 @@ export function drawResearchIcon(ctx: Ctx, r: number, id: ResearchIconId): void 
   } else {
     drawProbeCore(ctx, r, 0, 1);
   }
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// H5 (Fleet cap): fleet and recycle icons. See ART_STYLE.md "H5 entities".
+// ---------------------------------------------------------------------------
+
+/** Arrowhead chevron pointing up, tip at (cx, cy - a), half-width b. */
+function chevronPath(ctx: Ctx, cx: number, cy: number, a: number, b: number): void {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - a);
+  ctx.lineTo(cx + b, cy + a);
+  ctx.lineTo(cx, cy + a * 0.4);
+  ctx.lineTo(cx - b, cy + a);
+  ctx.closePath();
+}
+
+/** The fleet's three player-blue chevrons in a triangle formation (front one up), within 0.6r. */
+function fleetChevrons(ctx: Ctx, r: number): void {
+  ctx.fillStyle = palette.ship;
+  const a = r * 0.26;
+  const b = r * 0.22;
+  chevronPath(ctx, 0, -r * 0.17, a, b);
+  ctx.fill();
+  chevronPath(ctx, -r * 0.34, r * 0.17, a, b);
+  ctx.fill();
+  chevronPath(ctx, r * 0.34, r * 0.17, a, b);
+  ctx.fill();
+}
+
+/**
+ * Fleet icon: three player-blue chevrons in a triangle formation inside a
+ * bracket, "a fleet of N". Normal: an open bracket "[ ]" in pale starBright.
+ * `full` (at the limit): the bracket closes into a rectangle and turns amber,
+ * the only amber in the icon. The chevrons are identical in both, so the
+ * state reads from the bracket's closure as well as its colour. Within r.
+ */
+export function drawFleetIcon(ctx: Ctx, r: number, full: boolean): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const w = r * 0.76;
+  const h = r * 0.5;
+  ctx.lineWidth = Math.max(1.5, r * 0.12);
+  if (full) {
+    ctx.strokeStyle = palette.probe;
+    ctx.strokeRect(-w, -h, w * 2, h * 2);
+  } else {
+    ctx.strokeStyle = palette.starBright;
+    ctx.globalAlpha = 0.85;
+    const t = r * 0.26;
+    ctx.beginPath();
+    ctx.moveTo(-w + t, -h);
+    ctx.lineTo(-w, -h);
+    ctx.lineTo(-w, h);
+    ctx.lineTo(-w + t, h);
+    ctx.moveTo(w - t, -h);
+    ctx.lineTo(w, -h);
+    ctx.lineTo(w, h);
+    ctx.lineTo(w - t, h);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  fleetChevrons(ctx, r);
+  ctx.restore();
+}
+
+/**
+ * Recycle icon: one player-blue chevron inside two teal arrows chasing each
+ * other round a circle, "scrap back into ore". No amber. Within r.
+ */
+export function drawRecycleIcon(ctx: Ctx, r: number): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const rho = r * 0.66;
+  ctx.strokeStyle = palette.asteroidOre;
+  ctx.fillStyle = palette.asteroidOre;
+  ctx.lineWidth = Math.max(1.5, r * 0.16);
+  const deg = Math.PI / 180;
+  for (const start of [200, 20]) {
+    const e = (start + 125) * deg;
+    ctx.beginPath();
+    ctx.arc(0, 0, rho, start * deg, e);
+    ctx.stroke();
+    // Arrowhead at the end of the arc, pointing clockwise along the tangent.
+    const nx = Math.cos(e);
+    const ny = Math.sin(e);
+    const px = nx * rho;
+    const py = ny * rho;
+    const hw = r * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(px + nx * hw, py + ny * hw);
+    ctx.lineTo(px - ny * r * 0.3, py + nx * r * 0.3);
+    ctx.lineTo(px - nx * hw, py - ny * hw);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = palette.ship;
+  chevronPath(ctx, 0, -r * 0.02, r * 0.3, r * 0.25);
+  ctx.fill();
   ctx.restore();
 }

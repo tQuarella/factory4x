@@ -105,3 +105,10 @@ Owned by the Designer. Each entry: date, build, who (owner or friend name), the 
 - **The bug** (extraction rate display) is routed to an engineer separately. It isn't a design change.
 
 **Action:** DESIGN.md → "Owner direction 2026-11-08b: open world and a fleet cap (steelman)" and "H5 candidates (awaiting the owner's pick)": three slices, with A "Fleet cap" recommended. QUESTIONS.md Q17 asks the owner to pick. Q18 asks about a pillar 1 wording change, which matters only if a fleet cap ships. No spec until the pick.
+
+### 2026-11-08 · idea (no build) · owner
+
+> Idea for later: increase extraction and production depth. Have actual factorio/mindustry/shapez style gameplay on an individual node. This is the lower-level puzzle of maximizing throughput. The max throughput achieved is then applied to all nodes of that type. e.g. you build your ore extraction rig once and that extraction rate gets applied to every ore node. Certain upgrades would likely have you revisit your rig to improve it. Different node types would present different setups on the node. Could be the same for component manufacture too.
+
+**Interpretation (Director):** the owner marked this "for later". It is a candidate direction for after H5 (and the open-world H6), not a change to the current iteration. It touches the VISION fixed decision "Logistics are abstract routes between nodes, not tile-by-tile belts", which a node-level layout puzzle would need to revisit, and pillar 1 ("Throughput is the throttle"), which it would deepen.
+**Action:** parked. The Designer steelmans it (including the VISION conflict) when the next direction after H5 is chosen.

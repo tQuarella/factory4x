@@ -7,6 +7,7 @@ import {
   type ResearchIconId,
   drawAreaNode,
   drawAsteroid,
+  drawFleetIcon,
   drawGuardRing,
   drawHitFlash,
   drawLane,
@@ -15,6 +16,7 @@ import {
   drawProbe,
   drawProbeCore,
   drawRallyFlag,
+  drawRecycleIcon,
   drawResearchIcon,
   drawStockpileIcon,
   drawRichNode,
@@ -109,6 +111,7 @@ function iconRow(c: Ctx, r: number): void {
 }
 
 const researchIds: ResearchIconId[] = ['lancer', 'flak', 'opening', 'extract', 'rigs', 'yards', 'core'];
+const researchIds5: ResearchIconId[] = [...researchIds, 'fleet'];
 const areaStates: AreaNodeState[] = ['locked', 'open', 'reclaimed'];
 
 /** H4 actual-size strip: 3 rows of 7 at r = 12 (area tiers and states, research icons, core, crate, lanes). */
@@ -137,6 +140,30 @@ function strip4(c: Ctx, grey: boolean): void {
   c.restore();
 }
 
+/** H5 actual-size strip: the new icons beside the H4 research icons they must not be mistaken for. */
+function strip5(c: Ctx, grey: boolean): void {
+  const r = 12;
+  const items: ((c2: Ctx) => void)[] = [
+    (c2) => drawFleetIcon(c2, r, false),
+    (c2) => drawFleetIcon(c2, r, true),
+    (c2) => drawRecycleIcon(c2, r),
+    (c2) => drawResearchIcon(c2, r, 'fleet'),
+    ...researchIds.map((id) => (c2: Ctx) => drawResearchIcon(c2, r, id)),
+    (c2) => drawShip(c2, r, 0, 'drone'),
+    (c2) => drawResourceIcon(c2, r, 'ore'),
+    (c2) => drawStockpileIcon(c2, r),
+  ];
+  c.save();
+  if (grey) c.filter = 'grayscale(1)';
+  items.forEach((f, i) => {
+    c.save();
+    c.translate(r + 2 + (i % 7) * 46, 40 + Math.floor(i / 7) * 48);
+    f(c);
+    c.restore();
+  });
+  c.restore();
+}
+
 function areaRow(c: Ctx, r: number, state: AreaNodeState): void {
   [0, 1, 2, 3].forEach((tier, i) => {
     c.save();
@@ -147,10 +174,10 @@ function areaRow(c: Ctx, r: number, state: AreaNodeState): void {
 }
 
 function researchRow(c: Ctx, r: number): void {
-  researchIds.forEach((id, i) => {
+  researchIds5.forEach((id, i) => {
     c.save();
-    c.translate((i - 3) * r * 0.3, 0);
-    drawResearchIcon(c, r * 0.14, id);
+    c.translate((i - 3.5) * r * 0.27, 0);
+    drawResearchIcon(c, r * 0.125, id);
     c.restore();
   });
 }
@@ -175,6 +202,8 @@ const entries: Entry[] = [
   { label: '24 px strip, greyscale (shape-only check)', draw: (c) => strip(c, true), strip: true },
   { label: 'H4 24 px strip, colour (areas, research, core, crate, lanes)', draw: (c) => strip4(c, false), strip: true, h: 170 },
   { label: 'H4 24 px strip, greyscale', draw: (c) => strip4(c, true), strip: true, h: 170 },
+  { label: 'H5 24 px strip, colour (fleet, fleet full, recycle, research fleet; then H4 research icons, drone, ore, crate)', draw: (c) => strip5(c, false), strip: true, h: 120 },
+  { label: 'H5 24 px strip, greyscale (shape-only)', draw: (c) => strip5(c, true), strip: true, h: 120 },
   { label: 'drone', draw: (c, r) => drawShip(c, r, 0, 'drone') },
   { label: 'lancer', draw: (c, r) => drawShip(c, r, 0, 'lancer') },
   { label: 'flak', draw: (c, r) => drawShip(c, r, 0, 'flak') },
@@ -222,7 +251,11 @@ const entries: Entry[] = [
   { label: 'area node tier 2, open, ice icon', draw: (c, r) => { drawAreaNode(c, r, T, 2, 'open'); drawResourceIcon(c, r * 0.4, 'ice'); } },
   { label: 'lanes closed / open / owned', draw: (c, r) => laneSet(c, r) },
   ...researchIds.map((id) => ({ label: `research ${id}`, draw: (c: Ctx, r: number) => drawResearchIcon(c, r, id) })),
-  { label: 'research icons, all seven', draw: (c, r) => researchRow(c, r * 4) },
+  { label: 'research icons, all eight', draw: (c, r) => researchRow(c, r * 4) },
+  { label: 'fleet icon', draw: (c, r) => drawFleetIcon(c, r, false) },
+  { label: 'fleet icon, full', draw: (c, r) => drawFleetIcon(c, r, true) },
+  { label: 'recycle icon', draw: (c, r) => drawRecycleIcon(c, r) },
+  { label: 'fleet (left) vs full (right)', draw: (c, r) => { c.save(); c.translate(-r * 0.55, 0); drawFleetIcon(c, r * 0.5, false); c.restore(); c.save(); c.translate(r * 0.55, 0); drawFleetIcon(c, r * 0.5, true); c.restore(); } },
   { label: 'probe core frac 0', draw: (c, r) => drawProbeCore(c, r, T, 0) },
   { label: 'probe core frac .5', draw: (c, r) => drawProbeCore(c, r, T, 0.5) },
   { label: 'probe core frac 1', draw: (c, r) => drawProbeCore(c, r, T, 1) },
@@ -305,7 +338,10 @@ for (const s of areaStates) {
     boundLines.push(`area node tier ${tier} ${s}: ${(measure((c, r) => drawAreaNode(c, r, 0.5, tier, s)) / 50).toFixed(3)} r (limit 1.000 r)`);
   }
 }
-for (const id of researchIds) boundLines.push(`research ${id}: ${(measure((c, r) => drawResearchIcon(c, r, id)) / 50).toFixed(3)} r`);
+for (const id of researchIds5) boundLines.push(`research ${id}: ${(measure((c, r) => drawResearchIcon(c, r, id)) / 50).toFixed(3)} r`);
+boundLines.push(`fleet icon: ${(measure((c, r) => drawFleetIcon(c, r, false)) / 50).toFixed(3)} r`);
+boundLines.push(`fleet icon full: ${(measure((c, r) => drawFleetIcon(c, r, true)) / 50).toFixed(3)} r`);
+boundLines.push(`recycle icon: ${(measure((c, r) => drawRecycleIcon(c, r)) / 50).toFixed(3)} r`);
 boundLines.push(`probe core: ${(measure((c, r) => drawProbeCore(c, r, 0.5, 1)) / 50).toFixed(3)} r`);
 boundLines.push(`stockpile icon: ${(measure((c, r) => drawStockpileIcon(c, r)) / 50).toFixed(3)} r`);
 for (const s of ['closed', 'open', 'owned'] as LaneState[]) {
@@ -378,5 +414,57 @@ if (boundsEl) boundsEl.textContent = ['(pixel scan includes antialiasing: 1.002 
     m.textAlign = 'left';
     m.fillStyle = palette.starBright;
     m.fillText('ore 150  ice 80  crystal 0', 44, 31);
+  }
+}
+
+// ---- H5 mock HUD row at 375 px: ship chips and the fleet chip, normal and full ----
+{
+  const hud = document.getElementById('h') as HTMLCanvasElement | null;
+  if (hud) {
+    const W = 375;
+    const rows = 4;
+    const H = rows * 56;
+    hud.width = W * dpr;
+    hud.height = H * dpr;
+    hud.style.width = `${W}px`;
+    hud.style.height = `${H}px`;
+    const h = hud.getContext('2d') as Ctx;
+    h.scale(dpr, dpr);
+    h.fillStyle = palette.space;
+    h.fillRect(0, 0, W, H);
+    h.font = '13px system-ui, sans-serif';
+    h.textBaseline = 'middle';
+    const chip = (x: number, y: number, w: number, label: string, icon: (c: Ctx) => void, edge: string): number => {
+      h.fillStyle = 'rgba(207, 232, 255, 0.08)';
+      h.fillRect(x, y, w, 44);
+      h.strokeStyle = edge;
+      h.lineWidth = 1;
+      h.strokeRect(x + 0.5, y + 0.5, w - 1, 43);
+      h.save();
+      h.translate(x + 18, y + 22);
+      icon(h);
+      h.restore();
+      h.fillStyle = palette.starBright;
+      h.fillText(label, x + 34, y + 23);
+      return x + w + 6;
+    };
+    const shipChips = (y: number): number => {
+      let x = 6;
+      x = chip(x, y, 62, '3', (c) => drawShip(c, 11, 0, 'drone'), palette.starDim);
+      x = chip(x, y, 62, '2', (c) => drawShip(c, 11, 0, 'lancer'), palette.starDim);
+      x = chip(x, y, 62, '1', (c) => drawShip(c, 11, 0, 'flak'), palette.starDim);
+      return x;
+    };
+    // Rows: normal, full, normal with the wide-font stress (16px), and a recycle button row.
+    let x = shipChips(6);
+    chip(x, 6, 126, 'Fleet 6/12', (c) => drawFleetIcon(c, 12, false), palette.starDim);
+    x = shipChips(62);
+    chip(x, 62, 126, 'Fleet 12/12', (c) => drawFleetIcon(c, 12, true), palette.probe);
+    h.font = '16px system-ui, sans-serif';
+    x = shipChips(118);
+    chip(x, 118, 126, 'Fleet 12/12', (c) => drawFleetIcon(c, 12, true), palette.probe);
+    h.font = '13px system-ui, sans-serif';
+    chip(6, 174, 120, 'Recycle...', (c) => drawRecycleIcon(c, 12), palette.asteroidOre);
+    chip(132, 174, 150, 'Fleet limit 12 > 18', (c) => drawResearchIcon(c, 12, 'fleet'), palette.starDim);
   }
 }
