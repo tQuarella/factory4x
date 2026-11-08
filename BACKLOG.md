@@ -198,6 +198,51 @@ Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait 
 4. Tests cover the raid-supply decision logic and the flag computation.
 5. Gates pass. Report the actual numbers against the flags; do not retune data.
 
+## Milestone 2, iteration 3: H3 Counter web (spec in `DESIGN.md` → "H3 (Milestone 2, iteration 3, spec ready): Counter web")
+
+Owner chose this slice on 2026-11-07 (Q13, Q14). Where this backlog and the spec differ, the spec wins. Order: h3-sim and h3-art in parallel; after h3-sim merges, h3-client and h3-bots in parallel; then h3-design-data. Planned launches: 5 builders + 4 Critic reviews = 9 of 12.
+
+### h3-sim (core-engineer)
+
+**Files:** `packages/sim/**`, `data/sim.json`, `packages/bots/src/reference-replay.ts` and the determinism baselines. Only the minimal edits needed to keep `packages/client/src/*` (e.g. `sheet.ts`) and `packages/bots/src/*` (e.g. `strategies.ts`) compiling with the new input signatures; no feature work there.
+
+**Acceptance:**
+1. Every rule in the spec's "Entities and state: changes", "Rules per tick: changes from H1/H2" and "Player inputs: changes" is implemented in integer math with the fixed type orders and no RNG: stock of five resources, pods carrying `res`, assemblers (rule 5a), three yards (5b), two-type counter combat with target orders and overflow (7), capture for pockets/Root/heart including the wilt to starved caps (8), per-type regrowth (9), `capEff`.
+2. `data/sim.json`: `dataVersion` 4, the 16-node `map.nodes`, the three layouts in `map.layouts` (Frost Gate, Glass Thicket, Twin Seams) exactly as the spec tables give them, and every tunable from the spec's Tunables table under its dotted key with its range. H1/H2 keys the spec removes are gone.
+3. Selectors for everything in "Observable values" that comes from the sim, including the per-ship-type Strong/Even/Weak tag (guard-hp-weighted, integer, division last), yard and assembler status reasons, per-resource delivery buckets, capture order and `runSummary` additions.
+4. Unit tests cover at least: counter damage with overflow across guard types for each ship type (and drones at 100); assembler and yard ordering and ore reservation; component scarcity (lancer/flak never start without a component); capture of a pocket starts prize flow once routed; Root cut wilts both heart guard types to the starved caps, newest first; per-type regrowth and the starved multiplier; `capEff` with `guard.capPct`; `sendShips` per-type clamping; serialize round trip; a dataVersion-3 save is refused.
+5. A scripted test per layout shows the spec's minimum waves: report the real numbers against the spec's calibration table. Do not retune.
+6. The reference replay is regenerated for the new inputs and exercises a pocket capture, a component build, a lancer or flak build, the Root cut and the heart capture. Determinism hashes re-baselined in this task; `npm run gates -- --base main` passes (bots gate may run temporary minimal strategies until h3-bots lands; it must not crash or softlock).
+
+### h3-art (art-direction, parallel with h3-sim)
+
+**Files:** `packages/client/src/placeholders.ts`, `packages/client/src/palette.ts`, the art gallery files, `ART_STYLE.md`. Nothing else in the client.
+
+**Acceptance:**
+1. The draw contract in the spec's "Flavor and art needs" exists with these exact signatures: `drawShip(ctx, r, t, type)`, `drawSpore(ctx, r, t, hpFrac)`, `drawGuardRing(ctx, r, thornShare, sporeShare, t)`, `drawPocket(ctx, r, t, alive, prize)`, `drawResourceIcon(ctx, r, kind)` for `ore | ice | crystal | lens | plating`. Existing draw functions keep working.
+2. Drone, lancer and flak are distinguishable by shape alone at 24 px (show a greyscale row in the gallery). Spore is round and clearly distinct from Thorn; its palette entry is in the mob family, at least 4.5:1 on `space`, and not amber, teal or player blue.
+3. Ice and crystal icons are cool-family and distinct from each other, ore teal and mob pinks. The guard ring reads at 24 px and stays within radius r plus the existing ring margin.
+4. Every new palette key has a matching row in the ART_STYLE.md Palette table (the palette-sync test enforces this) and passes the contrast test or is on its documented allow-list.
+5. The gallery shows every new entity at 24 px and full size, at 375 px width. `npm run gates -- --base main` passes. Browser-facing: needs green branch CI before merge.
+
+### h3-client (engineer, after h3-sim merges)
+
+**Files:** `packages/client/src/**` except the h3-art files, and `tests/smoke/**`.
+
+**Acceptance:** everything in the spec's "Observable values and phone UI" and "What changes for H1/H2 content" (HUD chips hidden until owned, guard rings and prize icons on the map, pocket/Root/heart sheets with prize line, guard rows and Strong/Even/Weak tags from the sim selector, the "Choose…" send panel with per-type steppers, probe Yards and Assembly blocks with status reasons, banner with type counts, capture and repelled toasts with the counter hint, result panel with capture order, tuning panel keys and layout label). 375 px portrait, targets ≥ 44 px, every action ≤ 2 taps from the map. Smoke tests at desktop and phone cover: sending a mixed fleet through the send panel, a pocket capture unlocking a ship row, and the result panel's capture order; every layout assertion runs under the wide-font stress. Old saves start fresh with the existing toast. Gates and green branch CI.
+
+### h3-bots (engineer, after h3-sim merges; parallel with h3-client)
+
+**Files:** `packages/bots/src/strategies.ts`, `runner.ts`, `cli.ts`, `packages/bots/test/**`.
+
+**Acceptance:** the four strategies (`drones-only`, `ice-first`, `crystal-first`, `greedy`) and shared rules exactly as the spec's "Bot checks" describes; the per-strategy-per-layout report and per-layout comparison table; the six H3 depth flags reported as lines (not gates). Report the numbers; do not retune. Bot gate: no crash or softlock, tick p95 within budget. Gates pass.
+
+### h3-design-data (designer, after h3-bots reports)
+
+**Files:** `data/sim.json` (values only, bump `dataVersion` if a default changes), `DESIGN.md`.
+
+**Acceptance:** answer the spec's open calibration questions using the h3-bots report; retune layouts and defaults so as many depth flags as possible are met, with the reasoning in `DECISIONS.md`. Re-run the bot suite and gates; report which flags hold. The reference replay still passes (re-baseline only if the sim engineer's tooling requires it, and say so).
+
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-raid-regroup** (Designer to decide, then engineer): after cutting the Root, raid-supply moves the Root survivors to a5 but leaves ships built meanwhile at the probe. It is harmless at today's numbers, but would matter if Roots get weaker or starved Blooms stronger. The fix would be one `sendShips(probe, a5, 0)` after the cut (Critic note on h2-bots).
