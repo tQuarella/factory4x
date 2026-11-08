@@ -257,7 +257,7 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 .sheet-foot { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 6px 0 calc(6px + var(--safe-b)); z-index: 1; }
 .sheet-foot .btn { margin: 0; }
 #research {
-  position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; width: min(100%, 560px); max-height: 74dvh; max-height: 74vh; z-index: 9;
+  position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto; width: min(100%, 560px); max-height: 70dvh; max-height: 70vh; z-index: 9;
   background: var(--panel); border: 1px solid var(--line); border-bottom: 0; border-radius: 14px 14px 0 0;
   overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; padding: 0 12px calc(8px + var(--safe-b));
 }

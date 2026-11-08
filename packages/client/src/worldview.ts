@@ -94,7 +94,7 @@ export function labelSides(centers: readonly { x: number; y: number }[], lanes: 
   }
   const LW = 120;
   const LH = 30;
-  return centers.map((c, i) => {
+  return centers.map((c) => {
     const rect = (above: boolean): Rect => ({ x: c.x - LW / 2, y: above ? c.y - r - 3 - LH : c.y + r + 3, w: LW, h: LH });
     const score = (rc: Rect): number => {
       let s = 0;
@@ -107,7 +107,6 @@ export function labelSides(centers: readonly { x: number; y: number }[], lanes: 
       if (rc.x < 0 || rc.x + rc.w > w) s += 5;
       return s;
     };
-    void i;
     return score(rect(false)) <= score(rect(true)) ? 'below' : 'above';
   });
 }

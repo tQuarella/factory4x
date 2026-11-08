@@ -324,7 +324,7 @@ export class ResearchSheet {
     return {
       set: (r) => {
         const can = r.canBuy;
-        const label = can ? verb : r.cost === null ? 'Maxed' : researchBlock(r, (id, level) => this.itemLabel(id, level), (id) => this.areaName(id));
+        const label = can ? verb : r.cost === null ? (r.maxLevel === 1 ? 'Researched' : 'Max') : researchBlock(r, (id, level) => this.itemLabel(id, level), (id) => this.areaName(id));
         b.set(label, can);
         toggleClass(b.el, 'blocked', !can);
       },

@@ -464,6 +464,9 @@ requestAnimationFrame(frame);
 function startCampaign(start: CampaignStart, tunables: Record<string, number> = {}): void {
   const s = app.session;
   adopt(new Session(dataWithDefaults(data, { ...s.world.tun, ...tunables }), { seed: s.seed, start }));
+  // A constructed landing gets the landing notice a real one would.
+  const w = app.session.world;
+  if (w.campaign.active !== null) toast.show(landingNotice(data.map.areas[w.campaign.active]!.name, landingEffects(w)));
 }
 
 window.__factory4x = {

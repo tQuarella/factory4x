@@ -1,4 +1,4 @@
-/** Full-screen panels: tuning, feedback, result, and the New run confirmation. */
+/** Full-screen panels: tuning, feedback, the area result and win panels, and the New system confirmation. */
 import { SHIP_TYPES, areaStatus, campaignSummary, runSummary, tunableMeta, type CaptureEntry, type Input, type ShipTypeCounts, type SimData, type TunableMeta } from '@factory4x/sim';
 import { btn, h, setText, toggleClass, type Btn } from './dom.ts';
 import { buildNote } from './feedback.ts';
