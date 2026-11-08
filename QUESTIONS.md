@@ -43,7 +43,9 @@ Your Q13 answer (a long, persistent game with factories outside the probe) confl
    with
    "1. **Throughput is the throttle.** The rate your network delivers resources to your factories and shipyards gates everything else."
 
-**Answer:**
+**Answer (owner, 2026-11-07, in chat):** "Approve both". Also chose "Build Counter web" as the first M2 slice (H3).
+
+APPROVED-PROTECTED: VISION.md
 
 ### Q13. Which idea should the next build test? (2026-11-07, Designer)
 
