@@ -530,43 +530,162 @@ Only the minimal edits needed to keep `packages/client/src/*` and `packages/bots
 4. Update every DESIGN.md table the data tests read (H3 "Layouts", H4 "Area guards", "Areas", "Research", H5 "Tunables") together with the data. Search DESIGN.md for stale statements of what changed. Recompute every derived claim from its table.
 5. Re-run the bot suite and the gates, commit the report as `reports/archive/h5-design-data-v9.*`, and report which flags hold. Put any out-of-scope leftover at the top of the report as a blocker.
 
-## Milestone 2, iteration 6: owner bugs from build-20261108-4 (ship regardless of the H6 pick)
+## Milestone 2, iteration 6: H6 Open frontier (spec in `DESIGN.md` → "H6 (Milestone 2, iteration 6, spec ready): Open frontier")
 
-Both come from the owner's feedback on build-20261108-4 (PLAYTEST_LOG.md). They are client-only and ship in iteration 6 whatever Q19 picks. The Director may run them as one launch and one review (two ids, one branch), or fold them into the H6 client task. Each needs a smoke test that **fails on current `main`**, run and reported, before the fix.
+The owner picked A, Open frontier, and chose to remove the Root (Q19, 2026-11-08). Where this backlog and the spec differ, the spec wins. The two owner bugs from build-20261108-4 ship in this iteration too.
+
+**Parallel groups:**
+1. **Now:** `h6-sim` (core-engineer), `h6-art` (art-direction) and the bug engineer. The bug engineer does `h6-bug-topbar-oscillation`, then `h6-bug-buffer-toast-flicker` as a resume. The three file sets don't overlap. The bug tasks are client-only on purpose (no `packages/sim`), so they can't collide with h6-sim.
+2. **After h6-sim merges and both bug tasks merge:** `h6-client` and `h6-bots`. h6-client waits for the bugs because they share `hud.ts`, `sheet.ts` and `style.css`.
+3. **After h6-bots has Critic approval:** `h6-design-data`, stacked on `task/h6-bots` (PROCESS "Gates that wait on calibration"). The bot gate's no-softlock check is judged on the stacked branch, and `merge-task h6-design-data` merges both together. h6-bots is never merged alone. It may overlap h6-client.
+
+**Planned launches (12):**
+- Designer: 1, done (triage); the spec and h6-design-data are resumes.
+- Builders: 5 (h6-sim, h6-art, the bug engineer, h6-client, h6-bots).
+- Critics: 4 launches (h6-sim, bugs, h6-client, h6-bots). The bugs Critic is resumed for h6-art, and the h6-bots Critic for h6-design-data.
+- Retrospective: 1.
+
+That's 11, with 1 spare.
 
 | Id | Task | Owner | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| h6-bug-topbar-oscillation | The in-area top bar shifts back and forth while resources are gained and spent | engineer | none | Ready |
-| h6-bug-buffer-toast-flicker | The "backed up" warning shows and hides rapidly while an asteroid buffer sits at full, moving the buttons under it | engineer | none | Ready |
+| h6-bug-topbar-oscillation | The top bar holds still while resources change | engineer | none | Ready |
+| h6-bug-buffer-toast-flicker | The "backed up" warning holds steady while a buffer sits at full | engineer (resume) | none (after the first bug, same engineer) | Ready |
+| h6-sim | Ten-area map and lanes, relays, `fleetCap` from relays, band locks, scouting and repeat-haul selectors, Command limit removed, Root out of shipped data, data v10, H6 table tests, reference replay | core-engineer | none | Ready |
+| h6-art | Relay icon, lock badge, far area state, band label, lane modes; gallery; ART_STYLE | art-direction | none (draw contract in the spec) | Ready |
+| h6-client | Panned overworld, area states, band labels, relay and lock sheet lines, decayed haul, the step moment, research and tuning changes, Root smoke tests removed | engineer | h6-sim merged; both bug tasks merged | Blocked |
+| h6-bots | Needs-driven area choice, four strategies plus the cap-off reference, probe on fed hearts, trial visits, H6 flags | engineer | h6-sim merged | Blocked |
+| h6-design-data | Probe on v10, retune to the H6 windows, data v11 | designer (resume) | h6-bots Critic-approved (stacked) | Blocked |
 
 ### h6-bug-topbar-oscillation (engineer)
 
 Owner: "The top bar content started oscillating while gaining and spending resources." The likely cause is chip widths changing as counts change digit count or glyph width (`#chips` wraps with `justify-content: flex-end`), but the engineer diagnoses. The fix may not hide or truncate digits.
 
-**Files:** `packages/client/src/hud.ts`, `packages/client/src/style.css`, `tests/smoke/**`, plus a dev hook if needed.
+**Files:**
+- `packages/client/src/hud.ts`, `packages/client/src/style.css`;
+- a new `tests/smoke/hud-stability.spec.ts` (not `boot.spec.ts`, which h6-client edits later);
+- a dev hook in `main.ts` only if needed.
+
+No `packages/sim`.
 
 **Acceptance (test the state the bug is about):**
 1. A smoke test holds the fullest realistic HUD: The Deep, all five resource chips, all three ship chips and the fleet chip. It changes the counts **every tick** for at least 200 frames at 4x, crossing digit boundaries both ways (0↔1, 9↔10, 99↔100, 999↔1000 for ore). Ice and crystal rates appear and disappear, and lens and plating rise and fall through 0.
 2. Across those frames, every HUD element (each chip, each chip row, the stat blocks and the buttons) keeps its x, y, width and height within 1 px, and the bar's row count doesn't change.
 3. The test runs at 375x667 portrait under the wide-font stress, and in the landscape and desktop layouts.
 4. No chip shows or hides while its count passes through 0 within a visit.
-5. It still fits the H5 rule (at most two rows at 375 px). New smoke tests pass `--repeat-each 5` on both projects, and gates pass with green branch CI.
+5. It still fits the H5 rule (at most two rows at 375 px).
+6. The new test fails on current `main` (run and reported) and passes after the fix. It passes `--repeat-each 5` on both projects, and gates pass with green branch CI.
 
-### h6-bug-buffer-toast-flicker (engineer)
+### h6-bug-buffer-toast-flicker (engineer, resume)
 
-Owner: "When an asteroid buffer is full the toast warning shows and hides rapidly, shifting the buttons under them." The asteroid sheet's warning ("Backed up: route at capacity. Upgrade it.", `packages/client/src/sheet.ts`) and the map's "!" badge follow `nodeStatus(...).backedUp`, which is `buffer >= bufferCap` (`packages/sim/src/selectors.ts`). A pod leaving drops the buffer to cap − 1, and extraction refills it, so the flag flips every few ticks. The engineer picks the fix. For example: a steady definition (extraction rate above route capacity, or hysteresis over a window), and a reserved slot for the line so showing it never moves anything. A selector change is read-only and doesn't touch determinism. It needs core-engineer review if it lands in `packages/sim`.
+Owner: "When an asteroid buffer is full the toast warning shows and hides rapidly, shifting the buttons under them." Today:
+- The asteroid sheet's warning ("Backed up: route at capacity. Upgrade it.", `packages/client/src/sheet.ts`) and the map's "!" badge and dashed route (`view.ts`) follow `nodeStatus(...).backedUp`. That flag is `buffer >= bufferCap`, so it flips each time a pod leaves.
+- **Fix it in the client.** For example, derive a steady flag from `extractPerMinX10` against `route.capacityPerMin` (both already in `nodeStatus`), or hold the flag over a window. Reserve the line's space so showing it never moves anything.
+- A sim selector change would collide with h6-sim. If the engineer finds it necessary, they report it as a blocker instead of making it.
 
-**Files:** `packages/client/src/sheet.ts`, `view.ts`, `style.css`, `tests/smoke/**`. Also `packages/sim/src/selectors.ts` and its tests, if the fix is in the selector.
+**Files:** `packages/client/src/sheet.ts`, `view.ts`, `style.css` and `tests/smoke/hud-stability.spec.ts` (or a new `tests/smoke/sheet-stability.spec.ts`). No `packages/sim`.
 
 **Acceptance (test the state the bug is about):**
 1. A test builds an asteroid whose extraction exceeds its route capacity, so the buffer hovers at full (alternating cap and cap − 1). It keeps the sheet open for at least 10 game seconds at 1x and again at 4x.
 2. Across every frame, the warning is shown continuously (no hidden frame), the map badge and the dashed backed-up route don't blink, and every button below the warning keeps its position within 1 px.
 3. After the route is upgraded so its capacity covers extraction, the warning clears within 2 game seconds and stays cleared. Clearing it doesn't move the buttons either.
 4. The no-route warning still works.
-5. At 375x667 under the wide-font stress. New smoke tests pass `--repeat-each 5` on both projects, and gates pass with green branch CI.
+5. At 375x667 under the wide-font stress. The new test fails on current `main` (run and reported). New smoke tests pass `--repeat-each 5` on both projects, and gates pass with green branch CI.
+
+### h6-sim (core-engineer)
+
+**Files:**
+- `packages/sim/**` (tests included; frozen fixtures as needed);
+- `data/sim.json`;
+- `packages/bots/src/reference-replay.ts`;
+- DESIGN.md: only the dated "Superseded at data v10" notes under the H4 and H5 tables, plus H6 table cells if a value must differ, with the reason.
+
+**Acceptance:**
+1. **Data v10:** the H6 "Areas", "Area guards", "Research" and "Tunables (H6 …)" tables exactly, plus the 14 lanes and the frame. Areas gain `side` and `relay`. No area includes `root`. Command limit rows and `research.fleet.step` are removed. `parseSimData` validates the new fields and the H6 haul invariant (worst-position decay), and rejects a relay outside tiers 1–2.
+2. **Rules:**
+   - `fleetCap` from `commandedBands`; a second relay in a band adds nothing;
+   - `bandOpen` and the `enterArea` band lock, with the `bandLocked` reason;
+   - the repeat haul decay at reclaim, with `haulPaid` recorded.
+
+   Each has unit tests at defaults and at the edges: `overworld.bandLock` 0, `areas.repeatHaulPct` 0 and 100, and `fleet.cap` 0 (relays still unlock bands). Include one test with a haul that doesn't divide evenly.
+3. **Selectors:** `overworldStatus` (known, open, locked, relay, band, commanded, `haulNow`), `fleetStatus` (`commandedBands`), and the `haulPaid` fields. Test a far area two lanes out, and a known but locked area (with locks on and no relay).
+4. **The Root:**
+   - a shipped-data test asserts no area includes it;
+   - the H2/H3 Root rule tests still pass on the frozen fixtures;
+   - shipped-data tests that cut a Root move to a fixture or go;
+   - The Deep without `root` uses its layout's fed counts only (tested).
+5. **Data tests:** the shipped-data table tests read the H6 tables, and the H4/H5 table tests stop checking shipped data (fixtures only, or retired), with the dated notes. The `dataVersion` pin is 10.
+6. **The reference replay** covers the spec's list, and the hashes are re-baselined.
+7. Gates pass. Not browser-facing beyond the replay and data.
+
+### h6-art (art-direction, parallel with h6-sim)
+
+**Files:** `packages/client/src/placeholders.ts`, `icons.ts`, `gallery.ts`, `palette.ts` and `ART_STYLE.md`. Not `view.ts`, `worldview.ts`, `hud.ts`, `sheet.ts` or `style.css`.
+
+**Acceptance:**
+1. Everything in the spec's "Art needs (H6)" draw contract: `drawRelayIcon`, `drawLockBadge`, `drawAreaNode` with the four states, and `drawLane` with three modes and reveal progress. Existing callers keep working.
+2. The gallery shows each at 24 px and at the overworld size, beside the area node, the fleet icon and the "!" badge, and each is told apart from them.
+3. Each stays within `r`. Any new colour gets a palette key and an ART_STYLE.md row, and the palette sync test passes.
+4. Gates pass.
+
+### h6-client (engineer, after h6-sim and both bug tasks merge; parallel with h6-bots)
+
+**Files:** `packages/client/src/**` except the h6-art files, and `tests/smoke/**`.
+
+**Acceptance:**
+1. Everything in the spec's "Client: screens and phone UI (H6)":
+   - pan (drag pans, a touch under 10 px is a tap, no zoom), and the opening view;
+   - the four area states and relay icons, the band labels, and the top-row fleet limit;
+   - the area sheet lines (relay, already commanded, locked, far, decayed haul with its reason);
+   - the step moment (pan, fade, lane reveal, about 1.5 s, skippable, shown once) and its notice;
+   - no Command limit card, the new repelled hint, and the tuning labels with `bloom.starved*` hidden.
+2. **Remove the Root smoke tests** that need a Root on shipped data, and say which in the report.
+3. Every number comes from sim selectors or live tunables. Smoke tests don't pin data values.
+4. **Smoke at desktop and phone, in the fullest realistic state:**
+   - On the 10-area map at 375x667, pan to The Deep and tap it.
+   - Every area node is at least 44 px and no band label overlaps a node, under the wide-font stress, in portrait, landscape and desktop.
+   - A locked area's sheet has no Land button.
+   - A far area's sheet says unscouted.
+   - Reclaim a relay through a dev-hook `campaignWorld`, see the reveal and the notice once, and see the limit on the next landing notice.
+   - A repeat haul shows the decayed amount.
+   - With `overworld.bandLock` 0, the locked badges are gone.
+
+   New smoke tests pass `--repeat-each 5` on both projects.
+5. A v9 save starts fresh with the existing toast. Gates pass, with green branch CI.
+
+### h6-bots (engineer, after h6-sim merges; parallel with h6-client)
+
+**Files:** `packages/bots/src/strategies.ts`, `runner.ts`, `cli.ts`, `waves.ts` and `packages/bots/test/**`. Not the reference replay.
+
+**Acceptance:**
+1. The needs-driven area choice, the four strategies (`composer`, `ice-first`, `crystal-first` and `drones-only`) and the cap-off reference, exactly as the spec's "Bots (H6)" says.
+2. The probe on fed hearts for every tier ≥ 1 area and every Deep layout, marked against "Capability windows (H6)". Starved rows print "n/a". Also the trial visits: band 2 at L0, The Deep at L1 and band 1 relays with drones only, each a full composer visit up to the 30-minute cap, landed from `campaignWorld`. Both are bounded and print progress, as H5. The bot gate may skip the trials if they are slow; the full report runs them, and DECISIONS.md says which.
+3. The report: H5's per-run columns plus areas left untaken, haul paid against nominal and each capturing wave's composition. Also the probe table, the per-seed table, and the seven H6 flags as report lines.
+4. **Bot gate:** no crash, tick p95 in budget, and no softlock for `composer`, `ice-first` and `crystal-first`. It is judged on the stacked `h6-design-data` branch, because v10 is uncalibrated. Don't loosen it.
+5. Tests cover:
+   - the goal order and tie-breaks, a closed area skipped, and the side preferences;
+   - each flag computation, including one where two winners share a set (flag 6 fails) and one where a capturing wave is single-type (flag 4 fails).
+
+   Tests use fixtures with explicit premises, pin no tuned value, run under about 5 s each and don't grow with game length. Report the numbers; don't retune.
+
+### h6-design-data (designer, resume; stacked on `task/h6-bots` after its Critic approval)
+
+**Files:**
+- `data/sim.json` (values only);
+- `DESIGN.md`, `DECISIONS.md`;
+- the `dataVersion` pin test (version line and title only);
+- `reports/archive/h6-probe-v10.*` and `reports/archive/h6-design-data-v11.*`.
+
+**Acceptance:**
+1. **First,** commit the probe on v10.
+2. Retune to "Capability windows (H6)" in the spec's priority order, keeping the haul invariant. Put the reasoning in DECISIONS.md.
+3. Bump `dataVersion` to 11 if any value changed, and update the pin, its title and every H6 table together. Search DESIGN.md for stale statements, and recompute every derived claim.
+4. Re-run the suite and the gates, commit the report, and say which flags hold and which claim no bot exercises. Put any out-of-scope leftover at the top of the report as a blocker.
+5. Before the Critic round, merge h6-bots' approving review commit into this branch.
 
 ## Can wait (allowed while waiting on the owner)
 
+- **cw-root-code-removal** (core-engineer; from the H6 spec): the Root is out of play through data only (owner, Q19). After H6 ships, and if the owner hasn't asked for it back, delete the dormant Root code: the sim's wilt and starved rules and their fixture tests, the client's vine, Root sheet and wilt toast, the bots' Root targeting, and the `bloom.starved*` tunables. Acceptance: no reference to the Root kind outside the frame data and frozen fixtures; gates pass; determinism hashes are unchanged for shipped data.
 - **cw-worktree-prune** (engineer; added by the Retrospective after build-20261108-4): after H5 the repo has 14 worktrees besides the main checkout and 40 local branches besides `main`, every one already in `main` (`git branch --merged main`): agent worktrees under `.claude/worktrees/` (h3, h4 and h5 tasks), alias branches (`h4-bots-core`, `h4-client-core`, `h4-dd-core`, `h5-client-core`, `h5-art-merge`) and `worktree-agent-*` branches. `npm run worktree -- remove <id>` only knows `../Factory4X-wt/<id>`, so the reminder `merge-task` prints doesn't fit agent worktrees. Add `npm run worktree -- prune [--dry-run]` to `scripts/worktree.mjs`: remove every worktree and local branch whose head is already in `main` and has no local-only commits, skip locked worktrees and any with uncommitted changes (list them instead), and never touch `origin`. Acceptance: `--dry-run` lists exactly what would go and why each kept item stays; a test or scripted check with a temporary merged and unmerged branch. The Director then runs it after each handoff.
 - **cw-veil-starved-tag** (designer): on data v9 the Root-cut Spore Veil heart's counter tags read Even/Even, but the minimum waves say Flak is Strong (14 flak vs 20 drones). Fix the tag or the guard mix so the sheet reads true (h5-design-data review, round 1).
 

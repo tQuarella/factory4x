@@ -430,9 +430,9 @@ H5 (build-20261108-4, spec below) added a fleet limit per area (12, raised to 18
 
 ## Hypotheses
 
-### H6 candidates (awaiting the owner's pick)
+### H6 candidates (iteration 6): A picked, Root removed
 
-*Iteration 6, 2026-11-08. The triage is in PLAYTEST_LOG.md (build-20261108-4). The owner picks in QUESTIONS.md Q19. No spec until then.*
+*Iteration 6, 2026-11-08. The triage is in PLAYTEST_LOG.md (build-20261108-4). **The owner picked A, Open frontier, and chose to remove the Root rather than graft it** (QUESTIONS.md Q19). The spec is "H6 (Milestone 2, iteration 6, spec ready): Open frontier" below; where they differ, the spec wins. Q20 (the pillar 3 wording) is Can wait and changes nothing in the spec.*
 
 H5 worked where it was meant to bite: the limit made the owner think about the mix, they recycled, and an area felt stronger (Q1, Q2). It failed on one claim: a limit raise didn't feel like a big step (Q3). The open map the owner asked for after build-3 was held back until strength was a capability; it now is.
 
@@ -542,9 +542,349 @@ The owner, after build-4: "either remove the root mechanic or give some reward f
 - **Capability flag, if built:** a part unlock changes the optimizer's best layout's shape, not only its rate, and at least two layouts within 10% of the best exist for each part set. A rate gap alone doesn't count.
 - **Verdict:** H7 or later, once A or B holds. If the owner wants it sooner, the cheapest test is one ore rig screen on today's map, after the VISION edit.
 
+### H6 (Milestone 2, iteration 6, spec ready): Open frontier
+
+The owner picked A and chose to remove the Root (QUESTIONS.md Q19, 2026-11-08). The background is "H6 candidates" above.
+
+Everything not mentioned here is H5 (below), H4 on the overworld and H3 inside an area. Where this spec and BACKLOG.md differ, the spec wins.
+
+#### Claim
+
+**On an open map where each fleet-limit step is earned by reclaiming a command relay you choose, and opens a region you could already see, a step feels big, and which areas you take is your choice.**
+- A relay is a lock you meet before you hold the key: it needs a design you don't start with, and the next band is visibly locked until you take it.
+- Nothing else opens a band: no Root cut (the Root is gone), no grind level and no amount of waiting.
+- You need about 6 of the 10 areas, so leaving areas untaken is normal and the set you take is yours.
+
+What would disprove it:
+- The owner says a relay "didn't feel like a big step" or "was just a bigger number", as with Command limit.
+- The owner takes every area, or can't name why they took one over another.
+- The owner calls the map "linear" or "the same path".
+- The owner gets lost on the map or asks where to go next.
+
+#### The smallest mechanics that test it
+
+1. **Ten areas in four bands** on a taller overworld you pan. Band = the area's existing `tier` (0–3).
+2. **Command relays:** four new areas, two in band 1 and two in band 2 (one per side). The first relay you reclaim in a band raises the fleet limit by `fleet.relayStep` and unlocks the next band.
+3. **Band locks:** an area in band b ≥ 2 can be entered only once a relay in band b − 1 is reclaimed (`overworld.bandLock` 1). It's also calibrated so the lock tells the truth: the band's hearts don't fit the limit below.
+4. **Scouting:** every area shows its band, kind (relay or not) and lock state from the start. Its ring, prize and haul show only once it is open (lane-joined to a reclaimed area) or reclaimed.
+5. **Repeat hauls:** the second area reclaimed on the same band and side pays `areas.repeatHaulPct` of its haul.
+6. **The Root is removed from play** (data only; the code stays dormant; see "Removing the Root").
+7. **Command limit research is removed.** Relays are now the only way to raise the limit.
+
+No new inputs. `enterArea` gains one validity condition (the band lock).
+
+#### The overworld (data `map.areas`, `map.lanes`)
+
+Frame x 0–1000, y 0–2100. Area nodes are drawn at radius 80 su, as in H4.
+
+```
+                    [The Deep]                      band 3
+                   /          \
+         (Mire Relay)        (Spire Relay)          band 2 relays
+           |      \          /      |
+     [Spore Veil] ------- [Thorn Garden]            band 2
+           |   \            /   |
+         (Rime Relay) --- (Glint Relay)             band 1 relays
+           |                    |
+     [Frost Shelf]          [Glass Shoal]           band 1
+                \          /
+                 [Landfall]                         band 0
+```
+
+Lanes (undirected, 14):
+- `landfall–shelf`, `landfall–shoal`;
+- `shelf–rime`, `shoal–glint`, `rime–glint`;
+- `rime–veil`, `rime–mire`, `glint–garden`, `glint–spire`, `veil–garden`, `veil–mire`, `garden–spire`;
+- `mire–deep`, `spire–deep`.
+
+What this means in play:
+- The shortest win is about 6 areas: Landfall, one light area, its side's relay, a band 2 relay, The Deep, plus one area from the other side for the second design's resource. Either relay side works.
+- The mediums (Spore Veil, Thorn Garden), the second relay of each band and the other light area are optional: 4 of 10. What they give is resources for grind research and a second route.
+- `rime–mire` and `glint–spire` let you go from a band 1 relay straight to a band 2 relay, skipping the mediums.
+
+#### Areas (H6, data `map.areas`)
+
+`side` is `ice`, `crystal` or `none`, and decides repeat hauls. `relay` marks a command relay. Nodes are frame ids. **No area includes `root`.** Haul and export are ore / ice / crystal. The four relays are new. Values are h6-sim's starting points; h6-design-data calibrates them.
+
+| id | name | tier | side | relay | x | y | nodes | haul | export/min |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `landfall` | Landfall | 0 | none | no | 500 | 1940 | probe a1 a2 a3 a4 a5 heart | 100 / 0 / 0 | 4 / 0 / 0 |
+| `shelf` | Frost Shelf | 1 | ice | no | 220 | 1640 | probe a1 a2 a3 a5 p1 heart | 130 / 80 / 0 | 3 / 2 / 0 |
+| `shoal` | Glass Shoal | 1 | crystal | no | 780 | 1640 | probe a1 a2 a4 a5 p1 heart | 130 / 0 / 80 | 3 / 0 / 2 |
+| `rime` | Rime Relay | 1 | ice | yes | 220 | 1300 | probe a1 a2 a3 a5 a6 p1 heart | 200 / 60 / 20 | 3 / 2 / 0 |
+| `glint` | Glint Relay | 1 | crystal | yes | 780 | 1300 | probe a1 a2 a4 a5 a7 p2 heart | 200 / 20 / 60 | 3 / 0 / 2 |
+| `veil` | Spore Veil | 2 | ice | no | 220 | 900 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 heart | 420 / 90 / 70 | 5 / 3 / 0 |
+| `garden` | Thorn Garden | 2 | crystal | no | 780 | 900 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 heart | 420 / 70 / 90 | 5 / 0 / 3 |
+| `mire` | Mire Relay | 2 | ice | yes | 220 | 560 | probe a1 a2 a3 a5 a6 a8 p1 p3 heart | 300 / 60 / 40 | 4 / 2 / 1 |
+| `spire` | Spire Relay | 2 | crystal | yes | 780 | 560 | probe a1 a2 a4 a5 a7 a9 p2 p4 heart | 300 / 40 / 60 | 4 / 1 / 2 |
+| `deep` | The Deep | 3 | none | no | 500 | 180 | probe a1 a2 a3 a4 a5 a6 a7 a8 a9 p1 p2 p3 p4 heart | 920 / 100 / 100 | 8 / 3 / 3 |
+
+The Deep keeps `layout: "seed"` (the run's H3 layout). Its node list leaves out `root`, so the sim ignores that layout's `root` and starved counts (the existing no-Root path: `hasRoot` false, `fed` true for good).
+
+**The haul invariant** (`parseSimData`, replacing H4's). For each resource, take Σ over areas of the haul, with every area in a band-and-side group of two or more counted at `floor(haul × areas.repeatHaulPct / 100)`. That's every area at its worst position. The result must be ≥ Σ research cost over every level. It's checked at the data's default `areas.repeatHaulPct`. The tuning panel can lower it live, which is a dev experiment, not a softlock guarantee. At the starting values above the bound is 2070 / 310 / 310 against 1660 / 220 / 220.
+
+#### Area guards (H6)
+
+T/S before `guard.capPct`, in the H4 layout format. These are h6-sim's starting points; h6-design-data calibrates to "Capability windows (H6)". The four relays are new, and Spore Veil and Thorn Garden lose their Root and starved counts. Unchanged areas: Landfall, Frost Shelf and Glass Shoal as data v9.
+
+| Area | Node | Prize | Slots | Guards (T/S) |
+| --- | --- | --- | --- | --- |
+| rime | p1 | ice | 2 | 0 / 5 |
+| rime | heart | ore | 4 | 1 / 18 |
+| glint | p2 | crystal | 2 | 0 / 5 |
+| glint | heart | ore | 4 | 7 / 2 |
+| veil | p1 | ice | 2 | 0 / 6 |
+| veil | p2 | crystal | 2 | 2 / 6 |
+| veil | heart | ore | 4 | 4 / 34 |
+| garden | p1 | crystal | 2 | 0 / 5 |
+| garden | p2 | ice | 2 | 4 / 3 |
+| garden | heart | ore | 4 | 14 / 9 |
+| mire | p1 | ice | 2 | 0 / 8 |
+| mire | p3 | crystal | 3 | 4 / 4 |
+| mire | heart | ore | 4 | 6 / 38 |
+| spire | p2 | crystal | 2 | 0 / 8 |
+| spire | p4 | ice | 3 | 5 / 2 |
+| spire | heart | ore | 4 | 16 / 11 |
+| deep | all | as H3 | as H3 | the H3 layout tables (heart: fed counts only) |
+
+#### Fleet limit, relays and band locks
+
+- **`fleetCap(world)`** = `fleet.cap + fleet.relayStep × commandedBands` when `fleet.cap > 0`, otherwise null. `commandedBands` is the number of bands b in {1, 2} with at least one relay of band b reclaimed (0–2). At defaults: 12, then 20, then 28. It's derived, never stored.
+- **A second relay in the same band** pays its haul (decayed as a repeat) and adds nothing to the limit. Its sheet says so.
+- **`bandOpen(world, b)`:** true for b ≤ 1. For b ≥ 2, true if `overworld.bandLock` is 0 or a relay of band b − 1 is reclaimed.
+- **`enterArea`** is valid as in H4 (the area is held and lane-joined to a reclaimed area), **and** `bandOpen(world, tier)`. The status reason is `bandLocked` ("Locked: reclaim a band 1 relay (Rime Relay or Glint Relay)").
+- **Raising the limit mid-area can't happen.** Relays are reclaimed inside an area, and the raise applies from the next landing. The H5 "over the limit" rule is unchanged.
+- **With `fleet.cap` 0** there is no limit, but relays still unlock bands. That's the "H4 rules on the H6 map" comparison.
+
+#### Repeat hauls
+
+- An area's **group** is (`tier`, `side`). Groups with `side` `none` never decay.
+- At reclaim, if another area of the same group is already reclaimed, the haul paid is `floor(haul[r] × areas.repeatHaulPct / 100)` per resource. No group has more than two areas, so there's one step of decay.
+- Exports (shipments) don't decay.
+- The area result panel and the overworld sheet show the haul actually paid ("Haul 65 / 40 / 0 (half: Frost Shelf already reclaimed)").
+
+#### Scouting
+
+- **Known** (ring, prize, haul and guards shown): reclaimed, or lane-joined to a reclaimed area (Landfall at the start).
+- **Far** (everything else): drawn dim, with band, relay kind and lock state, but no ring, prize or numbers. Its sheet says "Unscouted: reclaim a neighbour to scout it" and shows the band's lock line.
+- Scouting is display only. A far area is never enterable, because H4's lane rule already says so.
+
+#### Research (H6, data `research`)
+
+The H4 items are unchanged. The three `fleet` (Command limit) rows are removed, and so is `research.fleet.step`. Whether the `limit` kind and the `tier` requirement stay in the code unused is the core engineer's call, but no shipped item uses them, and the research sheet shows no Command limit card.
+
+| id | name | kind | level | ore | ice | crystal | requires |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `lancer` | Lancer design | design | 1 | 60 | 0 | 40 | none |
+| `flak` | Flak design | design | 1 | 60 | 40 | 0 | none |
+| `opening` | Opening ore | grind | 1 | 50 | 0 | 0 | none |
+| `opening` | Opening ore | grind | 2 | 100 | 0 | 0 | none |
+| `opening` | Opening ore | grind | 3 | 150 | 0 | 0 | none |
+| `extract` | Extraction | grind | 1 | 60 | 0 | 0 | none |
+| `extract` | Extraction | grind | 2 | 120 | 0 | 0 | none |
+| `extract` | Extraction | grind | 3 | 180 | 0 | 0 | none |
+| `rigs` | Seed rigs | grind | 1 | 100 | 0 | 0 | extract 1 |
+| `rigs` | Seed rigs | grind | 2 | 200 | 0 | 0 | extract 1 |
+| `yards` | Fast yards | grind | 1 | 60 | 20 | 20 | none |
+| `yards` | Fast yards | grind | 2 | 120 | 40 | 40 | none |
+| `core` | Probe core | win | 1 | 400 | 120 | 120 | lancer 1, flak 1, The Deep reclaimed |
+
+Totals over every level: 1660 ore, 220 ice, 220 crystal.
+
+#### Removing the Root
+
+The owner's call (Q19). **Removed from play through data; the code stays dormant.**
+- **Data:** no area's `nodes` includes `root`; Spore Veil and Thorn Garden lose `layout.root` and the heart's starved counts. The frame keeps its `root` node and the H3 `map.layouts` keep their `root` entries, because the frame validation needs them and the frozen fixtures use them. `bloom.starved*` stay in data.
+- **Sim:** no rule changes. The H2/H3 Root rules (the wilt, starved regrowth) stay, covered by their existing tests on the frozen fixtures (`sim-v4.json`, `sim-v8.json`). A new shipped-data test asserts that no area includes the Root. Any shipped-data test that cuts a Root moves to a frozen fixture or is removed. The reference replay drops its Root cut.
+- **Bots:** the composer's "target the Root if the heart fails" step and the probe's starved rows become inert on shipped data. They print "n/a", and no flag uses them.
+- **Client:**
+  - No shipped area draws a Root, a vine or a wilt toast.
+  - The repelled hint already checks `hasRoot`; it changes "raise the limit (Command limit)" to "reclaim a command relay".
+  - The tuning panel hides `bloom.starved*` and drops `research.fleet.step`.
+  - Smoke tests that need a Root on shipped data (boot.spec.ts: "the Root sheet opens with the Feeds the Heart box…" and the Root-cut battle test) are removed. The behaviour stays covered in the sim tests.
+- **Why dormant, not deleted:** deleting touches rule code under determinism tests and nearly every package, for no player-visible gain, and it would collide with the parallel tasks. Deleting the dead client and bot paths is a Can wait item (`cw-root-code-removal`).
+
+#### Capability windows (H6; the calibration targets; bot flags 2–6 measure them)
+
+There are no starved states any more: every heart is fed.
+- **Limits:** L0 = 12, L1 = 20, L2 = 28 at defaults.
+- **Locally buildable:** as H5 (drones always; lancers with a crystal prize in the area, flak with an ice prize).
+- **Fits at L:** the minimum winning simultaneous wave is ≤ L − 2.
+- **Closed at L:** it is > L.
+- **Binds at L:** the best mix is ≥ L − 6, so the new slots are used.
+
+| Area | Window at defaults |
+| --- | --- |
+| Frost Shelf, Glass Shoal | The heart fits at L0 with drones alone (unchanged). |
+| Rime, Glint (band 1 relays) | Closed to drones alone at L0. Fits at L0 with drones plus the side's counter. You need a design before you can take a relay. |
+| Spore Veil, Thorn Garden, Mire, Spire (band 2) | Closed at L0 with any local mix. Fits at L1. No single type fits at L1. |
+| Mire, Spire | Also bind at L1 (best mix ≥ 14). |
+| The Deep (each layout) | Closed at L1 with any local mix. Fits at L2. No single type fits at L2. Binds at L2 (best mix ≥ 22). |
+| Every band 2 area's first pocket | Falls to drones alone within L1 (you land with no components). |
+
+#### Entities, inputs and rules: changes
+
+- **Data:** areas gain `side` and `relay`. New lanes, positions and frame. Three tunables are added and one removed (next table). The three Command limit research rows are removed.
+- **State:** none new. `campaign.research.fleet` goes, or stays at 0 (the core engineer's call). The limit, band locks, scouting and repeat decay are all derived.
+- **`enterArea`:** the band lock.
+- **Reclaim:** the haul decays for a repeat in the group. `stats` and the area record gain `haulPaid` (per resource).
+- **Determinism:** integer only, fixed orders, no RNG.
+
+#### Tunables (H6, data/sim.json, all integers)
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `fleet.relayStep` | 8 | 4–12 | 4: a relay is barely felt / 12: the next band is easy |
+| `areas.repeatHaulPct` | 50 | 0–100 | 0: the second area on a side pays nothing, so leave it / 100: no decay (the A/B off) |
+| `overworld.bandLock` | 1 | 0–1 | 0: lanes alone decide, so you can land in a band you can't take yet and feel the wall / 1: a band opens only when a relay below it is reclaimed |
+
+All three are live. Removed: `research.fleet.step`. Unchanged: `fleet.cap` (0 = no limit, the H5 A/B) and `fleet.recycleRefundPct`.
+
+#### Save, data version and replay
+
+- **`dataVersion` 10** (h6-sim). A v9 save is discarded with the existing toast.
+- **h6-design-data bumps to 11** if it changes any value. The pin test changes with it.
+- **The reference replay is regenerated** and covers:
+  - Landfall;
+  - a relay reclaim (from a `campaignWorld` start with both designs);
+  - a landing in band 2 with the raised limit;
+  - an `enterArea` refused by the band lock;
+  - a repeat haul;
+  - a yard at the limit;
+  - a `recycleShips`;
+  - a capture.
+
+  The determinism hashes are re-baselined.
+- **The H4 and H5 tables** ("Areas", "Area guards", "Research", "Tunables (H5)") describe data v9. h6-sim moves the shipped-data table tests to the H6 tables above, and adds a dated note under each H4/H5 table: "Superseded at data v10 by H6".
+
+#### Client: screens and phone UI (H6)
+
+The H1–H5 rules hold: 375 px portrait, no hover, every target ≥ 44 px, every action ≤ 2 taps from its screen (confirms and panels excepted), and nothing in either HUD wraps or shifts under the wide-font stress (the two bug fixes land first).
+
+**Overworld map:**
+- **Pan.** Scale so the frame's width fills the map width. On a wide screen that shows the whole frame, there's no pan. Area radius is ≥ 22 px. A one-finger drag pans vertically (and horizontally if the frame is wider than the view); a touch that moves < 10 px is a tap. No zoom and no momentum.
+- **The view opens** centred on the area you just left (Landfall at the start), clamped to the frame.
+- **Area states:** reclaimed, open, locked (a lock badge), and far (dim, no ring). Relays wear the relay icon in every state.
+- **Band labels** at the left edge: "Band 2 · locked" (with the lock icon) or "Band 2".
+- **Top row:** the stockpile chips plus "Fleet limit 20" with the fleet icon (hidden when `fleet.cap` is 0).
+
+**Area sheet:**
+- A relay: "Command relay: reclaim it to raise your fleet limit 12 → 20 and open band 2." If its band is already commanded: "Band 2 is already open: this relay pays its haul only."
+- Locked: "Locked: reclaim a band 1 relay (Rime Relay or Glint Relay)." There's no Land button, only that line.
+- Far: "Unscouted: reclaim a neighbour to scout it", plus band and relay kind.
+- Haul: the decayed haul, with the reason ("half: Frost Shelf already reclaimed").
+- "Your fleet limit: N" as H5. There's no ships-needed number.
+
+**The step moment** (the claim's centre). On returning to the overworld after reclaiming the first relay of a band:
+- The view pans to the newly opened band, the lock badges and the band's "locked" label fade out, and the lanes into it brighten. This takes about 1.5 s, is skippable by a tap, and is never replayed.
+- A notice: "Command relay reclaimed: fleet limit 12 → 20. Band 2 is open."
+
+**Research sheet:** no Command limit card. **Repelled hint:** "Change the mix, or reclaim a command relay to raise the limit." **Tuning:** the three keys ("Relay limit step", "Repeat haul %", "Band locks (0 = off)"); `bloom.starved*` hidden.
+
+**Phone checks:** the overworld pans at 375x667, every area node is tappable at ≥ 44 px, the band labels never cover a node, and the area sheet with the relay line fits 375x667.
+
+#### Art needs (H6, for Art Direction, within ART_STYLE.md)
+
+- **Relay icon:** a command beacon (a mast with three concentric arcs) in the player-blue family. It's used on the overworld node, the area sheet and the notice. It must read at 24 px against the existing area node and the fleet icon.
+- **Lock badge:** a small padlock, drawn over an area node's upper right, in a neutral grey with an amber shackle. It must be distinct from the H1 "!" badge.
+- **Far area:** a dim, desaturated area node with no ring. It's a draw state, not a new icon.
+- **Band label:** a text pill style and an optional faint band divider line.
+- **Lane reveal:** a lane brightness state (dim, normal, revealing).
+
+Any new colour gets a palette key and an ART_STYLE.md row. Draw contract (h6-client uses placeholders until h6-art merges):
+- `drawRelayIcon(ctx, r)`;
+- `drawLockBadge(ctx, r)`;
+- `drawAreaNode(..., state)`, with `state` one of `'reclaimed' | 'open' | 'locked' | 'far'` (extend the existing overworld area draw; existing callers keep working);
+- `drawLane(..., mode)`, with `mode` one of `'dim' | 'normal' | 'reveal'` and a reveal progress 0–100.
+
+#### Selectors (H6, sim, read-only)
+
+- **`overworldStatus(world)`:** per area `{ known, open, locked, relay, band, commanded, haulNow }`, plus `commandedBands` and `fleetCap`.
+- **`areaStatus` / `enterArea` validity:** the `bandLocked` reason.
+- **`fleetStatus`:** as H5, with `level` and `maxLevel` replaced by `commandedBands` and 2.
+- **`campaignSummary` and the area result:** `haulPaid`.
+
+#### Bots (H6): strategies and the probe
+
+**The engine:** the H5 composer engine, unchanged inside areas. Its Root step is inert.
+
+**Area choice, needs-driven** (replaces H4 greedy for H6 strategies):
+1. Find the first unmet goal, in this order:
+   1. the stockpile can afford both designs;
+   2. a band 1 relay reclaimed;
+   3. a band 2 relay reclaimed;
+   4. The Deep reclaimed;
+   5. the core is affordable.
+2. Among enterable areas, land in the one that advances that goal, cheapest by the H5 estimate. For a resource goal, an area advances it if its haul (decayed) adds the missing resource. Ties go to the strategy's side preference, then H4 order.
+3. Areas recorded closed are skipped, as in H5.
+4. Buy research by the H4 policy minus Command limit. Buy the core as soon as it's affordable.
+
+**Strategies:**
+- `composer`: no side preference.
+- `ice-first` and `crystal-first`: prefer their side.
+- `drones-only`: grind research only. Reported for where it stops; no flag depends on it.
+- **Reference:** `composer` with `fleet.cap` 0, one row per seed.
+
+**Trial visits** (new, in `waves.ts` next to the probe). A strategy that skips relays can't test the lock, because band 2 is lane-joined only to relays and so is never even reachable. So the bots land straight into areas from a `campaignWorld` start, as the probe already does. Each trial plays the composer engine for up to the 30-minute visit cap and records whether the heart fell:
+- every band 2 area at L0 with both designs;
+- every Deep layout at L1 with both designs;
+- every band 1 relay at L0 with drones only.
+
+**The probe:** H5's `waves.ts`, for every tier ≥ 1 heart (fed only) and every Deep layout. It gives single-type minima and the best local mix, marked against "Capability windows (H6)".
+
+**H6 flags** (report lines, not merge gates). Each measures what can or can't be done, never a time gap:
+1. **No softlock:** `composer`, `ice-first` and `crystal-first` buy the core on every seed within 120 game minutes.
+2. **A relay opens a band:** the probe shows every band 2 heart closed at L0 and every Deep layout closed at L1, with any local mix, and each fitting at the next limit.
+3. **The lock is real, not just a rule:** no trial visit reclaims its area. Band 2 at L0, The Deep at L1 and the band 1 relays with drones only all hold for a full visit of real play, not just the probe's arithmetic.
+4. **The mix is used:** every winning run captures at least one band ≥ 2 heart with a wave in which two counter types are each ≥ 30% of the ships.
+5. **The new limit is used:** in every winning run, the capturing wave at the band 2 relay it took and at The Deep has ≥ L − 6 ships, for the limit at that time.
+6. **The set is a choice:** every winning run leaves at least one area untaken, and on each seed at least two winners end with different sets of reclaimed areas.
+7. Determinism and the reference replay pass.
+
+**Reported, not flagged:** run length and area times, areas left untaken per run, recycles, haul paid against nominal, and the cap-off reference.
+
+**Tests must not pin tuned values** (fixtures with explicit premises, nothing over about 5 s, no runtime that grows with game length), as H5.
+
+#### Calibration (h6-design-data, stacked on h6-bots)
+
+1. Run the probe on v10 and commit it (`reports/archive/h6-probe-v10.*`). Every number cited comes from a committed report.
+2. Retune in priority order: flag 1, then flags 2–5, then flag 6. The levers are area guards, The Deep's heart counts, hauls (keeping the haul invariant), exports, and the three H6 tunables.
+3. Bump `dataVersion` to 11 if anything changed, update the H6 tables and the pin together, and search DESIGN.md for stale statements.
+4. Name in the report any claim no bot exercises.
+
+#### Success criteria (H6; the owner, one 30–40 minute phone session; 4x is fine)
+
+1. The owner reclaims at least 5 areas, including a command relay.
+2. They can name the moment a relay opened a band, and call it a step (fun question 1).
+3. They leave at least one area untaken by choice, or name why they took one area over another.
+4. They don't describe the run as "linear" or "max economy then build a fleet and attack".
+5. They never ask where to go next, or how to reach an area on the panned map.
+6. Every action is ≤ 2 taps from its screen (confirms and panels excepted), and the top bar and sheets don't shift as numbers change.
+
+Optional: they try `overworld.bandLock` 0 and say whether they prefer the locks.
+
+#### Fun questions for the handoff (H6)
+
+1. When you reclaimed a command relay and the next band opened, did that feel like a big step?
+2. Did you skip an area, or pick one over another for a reason? Which, and why?
+3. Did the map feel open, or still like one path? Did you miss the Root?
+
+#### Left out of H6 (hard limit)
+
+- Zoom, momentum panning and a "next decision" list.
+- Lane logistics (capacity, imports), and ships or stock crossing areas.
+- New ship or guard types (Warden, Lash), tier 2 resources, sap and grafts.
+- An overworld Root, and guards that adapt, escalate or attack.
+- Any "ships needed" number.
+- More than 10 areas, and procedurally generated maps (positions are fixed data).
+- Re-entering reclaimed areas, and research bought mid-area.
+- Deleting the dormant Root code (`cw-root-code-removal`).
+- New game+, and carrying the limit into it.
+- Node rigs (candidate C).
+
 ### H5 (Milestone 2, iteration 5, tested on build-20261108-4): Fleet cap
 
-**Result (owner, 2026-11-08):** mostly supported, on short answers. The limit made the owner think about the mix and they recycled (Q1); an area was closed until a raise, a mix or a Root cut, and it felt stronger (Q2). A limit raise did not feel like a big step (Q3); see "Why +6 slots felt small (Q3)" under "H6 candidates" above. The owner also found the Root cut the only reasonable choice; see "The Root" there. Keep the cap, Recycle and the capability windows. See PLAYTEST_LOG.md.
+**Result (owner, 2026-11-08):** mostly supported, on short answers. The limit made the owner think about the mix and they recycled (Q1); an area was closed until a raise, a mix or a Root cut, and it felt stronger (Q2). A limit raise did not feel like a big step (Q3); see "Why +6 slots felt small (Q3)" under "H6 candidates" above. The owner also found the Root cut the only reasonable choice; see "The Root" there. Keep the cap, Recycle and the capability windows. H6 removes the Command limit research (relays replace it) and the Root. See PLAYTEST_LOG.md.
 
 The owner picked A, "Fleet cap" (QUESTIONS.md Q17, 2026-11-08), and asked for no VISION.md edit yet (Q18). The cap ships as an experiment under the current pillar 1 wording. The background is "Owner direction 2026-11-08b: open world and a fleet cap (steelman)" above.
 
