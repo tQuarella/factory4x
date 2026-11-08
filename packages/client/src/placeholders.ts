@@ -176,9 +176,9 @@ export function drawShip(ctx: Ctx, r: number, heading: number, type: ShipType = 
     ctx.moveTo(r, 0);
     ctx.lineTo(r * 0.4, r * 0.12);
     ctx.lineTo(-r * 0.55, r * 0.14);
-    ctx.lineTo(-r, r * 0.42);
-    ctx.lineTo(-r * 0.8, 0);
-    ctx.lineTo(-r, -r * 0.42);
+    ctx.lineTo(-r * 0.9, r * 0.38);
+    ctx.lineTo(-r * 0.75, 0);
+    ctx.lineTo(-r * 0.9, -r * 0.38);
     ctx.lineTo(-r * 0.55, -r * 0.14);
     ctx.lineTo(r * 0.4, -r * 0.12);
     ctx.closePath();
@@ -191,14 +191,14 @@ export function drawShip(ctx: Ctx, r: number, heading: number, type: ShipType = 
     ctx.closePath();
     ctx.fill();
   } else if (type === 'flak') {
-    ctx.moveTo(r * 0.55, -r * 0.45);
-    ctx.lineTo(r * 0.7, -r * 0.2);
-    ctx.lineTo(r * 0.7, r * 0.2);
-    ctx.lineTo(r * 0.55, r * 0.45);
-    ctx.lineTo(-r * 0.6, r * 0.9);
-    ctx.lineTo(-r * 0.8, r * 0.9);
-    ctx.lineTo(-r * 0.8, -r * 0.9);
-    ctx.lineTo(-r * 0.6, -r * 0.9);
+    ctx.moveTo(r * 0.55, -r * 0.4);
+    ctx.lineTo(r * 0.65, -r * 0.2);
+    ctx.lineTo(r * 0.65, r * 0.2);
+    ctx.lineTo(r * 0.55, r * 0.4);
+    ctx.lineTo(-r * 0.5, r * 0.72);
+    ctx.lineTo(-r * 0.62, r * 0.66);
+    ctx.lineTo(-r * 0.62, -r * 0.66);
+    ctx.lineTo(-r * 0.5, -r * 0.72);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = palette.space;
@@ -321,8 +321,8 @@ export function drawResourceIcon(ctx: Ctx, r: number, kind: ResourceKind): void 
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * Math.PI;
-      ctx.moveTo(Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95);
-      ctx.lineTo(-Math.cos(a) * r * 0.95, -Math.sin(a) * r * 0.95);
+      ctx.moveTo(Math.cos(a) * r * 0.85, Math.sin(a) * r * 0.85);
+      ctx.lineTo(-Math.cos(a) * r * 0.85, -Math.sin(a) * r * 0.85);
     }
     ctx.stroke();
     ctx.lineWidth = Math.max(1, r * 0.13);
@@ -364,8 +364,9 @@ export function drawResourceIcon(ctx: Ctx, r: number, kind: ResourceKind): void 
     ctx.strokeStyle = palette.space;
     ctx.lineWidth = Math.max(1, r * 0.09);
     ctx.beginPath();
+    ctx.lineCap = 'butt';
     ctx.moveTo(0, -r * 0.2);
-    ctx.lineTo(0, r);
+    ctx.lineTo(0, r * 0.9);
     ctx.stroke();
   } else if (kind === 'lens') {
     ctx.strokeStyle = palette.starBright;
@@ -376,19 +377,21 @@ export function drawResourceIcon(ctx: Ctx, r: number, kind: ResourceKind): void 
     disc(ctx, 0, 0, r * 0.26);
     ctx.fill();
   } else {
-    ctx.fillStyle = palette.plating;
-    const h = r * 0.36;
-    for (let i = 0; i < 3; i++) {
-      const y = -r * 0.9 + i * r * 0.64;
-      const inset = i === 1 ? 0 : r * 0.12;
+    // Three stacked flat diamonds, top plate last, each separated by a dark edge.
+    ctx.strokeStyle = palette.space;
+    ctx.lineWidth = Math.max(1, r * 0.1);
+    for (let i = 2; i >= 0; i--) {
+      const cy = (i - 1) * r * 0.4;
+      ctx.fillStyle = palette.plating;
+      ctx.globalAlpha = i === 0 ? 1 : 0.8;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.9 + inset, y + h);
-      ctx.lineTo(-r * 0.6 + inset, y);
-      ctx.lineTo(r * 0.9 - inset, y);
-      ctx.lineTo(r * 0.6 - inset, y + h);
+      ctx.moveTo(-r * 0.8, cy);
+      ctx.lineTo(0, cy - r * 0.3);
+      ctx.lineTo(r * 0.8, cy);
+      ctx.lineTo(0, cy + r * 0.3);
       ctx.closePath();
-      ctx.globalAlpha = i === 2 ? 1 : 0.85;
       ctx.fill();
+      ctx.stroke();
     }
   }
   ctx.restore();

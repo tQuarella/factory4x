@@ -93,7 +93,7 @@ Root vs Bloom: the Bloom is a round coral with a big glow; the Root is a tall, n
 
 ## H3 entities
 
-Counter-web content. Every draw is centred and stays within radius r. The gallery shows each at 24, 48 and 96 px at 375 px width, plus a 24 px strip in colour and in greyscale.
+Counter-web content. Every draw is centred and stays within radius r (measured at r = 50 on an offscreen canvas, every shape is at most 1.01r, which is anti-aliasing). The gallery shows each at 24, 48 and 96 px at 375 px width, plus a 24 px strip in colour and in greyscale.
 
 | Entity | Draw | Look | 24 px read |
 | --- | --- | --- | --- |
@@ -108,7 +108,7 @@ Counter-web content. Every draw is centred and stays within radius r. The galler
 | Ice icon | `'ice'` | pale cyan six-spoke flake | pale snowflake |
 | Crystal icon | `'crystal'` | violet tall faceted shard, pale top facet | violet diamond |
 | Lens icon | `'lens'` | pale ring with a centre dot | ring |
-| Plating icon | `'plating'` | three stacked steel-grey plates | stripes |
+| Plating icon | `'plating'` | three stacked flat steel-grey diamonds with dark edges | layered diamonds, not menu bars |
 
 Notes:
 - `drawShip`'s third argument is the heading in radians, as in H1 and H2, and the type defaults to `'drone'`, so old callers keep working. Ships are told apart by shape alone: chevron, needle, block.
