@@ -263,6 +263,147 @@ Your probe arrives at the edge of a system broken into **areas**, asteroid clust
 6. **Two gates on one ship can confuse.** "Why can't I build Lancers here?" can now mean "not researched" or "no crystal in this area". The yard row has to name which one.
 7. **Bot runs get long.** A whole campaign is many areas, longer than the 30-minute tick cap. Bots play area by area with the summary carried over, and report per area; the per-tick budget is unchanged.
 
+*Tested on build-20261108-3 (2026-11-08): risks 2 and 3 happened. The owner found later areas a repeat and the overworld too linear. See PLAYTEST_LOG.md and the next section.*
+
+## Owner direction 2026-11-08b: open world and a fleet cap (steelman)
+
+The owner's feedback on build-20261108-3 (PLAYTEST_LOG.md, 2026-11-08) proposes two changes:
+- **A ship limit:** "Consider a ship limit so you need to build the right composition within that limit rather than just swarming drones. Could increase the limit with research."
+- **An open world:** "The overworld feels too linear. Consider going more open-world. Panning is fine, it doesn't need to all fit on the same screen. (steelman that before agreeing). That'd give the player the option to continue reclaiming and build strength before tackling the next challenge."
+
+This section argues for each as strongly as I can, then against, then says what would have to be true for each to work. It is a direction, not a spec. The slices are under "H5 candidates (awaiting the owner's pick)".
+
+### The root cause both proposals attack
+
+H2, H3 and H4 failed the same way. Every difference in the game is paid in **time**: ships are unlimited, a ship is ore, and ore is minutes. So:
+- a counter makes a fight faster, not possible;
+- research makes an area faster, not possible;
+- a heavier area takes longer, and is never closed to you.
+
+Pillar 4 says time doesn't matter, so none of these differences is felt. The proof is in the H4 calibration: the medium hearts grew 42–55%, and mean area times moved by 6 s and 32 s ("Calibration result (h4-design-data, data v7)"). "Max economy, then swarm" is not a strategy the player chose. It is the only strategy a time-only game has.
+
+So a fix has to make some choices about **what you can do**, not how fast you do it. The fleet cap does that directly. The open world does it only if it is built on something like the cap.
+
+### The fleet cap
+
+**The mechanic.** Each area has a limit on how many of your ships can be alive at once (all types count). At the limit, yards pause ("idle: fleet full 12/12"). A **Recycle** order at the probe scraps ships for part of their ore, so you can change your mix. Research raises the limit.
+
+**The case for it.**
+- **It changes the currency from ore to slots.** Arithmetic from `data/sim.json` (v7):
+  - a drone slot does 2 damage to anything;
+  - a matched counter slot does 4 × 200% = 8 (a lancer on Thorns, a flak on Spores), four drones' worth;
+  - a mismatched counter slot does 4 × 25% = 1, half a drone.
+
+  With unlimited ships, the 4× edge is only a time saving. Under a cap it's the difference between a fleet that fits and one that doesn't.
+- **There is a window where only a mix wins.** On the frozen v4 fixture, `packages/sim/test/min-waves.test.ts` pins the smallest winning simultaneous wave for each H3 heart (drones / lancers / flak / best mix):
+
+  | Heart | Drones | Lancers | Flak | Best mix |
+  | --- | --- | --- | --- | --- |
+  | Frost Gate | 33 | 25 | 39 | 14 |
+  | Glass Thicket | 37 | 23 | 46 | 16 |
+  | Twin Seams | 30 | 28 | 30 | 13 |
+
+  The best mix needs 42–43% of the drone wave. A cap between the mix and the best single type means only a mix wins. A cap between the best single type and the drones means a counter is required. The shipped data roughly doubled every guard count (H3 calibration, "about x2.1"). The shipped single-type waves are in the H3 layout tables (for example, Frost Gate's heart 63 / 42 / 70). The shipped mix minimum isn't in any committed report yet; measuring it is the first job of the H5 calibration task.
+- **A trickle doesn't beat the cap.** Guards regrow faster than you can rebuild:
+  - one Spore every 20 ticks and one Thorn every 60 ticks per guarded node, both at once;
+  - one ship every 90–120 ticks per yard.
+
+  So a failed wave can't be topped up while the node recovers, and each wave has to win on its own. Under the cap, "attack once the fleet is twice the regrowth" stops working, because you can't build twice.
+- **It breaks "max economy first".** A cap of about a dozen ships fills from a modest economy. Past that point, more economy only refills losses faster and feeds the components. The incentive becomes "get the right components, fill the cap with the right mix, attack", early and often.
+- **Heavier areas feel stronger, because some are closed to you.** If a heart's best mix doesn't fit your cap, you can't take it yet. That is a wall you can see on the area sheet, not a longer wait.
+- **Cap raises are felt steps.** Going from 12 to 18 slots opens areas that were closed. It's the "big step" H4 lacked, and the owner proposed it.
+- **It gives the Root a job.** H3 showed a starved heart needs about half the fleet of a fed one (H3 calibration headline; `min-waves.test.ts` asserts it on the fixture). Under a cap, cutting the Root is how you take a heart that's too big for your fleet. The owner's favourite moment becomes a gate, not an option.
+- **Phone cost is small:** one "Fleet 9/12" chip, one yard state and one Recycle stepper row, using the existing send-panel pattern.
+
+**The case against.**
+- **It touches pillar 1.** "Throughput... gates everything else." A cap is a ceiling that throughput doesn't set. Throughput still gates how fast you fill and refill, and which components you can make, but no longer how big your fleet is. See "Check against VISION.md" below.
+- **It can make the economy feel pointless.** If 12 ships fill in two minutes, the network you build matters less. This is real. Mitigations: components stay throughput-bound (a light pocket makes a handful a minute); losses are refilled from throughput; and Recycle refunds only part of the cost.
+- **"Wait for the next cap level" could become the new swarm.** If cap raises are cheap ore, the dominant plan is to grind ore, buy the cap and overwhelm. Mitigation: each cap level costs a resource that only a heavier area gives, so you earn a raise by taking an area, not by waiting.
+- **Counters stay a lookup.** With the cap, "Spores, so Flak" is still one step. It just becomes mandatory. A cap only creates thought when nodes are mixed and the area can't build every counter locally. Then the question is "which 12, from what I can make here". In H4, light areas have one pocket, so you can build drones and one counter there. That's fine for light areas, if the calibration makes the mediums need both.
+- **Drones become filler.** On a mixed node, a matched pair beats two drones by 16 to 4, so once you have both designs, drones only fill slots when components run short. That's acceptable: drones are the "no components yet" ship.
+
+**Does it break "swarm drones"?** Yes, if three things hold, and the calibration task must show all three:
+1. At each tier's expected cap, drones alone can't take the tier's hearts.
+2. The best mix you can build from that area's local resources fits the cap with a few slots to spare.
+3. The cap rises more slowly than area strength, so drones never fit again later.
+
+Below the window, nothing fits and the area is a wall. Above it, drones fit and the swarm is back.
+
+**Proposed numbers** (finalised by the calibration task):
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `fleet.cap` | 12 | 0–60 | 0: off, H4 as built (the in-build A/B) / 6: every ship is precious, fights are tiny / 60: no real limit, the swarm returns |
+| `research.fleet.step` | 6 | 2–12 | per level, 3 levels, so 12 → 30 at defaults. 2: raises go unnoticed / 12: one level doubles the fleet |
+| `fleet.recycleRefundPct` | 50 | 0–100 | 0: a wrong build is wasted until it dies / 100: free respec, so composition is never a commitment |
+
+`research.fleet` ("Command limit") costs are data, not tunables. Each level needs ice or crystal in amounts only a tier-2 or tier-3 haul covers.
+
+**What the in-area decision becomes.**
+1. **Which pocket first:** it decides which counter you can make here. Without it, some nodes are closed, not slower.
+2. **Which mix fills the cap for this node.**
+3. **Cut the Root or not:** forced when the fed heart's mix doesn't fit.
+4. **Recycle and refit** between targets with different mixes.
+
+The economy decision shrinks to "enough to make components and refill".
+
+### The open world
+
+**The mechanic, at its strongest.** The overworld is bigger than one screen: about 12–16 areas, which you pan. Areas beyond your border are scouted, so you see their guard ring and prize, not their numbers, until a neighbour is reclaimed. There are more areas than you need, so the probe core needs only a subset. You choose which areas to take, which to leave, and when to push into a heavier one.
+
+**The case for it.**
+- **It makes the set a choice, not just the order.** H4's six areas were all needed: hauls cover research with 20 ore spare (1680 against 1660), and no bot skipped one. With more areas than you need, which ones you take shapes your build, and two runs can end with different maps.
+- **The pacing is yours.** "Continue reclaiming and build strength before tackling the next challenge" is the owner's own wish. A linear ladder forces the next challenge on you; an open map lets you stop and prepare.
+- **It finally builds "explore".** VISION's original note names "explore, expand, exterminate". Nothing so far explores. Scouting and a map you uncover add a real X.
+- **Room for areas that differ in kind**, which "like a repeat" asks for:
+  - an overworld Root area whose cut starves the hearts of its lane neighbours (the owner's favourite moment, at map scale, foreseen in the H4 VISION check);
+  - a choke area that opens a region;
+  - a rich, far area held far beyond your cap, as a visible long-term goal.
+- **Pillar 2 at map scale:** the rich areas are far and heavy, and you can see them from the start.
+- **Panning is fine** on a phone, says the owner. That lifts our self-imposed one-screen limit, and a node graph still pans and taps cleanly.
+
+**The case against.**
+- **Without a cap, it amplifies the swarm.** If strength is ore, then "keep reclaiming to build strength" means "clear every easy area, buy every grind level, then swarm the hard ones until they're trivial". That is "max economy then swarm" at map scale: the owner's complaint, made bigger.
+- **More of the same loop is more repetition.** "Like a repeat" was about inside areas: the same frame, the same two guards, the same build-out. Twelve such areas feel like a repeat twice as often. An open map doesn't fix this; areas that differ in kind do, and they cost design and art per kind.
+- **The difficulty curve is uncontrolled.** With a free order, an area is either trivial (you came late) or a wall (you came early). The bots measure one of many paths.
+- **Scope.** A bigger map is mostly data, but scouting, pan, a "next decision" list, new area kinds and their calibration are more than one iteration of about 5 tasks.
+- **Bots, save and replay.** The best bot campaign is already 45:47–50:47 of play for the researching strategies (`reports/archive/h4-design-data-v7.md`). Twice the areas pushes past the 120-minute campaign cap. The save stays small (summaries), but the replay log grows with play time; area-boundary checkpoints, deferred in H4, would become needed.
+- **Phone.** Panning is fine, but finding the next decision on a map bigger than the screen needs the "next decision" list from the 2026-11-07 direction. That is more UI.
+
+**What would have to be true for it to fix "no big step" and "didn't feel stronger"** rather than amplify them:
+1. **Strength is a capability, not an amount.** Getting stronger means a higher cap, a new design or a new kind of prize. More ore alone opens nothing. The fleet cap is the natural unit.
+2. **Easy areas run out of value.** Hauls are one-off (as in H4); the same prize kind pays less each time (`areas.repeatHaulPct`); and cap raises need resources only heavier areas give. Grinding easy areas can buy grind research, never the next step.
+3. **Heavy areas are visibly closed, and you know why.** The sheet says "best mix needs about 18 slots; you have 12" or "fed: cut its Root first". The goal is concrete.
+4. **Areas differ in kind.** At least one new kind per tier (a Root area, a choke, a lone-counter area), so the fifth area isn't the first with bigger numbers.
+5. **You need fewer areas than exist.** For example, 12 areas with the core needing about 7, so leaving areas untaken is normal.
+
+**Mechanisms I rule out:**
+- **Guards that escalate over time:** they break pillar 4 and the owner's "waiting doesn't make it worse".
+- **Guards that come for you:** they break pillar 3 ("mobs only defend").
+- **Areas that toughen as you reclaim others:** this is allowed by the wording, but it punishes exactly the "build strength first" play the owner asked for.
+- **Guards that adapt to your fleet** (a heart that leans against your newest design): possible, and visible on the sheet before you commit. But it turns reading into guessing, so it stays an idea, not a proposal.
+
+### Order: the cap first
+
+The cap is cheap: one limit, one research item, one order and one recalibration. It goes straight at fun questions 1 and 3, and it creates the "strength" that an open world would let you build up. An open world without it would make the swarm bigger. With it, the open world becomes "choose where to earn your next cap raise". So: test the cap alone (H5-A); if it holds, the open map is H6 on top of it.
+
+### Check against VISION.md
+
+| VISION.md line | Fit |
+| --- | --- |
+| Fantasy: "grow from one probe into an industrial presence that can fight for the system's best resources" | Both fit. The open world shows the best resources from the start. |
+| Original note: "explore, expand, exterminate" | The open world adds explore. |
+| Original note: "The rate of resources delivered to the probe sets the rate of ship production." | A cap still lets throughput set the rate, up to the limit. It's a historical note, so leave it. |
+| Fixed: "Playable on a phone browser. Logistics are abstract routes between nodes" | Fits. The owner OK'd panning; the overworld stays a node graph. |
+| Fixed: "Each star system is one long game, played across many short sessions" | Fits both. |
+| Fixed: "No fail state" | Fits. An area too big for your cap is a wall you come back to, not a loss. Withdraw stays free. |
+| Fixed: "Ships take orders at nodes; no unit micro." | Fits. Recycle is an order at the probe. |
+| Pillar 1: "Throughput is the throttle. The rate your network delivers resources to your factories and shipyards gates everything else." | **Tension with the cap.** The cap is a ceiling throughput doesn't set. Proposed wording in QUESTIONS.md Q18 (only if a cap ships). |
+| Pillar 2: "Risk scales with reward... a bad commitment wastes production" | Stronger with the cap: a lost ship is a lost slot, so a bad commitment stings. |
+| Pillar 3: "Guardians have factories. Mobs only defend... Win a node by out-producing their replacement, or cut their supply first." | The cap shifts "out-produce" toward "out-compose" for big nodes, and makes "cut their supply" necessary for some. This fits the pillar's either/or. No edit. |
+| Pillar 4: "A puzzle, not a race. No clock and no pressure. The challenge is building an efficient network." | Fits. Time-based escalation is ruled out above. The challenge widens from "an efficient network" to "the right fleet from your network". I read that as within the pillar, so I propose no edit. |
+| Pillar 5: "Every system makes the next one stronger." | Fits. Cap research is a natural thing to carry into new game+ later. |
+
 ## Current mechanics
 
 Built in Milestone 1 (build-20261106-2, spec H1 below):
@@ -279,9 +420,87 @@ H2 (build-20261108-1, spec below) added the Root, a second guarded node that fee
 
 H3 (build-20261108-2, spec below) replaced the map with a 16-node field and three layouts: ice and crystal pockets, lens and plating made at the probe, lancer and flak yards next to the drone yard, Thorn and Spore guards with counter combat, the guard ring and Strong/Even/Weak tags, and a capture-order result panel.
 
+H4 (build-20261108-3, spec below) wrapped the field in a campaign:
+- an overworld of six areas cut from the H3 frame, starting at Landfall;
+- area landing, reclaim and withdraw;
+- a stockpile filled by hauls and shipments;
+- seven research items, including the Lancer and Flak designs and the probe core, which wins the game.
+
 ## Hypotheses
 
-### H4 (Milestone 2, iteration 4, spec ready): Reclaim ladder
+### H5 candidates (awaiting the owner's pick)
+
+Background: "Owner direction 2026-11-08b: open world and a fleet cap (steelman)" above, and the H4 triage in PLAYTEST_LOG.md (2026-11-08). Each slice keeps H4 (overworld, areas, research, Landfall start) and the H3 rules inside an area unless it says otherwise. Each is one iteration of about 5 tasks. Only one will be specced, after the owner picks (QUESTIONS.md Q17).
+
+**A lesson for every candidate:** a bot flag that claims a choice must measure capability, not a time gap. Each candidate's flags say what you *can't* do without the choice.
+
+#### H5-A: Fleet cap (recommended)
+
+- **Claim:** a limit on ships alive per area, raised by research, makes the composition of your fleet the answer instead of its size. Heavier areas feel stronger because some are closed until your cap or your mix allows them, and a cap raise is a step you feel.
+- **Built:**
+  - `fleet.cap` per area: all types count, and yards pause at the limit ("idle: fleet full").
+  - A **Recycle** order at the probe (per-type stepper, partial ore refund), so you can refit.
+  - A **Command limit** research item (3 levels).
+  - A "Fleet 9/12" HUD chip, and the area sheet shows your cap.
+  - **Recalibration:** at each tier's expected cap, drones alone can't take the hearts, the best mix you can build locally fits, and at least one fed heart needs its Root cut. Each medium needs both counters, so neither side is "the Flak side".
+- **Tunables:** `fleet.cap` (12, 0–60; 0 is H4 as built, so the owner can A/B it in the tuning panel), `research.fleet.step` (6, 2–12), `fleet.recycleRefundPct` (50, 0–100). The ends are in the steelman table.
+- **Flags (capability, not time):**
+  1. `drones-only` fails every tier 1+ heart at its tier's cap.
+  2. A composition-aware bot reclaims every area.
+  3. The best mix differs between at least two hearts in every run.
+  4. A no-cap-research strategy can't take The Deep's fed heart.
+- **Tasks (about 5):**
+  - h5-sim: cap, recycle input, research item;
+  - h5-client: chip, yard state, recycle row, sheet line;
+  - h5-bots: composition-aware engine and capability flags;
+  - h5-design-data: measure shipped mix minima, set the cap, levels and hearts;
+  - h5-art (small): a fleet-limit icon and a recycle icon.
+- **Deferred:** the open map, scouting, new area kinds, lane logistics, new ship or guard types.
+- **Fun questions:**
+  1. Did the ship limit make you think about which ships to build? Did you ever recycle ships to change your mix?
+  2. Was there an area you couldn't take until a limit raise, a better mix or a Root cut? Did that area feel stronger?
+  3. Did a limit raise feel like a big step?
+- **Risk:** the cap fills fast, so the economy feels pointless; or "wait for the next cap level" becomes the new swarm. The second is why each cap level costs a resource only a heavier area gives.
+
+#### H5-B: Open frontier (no cap)
+
+- **Claim:** a bigger, scouted overworld with more areas than you need makes *which* areas you take a real choice, and lets you build strength before a challenge, without the climb going flat. Areas that differ in kind make the fifth area feel different from the first.
+- **Built:**
+  - About 12 areas, a panned overworld and a "next decision" list;
+  - scouting: beyond your border you see the ring and prize, not the counts;
+  - the probe core needs about 7 areas;
+  - `areas.repeatHaulPct` (60, 25–100): each further area of the same prize kind hauls less;
+  - one new area kind, an **overworld Root**: an area whose capture starves the hearts of its lane neighbours, built on the existing wilt rules.
+- **Tunables:** `areas.repeatHaulPct` (60, 25–100; 25: grinding easy areas is pointless / 100: H4 hauls), `overworld.rootStarvePct` (50, 0–100; how far neighbours' caps drop).
+- **Flags:** in every run, the strategies leave different areas untaken, and at least two different area sets reach the core.
+- **Deferred:** the fleet cap, lane capacity, new ship or guard types.
+- **Fun questions:**
+  1. Did you leave areas untaken on purpose? Why those?
+  2. Did you ever stop to build strength before a harder area, and did that feel good or like a chore?
+  3. Did cutting the overworld Root feel like a big step?
+- **Risk:** without a cap, "build strength" still means "more ore, a bigger swarm", which is the steelman's main case against. I expect "max economy then swarm" again, on a bigger map. It is also the largest slice (map, pan, scouting and a new area kind).
+
+#### H5-C: Cap and command areas
+
+- **Claim:** A's cap, plus a slightly wider overworld where some cap raises are *found*, not bought. Choosing where to earn your next raise makes the overworld a choice, and the cap makes that raise matter.
+- **Built:** everything in A, plus:
+  - 2–3 extra areas (about 8–9 in all, panned if needed), with not every area required;
+  - one or two **command areas** whose prize is +1 cap level instead of resources.
+- **Tunables:** A's, plus `command.capStep` (6, 2–12).
+- **Fun questions:** A's 1 and 3, plus "Did choosing where to earn your next limit raise feel like your call?"
+- **Deferred:** scouting, the overworld Root, lane logistics.
+- **Risk:** about 6–7 tasks, over one iteration's budget. If it fails, we won't know whether the cap or the map failed.
+
+#### Recommendation: A
+
+- It is the cheapest test of the owner's own proposal.
+- It goes at the root cause of H2, H3 and H4 (every choice paid in time), and at fun questions 1 and 3 directly.
+- It carries an A/B inside the build (`fleet.cap` 0 in the tuning panel is H4 as built).
+- The open world's promise, "build strength before the next challenge", only means something once strength is a capability. If A holds, the open map (B, or C's command areas) is H6, on top of the cap. If A fails, we've learned that cheaply, before building a bigger map on it.
+
+### H4 (Milestone 2, iteration 4, tested on build-20261108-3): Reclaim ladder
+
+**Result (owner, 2026-11-08):** not supported. Areas didn't feel stronger, the approach stayed "max economy then swarm", the counters didn't feel necessary, the ice side was obvious, and later areas were a repeat with no big step. The bots' flags 3, 5 and 6 were met but measured only time gaps and permutations. The owner proposed a ship limit and a more open world. See PLAYTEST_LOG.md, "Owner direction 2026-11-08b" and "H5 candidates" above.
 
 The owner picked A, "Reclaim ladder" (QUESTIONS.md Q16, 2026-11-08). The direction is "Owner direction 2026-11-08: the overworld (steelman)" above. **Not picked:** B "Supply lines" (lane capacity, sending output into the active area), because routing only matters once there is progression to route for, and the owner rated in-area logistics "may be fine"; C "Area runs with research", because a card draft drops the overworld and the areas that keep producing. B is the likely next slice if A holds.
 

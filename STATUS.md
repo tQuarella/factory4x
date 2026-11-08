@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 4, hypothesis H4: Reclaim ladder)
-**State:** Iteration 5 started 2026-11-08. Owner feedback on build-20261108-3 is in PLAYTEST_LOG.md (ship cap, open world, extraction-rate bug). Designer triaging and steelmanning; engineer fixing the bug. Next hypothesis goes to the owner before any spec.
+**State:** Iteration 5. Owner picked H5 = A. Fleet cap (Q17); no VISION edit yet (Q18). Designer writing the H5 spec; fix-extract-rate in Critic round 2.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-3 (H4 Reclaim ladder), commit 631e4f9, live (CI gates and deploy green; site shows 631e4f9 · data v7).
@@ -13,10 +13,14 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
-| 1 | designer | triage build-20261108-3 feedback; steelman ship cap and open world | launch | Plan |
-| 2 | engineer | fix-extract-rate (owner bug) | launch | Build |
+| 1 | designer | triage build-20261108-3 feedback; steelman ship cap and open world | launch | Plan (done, c13cd55; owner picked A) |
+| 2 | engineer | fix-extract-rate (owner bug) | launch | Build (c7df834): display-only bug in nodeStatus/guardianStatus; bots now upgrade routes sooner, best run 43:35 (below H4's 45-min floor) |
+| 3 | critic | fix-extract-rate | launch | Review round 1: REJECT (heart total rounds to 124.8 not 125) |
+| r1 | engineer | fix-extract-rate | resume | Fix round 1 (369aaad) |
+| r2 | critic | fix-extract-rate | resume | Review round 2 |
+| r3 | designer | H5 spec (Fleet cap) | resume | Spec (resume of the triage Designer, per PROCESS) |
 
-Launches: 2 / 12. Resumes: 0.
+Launches: 3 / 12. Resumes: 3.
 
 ## Iteration 4 ledger
 
