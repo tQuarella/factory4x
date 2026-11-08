@@ -33,15 +33,18 @@ export class Hud {
   private readonly fleet: Chip & { icon: HTMLCanvasElement; full: boolean };
 
   constructor(root: HTMLElement) {
+    // Two rows, so the fleet chip always sits with the ship chips it counts: resources, then ships and the fleet.
+    const resRow = h('div', 'chip-row res', '', root);
+    const shipRow = h('div', 'chip-row ships', '', root);
     for (const r of RESOURCES) {
-      this.res.set(r, makeChip(root, `chip-${r}`, RES_NAME[r], (p) => resourceIcon(p, 18, r), r === 'ice' || r === 'crystal'));
+      this.res.set(r, makeChip(resRow, `chip-${r}`, RES_NAME[r], (p) => resourceIcon(p, 18, r), r === 'ice' || r === 'crystal'));
     }
     for (const s of SHIP_TYPES) {
-      this.ships.set(s, makeChip(root, `chip-${s}`, SHIP_NAME[s], (p) => shipIcon(p, 20, s), false));
+      this.ships.set(s, makeChip(shipRow, `chip-${s}`, SHIP_NAME[s], (p) => shipIcon(p, 20, s), false));
     }
     // H5: the fleet chip, "Fleet 9/12", with the fleet icon (closed amber bracket at the limit). Hidden while the limit is off.
     let icon!: HTMLCanvasElement;
-    const chip = makeChip(root, 'chip-fleet', 'Fleet limit', (p) => (icon = fleetIcon(p, 26, false)), false);
+    const chip = makeChip(shipRow, 'chip-fleet', 'Fleet limit', (p) => (icon = fleetIcon(p, 26, false)), false);
     chip.el.classList.add('fleet');
     chip.el.hidden = true;
     this.fleet = { ...chip, icon, full: false };

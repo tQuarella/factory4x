@@ -322,10 +322,9 @@ export class ResearchSheet {
         const item = this.host.session.data.research[r.index]!;
         const parts = item.requires.filter((q) => q.atLevel === undefined || q.atLevel === r.level + 1).map((q) => {
           if ('tier' in q) {
-            // "a medium area reclaimed", "both medium areas reclaimed": areas of tier >= q.tier, from the data.
-            const data = this.host.session.data;
-            const have = data.map.areas.filter((a, i) => a.tier >= q.tier && world.campaign.areas[i]?.reclaimedTick != null).length;
-            return `${tierRequirementText(q.tier, q.count)}${have >= q.count ? ' ✓' : ''}`;
+            // Met unless researchStatus lists it as a shortfall (the sim owns the rule).
+            const unmet = r.missing.tiers.some((t) => t.tier === q.tier && t.count === q.count);
+            return `${tierRequirementText(q.tier, q.count)}${unmet ? '' : ' ✓'}`;
           }
           if ('item' in q) {
             const ok = (world.campaign.research[q.item] ?? 0) >= q.level;

@@ -1168,13 +1168,65 @@ test.describe('H5 at 375x667 portrait', () => {
     await expect(page.locator('#chip-fleet')).toBeVisible();
     await expectControlsFit(page, '#bars', 'area HUD with the fleet chip');
     await expectHudNoWrap(page, 'area HUD with the fleet chip');
-    // The ship chips and the fleet chip are all in the HUD, none cut off.
-    const rects = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>('#chips .chip')).filter((e) => !e.hidden).map((e) => e.getBoundingClientRect().toJSON()));
-    expect(rects.length).toBeGreaterThanOrEqual(3);
-    for (const r of rects) expect(r.right).toBeLessThanOrEqual(375);
     await page.addStyleTag({ content: '#chip-fleet, #chip-fleet * { font-size: 16px !important; }' });
     await expectHudNoWrap(page, 'area HUD with a 16 px fleet chip');
   });
+
+  // The chips a mid-visit HUD shows. Unlocks come from deliveries, so the states are set in one synchronous evaluate
+  // (the next refresh puts the real state back) and measured at once.
+  const HUD_STATES = [
+    { name: 'Frost Shelf mid-visit', show: ['ore', 'ice', 'plating', 'drone', 'flak'], fleet: 'Fleet 12/12', full: false },
+    { name: 'Frost Shelf mid-visit, full', show: ['ore', 'ice', 'plating', 'drone', 'flak'], fleet: 'Fleet 12/12', full: true },
+    { name: 'The Deep, everything unlocked', show: ['ore', 'ice', 'crystal', 'lens', 'plating', 'drone', 'lancer', 'flak'], fleet: 'Fleet 30/30', full: false },
+    { name: 'The Deep, everything unlocked, full', show: ['ore', 'ice', 'crystal', 'lens', 'plating', 'drone', 'lancer', 'flak'], fleet: 'Fleet 30/30', full: true },
+  ];
+  for (const wide of [true, false]) {
+    for (const state of HUD_STATES) {
+      test(`HUD chips: ${state.name}, ${wide ? 'wide font' : 'normal font'}: the fleet chip shares the ships' row, two rows at most`, async ({ page }) => {
+        if (wide) await ready(page);
+        else {
+          await page.goto('/');
+          await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
+        }
+        await startCampaign(page, DEEP_START);
+        await expect(page.locator('#chip-fleet')).toBeVisible();
+        const m = await page.evaluate((s) => {
+          for (const e of Array.from(document.querySelectorAll<HTMLElement>('#chips .chip'))) {
+            const id = e.id.replace('chip-', '');
+            e.hidden = id !== 'fleet' && !s.show.includes(id);
+            if (id === 'ice' || id === 'crystal') (e.querySelector('small') as HTMLElement).textContent = '+12.5/min';
+            if (/^(ore|ice|crystal|lens|plating)$/.test(id)) (e.querySelector('b') as HTMLElement).textContent = '1234';
+          }
+          const fleet = document.getElementById('chip-fleet')!;
+          (fleet.querySelector('b') as HTMLElement).textContent = s.fleet;
+          fleet.classList.toggle('full', s.full);
+          const centre = (e: Element): number => {
+            const r = e.getBoundingClientRect();
+            return r.top + r.height / 2;
+          };
+          const chips = Array.from(document.querySelectorAll<HTMLElement>('#chips .chip')).filter((e) => !e.hidden);
+          const ships = chips.filter((e) => /^chip-(drone|lancer|flak)$/.test(e.id));
+          const rows = new Set(chips.map((e) => Math.round(centre(e) / 12)));
+          return {
+            fleetY: centre(fleet),
+            shipYs: ships.map(centre),
+            rows: rows.size,
+            right: Math.max(...chips.map((e) => e.getBoundingClientRect().right)),
+            left: Math.min(...chips.map((e) => e.getBoundingClientRect().left)),
+            fleetRight: fleet.getBoundingClientRect().right,
+            statsBottom: document.getElementById('stats')!.getBoundingClientRect().bottom,
+            ctlTop: document.getElementById('controls')!.getBoundingClientRect().top,
+          };
+        }, state);
+        expect(m.shipYs.length).toBeGreaterThanOrEqual(2);
+        for (const y of m.shipYs) expect(Math.abs(y - m.fleetY), `fleet chip row vs ship chip row ${JSON.stringify(m)}`).toBeLessThanOrEqual(6);
+        expect(m.rows, `chip rows ${JSON.stringify(m)}`).toBeLessThanOrEqual(2);
+        expect(m.right).toBeLessThanOrEqual(375);
+        expect(m.left).toBeGreaterThanOrEqual(0);
+        expect(m.statsBottom).toBeLessThanOrEqual(m.ctlTop + 1);
+      });
+    }
+  }
 
   test('the full fleet chip, the yard reason and the Recycle panel fit by touch', async ({ page }) => {
     test.setTimeout(90_000);
