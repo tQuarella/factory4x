@@ -35,6 +35,21 @@ export const COUNTER_PHRASE: Record<ShipType, string> = {
   flak: 'Strong vs Spores, Weak vs Thorns',
 };
 
+/** The sheet's Strong/Even/Weak tag text, shared by the sheet and the send panel. */
+export const TAG_TEXT: Record<'strong' | 'even' | 'weak', string> = { strong: '✓ Strong', even: 'Even', weak: '✗ Weak' };
+
+/** "1 / 2.0 s": one guard per period, one decimal always. */
+export function regrowText(ticks: number, tickRate: number): string {
+  return `1 / ${(ticks / tickRate).toFixed(1)} s`;
+}
+
+/** The notice for the first delivery of a prize that unlocks a ship type (the yard starts off, so say so). */
+export function unlockNotice(ship: ShipType): string {
+  const prize = ship === 'lancer' ? 'crystal' : 'ice';
+  const u = UNLOCKS[prize];
+  return `${RES_NAME[prize]} delivered: ${u.component} and ${SHIP_PLURAL[ship]} unlocked. Turn on the ${SHIP_NAME[ship]} yard at the Probe. Tap here to open it.`;
+}
+
 /** "Take a crystal pocket to unlock Lancers": the hint for a locked ship row. */
 export function unlockHint(ship: ShipType): string {
   return ship === 'lancer' ? 'Take a crystal pocket to unlock Lancers' : 'Take an ice pocket to unlock Flak';

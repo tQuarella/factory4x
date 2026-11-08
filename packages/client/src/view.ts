@@ -49,7 +49,14 @@ export function ringGeom(rr: number, count: number): { ringR: number; thornR: nu
  */
 export function guardRingOuter(rr: number, count: number, individuals: boolean): number {
   const { ringR, thornR } = ringGeom(rr, count);
-  return individuals ? (ringR + thornR + 2) / 0.84 : ringR;
+  return individuals ? ringR + thornR + 3 : ringR;
+}
+
+/** Radius the Root's and heart's individual guards sit at: just inside the ring band, so the ring stays within the old margin. */
+export function guardSpotR(rr: number, count: number): number {
+  const outer = guardRingOuter(rr, count, true);
+  const w = Math.max(2.5, outer * 0.16);
+  return outer - w - ringGeom(rr, count).thornR - 1;
 }
 
 /** Radius that a tap on a guarded node may land in: the whole guard ring, and at least a 44 px target. */
@@ -220,6 +227,7 @@ export class MapView {
     }
 
     const counts = shipCounts(world);
+    const labels: Array<{ text: string; x: number; y: number }> = [];
     for (const n of world.nodes) {
       const { x, y } = this.nodePos(n.index);
       const rr = this.nodeR(n);
@@ -243,12 +251,13 @@ export class MapView {
         const wilt = n.kind === 'heart' ? this.wilt : null;
         const individuals = n.kind !== 'pocket';
         const count = wilt ? wilt.from : guard.total;
-        const { ringR, thornR } = ringGeom(rr, count);
+        const { thornR } = ringGeom(rr, count);
+        const spotR = guardSpotR(rr, count);
         if (individuals) {
           for (let i = 0; i < count; i++) {
             const ang = (i / count) * Math.PI * 2 + t * 0.12;
             ctx.save();
-            ctx.translate(x + Math.cos(ang) * ringR, y + Math.sin(ang) * ringR);
+            ctx.translate(x + Math.cos(ang) * spotR, y + Math.sin(ang) * spotR);
             if (wilt && i >= wilt.to) {
               // Falls with the angle it had spinning (drawThorn turns at t * 0.8), so it doesn't snap when it starts to wilt.
               const frac = (nowMs - wilt.startMs) / WILT_MS;
@@ -282,16 +291,9 @@ export class MapView {
         }
       }
 
-      // Label, selection ring, rally flag, ship badge, warning badge.
-      ctx.save();
-      ctx.font = '600 11px ui-monospace, Menlo, Consolas, monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = '#9fb4d6';
+      // Label (drawn in a last pass, over every ring), selection ring, rally flag, ship badge, warning badge.
       // A label that would clip at the top edge goes below the node instead.
-      if (labelTop < LABEL_TOP_PAD) ctx.fillText(nodeLabel(n), x, y + selR + 12);
-      else ctx.fillText(nodeLabel(n), x, labelTop);
-      ctx.restore();
+      labels.push({ text: nodeLabel(n), x, y: labelTop < LABEL_TOP_PAD ? y + selR + 12 : labelTop });
 
       if (selected === n.index) {
         ctx.save();
@@ -314,6 +316,22 @@ export class MapView {
       const ns = nodeStatus(world, n.index);
       if (n.kind !== 'probe' && (ns.backedUp || ns.noRoute)) this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
     }
+
+    // Labels last, each on a dark pill, so no guard ring hides the name of the node it rings or a neighbour.
+    ctx.save();
+    ctx.font = '600 11px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    for (const l of labels) {
+      const wd = ctx.measureText(l.text).width + 6;
+      ctx.fillStyle = 'rgba(5, 7, 13, 0.78)';
+      ctx.beginPath();
+      ctx.roundRect(l.x - wd / 2, l.y - 10, wd, 14, 4);
+      ctx.fill();
+      ctx.fillStyle = '#9fb4d6';
+      ctx.fillText(l.text, l.x, l.y);
+    }
+    ctx.restore();
 
     // Ships in transit.
     for (const s of world.ships) {

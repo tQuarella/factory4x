@@ -29,7 +29,6 @@ import {
   type Node,
   type ShipType,
   type ShipTypeCounts,
-  type Tag,
   type YardRow,
   type YardState,
 } from '@factory4x/sim';
@@ -43,9 +42,11 @@ import {
   RES_NAME,
   SHIP_NAME,
   SHIP_PLURAL,
+  TAG_TEXT,
   UNLOCKS,
   feedsBloomText,
   guardName,
+  regrowText,
   supplyLine,
   unlockHint,
 } from './report.ts';
@@ -67,7 +68,6 @@ export function shipsText(c: Readonly<ShipTypeCounts>): string {
   return parts.length > 0 ? parts.join(', ') : 'none';
 }
 
-const TAG_TEXT: Record<Tag, string> = { strong: '✓ Strong', even: 'Even', weak: '✗ Weak' };
 
 const YARD_STATE_TEXT: Record<YardState, (component: string | null) => string> = {
   building: () => 'building',
@@ -277,7 +277,7 @@ export class Sheet {
           ? 'Backed up: route at capacity. Upgrade it.'
           : 'Backed up: no route. Build one.'
         : st.noRoute
-          ? 'No route: this ore goes nowhere. Build a route.'
+          ? `No route: this ${st.prize ? RES_NAME[st.prize].toLowerCase() : 'ore'} goes nowhere. Build a route.`
           : '';
       setHidden(warn, msg === '');
       setText(warn, msg);
@@ -501,7 +501,7 @@ export class Sheet {
         const row = g.guards[r.type];
         setHidden(r.wrap, row.count === 0 && row.cap === 0);
         setText(r.label, `${GUARD_NAME[r.type]} ${row.count}/${row.cap}`);
-        setText(r.regrow, `regrows 1 / ${fmt10(Math.round((row.regrowTicks * 10) / w.tickRate))} s`);
+        setText(r.regrow, `regrows ${regrowText(row.regrowTicks, w.tickRate)}`);
         setText(r.stats, `${row.hp} hp · hits ${row.damage}/round · heals ${row.repairPerRound}/round`);
         r.progress.set(row.count >= row.cap ? 0 : row.regrowProgress / Math.max(1, row.regrowTicks));
       }
@@ -572,7 +572,7 @@ export class Sheet {
       setHidden(all.el, live < 2);
       all.set(`${attack() ? 'Attack with all sources' : 'Send from all sources'} · ${total}`);
       setHidden(sec, total === 0);
-      setText(title, attack() ? `Attack the ${guardName(this.world, n.index)}` : 'Send ships here');
+      setText(title, attack() ? `Attack ${guardName(this.world, n.index)}` : 'Send ships here');
     });
   }
 

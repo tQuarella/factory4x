@@ -8,7 +8,7 @@
 import { SHIP_TYPES, clampSendCounts, guardianStatus, isGuarded, shipsAtByType, unlockStatus, type Input, type ShipType, type ShipTypeCounts, type World } from '@factory4x/sim';
 import { btn, h, setHidden, setText, type Btn } from './dom.ts';
 import { shipIcon } from './icons.ts';
-import { SHIP_NAME } from './report.ts';
+import { SHIP_NAME, TAG_TEXT } from './report.ts';
 import { shortName } from './sheet.ts';
 
 export interface SendPanelHost {
@@ -127,7 +127,7 @@ export class SendPanel {
       r.minus.set('−', shown[r.type] > 0);
       r.plus.set('+', shown[r.type] < have[r.type]);
       r.all.set('All', shown[r.type] < have[r.type]);
-      setText(r.tag, tags ? ` · ${tags[r.type].tag}` : '');
+      setText(r.tag, tags ? ` · ${TAG_TEXT[tags[r.type].tag]}` : '');
       total += shown[r.type];
     }
     this.send.set(total > 0 ? `Send ${total} ${total === 1 ? 'ship' : 'ships'}` : 'Send', total > 0);

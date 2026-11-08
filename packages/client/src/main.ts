@@ -14,6 +14,7 @@ import {
   shipCounts,
   shipsAtByType,
   throughputPerMin,
+  unlockStatus,
   worldHash,
   type Input,
 } from '@factory4x/sim';
@@ -22,7 +23,7 @@ import { shortVersion } from './format.ts';
 import { Hud } from './hud.ts';
 import { FeedbackPanel, TuningPanel, showResult, type PanelHost } from './panels.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
-import { bannerLines, battleReport } from './report.ts';
+import { bannerLines, battleReport, unlockNotice } from './report.ts';
 import { SendPanel } from './sendpanel.ts';
 import { Session, dataWithDefaults, replayData, type Speed } from './session.ts';
 import { Sheet } from './sheet.ts';
@@ -120,16 +121,23 @@ function newRun(): void {
 
 // --- toast (battle reports, notices); stays until tapped ----------------------------
 const toastEl = $('toast');
+let toastAction: (() => void) | null = null;
 const toast = {
-  show(text: string): void {
+  show(text: string, action: (() => void) | null = null): void {
     toastEl.textContent = text;
     toastEl.hidden = false;
+    toastAction = action;
   },
   hide(): void {
     toastEl.hidden = true;
+    toastAction = null;
   },
 };
-toastEl.addEventListener('click', () => toast.hide());
+toastEl.addEventListener('click', () => {
+  const act = toastAction;
+  toast.hide();
+  act?.();
+});
 toastEl.addEventListener('keydown', (ev) => {
   if (ev.key === 'Enter' || ev.key === ' ') {
     ev.preventDefault();
@@ -173,6 +181,8 @@ const el = {
 };
 
 let forceBanner = false;
+/** Unlocked ship types as of the last look, per world, so a resumed run doesn't announce old unlocks. */
+const unlockSeen: { world: unknown; ships: Record<string, boolean> } = { world: null, ships: {} };
 
 function refreshUi(): void {
   const s = app.session;
@@ -206,6 +216,17 @@ function refreshUi(): void {
     ended.sort((a, b) => a.endTick - b.endTick || a.node - b.node);
     s.flags.seenBattleEnd = ended[ended.length - 1]!.endTick;
     toast.show(ended.map((r) => battleReport(w, r)).join('\n\n'));
+  }
+  // The first delivery that unlocks Lancers or Flak: say so (the yards start off); one tap opens the Probe.
+  if (unlockSeen.world !== w) {
+    unlockSeen.world = w;
+    unlockSeen.ships = { ...unlockStatus(w).ships };
+  }
+  const fresh = (['lancer', 'flak'] as const).filter((t) => unlockStatus(w).ships[t] && !unlockSeen.ships[t]);
+  if (fresh.length > 0) {
+    for (const t of fresh) unlockSeen.ships[t] = true;
+    const text = fresh.map(unlockNotice).join('\n\n');
+    toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`, () => sheet.open(0));
   }
   // The first-run hint gives way to battle notices, so the strip keeps room for them.
   setHidden(el.hint, settings.hintDismissed || showBanner || !toastEl.hidden);

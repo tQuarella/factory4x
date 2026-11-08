@@ -11,9 +11,17 @@ function watchErrors(page: Page): string[] {
   return errors;
 }
 
+/**
+ * One wide, tall text stress for every layout assertion in this file, so nothing depends on which monospace the OS
+ * falls back to (CI's Linux font wrapped text that Windows' Consolas didn't). Covers the sheet, panels, chips and notices.
+ */
+const WIDE_FONT =
+  '#sheet *, #sendpanel *, #result *, #chips *, #tuning *, #feedback *, .card *, #banner, #toast, #toast::after, #hint { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.15em !important; line-height: 1.5 !important; }';
+
 async function ready(page: Page): Promise<void> {
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
+  await page.addStyleTag({ content: WIDE_FONT });
 }
 
 /** Taps a node on the map by its screen position. */
@@ -24,7 +32,7 @@ async function tapNode(page: Page, node: number): Promise<void> {
 
 test('build loads, sim ticks, and no console errors', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/');
+  await ready(page);
   await expect(page.locator('canvas#view')).toBeVisible();
   await expect(page.locator('#version')).not.toBeEmpty();
   await expect(page.locator('[data-hud="cw-hud-version"]')).toBeVisible();
@@ -322,9 +330,6 @@ test.describe('375x667 portrait', () => {
 // H3: the counter web through the UI. One play-through. Unstressed text would hide layout bugs, so every
 // H3 surface runs with a wide serif font and wide letter spacing, as the notices tests above do.
 
-const WIDE_H3_FONT =
-  '#sheet *, #sendpanel *, #result *, #chips *, .card * { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.15em !important; line-height: 1.5 !important; }';
-
 /** Sets sim tunables through the tuning panel, then starts a New run (startStock applies there). Leaves the game at 4x. */
 async function startTunedRun(page: Page, values: Record<string, number>): Promise<void> {
   await page.locator('#b-tune').click();
@@ -362,7 +367,6 @@ async function expectControlsFit(page: Page, root: string, label: string): Promi
 async function h3PlayThrough(page: Page): Promise<void> {
   const errors = watchErrors(page);
   await ready(page);
-  await page.addStyleTag({ content: WIDE_H3_FONT });
   // Frost Gate, cheap and quick, soft guards, and a pocket that pays fast, so the whole chain fits in a few seconds at 4x.
   await startTunedRun(page, {
     'system.variant': 1,
@@ -408,10 +412,13 @@ async function h3PlayThrough(page: Page): Promise<void> {
   await expect(page.locator('#sheet h2')).toContainText('Crystal');
   await page.locator('#sheet button', { hasText: /^Route to probe/ }).click();
   await expect(page.locator('#chip-crystal')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#toast')).toContainText(/Crystal delivered: Lens and Lancers unlocked\. Turn on the Lancer yard at the Probe/);
   await expect(page.locator('#chip-lens')).toBeVisible();
 
-  // The probe sheet: Yards (Lancer row unlocked, off at first), Assembly (lens).
-  await tapNode(page, 0);
+  // The probe sheet: one tap on the unlock notice opens it. Yards (Lancer row unlocked, off at first), Assembly (lens).
+  await page.locator('#toast').click();
+  await expect(page.locator('#sheet h2')).toHaveText('Probe');
+  await expect(page.locator('#toast')).toBeHidden();
   const lancerRow = page.locator('#sheet [data-yard="lancer"]');
   await expect(lancerRow).toBeVisible();
   await expect(page.locator('#sheet [data-yard="flak"]')).toBeHidden();

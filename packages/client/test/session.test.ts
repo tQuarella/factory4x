@@ -3,7 +3,7 @@ import { SEND_ALL, createWorld, defaultData, lastBattle, replayHashes, rootIndex
 import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
-import { bannerLines, battleReport, feedsBloomText, regrowChange, repelHint, supplyLine, unlockHint } from '../src/report.ts';
+import { bannerLines, battleReport, feedsBloomText, regrowChange, regrowText, repelHint, supplyLine, unlockHint, unlockNotice } from '../src/report.ts';
 import { byTypeText, captureOrderText } from '../src/panels.ts';
 import { shipsText } from '../src/sheet.ts';
 import { clampInt, fmt10, mmss, shortVersion, stepFor, ticksText } from '../src/format.ts';
@@ -297,6 +297,14 @@ describe('helpers', () => {
     expect(hint({ thorn: 8, spore: 2 }, { drone: 10, lancer: 0, flak: 0 })).toBe('Mostly Thorns.');
     expect(hint({ thorn: 8, spore: 2 }, { drone: 4, lancer: 6, flak: 0 })).toBe('Mostly Thorns.');
     expect(hint({ thorn: 5, spore: 5 }, { drone: 4, lancer: 6, flak: 0 })).toBe('An even mix of Thorns and Spores.');
+  });
+
+  it('the unlock notice names the prize, what it unlocks and the yard to turn on; regrow keeps one decimal', () => {
+    expect(unlockNotice('lancer')).toBe('Crystal delivered: Lens and Lancers unlocked. Turn on the Lancer yard at the Probe. Tap here to open it.');
+    expect(unlockNotice('flak')).toBe('Ice delivered: Plating and Flak unlocked. Turn on the Flak yard at the Probe. Tap here to open it.');
+    expect(regrowText(60, 30)).toBe('1 / 2.0 s');
+    expect(regrowText(20, 30)).toBe('1 / 0.7 s');
+    expect(regrowText(300, 30)).toBe('1 / 10.0 s');
   });
 
   it('capture order and per-type lines for the result panel', () => {
