@@ -18,9 +18,10 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 3 | core-engineer | h4-sim | launch | Build |
 | 4 | art-direction | h4-art | launch | Build (green, 08f1399) |
 | 5 | critic | h4-art | launch | Review round 1: REJECT (probe core amber at frac 0) |
-| r1 | art-direction | h4-art | resume | Fix round 1 |
+| r1 | art-direction | h4-art | resume | Fix round 1 (cb67a8f) |
+| r2 | critic | h4-art | resume | Review round 2 |
 
-Launches: 5 / 12. Resumes: 1. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 5 / 12. Resumes: 2. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 
