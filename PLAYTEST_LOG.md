@@ -74,3 +74,17 @@ Owned by the Designer. Each entry: date, build, who (owner or friend name), the 
 - **The overworld idea is a direction, not a tweak.** Many small areas on an overworld; reclaimed areas ship resources elsewhere; persistent research lets you reclaim heavier areas; start with nothing (one undefended area); the run ends when you can build the new probe; a "miner grind" punctuated by meatier steps (new ship types, which still need their resources locally, extraction speed, starting resources). It fits VISION.md as written: an overworld is one star system, an area is one H3-sized field, and "each new system is richer and harder" (pillar 5) now also happens area by area inside a system. It replaces the planned H4 (in-area factories) and H5 (one big field with pan and zoom) with something that reads better on a phone: every area and the overworld fit one screen.
 
 **Action:** DESIGN.md → "Owner direction 2026-11-08: the overworld (steelman)" and "H4 candidates (awaiting the owner's pick)": three slices, with A "Reclaim ladder" (the progression loop itself: an overworld of small areas plus persistent research, shipments faked as a passive stockpile) recommended. QUESTIONS.md Q16 asks the owner to pick. No VISION.md edit is needed. No spec until the pick.
+
+### 2026-11-08 · build build-20261108-3 (M2 H4, Reclaim ladder) · owner
+
+> 1 The areas didn't actually feel any stronger. The approach remained the same: max economy then build a fleet and attack once the fleet is twice as strong as the regrowth rate. Even flak vs drone vs lancer didn't feel like a necessary choice. Consider a ship limit so you need to build the right composition within that limit rather than just swarming drones. Could increase the limit with research.
+>
+> 2 Ice felt like the obvious choice for flak v spore
+>
+> 3 like a repeat, no big step
+>
+> The overworld feels too linear. Consider going more open-world. Panning is fine, it doesn't need to all fit on the same screen. (steelman that before agreeing). That'd give the player the option to continue reclaiming and build strength before tackling the next challenge.
+>
+> Bug: I noticed that the extraction rate didn't update to match the current research.
+
+**Interpretation:** pending the Designer's triage (iteration 5).

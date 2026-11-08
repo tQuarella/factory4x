@@ -15,6 +15,8 @@ What changed:
 
 Try this: land in Landfall and reclaim it, then open Research and buy something before your next landing; notice what the landing notice says changed. After each area, open two or three area sheets and pick the next one by its guards, haul and the designs you own. Play through to The Deep and the probe core if you can.
 
+**Owner's answer (2026-11-08, in chat):** recorded verbatim in PLAYTEST_LOG.md (2026-11-08, build-20261108-3). Areas didn't feel stronger; same max-economy-then-swarm approach; ice/flak obvious; no big step; overworld too linear; proposes a ship cap (raised by research) and a more open world; reports an extraction-rate display bug.
+
 Fun questions (the H4 hypothesis):
 1. Did getting stronger between areas feel good? Which upgrade did you notice when you landed in the next area?
 2. After each area, was there more than one sensible next area? What decided it: a design you had, a prize, or the guard mix?

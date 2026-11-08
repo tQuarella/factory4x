@@ -3,11 +3,20 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 4, hypothesis H4: Reclaim ladder)
-**State:** Awaiting owner feedback on build-20261108-3 (M2 H4: Reclaim ladder). Only Can wait work until feedback arrives. Retro done; team stopped until the owner answers the three H4 fun questions in QUESTIONS.md.
+**State:** Iteration 5 started 2026-11-08. Owner feedback on build-20261108-3 is in PLAYTEST_LOG.md (ship cap, open world, extraction-rate bug). Designer triaging and steelmanning; engineer fixing the bug. Next hypothesis goes to the owner before any spec.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-3 (H4 Reclaim ladder), commit 631e4f9, live (CI gates and deploy green; site shows 631e4f9 · data v7).
 **Last updated:** 2026-11-08 (desktop), after the iteration 4 retro
+
+## Iteration 5 ledger
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | triage build-20261108-3 feedback; steelman ship cap and open world | launch | Plan |
+| 2 | engineer | fix-extract-rate (owner bug) | launch | Build |
+
+Launches: 2 / 12. Resumes: 0.
 
 ## Iteration 4 ledger
 
