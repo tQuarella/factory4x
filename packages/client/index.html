@@ -7,20 +7,28 @@
     <title>Von Neumann Probe</title>
   </head>
   <body>
-    <div id="app">
+    <div id="app" data-mode="world">
       <header id="bars">
         <div id="stats">
-          <div class="stat big">
+          <div class="stat big area-only">
             <span class="lbl">ORE/MIN</span>
             <span class="num"><span id="thr">0</span><span id="thr-arrow" aria-hidden="true"></span></span>
           </div>
-          <div id="chips" aria-label="Stock and ships"></div>
+          <div id="chips" class="area-only" aria-label="Stock and ships"></div>
+          <div id="ow-stats" class="world-only" aria-label="Stockpile"></div>
         </div>
         <div id="controls">
-          <button type="button" class="ctl" id="b-pause" aria-label="Pause">Pause</button>
-          <button type="button" class="ctl speed" id="b-s1" data-speed="1">1x</button>
-          <button type="button" class="ctl speed" id="b-s2" data-speed="2">2x</button>
-          <button type="button" class="ctl speed" id="b-s4" data-speed="4">4x</button>
+          <button type="button" class="ctl area-only" id="b-world" aria-label="Overworld" title="Overworld">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="2.4" /><circle cx="5" cy="18" r="2.4" /><circle cx="19" cy="18" r="2.4" /><path d="M10.9 7.1 6.1 15.9M13.1 7.1l4.8 8.8M7.6 18h8.8" /></svg>
+          </button>
+          <button type="button" class="ctl area-only" id="b-pause" aria-label="Pause">
+            <svg class="i-pause" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><rect x="6" y="5" width="4.5" height="14" rx="1" /><rect x="13.5" y="5" width="4.5" height="14" rx="1" /></svg>
+            <svg class="i-play" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+          </button>
+          <button type="button" class="ctl speed area-only" id="b-s1" data-speed="1">1x</button>
+          <button type="button" class="ctl speed area-only" id="b-s2" data-speed="2">2x</button>
+          <button type="button" class="ctl speed area-only" id="b-s4" data-speed="4">4x</button>
+          <button type="button" class="ctl world-only" id="b-research">Research</button>
           <button type="button" class="ctl" id="b-tune" aria-label="Tuning">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="8" stroke-width="3.5" stroke-dasharray="3.1 3.15" /><circle cx="12" cy="12" r="6.4" /></svg>
           </button>
@@ -32,9 +40,9 @@
 
       <main id="map">
         <div id="notices">
-          <div id="hint" hidden><span>Tap an asteroid to build an extractor</span><button type="button" id="hint-x" aria-label="Dismiss hint">✕</button></div>
+          <div id="hint" hidden><span id="hint-text">Your probe has arrived. Tap Landfall, then Land.</span><button type="button" id="hint-x" aria-label="Dismiss hint">✕</button></div>
           <div id="banner" hidden></div>
-          <div id="toast" role="button" tabindex="0" aria-label="Battle report, tap to dismiss" hidden></div>
+          <div id="toast" role="button" tabindex="0" aria-label="Notice, tap to dismiss" hidden></div>
         </div>
         <div id="stage">
           <canvas id="view" aria-label="Game map"></canvas>
@@ -44,11 +52,13 @@
       </main>
 
       <aside id="sheet" hidden></aside>
+      <aside id="research" hidden aria-label="Research"></aside>
     </div>
 
     <section class="overlay" id="tuning" hidden aria-label="Tuning"></section>
     <section class="overlay" id="feedback" hidden aria-label="Feedback"></section>
     <section class="overlay modal" id="result" hidden aria-label="Result"></section>
+    <section class="overlay modal" id="win" hidden aria-label="The new probe launches"></section>
     <section class="overlay modal" id="sendpanel" hidden aria-label="Choose ships to send"></section>
 
     <script type="module" src="/src/main.ts"></script>

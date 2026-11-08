@@ -2,9 +2,10 @@
  * The HUD chips: icon + count per resource and per ship type, hidden until owned (DESIGN.md H3 "HUD").
  * Built once; `update` touches text and visibility only. All values come from the sim's selectors.
  */
-import { RESOURCES, SHIP_TYPES, prizePerMin, shipCounts, unlockStatus, type Resource, type ShipType, type World } from '@factory4x/sim';
+import { RAW_RESOURCES, RESOURCES, SHIP_TYPES, campaignStatus, prizePerMin, shipCounts, unlockStatus, type RawResource, type Resource, type ShipType, type SimData, type World } from '@factory4x/sim';
 import { h, setHidden, setText } from './dom.ts';
-import { resourceIcon, shipIcon } from './icons.ts';
+import { fmt10 } from './format.ts';
+import { resourceIcon, shipIcon, stockpileIcon } from './icons.ts';
 import { RES_NAME, SHIP_NAME } from './report.ts';
 
 interface Chip {
@@ -55,5 +56,40 @@ export class Hud {
       setHidden(c.el, !unlocked.ships[s]);
       setText(c.count, String(counts[s]));
     }
+  }
+}
+
+/**
+ * The overworld's top row (DESIGN.md H4 "HUD, top row"): the stockpile icon and chips (ice and crystal hidden until the
+ * stockpile first holds some), each with the rate the reclaimed areas ship at while you play, and "Reclaimed 3/6".
+ */
+export class OverworldHud {
+  private readonly chips = new Map<RawResource, Chip>();
+  private readonly reclaimed: HTMLElement;
+
+  constructor(root: HTMLElement) {
+    const stock = h('span', 'sp-icon', '', root);
+    stock.title = 'Stockpile';
+    stock.setAttribute('aria-label', 'Stockpile');
+    stockpileIcon(stock, 26);
+    const chips = h('div', 'sp-chips', '', root);
+    for (const r of RAW_RESOURCES) this.chips.set(r, makeChip(chips, `sp-${r}`, `${RES_NAME[r]} in the stockpile`, (p) => resourceIcon(p, 18, r), true));
+    this.reclaimed = h('span', 'reclaimed', '', root);
+    this.reclaimed.id = 'reclaimed';
+  }
+
+  update(world: Readonly<World>, data: SimData): void {
+    const st = campaignStatus(world, data);
+    const totals = world.campaign.totals;
+    for (const r of RAW_RESOURCES) {
+      const c = this.chips.get(r)!;
+      const seen = r === 'ore' || st.stockpile[r] > 0 || totals.hauled[r] > 0 || totals.shipped[r] > 0;
+      setHidden(c.el, !seen);
+      setText(c.count, String(st.stockpile[r]));
+      const rate = st.shipPerMinX10[r];
+      if (c.rate) setText(c.rate, rate > 0 ? `+${fmt10(rate)}/min` : '');
+      c.el.title = rate > 0 ? `${RES_NAME[r]} in the stockpile, +${fmt10(rate)}/min while you play` : `${RES_NAME[r]} in the stockpile`;
+    }
+    setText(this.reclaimed, `Reclaimed ${st.reclaimed}/${st.areaCount}`);
   }
 }

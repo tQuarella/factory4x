@@ -5,14 +5,15 @@
  * Save layout (one slot, key `fvn.save`), JSON:
  *   { format: 2, seed, dataVersion, world: <serializeWorld text>,
  *     log: [{tick, input}...]   the full input log since tick 0,
- *     startTunables: {key: value}  sim tunables the run started with (New run keeps tuning),
+ *     startTunables: {key: value}  sim tunables the run started with (New system keeps tuning),
+ *     start: CampaignStart      only for a constructed start (dev hooks, tests); a real game has none,
  *     pending: [input...]       inputs sent but not yet stepped,
  *     history: [ore/min...]     sparkline samples, flags: {...} }
  * The seed and the whole log are saved next to the world, so after a resume
  * `session.replay()` still reproduces the live state hash and a feedback note
  * sent after a resume carries a replay of the entire session.
  */
-import { deserializeWorld, serializeWorld, type Input, type SimData } from '@factory4x/sim';
+import { deserializeWorld, serializeWorld, type CampaignStart, type Input, type ResourceTriple, type SimData } from '@factory4x/sim';
 import { Session, dataWithDefaults, defaultsDiff, type LoggedInput, type RunFlags } from './session.ts';
 
 export const SAVE_KEY = 'fvn.save';
@@ -44,6 +45,7 @@ export function encodeSave(session: Session): string {
     format: SAVE_FORMAT,
     seed: session.seed,
     startTunables: defaultsDiff(session.data),
+    start: session.start,
     dataVersion: session.world.dataVersion,
     world: serializeWorld(session.world),
     log: session.log,
@@ -66,6 +68,11 @@ function readLog(v: unknown): LoggedInput[] | null {
   return out;
 }
 
+function readTriple(v: unknown): ResourceTriple | null {
+  if (!isObj(v) || !isInt(v.ore) || !isInt(v.ice) || !isInt(v.crystal)) return null;
+  return { ore: v.ore, ice: v.ice, crystal: v.crystal };
+}
+
 export function decodeSave(text: string, data: SimData): LoadOutcome {
   let parsed: unknown;
   try {
@@ -86,10 +93,13 @@ export function decodeSave(text: string, data: SimData): LoadOutcome {
   const flags: RunFlags = {
     seenBattleEnd: isInt(f.seenBattleEnd) ? f.seenBattleEnd : -1,
     resultShown: f.resultShown === true,
+    shippedAtLanding: readTriple(f.shippedAtLanding),
   };
-  const start = isObj(parsed.startTunables) ? (parsed.startTunables as Record<string, number>) : {};
-  const session = new Session(dataWithDefaults(data, start), {
+  const start = isObj(parsed.start) ? (parsed.start as CampaignStart) : undefined;
+  const tunables = isObj(parsed.startTunables) ? (parsed.startTunables as Record<string, number>) : {};
+  const session = new Session(dataWithDefaults(data, tunables), {
     seed: parsed.seed,
+    ...(start === undefined ? {} : { start }),
     world: loaded.world,
     log,
     pending: pending.map((p) => p.input),
@@ -137,12 +147,14 @@ export function loadSave(data: SimData, storage: StorageLike | null = defaultSto
 export interface Settings {
   showResult: boolean;
   hintDismissed: boolean;
+  /** H4: the overworld's first-run hint ("Tap Landfall, then Land") was dismissed (or the player has landed once). */
+  worldHintDismissed: boolean;
   /** `client.autosaveSec`, seconds of wall time between autosaves. */
   autosaveSec: number;
 }
 
 export function defaultSettings(data: SimData): Settings {
-  return { showResult: true, hintDismissed: false, autosaveSec: data.tunables['client.autosaveSec'].default };
+  return { showResult: true, hintDismissed: false, worldHintDismissed: false, autosaveSec: data.tunables['client.autosaveSec'].default };
 }
 
 export function loadSettings(data: SimData, storage: StorageLike | null = defaultStorage()): Settings {
@@ -156,6 +168,7 @@ export function loadSettings(data: SimData, storage: StorageLike | null = defaul
     const spec = data.tunables['client.autosaveSec'];
     if (typeof p.showResult === 'boolean') s.showResult = p.showResult;
     if (typeof p.hintDismissed === 'boolean') s.hintDismissed = p.hintDismissed;
+    if (typeof p.worldHintDismissed === 'boolean') s.worldHintDismissed = p.worldHintDismissed;
     if (isInt(p.autosaveSec) && p.autosaveSec >= spec.min && p.autosaveSec <= spec.max) s.autosaveSec = p.autosaveSec;
   } catch {
     /* fall back to defaults */

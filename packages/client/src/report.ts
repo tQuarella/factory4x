@@ -1,15 +1,21 @@
 import {
+  areaStatus,
   activeBattles,
   combatRates,
   counterTag,
   guardianStatus,
   supplyStatus,
   unlockStatus,
+  MIN_BUILD_TICKS,
+  RIG_NODES,
   SHIP_TYPES,
   type BattleResult,
   type GuardCounts,
   type GuardType,
   type HeartParams,
+  type LandingEffects,
+  type ResearchRow,
+  type SimData,
   type RawResource,
   type Resource,
   type ShipType,
@@ -43,11 +49,17 @@ export function regrowText(ticks: number, tickRate: number): string {
   return `1 / ${(ticks / tickRate).toFixed(1)} s`;
 }
 
-/** The notice for the first delivery of a prize that unlocks a ship type (the yard starts off, so say so). */
-export function unlockNotice(ship: ShipType): string {
+/**
+ * The notice for the first delivery of a prize that unlocks a ship type. H4: it says what the yard is doing, because a
+ * researched design lands with its yard already on, and an unresearched one cannot build at all.
+ */
+export function unlockNotice(ship: ShipType, yard: 'off' | 'on' | 'needsDesign' = 'off'): string {
   const prize = ship === 'lancer' ? 'crystal' : 'ice';
   const u = UNLOCKS[prize];
-  return `${RES_NAME[prize]} delivered: ${u.component} and ${SHIP_PLURAL[ship]} unlocked. Turn on the ${SHIP_NAME[ship]} yard at the Probe. Tap here to open it.`;
+  const head = `${RES_NAME[prize]} delivered: ${u.component} and ${SHIP_PLURAL[ship]} unlocked.`;
+  if (yard === 'needsDesign') return `${head} The ${SHIP_NAME[ship]} design is not researched yet (Research, on the overworld). Tap here to open the Probe.`;
+  if (yard === 'on') return `${head} The ${SHIP_NAME[ship]} yard is on. Tap here to open the Probe.`;
+  return `${head} Turn on the ${SHIP_NAME[ship]} yard at the Probe. Tap here to open it.`;
 }
 
 /** "Take a crystal pocket to unlock Lancers": the hint for a locked ship row. */
@@ -108,6 +120,7 @@ export function feedsBloomText(world: Readonly<World>, heartCaptured: boolean): 
 /** The line under the heart's guard count on its sheet. */
 export function supplyLine(world: Readonly<World>): string {
   const s = supplyStatus(world);
+  if (!s.hasRoot) return '';
   if (!s.rootAlive) return 'Starved: Root cut';
   const v = s.starvedHeart;
   return `Fed by the Root (cut it: ${mixText(v.caps)}, 1 / ${secs(v.regrowTicks.thorn, world.tickRate)} s)`;
@@ -156,4 +169,150 @@ export function battleReport(world: Readonly<World>, r: BattleResult): string {
       ? 'Regrowth outpaced the wave.'
       : `Too few ships to strip all ${guardianStatus(world, r.node).totalCap} guards before the wave was lost. Send more at once.`;
   return `${first}\n${why} ${rate}`;
+}
+
+// ---------------------------------------------------------------------------
+// H4: overworld, research and campaign text. Every number comes from a selector or a live tunable.
+
+/** Lower-case names for the three raw resources. */
+export const RAW_NAME: Record<RawResource, string> = { ore: 'ore', ice: 'ice', crystal: 'crystal' };
+const RAW_ORDER: readonly RawResource[] = ['ore', 'ice', 'crystal'];
+
+/** Player-facing tier names (the spec's "Medium"); the tier number itself is data. */
+export const TIER_NAME: readonly string[] = ['Landing', 'Light', 'Medium', 'Heavy'];
+
+/** "300 ore · 60 ice · 30 crystal" (zeros left out), or "nothing". */
+export function tripleText(t: Readonly<Record<RawResource, number>>, sep = ' · '): string {
+  const parts = RAW_ORDER.filter((r) => t[r] > 0).map((r) => `${t[r]} ${RAW_NAME[r]}`);
+  return parts.length > 0 ? parts.join(sep) : 'nothing';
+}
+
+/** "+300 ore +30 ice +60 crystal" (zeros left out), or "nothing". */
+export function plusText(t: Readonly<Record<RawResource, number>>): string {
+  const parts = RAW_ORDER.filter((r) => t[r] > 0).map((r) => `+${t[r]} ${RAW_NAME[r]}`);
+  return parts.length > 0 ? parts.join(' ') : 'nothing';
+}
+
+/** Per-minute rates given in tenths ("…X10"): "+5 ore +2.5 ice/min", or "nothing". */
+export function ratesX10Text(t: Readonly<Record<RawResource, number>>): string {
+  const parts = RAW_ORDER.filter((r) => t[r] > 0).map((r) => `+${fmt10(t[r])} ${RAW_NAME[r]}`);
+  return parts.length > 0 ? `${parts.join(' ')}/min` : 'nothing';
+}
+
+/** An area's export per game minute after `shipments.pct`, in tenths (what the reclaimed area ships). */
+export function exportX10(exp: Readonly<Record<RawResource, number>>, shipmentsPct: number): Record<RawResource, number> {
+  const x10 = (n: number): number => Math.floor((n * shipmentsPct) / 10);
+  return { ore: x10(exp.ore), ice: x10(exp.ice), crystal: x10(exp.crystal) };
+}
+
+/** The ship component's source resource: "lens" needs crystal, "plating" needs ice. */
+export const COMPONENT_SOURCE: Record<'lens' | 'plating', RawResource> = { lens: 'crystal', plating: 'ice' };
+
+/** "A1", "A1 and A2". */
+function nodeList(ids: readonly string[]): string {
+  return ids.map((i) => i.toUpperCase()).join(' and ');
+}
+
+/** The landing notice: names every research effect in play, so the upgrade is noticed where the chore would be. */
+export function landingNotice(areaName: string, fx: LandingEffects): string {
+  const parts = [`Landed in ${areaName}`, `${fx.openingOre} ore`];
+  if (fx.rigNodes.length > 0) parts.push(`${nodeList(fx.rigNodes)} ${fx.rigNodes.length === 1 ? 'rig' : 'rigs'} running`);
+  if (fx.extractPct > 100) parts.push(`extraction +${fx.extractPct - 100}%`);
+  if (fx.yardTimePct < 100) parts.push(`ships build ${100 - fx.yardTimePct}% faster`);
+  const designs = (['lancer', 'flak'] as const).filter((d) => fx.designs[d]).map((d) => SHIP_NAME[d]);
+  if (designs.length > 0) parts.push(`${designs.join(' and ')} ${designs.length === 1 ? 'yard' : 'yards'} on`);
+  return parts.join(' · ');
+}
+
+/** "Shipped while you were in Spore Veil: +56 ore +12 ice", or '' if nothing shipped. */
+export function shippedNotice(areaName: string, shipped: Readonly<Record<RawResource, number>>): string {
+  const total = shipped.ore + shipped.ice + shipped.crystal;
+  return total > 0 ? `Shipped while you were in ${areaName}: ${plusText(shipped)}` : '';
+}
+
+/** "Thorn Garden reclaimed: +300 ore +30 ice +60 crystal. Opened: The Deep." */
+export function reclaimNotice(areaName: string, haul: Readonly<Record<RawResource, number>>, opened: readonly string[]): string {
+  const head = `${areaName} reclaimed: ${plusText(haul)}.`;
+  return opened.length > 0 ? `${head} Opened: ${opened.join(', ')}.` : head;
+}
+
+/** Notice after a withdraw. */
+export function withdrawNotice(areaName: string): string {
+  return `Withdrew from ${areaName}. The area reset; research and the stockpile are kept.`;
+}
+
+/** Short summary of what a purchase just did ("Extraction 2: extractors now yield +50%"). */
+export function purchaseNotice(row: Pick<ResearchRow, 'id' | 'name' | 'level' | 'effect'>, rigNodes: readonly string[]): string {
+  switch (row.id) {
+    case 'opening':
+      return `${row.name} ${row.level}: you now land with ${row.effect} ore`;
+    case 'extract':
+      return `${row.name} ${row.level}: extractors now yield +${row.effect - 100}%`;
+    case 'rigs':
+      return `${row.name} ${row.level}: you land with ${nodeList(rigNodes)} already mined`;
+    case 'yards':
+      return `${row.name} ${row.level}: ships build ${100 - row.effect}% faster`;
+    case 'lancer':
+    case 'flak':
+      return `${row.name} researched: its yard can run (each ship still needs its component made in the area)`;
+    default:
+      return `${row.name} ${row.level}`;
+  }
+}
+
+/** Why a research button is disabled, from `researchStatus`: items, then areas, then the shortest missing resource. */
+export function researchBlock(row: ResearchRow, itemLabel: (id: string, level: number) => string, areaName: (id: string) => string): string {
+  if (row.cost === null) return 'Max';
+  const item = row.missing.items[0];
+  if (item) return `Needs ${itemLabel(item.id, item.level)}`;
+  const area = row.missing.areas[0];
+  if (area) return `Needs ${areaName(area)} reclaimed`;
+  let best: RawResource | null = null;
+  for (const r of RAW_ORDER) {
+    const short = row.missing.resources[r];
+    if (short > 0 && (best === null || short < row.missing.resources[best])) best = r;
+  }
+  return best === null ? 'Research' : `Needs ${row.missing.resources[best]} ${RAW_NAME[best]}`;
+}
+
+/** The areas this reclaim opened: neighbours that are open now and had no other reclaimed neighbour. */
+export function openedByReclaim(world: Readonly<World>, data: SimData, area: number): string[] {
+  const out: string[] = [];
+  for (const n of areaStatus(world, data, area).lanes) {
+    const st = areaStatus(world, data, n);
+    if (st.state !== 'open') continue;
+    const others = st.lanes.filter((l) => l !== area && world.campaign.areas[l]!.reclaimedTick !== null);
+    if (others.length === 0) out.push(st.name);
+  }
+  return out;
+}
+
+/** The effect of a grind item as the sheet words it: "Opening ore 80 → 120 per landing". Numbers come from the row and live tunables. */
+export function effectText(row: Pick<ResearchRow, 'id' | 'level' | 'maxLevel' | 'effect' | 'nextEffect'>, tun: Readonly<Record<string, number>>, tickRate: number): string {
+  const next = row.nextEffect;
+  const arrow = (a: string, b: string | null, unit: string): string => (b === null ? `${a}${unit}` : `${a} → ${b}${unit}`);
+  switch (row.id) {
+    case 'opening':
+      return `Opening ore ${arrow(String(row.effect), next === null ? null : String(next), '')} per landing`;
+    case 'extract': {
+      const base = tun['extractor.orePerMin']!;
+      const rate = (pct: number): string => fmt10(Math.floor((base * pct) / 10));
+      return `Extractors ${arrow(rate(row.effect), next === null ? null : rate(next), '')} ore/min`;
+    }
+    case 'yards': {
+      const base = tun['ship.drone.buildTicks']!;
+      const sec = (pct: number): string => (Math.max(MIN_BUILD_TICKS, Math.floor((base * pct) / 100)) / tickRate).toFixed(1);
+      return `Ship build ${arrow(sec(row.effect), next === null ? null : sec(next), '')} s`;
+    }
+    case 'rigs': {
+      const list = (n: number): string => nodeList(RIG_NODES.slice(0, n));
+      if (next === null) return `Land with ${list(row.effect)} mined`;
+      return row.effect === 0 ? `Land with ${list(next)} mined` : `${list(row.effect)} mined → ${list(next)} mined`;
+    }
+    case 'lancer':
+    case 'flak':
+      return row.level > 0 ? 'Researched: its yard can run' : 'Unlocks its yard';
+    default:
+      return '';
+  }
 }

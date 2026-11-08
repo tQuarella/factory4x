@@ -72,6 +72,7 @@ interface WiltAnim {
 
 /** The heart's wilt as total guard counts before and after, or null. */
 function wiltOf(world: Readonly<World>): { from: number; to: number } | null {
+  if (rootIndex(world) < 0) return null;
   const b = lastBattle(world, rootIndex(world));
   if (!b || b.outcome !== 'captured' || !b.wilt) return null;
   const from = b.wilt.from.thorn + b.wilt.from.spore;
@@ -117,7 +118,7 @@ export class MapView {
     this.canvas.width = Math.floor(this.w * dpr);
     this.canvas.height = Math.floor(this.h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.fit = fitMap(this.session.world.nodes, this.w, this.h);
+    if (this.session.world.nodes.length > 0) this.fit = fitMap(this.session.world.nodes, this.w, this.h);
     let seed = 12345;
     const rnd = (): number => {
       seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
@@ -221,9 +222,12 @@ export class MapView {
 
     // The vine, under the nodes: pink and pulsing toward the Bloom while the Root lives, grey once it is cut.
     {
-      const a = this.nodePos(rootIndex(world));
-      const b = this.nodePos(heartIndex(world));
-      drawVine(ctx, a.x, a.y, b.x, b.y, t, isRootCut(world));
+      // Areas without a Root (Landfall, the light areas) have no vine.
+      if (rootIndex(world) >= 0) {
+        const a = this.nodePos(rootIndex(world));
+        const b = this.nodePos(heartIndex(world));
+        drawVine(ctx, a.x, a.y, b.x, b.y, t, isRootCut(world));
+      }
     }
 
     const counts = shipCounts(world);
