@@ -22,9 +22,10 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r2 | critic | h4-art | resume | Review round 2: APPROVE; green branch CI on 34cae84; merged 5ca6921 |
 | 6 | critic | h4-sim | launch | Review round 1: APPROVE; green branch CI on 4f01607; merged caa81b1 |
 | 7 | engineer | h4-client | launch | Build |
-| 8 | engineer | h4-bots | launch | Build |
+| 8 | engineer | h4-bots | launch | Build (green, 234c1b0; flags 1,5,7 met, 2,3,4,6 missed on uncalibrated data) |
+| 9 | critic | h4-bots | launch | Review round 1 |
 
-Launches: 8 / 12. Resumes: 2. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 9 / 12. Resumes: 2. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 
