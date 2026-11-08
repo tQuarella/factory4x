@@ -6,6 +6,12 @@ Player-facing changes per build. Three plain lines per build, written by the Dir
 
 Nothing yet.
 
+## build-20261108-3 (2026-11-08, commit 631e4f9) · Milestone 2, H4: Reclaim ladder
+
+- A new overworld of six areas. You start with nothing at Landfall, an undefended field your first ship reclaims. Each area you reclaim pays a haul and keeps shipping resources home while you play.
+- Research between areas makes you stronger for good: Lancer and Flak designs, more opening ore, faster extraction, seed rigs that land with an extractor already running, and faster yards.
+- Ice areas are held by Spores, crystal areas by Thorns. Pick your next area by its guards and the designs you own, take The Deep, and build the probe core to win the system.
+
 ## build-20261108-2 (2026-11-07, commit a4096a7) · Milestone 2, H3: Counter web
 
 - A new 16-node field in three layouts (Frost Gate, Glass Thicket, Twin Seams). Ice and crystal sit in guarded pockets across it: take a pocket, route its prize to the Probe, and it unlocks a new component and ship type.

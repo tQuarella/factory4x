@@ -4,7 +4,37 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
-## Build build-20261108-2 is ready (2026-11-07): H3, the Counter web
+## Build build-20261108-3 is ready (2026-11-08): H4, the Reclaim ladder
+
+Play: https://factory4x.pages.dev (on your phone, portrait). A full run to the probe core is about 46–51 game minutes, roughly 12–15 real minutes at 4x plus your decisions, so one 30–40 minute session should reach the win. Your old save is from an older data version, so the game starts fresh on the overworld.
+
+What changed:
+- A new overworld of six areas. You start with nothing at Landfall, an undefended field your first ship reclaims. Each area you reclaim pays a haul and keeps shipping resources home while you play.
+- Research between areas makes you stronger for good: Lancer and Flak designs, more opening ore, faster extraction, seed rigs that land with an extractor already running, and faster yards.
+- Ice areas are held by Spores, crystal areas by Thorns. Pick your next area by its guards and the designs you own, take The Deep, and build the probe core to win the system.
+
+Try this: land in Landfall and reclaim it, then open Research and buy something before your next landing; notice what the landing notice says changed. After each area, open two or three area sheets and pick the next one by its guards, haul and the designs you own. Play through to The Deep and the probe core if you can.
+
+Fun questions (the H4 hypothesis):
+1. Did getting stronger between areas feel good? Which upgrade did you notice when you landed in the next area?
+2. After each area, was there more than one sensible next area? What decided it: a design you had, a prize, or the guard mix?
+3. Did your third or fourth area feel like a fresh puzzle or a repeat of the first? Was there a moment that felt like a big step?
+
+Known from the bots (not hidden from you): the best bot run is 45.8–47.6 game minutes, so it clears the 45-minute floor by under a minute on two seeds. Ice-first and crystal-first finish within 1% of each other, and four different area orders finish within 15% of the best. The bots buy both Fast yards levels and so take all six areas; if you go light on Fast yards you can win with five. The Deep on the Glass Thicket layout runs a little long (16:50 against a 16:00 target).
+
+Feedback: plain answers in chat work best. The speech-bubble button also opens a prefilled GitHub issue with a replay of your session.
+
+Also open (none blocks anything): Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
+
+Protected files changed this build: none. Every merge passed the protected-files gate.
+
+## Blocking
+
+None.
+
+## Answered
+
+### Build build-20261108-2 handoff (2026-11-07): H3, the Counter web
 
 Play: https://factory4x.pages.dev (on your phone, portrait). Plan on one 30–40 minute session; 2x/4x is fine once your economy is running. Your old save is from an older data version, so the game starts fresh.
 
@@ -29,12 +59,6 @@ Feedback: plain answers in chat work best. The speech-bubble button also opens a
 Also open (none blocks anything): Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
 
 Protected files changed this build: VISION.md (Q14, owner-approved: long persistent game, pillar 1 wording). Every merge passed the protected-files gate.
-
-## Blocking
-
-None.
-
-## Answered
 
 ### Q16. Which part of the overworld should the next build test first? (2026-11-08, Designer)
 
