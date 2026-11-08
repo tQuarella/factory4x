@@ -3,11 +3,11 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 4, hypothesis H4: Reclaim ladder)
-**State:** Awaiting owner feedback on build-20261108-3 (M2 H4: Reclaim ladder). Only Can wait work until feedback arrives. Next: retro, then stop.
+**State:** Awaiting owner feedback on build-20261108-3 (M2 H4: Reclaim ladder). Only Can wait work until feedback arrives. Retro done; team stopped until the owner answers the three H4 fun questions in QUESTIONS.md.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-3 (H4 Reclaim ladder), commit 631e4f9, live (CI gates and deploy green; site shows 631e4f9 · data v7).
-**Last updated:** 2026-11-08 (desktop)
+**Last updated:** 2026-11-08 (desktop), after the iteration 4 retro
 
 ## Iteration 4 ledger
 
@@ -36,12 +36,12 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r5 | core-engineer | h4-bots | resume | Fix round 2, reassigned per deadlock rule (resumed the h4-sim core-engineer to stay within launch budget); 57d789f, test gate 6.4 s |
 | r6 | critic | h4-bots | resume | Review round 3: APPROVE; merged ab8bd65 (not browser-facing) |
 | r7 | designer | h4-design-data | resume | Calibrated (349b8b8): all 7 flags met |
-| 12 | retrospective | iteration 4 retro | launch | Retro after build-20261108-3 |
+| 12 | retrospective | iteration 4 retro | launch | Retro after build-20261108-3: merge-task uses origin/task/<id> when newer (with --dry-run); engineer test-speed/fixture and smoke repeat-each rules; designer data-task checklist; PROCESS deadlock resume, route out-of-scope leftovers, spec as triage resume, dataVersion on values-only |
 | 11 | critic | h4-design-data | launch | Review round 1: REJECT (bump dataVersion to 7; unsourced numbers) |
 | r9 | designer | h4-design-data | resume | Fix round 1 (scope widened to one test line for the v7 bump); bdaa801, dataVersion 7 |
 | r11 | critic | h4-design-data | resume | Review round 2: REJECT (one false sentence in DESIGN.md; stale test title line 125). Queued for the core-engineer after its h4-client fix (deadlock rule); round 3 reject parks it |
 
-Launches: 12 / 12. Resumes: 15. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 12 / 12. Resumes: 15. Iteration 4 closed. Leftover worktrees and alias branches (h4-bots-core, h4-client-core, h4-dd-core) can be cleaned up as Can wait. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 
