@@ -290,3 +290,14 @@ Scope: `git log build-20261106-2..build-20261108-1` (f1b1b33..13201db), `reviews
 - Owner chose "Build Counter web" as H3, the first Milestone 2 slice (DESIGN.md → "Owner direction 2026-11-07: the asteroid field (steelman)" → H3 slice). Logistics (H4), the big field (H5) and the probe endgame (H6) follow, one hypothesis per build.
 - Milestone 1 is closed: it proved the loop works but plays as one fixed sequence (PLAYTEST_LOG.md, both owner entries).
 - Balance and Faction AI stay dormant for H3. H3 calibration is a Designer task (h3-design-data) and guard behaviour is still plain defend/regrow. Revisit at H4 split, when the counter numbers and pocket count grow.
+
+## 2026-11-07 · Designer · H3 Counter web spec
+
+- **Fixed node positions; layouts vary only the contents** (prize, slots and guard mix of each pocket, the Root's mix, the heart's mix). This keeps bot comparisons clean, as H2's Root-only variants did, while the "which pocket next" answer still changes between layouts. Rejected for H3: moving nodes per layout, and procedural fields (H5).
+- **Counters multiply the ship's damage only**, with strong 200% and weak 25%. At weak 50% the model made lancers better than drones even against Spores, so counters vanished. At 25%, the wrong ship needs more ships than drones do, the right one about half, and a mix beats any single type on every mixed pocket. Guard-side multipliers (Spores hurting lancers more) were left out to keep one table. That is a calibration lever if the owner wants counters sharper.
+- **Integer damage conversion with a fixed type order.** Each ship type pools base damage, converts it to effective damage per guard type with floor, and converts the leftover back with floor. The order is lancer, flak, then drone. This is deterministic, and a small rounding loss is accepted.
+- **Assemblers run automatically up to a stock cap; there is no input.** On a phone a component should be visible, not micromanaged. The cap (5) stops a forgotten assembler from eating ore. H4 moves assemblers out of the probe.
+- **One yard toggle per ship type, served in the order lancer, flak, drone,** so a scarce component is never starved by drones. Choosing a mix is a send-time decision (steppers), and "Attack with all" stays one tap.
+- **A Strong/Even/Weak tag computed in sim selectors, with no ships-needed number.** One integer definition shared by client and bots. Estimating stays the player's puzzle (the H2 decision stands).
+- **Drones stay a full fallback that can finish every layout,** to respect no fail state. The depth flags require them to be clearly worse (40% more losses or 20% slower), not impossible.
+- **Calibration:** throwaway JS model in the scratchpad (not committed), bounded at 80 ships and 400 rounds. The per-pocket minimum waves are in the layout tables. The economy timing is unmodelled and left to h3-design-data.

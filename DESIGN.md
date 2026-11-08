@@ -141,6 +141,8 @@ Riskiest claim first: that **pockets + counters + resource prizes make "which po
 
 #### H3 slice: Counter web
 
+*Owner chose this as H3 (2026-11-07). The full spec is "H3 (Milestone 2, iteration 3, spec ready): Counter web" under Hypotheses; where the two differ, the spec wins.*
+
 - **Contains:**
   - **The field.** One field of about 16 nodes that fits a phone screen with light pan, or none. Three hand-made layouts, shuffled by seed: the H2 lesson was that hand-made layouts compare cleanly.
   - **Resources:** ore (free), ice and crystal (each only in pockets).
@@ -187,6 +189,404 @@ Built in Milestone 1 (build-20261106-2, spec H1 below):
 H2 (build-20261108-1, spec below) added the Root, a second guarded node that feeds the Bloom, and three system variants that differ only in the Root.
 
 ## Hypotheses
+
+### H3 (Milestone 2, iteration 3, spec ready): Counter web
+
+The owner chose "Build Counter web" as H3 (QUESTIONS.md Q14). The direction and the M2 plan are under "Owner direction 2026-11-07: the asteroid field (steelman)" above. This spec replaces the H1 map and the H2 variants. H1 and H2 rules not mentioned here still apply.
+
+#### Claim
+
+When every pocket's prize is a new resource, and that resource unlocks a ship type that counters one kind of guard, **"which pocket next" is a real choice that changes from game to game.** The run stops being one fixed sequence ("max economy, then ships, then attack").
+
+What would disprove it:
+- The owner takes pockets in the same order every game without weighing them.
+- The owner says counters "just mean bring the right ship".
+- The owner masses drones and ignores components.
+
+#### The smallest mechanics that test it
+
+1. **A 16-node field.** The probe, 9 ore asteroids, 4 resource pockets (2 light, 2 heavy), the Root and the Bloom heart. Positions are fixed. Each of three hand-made **layouts** changes what is in each pocket (prize, guard mix, slots), the Root's guard mix and the heart's mix. The layout is chosen by seed, as in H2.
+2. **Three resources:** ore (asteroids), ice and crystal (pockets only, after capture). The heart's prize is ore, as the H1 rich node.
+3. **Two components, assembled automatically at the probe:**
+   - **lens** = ore + crystal;
+   - **plating** = ore + ice.
+4. **Three ship types, each with its own yard switch at the probe:**
+   - **drone**: ore only, neutral against both guards;
+   - **lancer**: ore + 1 lens; strong against Thorns, weak against Spores;
+   - **flak**: ore + 1 plating; strong against Spores, weak against Thorns.
+5. **Two guard types:**
+   - **Thorn**: the H1 thorn: armoured, slow to regrow, repairs;
+   - **Spore**: fragile, hits lightly, regrows fast, never repairs.
+
+   Every guarded node (pockets, Root, heart) has a mix of the two. All of them use the H1/H2 strip, regrow and capture rules, generalised to two types.
+6. **Readouts for an informed estimate:**
+   - a guard ring on each pocket, split by type;
+   - strong/even/weak tags per ship type on the pocket's sheet;
+   - the prize named on the sheet.
+
+   Still no "ships needed" number.
+
+H3 adds no new kind of input. `setShipyard` and `sendShips` gain a ship-type parameter.
+
+#### Map: fixed positions (data `map.nodes`)
+
+The frame is the same as H1 (x 0–1000, y 0–1300; `fit.ts` fits the bounds). Every node is at least 160 su from every other.
+
+| id | kind | x | y | r | slots | notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `probe` | probe | 500 | 1180 | 70 | 0 | |
+| `a1` | asteroid | 300 | 1010 | 45 | 2 | |
+| `a2` | asteroid | 700 | 1010 | 45 | 2 | |
+| `a3` | asteroid | 120 | 850 | 40 | 1 | |
+| `a4` | asteroid | 880 | 850 | 40 | 1 | |
+| `a5` | asteroid | 500 | 650 | 55 | 3 | central staging rock, as in H1 |
+| `a6` | asteroid | 170 | 640 | 45 | 2 | |
+| `a7` | asteroid | 830 | 640 | 45 | 2 | |
+| `a8` | asteroid | 100 | 250 | 40 | 1 | far corner |
+| `a9` | asteroid | 900 | 250 | 40 | 1 | far corner |
+| `p1` | pocket | 360 | 850 | 50 | layout | light pocket, near |
+| `p2` | pocket | 640 | 850 | 50 | layout | light pocket, near |
+| `p3` | pocket | 250 | 440 | 60 | layout | heavy pocket, far |
+| `p4` | pocket | 750 | 440 | 60 | layout | heavy pocket, far |
+| `root` | root | 500 | 450 | 45 | 0 | feeds the heart; no prize |
+| `heart` | heart | 500 | 220 | 90 | 4 | the Bloom heart (H1's `rich`) |
+
+There are 15 asteroid slots, 150 ore/min at full build: the same ore ceiling as H1. Routes still run only to the probe. A pocket's route carries its prize resource.
+
+#### Layouts (data `map.layouts`; chosen like the H2 variants)
+
+Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per type after the Root is cut. Slots apply to the pocket after capture. The model columns come from the throwaway model (scratchpad, defaults below): the minimum simultaneous wave that wins, as drones / lancers / flak / best mix.
+
+**Layout 0: Frost Gate**
+
+| Node | Prize | Slots | Guards (T/S) | Model: drones / lancers / flak / best mix |
+| --- | --- | --- | --- | --- |
+| p1 | ice | 2 | 1 / 8 | 14 / 17 / 8 / 5 |
+| p2 | crystal | 2 | 3 / 3 | 13 / 12 / 20 / 6 |
+| p3 | ice | 3 | 9 / 4 | 25 / 17 / 35 / 11 |
+| p4 | crystal | 3 | 2 / 18 | 22 / 25 / 18 / 10 |
+| root | none | 0 | 6 / 0 | 16 / 6 / 25 / 6 |
+| heart | ore | 4 | 10 / 14, starved 6 / 7 | 32 / 25 / 39 / 14; starved 16 / 10 / 17 / 7 |
+
+**Layout 1: Glass Thicket**
+
+| Node | Prize | Slots | Guards (T/S) | Model: drones / lancers / flak / best mix |
+| --- | --- | --- | --- | --- |
+| p1 | crystal | 2 | 1 / 8 | 14 / 17 / 8 / 5 |
+| p2 | ice | 2 | 3 / 3 | 13 / 12 / 20 / 6 |
+| p3 | ice | 3 | 2 / 18 | 22 / 25 / 18 / 10 |
+| p4 | crystal | 3 | 9 / 4 | 25 / 17 / 35 / 11 |
+| root | none | 0 | 0 / 12 | 11 / 17 / 4 / 4 |
+| heart | ore | 4 | 14 / 8, starved 8 / 4 | 36 / 23 / 46 / 16; starved 17 / 9 / 21 / 8 |
+
+**Layout 2: Twin Seams**
+
+| Node | Prize | Slots | Guards (T/S) | Model: drones / lancers / flak / best mix |
+| --- | --- | --- | --- | --- |
+| p1 | ice | 2 | 2 / 5 | 14 / 15 / 17 / 5 |
+| p2 | crystal | 2 | 2 / 5 | 14 / 15 / 17 / 5 |
+| p3 | crystal | 3 | 2 / 18 | 22 / 25 / 18 / 10 |
+| p4 | ice | 3 | 9 / 4 | 25 / 17 / 35 / 11 |
+| root | none | 0 | 3 / 6 | 16 / 16 / 20 / 7 |
+| heart | ore | 4 | 6 / 20, starved 4 / 10 | 30 / 28 / 30 / 13; starved 14 / 11 / 12 / 6 |
+
+Why these layouts:
+- **Every first move is a light pocket taken with drones**, about 13–14 of them. There are two doors, one per resource.
+- **Each heavy pocket wants one counter.** In each layout, one tier 1 resource gives a cheap path to the heavy pocket holding the *other* resource, or to more of the same. Which path is cheap flips between layouts.
+- **Light pockets are not all the same.**
+  - In Frost Gate and Glass Thicket, one light pocket is Spore-heavy (flak-friendly) and the other is Thorn-mixed. The resource behind each is swapped between the two layouts.
+  - In Twin Seams the light pockets are identical, so the first pick there depends on where it leads.
+- **Hearts are mixed in every layout**, so the cheapest finale uses both counters. Owning both resources is felt as about half the fleet.
+- **The Root's mix flips** (Thorn, Spore, mixed), so the cheap cut depends on what you own.
+
+Selection:
+- If `system.variant > 0`, use layout `variant − 1`; otherwise use `((seed mod 3) + 3) mod 3`.
+- New run uses `seed + 1`, as in H2.
+- Each layout has `id` and `name` (`frost`/"Frost Gate", `glass`/"Glass Thicket", `twin`/"Twin Seams") and, per pocket node, `{prize, slots, thorns, spores}`. The Root has `{thorns, spores}`, and the heart `{thorns, spores, starvedThorns, starvedSpores}`.
+
+#### Entities and state: changes
+
+- **Stock:** `stock` becomes `{ore, ice, crystal, lens, plating}`. Every field is an integer, kept at the probe. `probeAccum` still adds ore only.
+- **Node:**
+  - `kind` gains `pocket` and `heart` (`rich` is gone);
+  - pockets carry `prize` (`ice | crystal`) from the layout;
+  - the node's `buffer` holds its prize resource (asteroids: ore; heart: ore).
+- **Pod:** gains `res` (`ore | ice | crystal`), copied from the source node. On delivery it adds to `stock[res]`.
+- **Assemblers:** `assemblers: {lens: {ticksLeft}, plating: {ticksLeft}}`, at the probe. There is no input: they always run (see rules).
+- **Yards:** `yards: {drone: {on, ticksLeft}, lancer: {on, ticksLeft}, flak: {on, ticksLeft}}`. They replace `shipyard`.
+- **Ship:** gains `type` (`drone | lancer | flak`). The hp comes from its type.
+- **Guardian:** one per guarded node (`p1`–`p4`, `root`, `heart`) in node-index order.
+  - `thorns[]` becomes `guards[]` (`{id, type: thorn | spore, hp}`, ascending id).
+  - `regrowProgress` becomes `{thorn, spore}`.
+  - The heart's guardian has `fed` (true until the Root is cut).
+- **Stats:**
+  - `captures[]` (`{node, tick}` in capture order). The heart's capture still sets `capturedTick`;
+  - `shipsBuilt` and `shipsLost` per type;
+  - `delivered` per resource;
+  - `guardsKilled` per type;
+  - `guardsWithered` (renamed from `thornsWithered`);
+  - `rootCutTick` and `variant` stay (`variant` is the layout index).
+
+#### Rules per tick: changes from H1/H2
+
+The rule numbers are H1's. Anything not listed is unchanged.
+
+- **Effective caps.** `capEff(n) = min(60, floor(n × guard.capPct / 100))`, applied to every layout guard count, starved caps included. A guarded node whose effective caps are all 0 has no guards. The first ship to arrive takes it (rule 8).
+- **2. Construction.** As H1, paid from `stock.ore`. `buildExtractor` is valid on asteroids, on captured pockets and on the captured heart.
+- **3. Extraction.**
+  - asteroids: `extractor.orePerMin` ore;
+  - captured pockets: `pocket.resourcePerMin` of their prize;
+  - captured heart: `heart.orePerMin` ore.
+
+  The accumulator rule is unchanged.
+- **4. Routes.** As H1. A pod carries `res` from its source and delivers to `stock[res]`. `deliveredBuckets` (the big ore/min number) counts **ore only**. Ice and crystal have their own per-minute buckets, shown small.
+- **5a. Assemblers (new, before yards).** For each component, in the fixed order lens, then plating:
+  - If `ticksLeft > 0`, decrement it. At 0, `stock[component] += 1`.
+  - Then, if it is idle (`ticksLeft = 0` after any completion) and all of the following hold, pay both costs and set `ticksLeft = component.buildTicks`:
+    - `stock[component] < component.stockCap`;
+    - `stock.ore − reservedOre ≥ component.<c>.ore`, where `reservedOre = Σ queue[].cost`;
+    - `stock[res] ≥ component.<c>.<res>`.
+- **5b. Yards (replaces rule 5).** For each type, in the fixed order lancer, flak, drone:
+  - If `ticksLeft > 0`, decrement it. At 0, spawn a ship of that type at `probe` with `ship.<type>.hp`. If `rally ≠ probe`, it starts transit to `rally`.
+  - Then, if the yard is on and idle, `stock.ore − reservedOre ≥ ship.<type>.cost` and (for lancer and flak) `stock[component] ≥ 1`: pay both and set `ticksLeft = ship.<type>.buildTicks`.
+
+  Queued builds still reserve their ore ahead of assemblers and yards. Lancers and flak go first, so a scarce component is never starved by drones.
+- **7. Combat** (per living guardian, on round ticks, ships `at` its node, resolved together from start-of-round state):
+  - **Player damage.**
+    - For each ship type present, in the order lancer, flak, drone, pool `base = count × ship.<type>.damage`.
+    - Then walk that type's **target order**:
+      - lancer: Thorns, then Spores;
+      - flak: Spores, then Thorns;
+      - drone: all guards in id order, with no type preference. For drones, `pct = 100` throughout, so convert per guard.
+    - For each guard type group in that order, with `pct = mult(type, guardType)`:
+      1. `eff = floor(base × pct / 100)`.
+      2. Apply `eff` to the living guards of that type in id order, overflowing from one guard to the next (as H1).
+      3. If guards of that type remain, `base = 0`. Otherwise `base = floor(effLeft × 100 / pct)`, and continue to the next group.
+    - `mult` is `counter.strongPct` for (lancer, thorn) and (flak, spore), `counter.weakPct` for (lancer, spore) and (flak, thorn), and 100 for drones.
+    - Damage from earlier types is already applied when later types act. Guards at hp ≤ 0 still count for the guard damage step (simultaneous rounds).
+  - **Guard damage:** `Σ guard.<type>.damage` over the guards alive at the start of the round, applied to ships present in id order with overflow (as H1).
+  - Remove the dead on both sides. Then, on every round tick, each surviving guard heals its `repairPerRound` (`guard.thorn.repairPerRound` or `guard.spore.repairPerRound`; 0 for the starved heart) up to its type's hp.
+- **8. Capture** (any guardian): it is alive, has no guards and at least one ship is `at` its node. Then:
+  - `alive = false`, `owned = true`, and the battle ends `captured`. Push `{node, tick}` to `stats.captures`.
+  - **Pocket:** `extractors = min(pocket.freeExtractors, slots)`. Its prize starts flowing once it has a route.
+  - **Root:** `rootCutTick = tick`. If the heart is alive, it wilts: `fed = false`. Then, for each type, while its count is above `capEff(starved<Type>)`, remove the highest-id guard of that type and add 1 to `guardsWithered`. Reset both of the heart's regrow progresses to 0.
+  - **Heart:** `extractors = min(heart.freeExtractors, slots)` and `capturedTick = tick`. This shows the result panel; free play continues.
+- **9. Regrowth.** For each living guardian, each type is handled separately:
+  - The cap is `capEff(layout count)`; for the heart while starved, `capEff(starved count)`.
+  - The period is `guard.<type>.regrowTicks`, multiplied by `bloom.starvedRegrowMul` for the starved heart.
+  - Below the cap, progress goes up by 1, and at the period a full-hp guard of that type is added with a new id from `nextId`. At or above the cap, progress is held at 0.
+  - Guardians start full.
+- **Determinism.** Everything stays integer, the type orders are fixed, and there is no RNG.
+
+#### Player inputs: changes
+
+| Input | Change |
+| --- | --- |
+| `setShipyard` | Becomes `setShipyard {shipType, on}`. Always valid. A ship already in progress finishes. |
+| `sendShips` | Becomes `sendShips {from, to, counts: {drone, lancer, flak}}`. Each count is an integer ≥ 0 and is clamped to the ships of that type `at` `from`. It is valid if `from ≠ to` and the clamped total is ≥ 1. The lowest-id ships of each type go. It's an attack (counted in `wavesSent`) if `to` is a living guarded node. One attack per node per tick, as in H2. |
+| `buildExtractor`, `buildRoute`, `upgradeRoute` | Also valid on captured pockets (and the heart, as H1's rich node). |
+| `setTunable` | Accepts the new keys below. `system.variant` is `newRunOnly`. |
+
+Assemblers need no input.
+
+#### Tunables (data/, all integers)
+
+New or renamed keys. H1 economy, route and build keys are unchanged.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `ship.drone.cost` | 15 | 5–60 | from `ship.cost` |
+| `ship.drone.buildTicks` | 90 | 15–900 | from `ship.buildTicks` |
+| `ship.drone.hp` | 10 | 1–100 | |
+| `ship.drone.damage` | 2 | 1–20 | 1: drones are fodder / 4: counters don't matter |
+| `ship.lancer.cost` | 15 | 5–60 | ore part; plus 1 lens |
+| `ship.lancer.buildTicks` | 120 | 15–900 | |
+| `ship.lancer.hp` | 12 | 1–100 | |
+| `ship.lancer.damage` | 4 | 1–20 | |
+| `ship.flak.cost` | 15 | 5–60 | ore part; plus 1 plating |
+| `ship.flak.buildTicks` | 120 | 15–900 | |
+| `ship.flak.hp` | 12 | 1–100 | |
+| `ship.flak.damage` | 4 | 1–20 | |
+| `counter.strongPct` | 200 | 100–400 | 100: no edge from the right ship / 400: one right ship equals four drones |
+| `counter.weakPct` | 25 | 10–100 | 10: the wrong ship is useless / 100: no penalty, so lancers are simply better drones (counters vanish) |
+| `guard.thorn.hp` | 20 | 1–200 | from `guardian.thornHp` |
+| `guard.thorn.damage` | 3 | 0–30 | from `guardian.thornDamage` |
+| `guard.thorn.repairPerRound` | 2 | 0–20 | from `guardian.repairPerRound` |
+| `guard.thorn.regrowTicks` | 60 | 15–1800 | from `guardian.regrowTicks` |
+| `guard.spore.hp` | 6 | 1–100 | 2: spores pop / 20: spores are Thorns that regrow fast |
+| `guard.spore.damage` | 1 | 0–30 | |
+| `guard.spore.repairPerRound` | 0 | 0–20 | 0: the swarm is replaced, not healed |
+| `guard.spore.regrowTicks` | 20 | 5–1800 | 5: Spore pockets need a real counter / 300: Spores are a speed bump |
+| `guard.capPct` | 100 | 25–300 | the live knob for overall guard strength (replaces `root.capBonus`). 25: everything is soft / 300: everything is a fortress |
+| `bloom.starvedRegrowMul` | 5 | 1–30 | replaces `bloom.starvedRegrowTicks`. 1: cutting the Root only drops caps / 30: a starved heart barely regrows |
+| `bloom.starvedRepairPerRound` | 0 | 0–20 | unchanged |
+| `pocket.resourcePerMin` | 6 | 1–40 | per extractor. 2: a prize trickles, components throttle everything / 20: one pocket floods you |
+| `pocket.freeExtractors` | 1 | 0–3 | 0: the prize waits for a build / 3: an instant payoff |
+| `heart.orePerMin` | 25 | 10–80 | from `rich.orePerMin` |
+| `heart.freeExtractors` | 1 | 0–4 | from `rich.freeExtractors` |
+| `component.lens.ore` | 5 | 0–60 | |
+| `component.lens.crystal` | 4 | 1–40 | 1: crystal is never the limit / 12: lancers are rare and precious |
+| `component.plating.ore` | 5 | 0–60 | |
+| `component.plating.ice` | 4 | 1–40 | as lens |
+| `component.buildTicks` | 90 | 15–900 | |
+| `component.stockCap` | 5 | 1–50 | 1: just-in-time / 50: components pile up and hide the throttle |
+| `system.variant` | 0 | 0–3 | 0: by seed / 1–3: force Frost Gate, Glass Thicket or Twin Seams (new run only) |
+
+- **Removed:** `ship.cost`, `ship.buildTicks`, `ship.hp`, `ship.damage`, every `guardian.*`, `root.capBonus`, `root.regrowTicks`, `bloom.starvedCap`, `bloom.starvedRegrowTicks`, and `rich.*`.
+- **Kept:** `ship.speedSu` (shared by all types) and `combat.roundTicks`.
+- **Map data:** `map.variants` is replaced by `map.layouts`.
+
+**Calibration** (throwaway model at these defaults; the layout tables show the minimum waves). The headline:
+- The right counter needs about half the ships of drones.
+- The wrong counter needs more than drones.
+- A two-type mix beats any single type on every mixed pocket.
+- Each light pocket falls to about 13–14 drones.
+- A starved heart needs about half the fleet of a fed one.
+
+#### Save, data version and replay
+
+- **`dataVersion` 4.** An H2 save fails the data-version check and is discarded with the existing toast ("Saved run was from an older version; starting fresh"). There is no migration.
+- **The save format** is the world snapshot, as now, with the new fields.
+- **The reference replay** in `packages/bots` is regenerated for the new inputs. The determinism gate's hashes are re-baselined in the same task.
+
+#### What changes for H1/H2 content
+
+- **Map:** the H1 map and the H2 variants are replaced by the 16-node field and three layouts. The node ids `a1`–`a5` are reused at new positions. `rich` becomes `heart`.
+- **Asteroids, extractors, routes, upgrades and the build queue:** unchanged.
+- **The Bloom heart:** H1's rich node, now with a Thorn/Spore mix. It is still fed by the Root, and capturing it still ends the run.
+- **The Root:** the same feeding, cutting and wilt rules, with a guard mix per layout, and the vine is unchanged. The wilt removes guards of both types down to the starved caps. It still has no prize.
+- **Shipyard:** the one toggle becomes three yard toggles, and drone is on at the start. As in H1, the shipyard starts on, because the first ship early matters.
+- **Result panel:**
+  - the layout name and the time to capture the heart;
+  - **capture order**, for example "Ice (P1) 4:10 → Crystal (P4) 11:30 → Root 15:02 → Heart 19:45";
+  - ships lost per type, guards withered, and the Root cut time.
+- **New run:** seed + 1, which cycles the layouts.
+- **Tuning panel:** the keys above; removed keys disappear. `system.variant` is labelled "0 · by seed / 1 Frost / 2 Glass / 3 Twin".
+- **Bots:** rush, turtle and raid-supply are replaced (see Bot checks).
+
+#### Observable values and phone UI
+
+The rules from H1 and H2 hold: 375 px portrait, no hover, every target at least 44 px, and every action at most 2 taps from the map (confirm taps excepted).
+
+- **HUD:**
+  - **Top row:** ore/min stays the big number.
+  - **Second row:** small icon+count chips for `ore`, `ice`, `crystal`, `lens` and `plating`, with ice/min and crystal/min under their chips once they are non-zero.
+  - **Ship count chips:** drone, lancer and flak (ships anywhere).
+  - Chips for resources not yet owned are hidden, not greyed, so the HUD starts as simple as H2.
+- **Map:**
+  - **Pockets:** a living pocket is a small Bloom growth on a rock, with its **prize icon** in the centre and a **guard ring**: a ring around it split into two arcs, Thorn colour and Spore colour, proportional to current counts. The ring shrinks as guards die and grows back as they regrow. It reads at 24 px.
+  - **Captured pockets** become rock with the prize icon and extractor pips, like asteroids.
+  - **The Root and the heart** get the same guard ring. Individual guards are drawn as now (Thorns are spiky; Spores are small round puffs).
+  - **Ships:** three silhouettes (see Art).
+- **Pocket, Root and heart sheets:**
+  1. **Prize:** "Prize: Ice · 2 slots · 6/min each · unlocks Plating → Flak". The Root says "No prize · feeds the Heart", and the heart says "Ore · 4 slots".
+  2. **Guards:** one row per type: icon, count/cap, regrow (as "1 / 2.0 s"), hp and damage.
+  3. **Your ships here:** one tag per ship type you have unlocked: **Strong** (green check), **Even** or **Weak** (red cross). Each tag has its counter phrase: "Lancer · Strong vs Thorns, Weak vs Spores".
+     - The tag is the guard-hp-weighted multiplier: Σ over types of `count × hp × mult` / Σ `count × hp`. It is Strong at ≥ 150, Weak at ≤ 75, and Even otherwise. Drones are always Even.
+     - It is computed in the sim's selectors so that the client and the bots agree. It is integer, with the division last.
+  4. **Ships present and en route**, by type.
+  5. **Attack:**
+     - The H2 target-first buttons stay: "Attack with all from Probe · 14", sending every type. That is one tap.
+     - Each source also has a **"Choose…"** button. It opens a send panel with one row per type: icon, a −/+ stepper (44 px buttons), the count and "All". It defaults to all of each type. Then Send.
+- **The probe sheet:**
+  - The **Yards** block has three rows (Drone, Lancer, Flak). Each row has an on/off toggle (44 px), a cost line ("15 ore + 1 lens · 4.0 s") and a status: "building", "idle: needs lens" or "idle: needs ore".
+  - The **Assembly** block has two rows (Lens, Plating), each with stock/cap, recipe, and a status: "making", "full" or "needs crystal".
+  - The Lancer and Flak rows are hidden until their resource has first been delivered. The sheet still names them: "Take a crystal pocket to unlock Lancers".
+- **The battle banner:** per node, with type counts: "P3 · 6 Thorn 2 Spore · strip 1.3/s · 4 lost".
+- **Toasts:**
+  - Capture: "Ice pocket taken: 12 sent, 3 lost. Plating and Flak unlocked." (the second sentence only on the first unlock).
+  - Repelled: "P4 held: 10 sent, 10 lost. Mostly Spores; Lancers are weak here." This hint names the dominant guard type and any Weak tag among the ships sent.
+
+#### Flavor and art needs (for Art Direction, within ART_STYLE.md)
+
+- **Drone:** the existing blue arrowhead, slightly smaller.
+- **Lancer:** a long, narrow needle or spear, player blue `#7ab8ff`, with one bright tip.
+- **Flak:** a short, wide hull with a ring or burst motif, player blue.
+
+  The three must be told apart **by shape** at 24 px, not by colour alone.
+- **Spore:** a small round puff with a dotted halo, in the mob family but distinct from Thorns. Thorns are spikes; Spores are round. It needs its own palette entry (a mob-family hue clearly different from Thorn `#ff5d73`, at 4.5:1 or better on space). It must not be amber (reserved for the player), teal (ore) or player blue.
+- **Guard ring:** two arcs, Thorn colour and Spore colour, around guarded nodes, within radius r plus the existing ring margin, readable at 24 px.
+- **Pocket:** a rock with a small Bloom growth, smaller than the heart and not round coral. Its prize icon sits in the centre.
+- **Resource icons:** ore (existing teal), **ice** (pale cyan-white, a hex flake) and **crystal** (light violet, a faceted shard). They are cool-family, distinct from each other and from mob pinks.
+- **Component icons:** **lens** (a ring with a dot) and **plating** (a stacked plate).
+
+Draw contract, so h3-client can call these before h3-art merges, with placeholders until then:
+- `drawShip(ctx, r, t, type)`;
+- `drawSpore(ctx, r, t, hpFrac)`;
+- `drawGuardRing(ctx, r, thornShare, sporeShare, t)`;
+- `drawPocket(ctx, r, t, alive, prize)`;
+- `drawResourceIcon(ctx, r, kind)`, with kind `ore | ice | crystal | lens | plating`.
+
+#### Bot checks: no single order dominates
+
+Strategies (replacing rush, turtle and raid-supply):
+- **`drones-only`:** the H1 turtle economy plan, then only the drone yard. It takes guarded nodes cheapest-first by estimate, the Root before the heart.
+- **`ice-first`:** the economy plan, then it takes the light **ice** pocket with drones. It builds its extractors and route, turns on flak, and turns on lancer when crystal arrives. After that it is greedy (below).
+- **`crystal-first`:** the same, with the light crystal pocket first.
+- **`greedy`:** the economy plan, then always the cheapest next target by estimate, using whatever is unlocked.
+
+Shared bot rules:
+- **Staging:** rally at `a5`.
+- **After a capture:** build the pocket's extractors up to its slots, a route, and up to 2 route upgrades.
+- **Next target (greedy part):** the living guarded node with the lowest `estimate / prizeWeight`.
+  - `prizeWeight`: heavy pockets 3, light 2, Root 2, heart 1. The heart goes last unless it is the only one left.
+  - Estimate: `need = Σ capEff × hp` over guard types. A fleet's per-round power is `Σ n_t × damage_t × tag_t / 100`, where `tag_t` is the weighted multiplier from the sheet tag.
+  - Attack with everything at `a5` when `power × 3 ≥ need + 20`.
+  - If repelled, multiply the threshold by 5/4 and wait.
+- **Yards:** all unlocked yards stay on.
+
+Report, per strategy and layout:
+- the heart capture time;
+- the capture order with times;
+- ships lost by type;
+- waves sent and repelled;
+- the time each resource was first delivered.
+
+Plus a per-layout comparison table.
+
+**H3 depth flags** (report lines, not merge gates):
+1. Every strategy captures the heart in every layout within 15–45 game minutes. Nothing softlocks.
+2. **Counters matter:** in every layout, `drones-only` loses at least 40% more ships than the best strategy, or captures at least 20% later.
+3. **Two viable first doors:** in at least 2 of the 3 layouts, `ice-first` and `crystal-first` capture the heart within 15% of each other.
+4. **No fixed best opening:** across the three layouts, the faster of `ice-first` and `crystal-first` is not the same in all three.
+5. **Order varies:** `greedy`'s capture order is different in each layout.
+6. Determinism and the reference replay pass.
+
+If the numbers miss these, the engineers report them and do not retune. h3-design-data retunes the layouts and defaults.
+
+#### Success criteria (the owner, one 30–40 minute phone session; 4x is fine)
+
+1. The owner takes at least three guarded nodes in game 1.
+2. Before their second pocket, they can name two sensible next targets and why they picked one.
+3. They open at least one pocket sheet and use the Strong/Weak tags or the ring to choose ships, and can say so.
+4. If they start a second game (a different layout), their first or second pick differs, or they can say why it shouldn't.
+5. They do not describe the run as "build economy, then ships, then attack".
+6. Every action is at most 2 taps from the map (confirms and the Choose… panel excepted). Nothing in the HUD wraps at 375 px.
+
+#### Fun questions for the handoff
+
+1. After your first pocket, did you have more than one sensible next target? What decided it?
+2. Did the ring and the Strong/Weak tags tell you which ships to bring? Did you ever send the wrong ships, and did it sting?
+3. Did unlocking a new ship type feel like a payoff? Did the game feel like one fixed sequence, or like a path you chose?
+
+#### Open calibration questions (for h3-design-data, after h3-sim merges)
+
+1. **Pacing.** With the H1 economy, do bots take the first light pocket at about 4–6 min and the heart at 20–35 min, or 35–45 for `drones-only`? If they're too slow, trim the asteroid build-out cost before trimming the guards.
+2. **Prize throughput.** At 6/min per extractor and 4 per component, a light pocket gives about 3 components/min. Is the component, not ore, the visible throttle for lancers and flak, without the player waiting on it?
+3. **Door balance.** Do flags 3 and 4 hold? Twin Seams is symmetric by design. If a layout fails, change its heavy pocket's mix before touching `counter.*`.
+4. **Drones as the fallback.** Are they clearly worse (flag 2), yet able to finish? Is `ship.drone.damage` 2 too strong?
+5. **Spore regrowth at 20 ticks.** Does it keep trickles from winning, as Thorns did in H1? The model says yes for waves under about 8.
+6. **Combat order.** Lancers resolve before flak, so lancers soak the Thorns first in a mixed wave. Check that this doesn't make one type always better in mixes.
+7. **The bot estimator.** The constant 3 and the +20 margin overestimate drones and underestimate wrong-type waves. Tune it only so the bots behave sensibly. It isn't shown to the player.
+
+#### Out of scope for H3
+
+Each is a later M2 hypothesis:
+- factories outside the probe, max route length, relays and shared capacity (H4);
+- the big field, zoom, scouting and multi-session play (H5);
+- the third ship and guard type (Warden and Lash), tier 2 resources and sap (H4 or H5);
+- the new probe and new game+ (H6);
+- route blocking by living pockets (H4).
 
 ### H3 candidates (iteration 3): superseded
 
