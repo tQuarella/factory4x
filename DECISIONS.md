@@ -458,3 +458,13 @@ All seven H4 bot flags now hold. Before: `reports/archive/h4-bots-data-v6.md`. A
 - **Left alone:** The Deep (the H3 layouts unchanged, Glass Thicket at 16:50) and the research costs. The thin margins (best run 45.8 min on seeds 2 and 3) are recorded, not padded.
 - **Side effect to watch:** no bot skips an area now, because the bot policy buys both Fast yards levels before the core. A player can still skip one by going light on Fast yards. DESIGN.md "Why these areas" says so.
 - **Doc fixes from the h4-sim Critic:** research has 13 levels, not 14, and the save grows by about 1.7 KB (capped at 2 KB by a test), not "under 1 KB".
+
+## 2026-11-08 · Designer · h4-design-data round 2: dataVersion 7, and sourcing fixes
+
+The Critic rejected round 1 (`reviews/h4-design-data.md`). This entry corrects the previous one (DECISIONS.md is append-only).
+
+- **`dataVersion` is now 7, not 6.** The save format is unchanged, but the calibration changed area defaults (hauls and guards). Production already serves v6 with the old values, so without a bump a v6 save or feedback replay would load silently against different numbers. With the bump, it is discarded with the existing "older version" toast. The previous entry's "no `dataVersion` bump" is superseded.
+- **Scope widened by one line, on the Director's routing:** `packages/sim/test/data-h4.test.ts:126`, `toBe(6)` → `toBe(7)`. No other test pins 6. That test's title still reads "is data version 6" (line 125). I left it, because it's outside the one line I was allowed; it needs a later one-word fix.
+- **The report of record is `reports/archive/h4-design-data-v7.{md,json}`.** The v6 copies are removed. The v7 numbers are identical to round 1's, since only the version stamp changed. All seven flags are met.
+- **Unsourced numbers removed.** Shelf at 3/12 and "under a minute" were from uncommitted intermediate runs. DESIGN.md now cites only the two committed reports and marks the intermediate-run attribution as such. The run-length margin is 0.9 min on seed 2 (45:54) and 0.8 min on seed 3 (45:47).
+- **The stale full-run length** in DESIGN.md "Save" now quotes the v7 report: 45:47–67:46 game minutes, about 82–122k ticks.

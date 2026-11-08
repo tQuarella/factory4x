@@ -1,5 +1,5 @@
 {
-  "dataVersion": 6,
+  "dataVersion": 7,
   "tickRate": 30,
   "tunables": {
     "economy.startStock": { "default": 40, "min": 0, "max": 200 },

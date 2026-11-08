@@ -345,7 +345,7 @@ What is open when:
 
 Totals: haul 1680 / 240 / 240 (calibrated by h4-design-data), which covers every research level (1660 / 220 / 220; see "Research"). The sim's data validation enforces haul ≥ research cost per resource, so a player who takes every area can always afford the probe core, whatever they bought first. No softlock.
 
-**Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). First derived from the H3 layouts at about 20% (light) and 60% (medium) and pushed toward each side's theme, then calibrated by h4-design-data (see "Calibration result (h4-design-data, data v6)"). The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
+**Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). First derived from the H3 layouts at about 20% (light) and 60% (medium) and pushed toward each side's theme, then calibrated by h4-design-data (see "Calibration result (h4-design-data, data v7)"). The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
 
 | Area | Node | Prize | Slots | Guards (T/S) | Tags l / f |
 | --- | --- | --- | --- | --- | --- |
@@ -376,7 +376,7 @@ Why these areas:
 - **Each side has a theme.** The ice side (Frost Shelf, Spore Veil) is held by Spore swarms; the crystal side (Glass Shoal, Thorn Garden) by Thorns. Spore Veil's heart and Root are Flak Strong; Thorn Garden's are Lancer Strong.
 - **Research decides the cheap medium.** The ice haul from the Shelf buys the Flak design, the crystal haul from the Shoal buys the Lancer design. So your first light area and your first design decide which medium is cheap. It's the owner's H3 read ("the heart is spore-heavy so go win the easiest flak node") one level up. Both mediums have both light pockets, so either design can be built in either.
 - **The probe core needs both designs and The Deep** (see Research), so every run crosses sides at some point; the order is yours.
-- **You can skip one area, if you go light on Fast yards.** Both designs and the core need 160 ice and 160 crystal. Skipping a medium leaves 180–200 of each from hauls alone; skipping a light area leaves exactly 160 of its resource. Fast yards costs 20 then 40 more of each, so a player who buys both levels needs all six areas (hauls total 240 of each, plus shipments). Skipping is a trade-off between yard speed and one fewer area. Four areas never do: one side's resource stops at 100. In the h4-design-data bot report every strategy buys both yard levels before the core and so takes all six areas (`reports/archive/h4-design-data-v6.md`, "Skipped" column).
+- **You can skip one area, if you go light on Fast yards.** Both designs and the core need 160 ice and 160 crystal. Skipping a medium leaves 180–200 of each from hauls alone; skipping a light area leaves exactly 160 of its resource. Fast yards costs 20 then 40 more of each, so a player who buys both levels needs all six areas (hauls total 240 of each, plus shipments). Skipping is a trade-off between yard speed and one fewer area. Four areas never do: one side's resource stops at 100. In the h4-design-data bot report every strategy buys both yard levels before the core and so takes all six areas (`reports/archive/h4-design-data-v7.md`, "Skipped" column).
 
 #### Area lifecycle
 
@@ -507,9 +507,9 @@ New keys, plus one changed default. Per-area numbers (guards, haul, export) and 
 
 #### Save, data version and replay
 
-- **`dataVersion` 6.** An H3 save (v5) fails the data-version check and is discarded with the existing toast ("Saved run was from an older version; starting fresh"). **No migration:** an H3 save is one field mid-game, and there's no honest way to map it onto a campaign. The owner loses one H3 run, which is a finished test.
+- **`dataVersion` 7** (6 when h4-sim shipped; bumped by h4-design-data because the calibration changed area defaults, and a v6 save or replay must not load silently against different numbers). An H3 save (v5), or an H4 save made on v6 data, fails the data-version check and is discarded with the existing toast ("Saved run was from an older version; starting fresh"). **No migration:** an H3 save is one field mid-game, and there's no honest way to map it onto a campaign. The owner loses one H3 run, which is a finished test.
 - **The save** is the world snapshot with `campaign` added (about 1.7 KB more than an H3 save, measured in h4-sim; a test caps it at 2 KB) plus the client's input log, as now. `deserializeWorld` also checks the campaign's shape.
-- **The log grows over a campaign.** A full run is about 60–75 game minutes, or 110–135k ticks. The client stores inputs only (a few thousand), so the save stays well under 1 MB. A feedback replay re-runs the whole campaign; that's a few seconds in the browser. If it gets slow, area-boundary checkpoints are a follow-up, not H4 scope.
+- **The log grows over a campaign.** In the h4-design-data bot report (`reports/archive/h4-design-data-v7.md`) a full run takes 45:47–50:47 game minutes for the researching strategies and up to 67:46 for no-research, about 82–122k ticks at 30 ticks per second. The client stores inputs only (a few thousand), so the save stays well under 1 MB. A feedback replay re-runs the whole campaign; that's a few seconds in the browser. If it gets slow, area-boundary checkpoints are a follow-up, not H4 scope.
 - **The reference replay** is regenerated. It covers: landing in Landfall and reclaiming it; buying research (opening, extraction); landing in Frost Shelf; a withdraw; landing again (the opening includes the research); a pocket capture and a heart capture; leaving. It may use `setTunable` (for example `guard.capPct` 25) to stay short. The probe core and the win are covered by unit tests from `campaignWorld`. The determinism gate's run must land in an area (not idle on the overworld), and its hashes are re-baselined.
 
 #### What changes for H3 content
@@ -661,15 +661,15 @@ Reaching the probe core is a bonus in this session, not a criterion. A second se
 2. After each area, was there more than one sensible next area? What decided it: a design you had, a prize, or the guard mix?
 3. Did your third or fourth area feel like a fresh puzzle or a repeat of the first? Was there a moment that felt like a big step?
 
-#### Calibration result (h4-design-data, data v6)
+#### Calibration result (h4-design-data, data v7)
 
 Sources:
 - **Before:** `reports/archive/h4-bots-data-v6.md`, the h4-bots report on the data as first specced.
-- **After:** `reports/archive/h4-design-data-v6.md`, the current data.
+- **After:** `reports/archive/h4-design-data-v7.md`, the current data (v7).
 
 Both are `npm run bots -- --seeds 3`. Seeds pick The Deep's layout: 1 Glass Thicket, 2 Twin Seams, 3 Frost Gate. Times are game minutes of play.
 
-Only data in `map.areas` changed. Research costs, tunables and the sim are unchanged, and `dataVersion` stays 6 (the save format didn't change).
+Only data in `map.areas` changed. Research costs, tunables and the sim are unchanged. `dataVersion` goes from 6 to 7: the save format is the same, but the area defaults changed, and the deployed build already serves v6 with the old values. Without the bump, a v6 save or feedback replay would load silently against different data. With it, an old save is discarded with the existing toast.
 
 | Area | Change | Why |
 | --- | --- | --- |
@@ -677,7 +677,7 @@ Only data in `map.areas` changed. Research costs, tunables and the sim are uncha
 | Thorn Garden | haul ice 30 → 40 | the same for the crystal side and the Flak design |
 | Spore Veil | heart 3/30 (starved 1/15) → 1/50 (0/25); Root 0/12 → 0/16 | Flak vs Lancer gap (flag 4) and a longer medium (flag 2) |
 | Thorn Garden | heart 17/9 (starved 9/4) → 24/13 (11/5); Root 7/0 → 9/0 | a longer medium (flag 2), keeping the Lancer lead |
-| Frost Shelf | heart 2/10 → 2/12 | a slightly longer light area (flag 2). 3/12 pushed it to 10:37, past its band |
+| Frost Shelf | heart 2/10 → 2/12 | a slightly longer light area (flag 2), staying inside the 4–9 min band |
 | Glass Shoal | heart 5/3 → 6/4 | the same |
 | Landfall, Frost Shelf, Glass Shoal | haul ore 150 → 100, 130, 130 | slows the early grind purchases, which lengthens the first areas (flag 2) |
 | The Deep | haul ore 650 → 720 | keeps total ore hauls (1680) above total research ore (1660) |
@@ -713,9 +713,9 @@ The shipped share is 25–29% for the researching strategies and 36–37% for no
 
 What the numbers say:
 - **Flags 3 and 6 were one problem: the ice side met The Deep without Lancers.** Before the change, ice-line's Deep took 22:27–25:32 against crystal-line's 14:01–15:05. Ten more crystal in Spore Veil's haul lets ice-line buy the Lancer design after Spore Veil. Its Deep now takes 14:31–16:20, the same as crystal-line's.
-- **Medium areas are mostly economy-bound for the bots.** Raising the guards moved them by well under a minute. Smaller early ore hauls moved every area, because the grind arrives later. So the run-length lever is the early hauls, not guard counts.
+- **Medium areas are mostly economy-bound for the bots.** Both medium hearts grew by more than half. Yet the mean times moved only from 8:58 to 9:04 (Spore Veil) and from 9:57 to 10:29 (Thorn Garden), comparing the two reports. That fits the bots building their economy first and then attacking. Intermediate runs (not committed) pointed the same way: the smaller early ore hauls, which delay the early grind, carried most of the run-length gain.
 - **Margins are thin.**
-  - The best run clears 45 min by 0.8 min on seeds 2 and 3.
+  - The best run clears 45 min by 0.9 min on seed 2 (45:54) and 0.8 min on seed 3 (45:47).
   - The Deep's mean (15:42) is inside 16:00, but Glass Thicket alone is 16:50. The Deep is the H3 layouts unchanged; making it shorter would mean retuning the H3 tables, which I left alone.
 - **No bot skips an area now.** The bots buy both Fast yards levels (60 ice and 60 crystal) before the core, so they need all six hauls. Skipping is still possible for a player who skips Fast yards; it isn't exercised by any strategy.
 - **The reference replay wasn't re-recorded.** Flag 7 and the determinism gate pass on the new data as is.

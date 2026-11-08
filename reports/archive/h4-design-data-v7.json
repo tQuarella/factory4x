@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-11-08T14:38:13.103Z",
-  "dataVersion": 6,
+  "generatedAt": "2026-11-08T14:44:57.156Z",
+  "dataVersion": 7,
   "seeds": 3,
   "visitCapTicks": 54000,
   "campaignCapMinutes": 120,
   "tickBudgetMsP95": 2,
-  "runSeconds": 16.47,
+  "runSeconds": 16.53,
   "failures": [],
   "flags": [
     {
@@ -232,8 +232,8 @@
       },
       "shippedSharePct": 28,
       "tickMsP50": 0.002200000000129876,
-      "tickMsP95": 0.004000000000019099,
-      "finalHash": "0177557b"
+      "tickMsP95": 0.0039000000000442014,
+      "finalHash": "f64981f4"
     },
     {
       "strategy": "ice-line",
@@ -415,9 +415,9 @@
         "crystal": 57
       },
       "shippedSharePct": 27,
-      "tickMsP50": 0.002100000000154978,
-      "tickMsP95": 0.003500000000030923,
-      "finalHash": "a078b49c"
+      "tickMsP50": 0.002199999999902502,
+      "tickMsP95": 0.0036000000000058208,
+      "finalHash": "99ac51ab"
     },
     {
       "strategy": "ice-line",
@@ -600,8 +600,8 @@
       },
       "shippedSharePct": 27,
       "tickMsP50": 0.002199999999902502,
-      "tickMsP95": 0.003699999999753345,
-      "finalHash": "3fb707d5"
+      "tickMsP95": 0.0037000000002080924,
+      "finalHash": "69af3fb0"
     },
     {
       "strategy": "crystal-line",
@@ -785,7 +785,7 @@
       "shippedSharePct": 26,
       "tickMsP50": 0.0019999999999527063,
       "tickMsP95": 0.003499999999803549,
-      "finalHash": "c433c67f"
+      "finalHash": "269e45b8"
     },
     {
       "strategy": "crystal-line",
@@ -969,7 +969,7 @@
       "shippedSharePct": 26,
       "tickMsP50": 0.0020000000004074536,
       "tickMsP95": 0.0036000000000058208,
-      "finalHash": "d3dc66f9"
+      "finalHash": "5f08f1b2"
     },
     {
       "strategy": "crystal-line",
@@ -1151,9 +1151,9 @@
         "crystal": 182
       },
       "shippedSharePct": 25,
-      "tickMsP50": 0.0020999999997002305,
-      "tickMsP95": 0.0037000000002080924,
-      "finalHash": "6dcf65bb"
+      "tickMsP50": 0.0020000000004074536,
+      "tickMsP95": 0.0036999999992985977,
+      "finalHash": "0eac824a"
     },
     {
       "strategy": "full-kit",
@@ -1336,8 +1336,8 @@
       },
       "shippedSharePct": 29,
       "tickMsP50": 0.0020999999997002305,
-      "tickMsP95": 0.0037000000002080924,
-      "finalHash": "2d79ea3f"
+      "tickMsP95": 0.0036000000000058208,
+      "finalHash": "a38b4e04"
     },
     {
       "strategy": "full-kit",
@@ -1520,8 +1520,8 @@
       },
       "shippedSharePct": 28,
       "tickMsP50": 0.0020999999997002305,
-      "tickMsP95": 0.0037000000002080924,
-      "finalHash": "70287eda"
+      "tickMsP95": 0.0036000000000058208,
+      "finalHash": "775c06b9"
     },
     {
       "strategy": "full-kit",
@@ -1704,8 +1704,8 @@
       },
       "shippedSharePct": 27,
       "tickMsP50": 0.0020999999997002305,
-      "tickMsP95": 0.003800000000410364,
-      "finalHash": "5d06fc3f"
+      "tickMsP95": 0.0037999999985913746,
+      "finalHash": "f7e2c0e6"
     },
     {
       "strategy": "greedy",
@@ -1888,8 +1888,8 @@
       },
       "shippedSharePct": 28,
       "tickMsP50": 0.0020999999997002305,
-      "tickMsP95": 0.0036999999992985977,
-      "finalHash": "3b28f2c8"
+      "tickMsP95": 0.0036000000000058208,
+      "finalHash": "53ec7837"
     },
     {
       "strategy": "greedy",
@@ -2071,9 +2071,9 @@
         "crystal": 85
       },
       "shippedSharePct": 27,
-      "tickMsP50": 0.0021999999989930075,
-      "tickMsP95": 0.003800000000410364,
-      "finalHash": "9ed44236"
+      "tickMsP50": 0.0020999999997002305,
+      "tickMsP95": 0.004100000000107684,
+      "finalHash": "70a0cbc9"
     },
     {
       "strategy": "greedy",
@@ -2255,9 +2255,9 @@
         "crystal": 84
       },
       "shippedSharePct": 27,
-      "tickMsP50": 0.0021999999989930075,
+      "tickMsP50": 0.0020999999997002305,
       "tickMsP95": 0.003800000000410364,
-      "finalHash": "0812debd"
+      "finalHash": "fd8042dc"
     },
     {
       "strategy": "no-research",
@@ -2380,8 +2380,8 @@
       },
       "shippedSharePct": 37,
       "tickMsP50": 0.0020999999997002305,
-      "tickMsP95": 0.0036000000000058208,
-      "finalHash": "28b8d579"
+      "tickMsP95": 0.003800000000410364,
+      "finalHash": "fb7f63d4"
     },
     {
       "strategy": "no-research",
@@ -2503,9 +2503,9 @@
         "crystal": 128
       },
       "shippedSharePct": 36,
-      "tickMsP50": 0.00210000000151922,
+      "tickMsP50": 0.0020999999997002305,
       "tickMsP95": 0.0036000000000058208,
-      "finalHash": "93ede3af"
+      "finalHash": "bb15686a"
     },
     {
       "strategy": "no-research",
@@ -2627,9 +2627,9 @@
         "crystal": 129
       },
       "shippedSharePct": 36,
-      "tickMsP50": 0.00210000000151922,
-      "tickMsP95": 0.003700000001117587,
-      "finalHash": "5cdbf634"
+      "tickMsP50": 0.0021999999989930075,
+      "tickMsP95": 0.003800000000410364,
+      "finalHash": "3f3361ff"
     }
   ]
 }
