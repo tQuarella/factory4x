@@ -704,3 +704,328 @@ export function drawWiltingThorn(ctx: Ctx, r: number, frac: number): void {
   ctx.fill();
   ctx.restore();
 }
+
+// ---------------------------------------------------------------------------
+// H4 (Reclaim ladder): overworld art. See ART_STYLE.md "H4 entities".
+// ---------------------------------------------------------------------------
+
+export type AreaNodeState = 'locked' | 'open' | 'reclaimed';
+export type LaneState = 'closed' | 'open' | 'owned';
+export type ResearchIconId = 'lancer' | 'flak' | 'opening' | 'extract' | 'rigs' | 'yards' | 'core';
+
+/** Four rocks around an open centre (the caller draws the prize icon there). All within 0.7r. */
+const AREA_ROCKS: readonly [number, number, number][] = [
+  [-0.37, -0.31, 0.27],
+  [0.37, -0.35, 0.25],
+  [0.39, 0.33, 0.26],
+  [-0.35, 0.37, 0.24],
+];
+
+/**
+ * Area node on the overworld: a cluster of four rocks around an open centre,
+ * everything within r including spikes. `tier` 0..3 is the number of Bloom
+ * spikes on the rim while the area is held (locked or open); a reclaimed area
+ * has none. locked = dim grey-blue rocks and faint spikes; open = full rocks,
+ * pink spikes and a pulsing dashed pale ring; reclaimed = amber rocks and a
+ * steady solid amber rim (the only place amber marks an area).
+ */
+export function drawAreaNode(ctx: Ctx, r: number, t: number, tier: number, state: AreaNodeState): void {
+  ctx.save();
+  ctx.lineJoin = 'round';
+  const spikes = state === 'reclaimed' ? 0 : Math.max(0, Math.min(3, Math.round(tier)));
+  const lw = Math.max(1.5, r * 0.07);
+  // Backing disc so the rocks and the centre icon sit on something.
+  ctx.fillStyle = palette.space;
+  ctx.globalAlpha = 0.7;
+  disc(ctx, 0, 0, r * 0.74);
+  ctx.fill();
+  ctx.globalAlpha = state === 'locked' ? 0.6 : 1;
+  const rockFill = state === 'locked' ? palette.areaLocked : state === 'reclaimed' ? palette.probe : palette.asteroid;
+  AREA_ROCKS.forEach(([x, y, k], i) => {
+    ctx.save();
+    ctx.translate(x * r, y * r);
+    rockPath(ctx, k * r, 3 + i * 2, 8, 0.78);
+    ctx.fillStyle = rockFill;
+    ctx.fill();
+    ctx.strokeStyle = palette.space;
+    ctx.lineWidth = Math.max(1, r * 0.035);
+    ctx.stroke();
+    ctx.restore();
+  });
+  // Spikes from the rim of the cluster out to r.
+  if (spikes > 0) {
+    ctx.fillStyle = palette.bloom;
+    ctx.globalAlpha = state === 'locked' ? 0.35 : 1;
+    for (let i = 0; i < spikes; i++) {
+      const a = -Math.PI / 2 + (i / spikes) * Math.PI * 2;
+      ctx.save();
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.moveTo(r * 0.7, -r * 0.14);
+      ctx.lineTo(r, 0);
+      ctx.lineTo(r * 0.7, r * 0.14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  if (state === 'open') {
+    // Invitation: a pale dashed ring whose strength breathes.
+    ctx.globalAlpha = 0.55 + 0.35 * Math.sin(t * 3);
+    ctx.strokeStyle = palette.starBright;
+    ctx.lineWidth = lw;
+    ctx.setLineDash([lw * 3, lw * 2]);
+    disc(ctx, 0, 0, r * 0.9);
+    ctx.stroke();
+  } else if (state === 'reclaimed') {
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = palette.probe;
+    ctx.lineWidth = lw * 1.4;
+    disc(ctx, 0, 0, r * 0.88);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Lane between two area nodes (untranslated context; the caller trims the ends
+ * to the node rims). Stays within 4 px of the segment. closed = dim dotted,
+ * open = dashed, owned = solid amber with comet pulses running from (x1, y1)
+ * to (x2, y2).
+ */
+export function drawLane(ctx: Ctx, x1: number, y1: number, x2: number, y2: number, t: number, state: LaneState): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  if (state === 'closed') {
+    ctx.strokeStyle = palette.laneClosed;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([0.1, 7]);
+    ctx.stroke();
+  } else if (state === 'open') {
+    ctx.strokeStyle = palette.laneOpen;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([9, 6]);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = palette.laneOwned;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len > 1) {
+      const n = Math.max(1, Math.round(len / 80));
+      ctx.fillStyle = palette.flash;
+      for (let i = 0; i < n; i++) {
+        const head = (t * 0.45 + i / n) % 1;
+        for (let k = 0; k < 3; k++) {
+          const f = head - k * (10 / len);
+          if (f < 0) continue;
+          ctx.globalAlpha = 1 - k * 0.3;
+          disc(ctx, x1 + dx * f, y1 + dy * f, 3.2 - k * 0.7);
+          ctx.fill();
+        }
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Probe core: a compact seed of the probe shape (hexagon around a smaller
+ * hexagon) with a soft glow. `frac` 0..1 fills the hexagon from the bottom up,
+ * from an empty pale outline to a complete amber core. Within r including glow.
+ */
+export function drawProbeCore(ctx: Ctx, r: number, t: number, frac: number): void {
+  const f = Math.max(0, Math.min(1, frac));
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.fillStyle = palette.probeGlow;
+  ctx.globalAlpha = 0.25 + 0.75 * f;
+  disc(ctx, 0, 0, r * (0.9 + 0.06 * Math.sin(t * 2)));
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  const hex = r * 0.74;
+  const lw = Math.max(1.5, r * 0.1);
+  if (f > 0) {
+    // The hexagon cut by a horizontal line: keep the part below y = top.
+    const top = hex - 2 * hex * f;
+    const pts: [number, number][] = [];
+    for (let i = 0; i < 6; i++) pts.push([Math.cos(Math.PI / 6 + (i / 6) * Math.PI * 2) * hex, Math.sin(Math.PI / 6 + (i / 6) * Math.PI * 2) * hex]);
+    ctx.fillStyle = palette.probe;
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => {
+      const [nx, ny] = pts[(i + 1) % 6] as [number, number];
+      const inside = y >= top;
+      if (inside) ctx.lineTo(x, y);
+      if (inside !== ny >= top) {
+        const u = (top - y) / (ny - y);
+        ctx.lineTo(x + (nx - x) * u, top);
+      }
+    });
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.strokeStyle = f >= 1 ? palette.probe : palette.starBright;
+  ctx.lineWidth = lw;
+  polygon(ctx, 6, hex - lw / 2, Math.PI / 6);
+  ctx.stroke();
+  // Inner hexagon: the seed, dark once the core is complete.
+  polygon(ctx, 6, hex * 0.42, -t * 0.4);
+  ctx.fillStyle = f >= 1 ? palette.space : palette.probeGlow;
+  ctx.fill();
+  if (f >= 1) {
+    ctx.strokeStyle = palette.space;
+    ctx.lineWidth = Math.max(1, r * 0.07);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Stockpile: a steel crate with a lid band and an X brace, three resource pips on top. Within r. */
+export function drawStockpileIcon(ctx: Ctx, r: number): void {
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const w = r * 0.68;
+  const top = -r * 0.15;
+  const bot = r * 0.62;
+  const lw = Math.max(1.5, r * 0.13);
+  ctx.fillStyle = palette.rootRock;
+  ctx.fillRect(-w, top, w * 2, bot - top);
+  ctx.strokeStyle = palette.plating;
+  ctx.lineWidth = lw;
+  ctx.strokeRect(-w + lw / 2, top + lw / 2, w * 2 - lw, bot - top - lw);
+  ctx.lineWidth = Math.max(1.2, r * 0.1);
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.8, top + r * 0.28);
+  ctx.lineTo(w * 0.8, top + r * 0.28);
+  ctx.moveTo(-w * 0.75, top + r * 0.4);
+  ctx.lineTo(w * 0.75, bot - r * 0.12);
+  ctx.moveTo(w * 0.75, top + r * 0.4);
+  ctx.lineTo(-w * 0.75, bot - r * 0.12);
+  ctx.stroke();
+  // Pips: ore, ice, crystal peeking above the lid.
+  const py = -r * 0.48;
+  const pr = r * 0.2;
+  ctx.fillStyle = palette.asteroidOre;
+  disc(ctx, -w * 0.55, py, pr);
+  ctx.fill();
+  ctx.fillStyle = palette.ice;
+  disc(ctx, 0, py - r * 0.1, pr);
+  ctx.fill();
+  ctx.fillStyle = palette.crystal;
+  disc(ctx, w * 0.55, py, pr);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Research icons, each within r and told apart by silhouette at 24 px:
+ * lancer and flak = the ship inside a dashed blueprint square; opening = an
+ * ore chip with a plus; extract = a steel drill bit; rigs = an extractor mast
+ * on a rock; yards = a chevron with speed lines; core = the probe core.
+ */
+export function drawResearchIcon(ctx: Ctx, r: number, id: ResearchIconId): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const lw = Math.max(1.5, r * 0.16);
+  if (id === 'lancer' || id === 'flak') {
+    const h = r * 0.66;
+    const bw = Math.max(1.2, r * 0.09);
+    ctx.strokeStyle = palette.starBright;
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = bw;
+    ctx.setLineDash([bw * 3, bw * 2]);
+    ctx.strokeRect(-h + bw / 2, -h + bw / 2, h * 2 - bw, h * 2 - bw);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    drawShip(ctx, r * 0.48, 0, id);
+  } else if (id === 'opening') {
+    ctx.save();
+    ctx.translate(-r * 0.2, r * 0.2);
+    drawResourceIcon(ctx, r * 0.62, 'ore');
+    ctx.restore();
+    ctx.strokeStyle = palette.starBright;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.55, -r * 0.8 + lw / 2);
+    ctx.lineTo(r * 0.55, -r * 0.3);
+    ctx.moveTo(r * 0.3, -r * 0.55);
+    ctx.lineTo(r * 0.8 - lw / 2, -r * 0.55);
+    ctx.stroke();
+  } else if (id === 'extract') {
+    // Drill bit pointing down: shank, steel cone with thread cuts, teal tip.
+    ctx.fillStyle = palette.plating;
+    ctx.fillRect(-r * 0.2, -r * 0.92, r * 0.4, r * 0.4);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.46, -r * 0.52);
+    ctx.lineTo(r * 0.46, -r * 0.52);
+    ctx.lineTo(0, r * 0.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = palette.space;
+    ctx.lineWidth = Math.max(1.2, r * 0.12);
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const y = -r * 0.3 + i * r * 0.36;
+      const hw = r * 0.46 * (1 - (y + r * 0.52) / (r * 1.44));
+      ctx.moveTo(-hw, y);
+      ctx.lineTo(hw, y + r * 0.16);
+    }
+    ctx.stroke();
+    ctx.fillStyle = palette.asteroidOre;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.14, r * 0.62);
+    ctx.lineTo(r * 0.14, r * 0.62);
+    ctx.lineTo(0, r * 0.92);
+    ctx.closePath();
+    ctx.fill();
+  } else if (id === 'rigs') {
+    // A wide flat rock with an extractor mast and a pump head on top.
+    ctx.save();
+    ctx.translate(0, r * 0.45);
+    ctx.scale(1.4, 0.7);
+    rockPath(ctx, r * 0.5, 6, 9, 0.8);
+    ctx.fillStyle = palette.asteroid;
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = palette.asteroidOre;
+    ctx.fillStyle = palette.asteroidOre;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(0, r * 0.4);
+    ctx.lineTo(0, -r * 0.6);
+    ctx.moveTo(-r * 0.55, -r * 0.7);
+    ctx.lineTo(r * 0.5, -r * 0.7);
+    ctx.stroke();
+    disc(ctx, 0, -r * 0.7, r * 0.2);
+    ctx.fill();
+  } else if (id === 'yards') {
+    ctx.strokeStyle = palette.ship;
+    ctx.lineWidth = lw * 1.3;
+    ctx.beginPath();
+    ctx.moveTo(r * 0.05, -r * 0.62);
+    ctx.lineTo(r * 0.7, 0);
+    ctx.lineTo(r * 0.05, r * 0.62);
+    ctx.stroke();
+    ctx.strokeStyle = palette.starBright;
+    ctx.lineWidth = lw * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.75, -r * 0.42);
+    ctx.lineTo(-r * 0.3, -r * 0.42);
+    ctx.moveTo(-r * 0.85, 0);
+    ctx.lineTo(-r * 0.15, 0);
+    ctx.moveTo(-r * 0.75, r * 0.42);
+    ctx.lineTo(-r * 0.3, r * 0.42);
+    ctx.stroke();
+  } else {
+    drawProbeCore(ctx, r, 0, 1);
+  }
+  ctx.restore();
+}

@@ -33,6 +33,10 @@ const roles: Record<keyof typeof palette, string> = {
   ice: 'Ice icon',
   crystal: 'Crystal icon',
   plating: 'Plating icon',
+  areaLocked: 'Locked area rock',
+  laneClosed: 'Closed lane',
+  laneOpen: 'Open lane',
+  laneOwned: 'Owned lane',
 };
 
 function tableRows(): Map<string, string> {

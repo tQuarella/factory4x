@@ -45,6 +45,10 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Ice icon | `#bdf3ff` |
 | Crystal icon | `#b79cff` |
 | Plating icon | `#a8b3c7` |
+| Locked area rock | `#707b90` |
+| Closed lane | `#707b90` |
+| Open lane | `#9fb4d4` |
+| Owned lane | `#ffd27a` |
 
 Contrast check: every entity color must read against `#05070d` at 4.5:1 or better.
 
@@ -115,4 +119,32 @@ Notes:
 - Spore `#e056d6` is a magenta in the mob family (bluer and hotter than Thorn `#ff5d73` and Bloom `#ff4f8b`); it is not amber, teal or player blue. Ice and crystal are the cool family; the crystal violet is lighter and bluer than the Spore magenta.
 - New palette entries: `spore`, `sporeGlow`, `ice`, `crystal`, `plating`. Lens reuses `starBright`; ore reuses `asteroidOre`.
 
-Rules: pink glow and round coral mean the Bloom, spikes mean thorns (shape, not only color). Amber is reserved for the player's probe, rally flag and backed-up routes.
+Rules: pink glow and round coral mean the Bloom, spikes mean thorns (shape, not only color). Amber is reserved for the player's probe, rally flag, backed-up routes and (H4) reclaimed areas and owned lanes.
+
+## H4 entities
+
+Overworld content for the Reclaim ladder. Draw functions are in `packages/client/src/placeholders.ts`; every draw is centred (lanes excepted) and its bounds are measured in the gallery (`packages/client/gallery.html`, a pixel scan at r = 50) and in `packages/client/test/h4-art.test.ts` (a recording context). The gallery also shows a 24 px strip in colour and greyscale and an overworld mock at 375x667.
+
+| Entity | Draw | Look | 24 px read |
+| --- | --- | --- | --- |
+| Area node | `drawAreaNode(ctx, r, t, tier, state)` | four rocks round an open centre (the caller puts the prize icon there); `tier` 0-3 is the count of pink Bloom spikes on the rim while held | rock cluster, spikes count the tier |
+| Area `locked` | `state 'locked'` | rocks in `areaLocked` at 0.6 alpha, spikes at 0.35 alpha, no ring | dim blue-grey cluster |
+| Area `open` | `state 'open'` | tan rocks, full pink spikes, a pale dashed ring whose alpha breathes | cluster in a dashed ring |
+| Area `reclaimed` | `state 'reclaimed'` | amber rocks, no spikes, a steady solid amber rim | amber cluster in a solid ring |
+| Lane | `drawLane(ctx, x1, y1, x2, y2, t, state)` | `closed` dim dotted; `open` dashed `laneOpen`; `owned` solid amber with white comet pulses (head plus two fading tail dots) moving from (x1, y1) to (x2, y2) | dots, dashes, solid line with a moving head |
+| Research lancer / flak | `drawResearchIcon(ctx, r, 'lancer' \| 'flak')` | the ship (`drawShip`) in a dashed pale blueprint square | needle vs ringed block in a square |
+| Research opening | `'opening'` | teal ore chip with a pale plus top right | chip with a plus |
+| Research extract | `'extract'` | steel drill bit pointing down, dark thread cuts, teal tip | spiral cone |
+| Research rigs | `'rigs'` | teal extractor mast with a pump head on a flat rock | T on a mound |
+| Research yards | `'yards'` | blue chevron with three pale speed lines | arrow with trailing lines |
+| Research core | `'core'` | `drawProbeCore(ctx, r, 0, 1)` | amber hexagon |
+| Probe core | `drawProbeCore(ctx, r, t, frac)` | hexagon round a smaller hexagon with a soft glow; `frac` 0 to 1 fills the hexagon from the bottom up, a pale outline turning amber at 1 | outlined hex, filling amber |
+| Stockpile | `drawStockpileIcon(ctx, r)` | steel crate with a lid band and X brace, ore / ice / crystal pips on top | crate with three dots |
+
+Rules:
+- **Bounds.** The area node, spikes included, stays within r. Lanes stay within 4 px of their segment (line 3 px, pulse dots at most 3.2 px radius). Research icons, probe core and crate stay within r. The recording-context test checks these at several `t` and `frac`; the gallery shows the pixel-scan numbers.
+- **Amber marks reclaimed areas only** on the overworld: the reclaimed rim and rocks, and the owned lane (which joins two reclaimed areas). An unreclaimed area never carries amber, so The Deep's centre `drawProbeCore(ctx, r * 0.45, t, 0)` draws its outline in pale `starBright`; amber appears only as `frac` rises.
+- **Tier is shown by spikes and by the caller's r**, and only while held; a reclaimed area has no spikes, so its tier reads from size and position.
+- **Locked and open differ by more than hue**: ring (open only), spike strength, rock tone. Checked in the greyscale strip.
+- The caller trims lane ends to the node rims and orders them so pulses flow toward Landfall.
+- New palette entries: `areaLocked` and `laneClosed` (`#707b90`, 4.7:1; the dimness comes from alpha, so the colour passes the contrast test), `laneOpen` (`#9fb4d4`), `laneOwned` (`#ffd27a`, same as the probe). Everything else reuses existing colours.
