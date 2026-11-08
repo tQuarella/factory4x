@@ -119,7 +119,7 @@ Notes:
 - Spore `#e056d6` is a magenta in the mob family (bluer and hotter than Thorn `#ff5d73` and Bloom `#ff4f8b`); it is not amber, teal or player blue. Ice and crystal are the cool family; the crystal violet is lighter and bluer than the Spore magenta.
 - New palette entries: `spore`, `sporeGlow`, `ice`, `crystal`, `plating`. Lens reuses `starBright`; ore reuses `asteroidOre`.
 
-Rules: pink glow and round coral mean the Bloom, spikes mean thorns (shape, not only color). Amber is reserved for the player's probe, rally flag, backed-up routes and (H4) reclaimed areas and owned lanes.
+Rules: pink glow and round coral mean the Bloom, spikes mean thorns (shape, not only color). Amber is reserved for the player's probe, rally flag, backed-up routes, (H4) reclaimed areas and owned lanes, and (H5) the full fleet bracket.
 
 ## H4 entities
 
@@ -148,3 +148,21 @@ Rules:
 - **Locked and open differ by more than hue**: ring (open only), spike strength, rock tone. Checked in the greyscale strip.
 - The caller trims lane ends to the node rims and orders them so pulses flow toward Landfall.
 - New palette entries: `areaLocked` and `laneClosed` (`#707b90`, 4.7:1; the dimness comes from alpha, so the colour passes the contrast test), `laneOpen` (`#9fb4d4`), `laneOwned` (`#ffd27a`, same as the probe). Everything else reuses existing colours.
+
+## H5 entities
+
+Fleet cap icons. Draw functions are in `packages/client/src/placeholders.ts`; bounds are measured in the gallery (pixel scan at r = 50) and in `packages/client/test/h5-art.test.ts` (recording context, at r = 50 and r = 12). The gallery also shows a 24 px strip in colour and greyscale (the new icons beside the H4 research icons they must not be mistaken for) and a mock HUD row at 375 px (ship chips and the fleet chip, normal, full and at 16 px text). No new palette entries: everything reuses existing colours.
+
+| Entity | Draw | Look | 24 px read |
+| --- | --- | --- | --- |
+| Fleet icon | `drawFleetIcon(ctx, r, full)` | three `ship` blue chevrons in a triangle (one ahead, two behind) between an open bracket "[ ]" in pale `starBright` (0.85 alpha) | blue trio between two brackets |
+| Fleet icon, `full` | `full = true` | the same chevrons; the bracket closes into a rectangle and turns amber (`probe`) | blue trio in an amber box |
+| Recycle icon | `drawRecycleIcon(ctx, r)` | two teal (`asteroidOre`) arrows chasing each other round a circle, one `ship` blue chevron in the middle | circular arrows round a point |
+| Research `fleet` | `drawResearchIcon(ctx, r, 'fleet')` | the fleet's three chevrons (no bracket; the square is the frame) in the dashed pale blueprint square used by lancer and flak | blue trio in a dashed square |
+
+Rules:
+- **Bounds.** All three stay within r (measured: fleet 0.993 r, recycle 0.865 r, research fleet 0.933 r at r = 50).
+- **Amber** appears only in the full fleet bracket (the fleet chip at the limit: amber means "yours, and at its limit"). The normal fleet icon, the recycle icon and the research icon use none, which the test checks. The chevrons stay blue in both states.
+- **Full is told apart by shape as well as colour**: an open bracket vs a closed box, so it reads in greyscale and for colour-blind players. Callers should also change the chip text, not only the icon.
+- **Told apart at 24 px** (greyscale strip): fleet = brackets round a trio; full = a closed box round a trio; recycle = a ring of arrows; research fleet = a dashed square round a trio (lancer and flak hold one ship, opening is a chip with a plus). The recycle icon is ore teal, since it turns ships into ore.
+- **Callers.** The fleet chip draws `drawFleetIcon` at about r = 12 beside its text, with `full = true` when `fleetStatus.full`. The Command limit card uses `drawResearchIcon(ctx, r, 'fleet')` like the other research cards, or `drawFleetIcon` for the sheet header. The Recycle button uses `drawRecycleIcon`.
