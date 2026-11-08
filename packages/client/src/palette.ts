@@ -32,4 +32,9 @@ export const palette = {
   ice: '#bdf3ff',
   crystal: '#b79cff',
   plating: '#a8b3c7',
+  // H4 additions
+  areaLocked: '#707b90',
+  laneClosed: '#707b90',
+  laneOpen: '#9fb4d4',
+  laneOwned: '#ffd27a',
 } as const;
