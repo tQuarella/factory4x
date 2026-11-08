@@ -1002,3 +1002,212 @@ test.describe('H3 at 375x667 portrait', () => {
     await h3PlayThrough(page);
   });
 });
+
+// ---------------------------------------------------------------------------
+// H5: the fleet limit. Values that are data (the limit, the step) are read from the shipped data, never pinned; a small
+// `fleet.cap` is set through the dev hook so the fleet fills in seconds. Every surface runs under WIDE_FONT.
+
+const FLEET_CAP = defaultData.tunables['fleet.cap'].default;
+const FLEET_STEP = defaultData.tunables['research.fleet.step'].default;
+const PROBE = 0;
+const SHOAL = 2;
+
+/** Lands in Frost Shelf with `fleet.cap` set, at 4x, and waits until the yards have filled the fleet. */
+async function fillFleet(page: Page, cap: number): Promise<void> {
+  await startCampaign(page, { reclaimed: ['landfall'], land: 'shelf' }, { 'fleet.cap': cap });
+  await page.locator('#b-s4').click();
+  await expect(page.locator('#chip-fleet b')).toHaveText(`Fleet ${cap}/${cap}`, { timeout: 30_000 });
+  // The count includes a ship in a yard: wait until every ship is built and parked (the yard row then reads "fleet full").
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 30_000 }).toBe(cap);
+}
+
+/** Pauses, turns the drone yard off (so no ore is spent while the stock is read), and opens the Recycle panel at the probe. */
+async function openRecycleAtProbe(page: Page): Promise<void> {
+  await page.locator('#b-pause').click();
+  await tapNode(page, PROBE);
+  await expect(page.locator('#sheet h2')).toHaveText('Probe');
+  const tog = page.locator('#sheet .yard-row[data-yard="drone"] button.tog');
+  if ((await tog.textContent()) === 'ON') await tog.click();
+  await expect(tog).toHaveText('OFF');
+  await page.locator('#sheet button.recycle-btn').scrollIntoViewIfNeeded();
+  await page.locator('#sheet button.recycle-btn').click();
+  await expect(page.locator('#recyclepanel')).toBeVisible();
+}
+
+test('H5: the fleet fills, the chip turns amber and the yard row says why, with counts', async ({ page }) => {
+  const errors = watchErrors(page);
+  await ready(page);
+  await fillFleet(page, 2);
+  const chip = page.locator('#chip-fleet');
+  await expect(chip).toHaveClass(/full/);
+  // The full style: the chip's edge is the probe amber (palette.probe).
+  expect(await chip.evaluate((e) => getComputedStyle(e).borderTopColor)).toBe('rgb(255, 210, 122)');
+  await expect(page.locator('#toast')).toContainText('Fleet full (2/2): yards paused. Recycle ships at a node to change your mix.');
+  await tapNode(page, PROBE);
+  await expect(page.locator('#sheet .fleet-line')).toHaveText('Fleet 2/2 · Command limit 0/3');
+  await expect(page.locator('#sheet .yard-row[data-yard="drone"] .yr-status')).toHaveText('idle: fleet full (2/2)');
+  expect(errors).toEqual([]);
+});
+
+test('H5: recycle frees a slot, the stock rises by the preview, and the yard resumes', async ({ page }) => {
+  const errors = watchErrors(page);
+  await ready(page);
+  await fillFleet(page, 2);
+  await openRecycleAtProbe(page);
+  const panel = page.locator('#recyclepanel');
+  // Every row defaults to 0, never to all.
+  await expect(panel.locator('.sp-row[data-ship="drone"] .sp-count')).toHaveText('0/2');
+  await expect(panel.locator('.recycle-preview')).toHaveText('+0 ore');
+  await expect(panel.locator('button.primary')).toBeDisabled();
+  await panel.locator('button[aria-label="More Drone"]').click();
+  await panel.locator('button[aria-label="More Drone"]').click();
+  await expect(panel.locator('.sp-row[data-ship="drone"] .sp-count')).toHaveText('2/2');
+  const preview = Number(/^\+(\d+) ore$/.exec((await panel.locator('.recycle-preview').textContent())!)![1]);
+  const before = await page.evaluate(() => window.__factory4x!.stock());
+  await panel.locator('button.primary').click();
+  await expect(panel).toBeHidden();
+  const gained = (await page.evaluate(() => window.__factory4x!.stock())) - before;
+  // One paused tick of probe mining may add an ore on top of the refund.
+  expect(gained).toBeGreaterThanOrEqual(preview);
+  expect(gained).toBeLessThanOrEqual(preview + 1);
+  await expect(page.locator('#toast')).toContainText(`Recycled 2 drones: +${preview} ore.`);
+  await expect(page.locator('#chip-fleet b')).toHaveText('Fleet 0/2');
+  await expect(page.locator('#chip-fleet')).not.toHaveClass(/full/);
+  // The yard resumes: switch it back on and play on.
+  await page.locator('#sheet .yard-row[data-yard="drone"] button.tog').click();
+  await page.locator('#b-pause').click();
+  await expect(page.locator('#chip-fleet b')).toHaveText('Fleet 2/2', { timeout: 30_000 });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('H5: Command limit is bought on the overworld and the next landing shows the new limit', async ({ page }) => {
+  const errors = watchErrors(page);
+  await ready(page);
+  await startCampaign(page, { reclaimed: ['landfall', 'shelf'], stockpile: { ore: 500, ice: 100, crystal: 100 } });
+  await tapArea(page, SHOAL);
+  await expect(page.locator('#sheet .fleet-limit')).toHaveText(`Your fleet limit: ${FLEET_CAP}`);
+  await page.locator('#b-research').click();
+  const card = page.locator('#research section[data-item="fleet"]');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Command limit');
+  await expect(card).toContainText('0/3');
+  await expect(card).toContainText(`Fleet limit ${FLEET_CAP} → ${FLEET_CAP + FLEET_STEP}`);
+  // It sits in the meaty-step group after the designs, never above the probe core.
+  const order = await page.locator('#research section.rcard').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.item));
+  expect(order.indexOf('core')).toBe(0);
+  expect(order.indexOf('fleet')).toBeGreaterThan(order.indexOf('flak'));
+  await card.locator('button.buy').click();
+  await expect(card).toContainText('1/3');
+  await expect(page.locator('#toast')).toContainText(`Command limit 1: fleet limit now ${FLEET_CAP + FLEET_STEP}.`);
+  await page.locator('#research button[aria-label="Close research"]').click();
+  await landByTaps(page, SHOAL, 'Glass Shoal');
+  await expect(page.locator('#toast')).toContainText(`fleet limit ${FLEET_CAP + FLEET_STEP}`);
+  await expect(page.locator('#chip-fleet b')).toHaveText(new RegExp(`^Fleet \\d+/${FLEET_CAP + FLEET_STEP}$`));
+  expect(errors).toEqual([]);
+});
+
+test('H5: a disabled Command limit says why: the area tier it needs', async ({ page }) => {
+  await ready(page);
+  await startCampaign(page, { reclaimed: ['landfall'], stockpile: { ore: 500, ice: 100, crystal: 100 } });
+  await page.locator('#b-research').click();
+  const buy = page.locator('#research section[data-item="fleet"] button.buy');
+  await expect(buy).toBeDisabled();
+  await expect(buy).toHaveText(/^Needs an? \w+ area reclaimed$/);
+  await expect(page.locator('#research section[data-item="fleet"] .req')).toContainText(/Needs: an? \w+ area reclaimed/);
+});
+
+test('H5: fleet.cap 0 hides the limit UI everywhere and says so on Command limit', async ({ page }) => {
+  const errors = watchErrors(page);
+  await ready(page);
+  await startCampaign(page, { reclaimed: ['landfall', 'shelf'], stockpile: { ore: 500, ice: 100, crystal: 100 } }, { 'fleet.cap': 0 });
+  await tapArea(page, SHOAL);
+  await expect(page.locator('#sheet h2')).toHaveText('Glass Shoal');
+  await expect(page.locator('#sheet .fleet-limit')).toBeHidden();
+  await page.locator('#b-research').click();
+  const buy = page.locator('#research section[data-item="fleet"] button.buy');
+  await expect(buy).toBeDisabled();
+  await expect(buy).toHaveText('Fleet limit is off (tuning)');
+  await page.locator('#research button[aria-label="Close research"]').click();
+  await landByTaps(page, SHOAL, 'Glass Shoal');
+  await expect(page.locator('#toast')).not.toContainText('fleet limit');
+  await expect(page.locator('#chip-fleet')).toBeHidden();
+  await tapNode(page, PROBE);
+  await expect(page.locator('#sheet .fleet-line')).toBeHidden();
+  await expect(page.locator('#sheet .yard-row[data-yard="drone"] .yr-status')).not.toContainText('fleet full');
+  expect(errors).toEqual([]);
+});
+
+test('H5: the tuning panel labels the fleet limit as the A/B switch', async ({ page }) => {
+  await ready(page);
+  await page.locator('#b-tune').click();
+  await expect(page.locator('#tuning')).toContainText('Fleet limit (0 = none)');
+  await expect(page.getByLabel('fleet.cap', { exact: true })).toHaveValue(String(FLEET_CAP));
+  await expect(page.getByLabel('fleet.recycleRefundPct', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('research.fleet.step', { exact: true })).toBeVisible();
+});
+
+test('H5: a v7 save (before the fleet limit) starts fresh with the toast', async ({ page }) => {
+  const world = JSON.parse(serializeWorld(createWorld(1, defaultData))) as { dataVersion: number };
+  world.dataVersion = 7;
+  const save = JSON.stringify({ format: 2, seed: 1, dataVersion: 7, world: JSON.stringify(world), log: [], pending: [], history: [], flags: {} });
+  await page.addInitScript((text) => window.localStorage.setItem('fvn.save', text), save);
+  await page.goto('/');
+  await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
+  await expect(page.locator('#toast')).toContainText(/older game data \(v7; this build is v\d+\), so it was discarded and a new run started/);
+  expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
+});
+
+test.describe('H5 at 375x667 portrait', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('the fleet chip and the ship chips fit the HUD under a wide font, normal and full', async ({ page }) => {
+    await ready(page);
+    await startCampaign(page, DEEP_START);
+    await expect(page.locator('#chip-fleet')).toBeVisible();
+    await expectControlsFit(page, '#bars', 'area HUD with the fleet chip');
+    await expectHudNoWrap(page, 'area HUD with the fleet chip');
+    // The ship chips and the fleet chip are all in the HUD, none cut off.
+    const rects = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>('#chips .chip')).filter((e) => !e.hidden).map((e) => e.getBoundingClientRect().toJSON()));
+    expect(rects.length).toBeGreaterThanOrEqual(3);
+    for (const r of rects) expect(r.right).toBeLessThanOrEqual(375);
+    await page.addStyleTag({ content: '#chip-fleet, #chip-fleet * { font-size: 16px !important; }' });
+    await expectHudNoWrap(page, 'area HUD with a 16 px fleet chip');
+  });
+
+  test('the full fleet chip, the yard reason and the Recycle panel fit by touch', async ({ page }) => {
+    test.setTimeout(90_000);
+    await ready(page);
+    await fillFleet(page, 3);
+    await expectHudNoWrap(page, 'full fleet HUD');
+    await expectControlsFit(page, '#bars', 'full fleet HUD');
+    await page.screenshot({ path: 'test-results/h5-full-hud.png' });
+    await openRecycleAtProbe(page);
+    await expectControlsFit(page, '#recyclepanel', 'recycle panel');
+    const card = (await page.locator('#recyclepanel .card').boundingBox())!;
+    expect(card.y).toBeGreaterThanOrEqual(0);
+    expect(card.y + card.height).toBeLessThanOrEqual(667);
+    await page.locator('#recyclepanel button[aria-label="All Drone"]').click();
+    await expectControlsFit(page, '#recyclepanel', 'recycle panel with a count');
+    await page.screenshot({ path: 'test-results/h5-recycle.png' });
+    await page.locator('#recyclepanel button', { hasText: 'Cancel' }).click();
+    await expect(page.locator('#recyclepanel')).toBeHidden();
+  });
+
+  test('the research sheet with the Command limit card fits, with a wide font', async ({ page }) => {
+    await ready(page);
+    await startCampaign(page, { reclaimed: ['landfall', 'shelf', 'shoal'], research: { fleet: 1 }, stockpile: { ore: 300, ice: 50, crystal: 50 } });
+    await page.locator('#b-research').click();
+    await expect(page.locator('#research section[data-item="fleet"]')).toHaveCount(1);
+    await page.locator('#research section[data-item="fleet"]').scrollIntoViewIfNeeded();
+    await expectControlsFit(page, '#research', 'research sheet with the Command limit card');
+    await page.screenshot({ path: 'test-results/h5-research.png' });
+    // A disabled reason fits in its button too.
+    await startCampaign(page, { reclaimed: ['landfall'] }, { 'fleet.cap': 0 });
+    await page.locator('#b-research').click();
+    await page.locator('#research section[data-item="fleet"]').scrollIntoViewIfNeeded();
+    await expect(page.locator('#research section[data-item="fleet"] button.buy')).toHaveText('Fleet limit is off (tuning)');
+    await expectControlsFit(page, '#research', 'disabled Command limit button');
+  });
+});
