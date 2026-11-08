@@ -38,7 +38,13 @@ Your H2 feedback showed two problems. Every run is the same sequence (build the 
 - **B. Prizes that change your factory.** Guarded nodes give you something new, such as a material for a tougher ship, instead of just more ore. What you take first changes how the rest of the run plays.
 - **C. A new system every run.** A different generated map each time. It's fresher, but probably the same plan on a new map until A or B adds real choices.
 
-**Answer:**
+**Answer (owner, 2026-11-07, in chat):** "Let's explore a more radical change:  a longer, persistent game across a large asteroid field.  Different types of resources, resource combos creating components, components adding new ship types.  Bloom in pockets across the field, guarding resources.  Stronger bloom over better resources requiring you to build more and stronger ships that need advanced components.  That becomes the progression loop.  The progression needs to feel somewhat varied rather than a straight line.  Consider some rock/paper/scissors type ship interaction with different types of bloom guards.  That would give choice in how you spread across the asteroid field and which resources you go for in what order.
+
+Deeper logistics than just 'route to probe'  Consider:  components are made in factories outside the probe, there is a maximum route distance, anything else you suggest.
+
+Steelman this."
+
+Status: the Designer is steelmanning this direction (DESIGN.md). Parts of it may change VISION.md fixed decisions (for example run length), which would come back to you for approval.
 
 ## Answered
 
