@@ -130,6 +130,8 @@ H1 and H2 had one loop per run, and it ended at the only prize. Here the loop ru
 
 ### Milestone 2 plan (ordered, one hypothesis per build)
 
+*Rows H4–H6 are superseded by "Owner direction 2026-11-08: the overworld (steelman)" below: H4 is absorbed at overworld scale, H5 is replaced by many one-screen areas, H6 becomes the top of the overworld. Kept for the record.*
+
 Riskiest claim first: that **pockets + counters + resource prizes make "which pocket next" a real, felt choice that isn't a straight line**. Everything else (big field, factories, route limits, endgame) only matters if that holds.
 
 | H | Build | Fun claim tested | Fun question |
@@ -174,6 +176,93 @@ Riskiest claim first: that **pockets + counters + resource prizes make "which po
   - on a second game, their first pick differs or they can say why it shouldn't;
   - they don't describe the run as "build economy, then ships, then attack".
 
+## Owner direction 2026-11-08: the overworld (steelman)
+
+The owner's feedback on build-20261108-2 (PLAYTEST_LOG.md, 2026-11-08) proposes the progression loop for the whole game: many areas connected on an overworld; a reclaimed area's resources can be sent elsewhere; you manage logistics on the overworld and choose which area to reclaim next; persistent research makes heavier areas reclaimable; you start with nothing (only an undefended area), grow stronger, reclaim richer areas, and repeat until you can build the new probe; the climb is a "miner grind" punctuated by meatier steps (new ship types, which still need their resources locally, extraction speed, starting resources). They also said in-area logistics "may be fine at the scope of a small area".
+
+This section is the strongest version of that game, how it absorbs H3 and the rest of the Milestone 2 plan, and its risks. It is a direction, not a spec. The first slice is chosen from "H4 candidates (awaiting the owner's pick)" under Hypotheses.
+
+### The pitch
+
+Your probe arrives at the edge of a system broken into **areas**, asteroid clusters joined by **lanes** on an overworld map. One area is empty of Bloom; every other one is held, and the richer the area, the heavier the hold. You reclaim the empty one with nothing but drones and ore. Every area you reclaim keeps working for you: its extractors keep running, and its output flows along the lanes into your **stockpile**. The stockpile pays for **research**, and research makes you permanently stronger: new ship designs, faster extraction, a bigger opening stock in the next area. Stronger means a heavier, richer area is now within reach. You pick which one, go in, and crack it. The game ends when your network can afford the **probe core** and you launch the new probe.
+
+### Two loops, two scales
+
+- **The inner loop is an area, and it is H3.** You land with starting resources, build extractors and routes, read each pocket's guard mix, take the pocket whose prize unlocks the counter you need, then take the area's heart. Capturing the heart reclaims the area. The owner's "the heart is spore-heavy so go win the easiest flak node" is exactly the decision we keep. In-area logistics stays as simple as H3: routes to the area's probe, no factories elsewhere.
+- **The outer loop is the overworld.** Between areas you choose what to research and which area to reclaim next, and (in a later slice) where reclaimed areas send their output. The overworld is one screen of about 6–10 area nodes joined by lanes. It is a node graph, so it obeys the same phone rules as an area.
+- **Sizes.** An area must fit one phone session, so it should take 5–15 minutes, not the 20–30 of the H3 field. The first areas are small (6–8 nodes, one pocket or none). The H3 field, as built, is about the size of a late area.
+
+### Local resources and overworld shipments
+
+- **Local** means what is in the active area's probe stock: what its asteroids and pockets deliver, plus the opening stock (`area.startOre`, raised by research), plus imports. Yards only ever spend local stock. This is the owner's "still need the required resources locally": researching the Lancer design lets you build Lancers anywhere, but each one still needs a lens made from crystal in this area. Research opens the door; the area's pockets, or an import, pay for each ship.
+- **Shipments** are what reclaimed areas produce. A reclaimed area isn't simulated tick by tick. It becomes a summary: one integer rate per resource, taken from the network you built there. That output can go to:
+  - **the stockpile** (research and the probe core), or
+  - **the active area**, arriving at its probe as an import stream. This is how a crystal area lets you build Lancers in an area with no crystal pocket.
+- **Overworld logistics** is where the "logistics is still very simple" complaint gets its answer. Lanes join neighbouring areas only, so far areas are reached by chaining through reclaimed ones. Each lane has a capacity, so a trunk lane becomes the bottleneck you upgrade or route around. A held area blocks every lane through it, so reclaiming opens paths as well as resources. Pillar 1 now holds at two scales: delivery inside an area throttles ships; delivery across the overworld throttles research and the probe.
+- **Imports are weaker than a local pocket** (a tunable share), so a local prize is still worth fighting for and the H3 choice survives.
+
+### What persists and what resets
+
+| Scope | Kept | Reset |
+| --- | --- | --- |
+| Entering a new area | research levels; the stockpile; every reclaimed area's output | local stocks (you start with `area.startOre`), extractors and routes (each area is built fresh, and research shortens that), ships (fleets belong to their area in the first slices) |
+| Leaving an area before reclaiming it | as above | that area returns to its starting state. You lose time, never the run. Only one area is in progress at a time, which also keeps the save small. |
+| The whole system (one long game) | which areas are reclaimed, their output rates, lanes, research, stockpile | nothing until the probe launches |
+| New game+ (next system) | the research tree (pillar 5) and probe design choices | areas, stockpile, lanes. The next system's areas start heavier. Decided in the slice that builds the probe. |
+
+### The grind and the meatier steps
+
+- **The grind** is small, repeatable progress you can see. Each reclaim adds a little output. Research has small levelled items: extraction +25%, opening ore +40, faster yards, cheaper route upgrades. Their reward lands where the chore would be: the next area's opening (build extractors, wait for ore) gets visibly shorter. The owner's pun fits: the grind is a minor one, and research keeps it minor.
+- **The meatier steps** change what you can attempt, not how fast:
+  - a new ship design (Lancer, Flak; later Warden);
+  - a new resource tier (heavy areas give sap or heavy metal, which unlock tier 2 components);
+  - a lane upgrade that opens a far region;
+  - the probe core itself.
+
+  Each meaty step costs a resource that only some areas give, so you take it by choosing an area, not by waiting. Target rhythm: a meaty step every 2–3 areas, and never more than 3 areas in a row that only grind.
+- **Keep it a web, not a ladder.** The owner describes a ladder ("reclaim richer area, get stronger, repeat"); the 2026-11-07 direction says the climb must not be a straight line. Both hold if every tier of areas has at least two doors with different prizes and guard mixes, and research is a small tree, so the order you climb in is yours. The bots check this, as in H3.
+- **No waiting (pillar 4).** Research never runs on a timer. The stockpile fills while you play the next area, so when you return to the overworld there is something to buy. While the overworld screen is open, the game is paused; there is nothing to wait for there. An area far below your strength should be quick: an "overwhelm" option (one tap sends the opening fleet, or easy areas auto-reclaim) is the main anti-chore valve, deferred until play shows it's needed.
+
+### What happens to the Milestone 2 plan
+
+- **H3 (Counter web) is kept whole** as the inner loop. Its field, counters, pockets, Root and heart become the template for every area.
+- **H4 "Factories and reach" is absorbed at overworld scale and dropped inside an area.** Factories outside the probe become reclaimed areas whose output you direct. Max route length becomes lane adjacency. "Pockets block routes" becomes "held areas block lanes". Shared route capacity becomes lane capacity. Relays become empty or poor areas worth taking as waypoints. In-area factory placement is dropped, because the owner says simple is fine at that scope.
+- **H5 "The big field" is replaced.** Many one-screen areas plus a one-screen overworld read better on a phone than one large field with pan and zoom. Multi-session play arrives on its own, since an area is a session.
+- **H6 "The new probe" becomes the top of the overworld:** the probe core costs tier 2 resources from the heaviest areas. New game+ follows.
+- **Warden, Lash and tier 2 resources** arrive later as meaty steps in research.
+
+### Check against VISION.md, line by line
+
+| VISION.md line | Fit |
+| --- | --- |
+| Fantasy: "Everything you will ever have starts with what you can pull out of the rocks around you. Grow from one probe into an industrial presence... then build a new probe" | Fits, and gets stronger: start with nothing, grow across areas, end with the probe. |
+| Original note: "Extract resources and build components that go back to the probe, which builds ships" | Fits. Shipments go back to the stockpile at home; ships are built in areas from local stock. |
+| Original note: "Better stuff means harder mobs" / pillar 2 "Risk scales with reward" | Fits. Richer areas are held more heavily. |
+| Original note: "Research components and ships." | Fits. This is the first slice where research appears. |
+| Original note: "Mobs have their own factories" / pillar 3 | Fits. Every area's guards regrow up to caps, as in H3. An opportunity for later: an area's guards fed from a neighbouring area, an overworld Root you can cut. |
+| Original note: "You win when you build a new von Neumann probe. Then new game+." | Fits. The probe core is the top of the overworld. |
+| Fixed: "Real-time, with pause and 1x/2x/4x speed." | Fits. Areas play in real time; the overworld screen is paused. |
+| Fixed: "Playable on a phone browser. Logistics are abstract routes between nodes, not tile-by-tile belts." | Fits. Lanes are routes between area nodes; each screen is one node graph. |
+| Fixed: "Each star system is one long game, played across many short sessions and kept by autosave. It ends when you launch a new probe; then new game+ in a richer, harder system." | Fits. The overworld is the star system; an area is a natural session. |
+| Fixed: "No fail state. You can lose ships and time, never the run." | Fits. Leaving an area early costs time; nothing is lost from the overworld. |
+| Fixed: "Ships take orders at nodes (attack, guard, escort); no unit micro." | Fits, unchanged inside areas. |
+| Fixed: "Autosave, so a run survives a closed tab." | Fits, if reclaimed areas are summaries (see risks). |
+| Pillar 1 "Throughput is the throttle." | Fits, at two scales (see above). |
+| Pillar 4 "A puzzle, not a race. No clock and no pressure." | No conflict in wording. The grind is the risk to this pillar (see risks), not a clock. |
+| Pillar 5 "Every system makes the next one stronger. Research and probe design carry forward" | Fits. Research now also carries from area to area inside a system, which the pillar doesn't forbid. |
+
+**No VISION.md edit is needed.** If the owner later wants pillar 5 to name areas as well as systems, that is a wording choice, not a conflict.
+
+### Real risks
+
+1. **Scope.** This is a second game layer: an overworld screen, a research screen, an area lifecycle and a new save shape. Mitigation: the first slice reuses the H3 sim unchanged inside each area, areas are data (layouts on the existing 16-node frame, with some nodes left out), and the overworld state is tiny.
+2. **The grind feels like a chore (pillar 4).** Every area starts with the same build-out. If the third area feels like the first with bigger numbers, the loop has failed. Mitigations: research aims at the opening; every area differs in prize and mix; the overwhelm valve. Measurable: the bots report each area's time to first attack, which should fall from area to area.
+3. **The ladder is a line.** "Always take the easiest available area" could be the whole strategy, which is H1's "obvious" again. Mitigations: two doors per tier, prizes that differ in kind, a research tree that branches, and a bot check that at least two area orders are viable.
+4. **Session length on a phone.** An area must finish in 5–15 minutes, so most areas are smaller than the H3 field. A 30–40 minute playtest should reach 3–5 areas, including at least one meaty step.
+5. **Autosave size and sim cost.** Simulating every reclaimed area would multiply both. Reclaimed areas are summaries (integer rates per resource), one area at most is in progress, and research is a list of levels. The save should be the H3 save plus well under 1 KB. Overworld accrual uses integer per-tick accumulators, so determinism holds.
+6. **Two gates on one ship can confuse.** "Why can't I build Lancers here?" can now mean "not researched" or "no crystal in this area". The yard row has to name which one.
+7. **Bot runs get long.** A whole campaign is many areas, longer than the 30-minute tick cap. Bots play area by area with the summary carried over, and report per area; the per-tick budget is unchanged.
+
 ## Current mechanics
 
 Built in Milestone 1 (build-20261106-2, spec H1 below):
@@ -190,7 +279,71 @@ H2 (build-20261108-1, spec below) added the Root, a second guarded node that fee
 
 ## Hypotheses
 
-### H3 (Milestone 2, iteration 3, spec ready): Counter web
+### H4 candidates (awaiting the owner's pick)
+
+The direction is "Owner direction 2026-11-08: the overworld (steelman)" above. Each candidate tests one part of the owner's loop in one iteration of about five tasks (sim, client, art, bots, design-data), reusing the H3 sim inside each area. Only one will be specced, after the owner picks (QUESTIONS.md Q16).
+
+What H3 told us (PLAYTEST_LOG.md, 2026-11-08): the per-node guard mix creates a real choice, and in-area logistics can stay simple. What we don't know yet: whether an unlock feels like a payoff, and whether a run feels like a chosen path. All three candidates ask the second question again, at overworld scale.
+
+#### H4-A: Reclaim ladder (recommended)
+
+- **Claim:** persistent research, paid for by the areas you've reclaimed, plus a choice of which area to take next, makes getting stronger feel good and makes heavier areas a goal. The repeated build-out at the start of each area reads as progress, not a chore, because research visibly shortens it.
+- **Built:**
+  - **An overworld of 6 areas on one screen,** joined by lanes that only decide which areas are available (an area opens when a neighbour is reclaimed). A0 is undefended. Two light areas follow (one gives ice, one crystal), then two medium, then one heavy area holding the probe core's last resource.
+  - **Areas are data:** H3 layouts on the existing 16-node frame with some nodes left out (A0 and the light areas about 6–8 nodes), plus a per-area guard scale. Each area is reclaimed by capturing its heart; A0's heart has no guards, so A0 teaches the build-out.
+  - **Area lifecycle:** enter, land with `area.startOre`, play H3 rules, reclaim or withdraw (withdraw resets the area). One area in progress at a time.
+  - **Stockpile:** every reclaimed area adds `area.exportPerMin` of each of its resources to the stockpile, in game time, while you play the next area.
+  - **Research sheet (about 7 items):** Lancer design (crystal) and Flak design (ice) as the meaty steps; Extraction +25% (3 levels), Opening ore +40 (3 levels), Faster yards (2 levels) as the grind; Probe core (a large cost in every resource) as the win, which shows a win panel.
+  - **One rule change inside areas:** a counter yard needs its design researched **and** its component made locally. The yard row names which is missing.
+- **Faked or deferred:**
+  - shipments are passive (no choice of destination, no import into the active area, no lane capacity);
+  - reclaimed areas are summaries, not simulated;
+  - ships don't cross areas;
+  - no Warden, Lash or tier 2 resources;
+  - the probe core is a research item and a win panel, with no new game+.
+- **Tunables (proposed; ranges for the spec):**
+
+  | Key | Default | Range | Feels like (low / high) |
+  | --- | --- | --- | --- |
+  | `area.startOre` | 40 | 0–300 | 0: every opening is a slow trickle / 300: openings are skipped |
+  | `area.exportPerMin` | 6 | 1–30 | 1: research is a long wait / 30: research is instant and meaningless |
+  | `area.<id>.guardPct` | 0 / 60 / 100 / 160 by tier | 0–300 | per-area version of `guard.capPct` |
+  | `research.extract.stepPct` | 25 | 10–50 | 10: unnoticed / 50: two levels trivialise ore |
+  | `research.extract.maxLevel` | 3 | 1–5 | |
+  | `research.startOre.step` | 40 | 10–150 | 10: unnoticed / 150: the opening disappears |
+  | `research.startOre.maxLevel` | 3 | 1–5 | |
+  | `research.yard.stepPct` | 20 | 10–50 | |
+  | `research.yard.maxLevel` | 2 | 1–4 | |
+  | `research.<item>.cost.<resource>` | calibrated | 0–2000 | grind items cheap in ore; designs in their own resource |
+  | `research.probeCore.cost.<resource>` | calibrated | 0–5000 | the session-length knob: the win should land after 4–6 areas |
+
+- **Success (one 30–40 minute phone session):** the owner reclaims at least 4 areas; names a reason for picking one area over another; names one upgrade they noticed in a later area; does not call a later area a chore or a repeat.
+- **Fun questions:**
+  1. Did getting stronger between areas feel good? Which upgrade did you notice in the next area?
+  2. After each area, did you have more than one sensible next area? What decided it?
+  3. Did your third area feel like a fresh puzzle or a repeat of the first? Was there a moment that felt like a big step?
+- **Tasks:** ow-sim (overworld state, area lifecycle, stockpile, research effects, save shape and `dataVersion`), ow-client (overworld screen, research sheet, enter and withdraw, yard-row reasons), ow-art (area nodes by tier, lanes, research icons, the stockpile chip), ow-bots (a campaign runner with research-order strategies; flags: no softlock, at least two viable area orders, time to first attack falls area by area), ow-design-data (areas and research costs).
+- **Why recommended:** it tests the riskiest part of the owner's idea, the part they called "the progression loop": does growing stronger across areas feel like growth, and does the repeated opening stay minor? Overworld logistics (B) only matters once there is progression to route for, and the owner said simple logistics may be fine. A still includes the core of "a taken area's resources keep working for you", in passive form.
+
+#### H4-B: Supply lines
+
+- **Claim:** sending a reclaimed area's output where you need it is the logistics depth the owner is missing, and importing a resource into an area changes which of its pockets are worth taking.
+- **Built:** an overworld of 5 areas with lanes that have capacity and only join neighbours; each reclaimed area's output is assigned to one destination (the stockpile, or the active area's probe as an import stream); held areas block lanes. Each reclaim grants a fixed unlock instead of research.
+- **Faked or deferred:** the research sheet, levelled upgrades, opening ore and the grind; the probe core.
+- **Risk:** it tests the half of the loop the owner rated "may be fine" and leaves out the progression they asked for. Without a reason to grow, routing is plumbing.
+- **Fun questions:** Did importing a resource change your plan inside an area? Did choosing where to send an area's output feel like a decision? Did a blocked lane change which area you took next?
+
+#### H4-C: Area runs with research (no overworld map)
+
+- **Claim:** persistent research between areas is enough on its own to turn the H3 field into a satisfying climb with meatier steps.
+- **Built:** after reclaiming an area, a card list offers 2–3 next areas (prize, guard tier, mix). Research is paid from a lump of salvage on each reclaim. The same research sheet as A.
+- **Faked or deferred:** the overworld map, lanes, and areas that keep producing after you leave.
+- **Risk:** the cheapest option (the client is mostly lists), but it drops "a taken area's resources can be sent elsewhere" entirely, and a card draft feels more like a roguelite than a network you grow. A positive result here would still leave the overworld untested.
+- **Fun questions:** Did the research make each next area feel different, or just easier? Did choosing between the offered areas feel like a real choice? Was there a moment that felt like a big step?
+
+### H3 (Milestone 2, iteration 3, tested on build-20261108-2): Counter web
+
+**Result (owner, 2026-11-08):** the core claim is supported. The guard mix per node made the next target a real choice ("the heart is spore-heavy so go win the easiest flak node"). Unlock-as-payoff and fixed sequence vs chosen path were not answered. In-area logistics "may be fine" simple. The owner proposed the overworld; see PLAYTEST_LOG.md and "Owner direction 2026-11-08: the overworld (steelman)".
 
 The owner chose "Build Counter web" as H3 (QUESTIONS.md Q14). The direction and the M2 plan are under "Owner direction 2026-11-07: the asteroid field (steelman)" above. This spec replaces the H1 map and the H2 variants. H1 and H2 rules not mentioned here still apply.
 

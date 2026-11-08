@@ -32,7 +32,17 @@ Protected files changed this build: VISION.md (Q14, owner-approved: long persist
 
 ## Blocking
 
-None.
+### Q16. Which part of the overworld should the next build test first? (2026-11-08, Designer)
+
+Your overworld idea fits VISION.md as written (no edit needed). Steelman: DESIGN.md → "Owner direction 2026-11-08: the overworld (steelman)"; details: "H4 candidates (awaiting the owner's pick)". Each is one build, reusing the H3 field inside every area:
+
+- **A. Reclaim ladder (recommended):** 6 small areas on an overworld map, starting from one undefended area; reclaimed areas fill a stockpile that buys persistent research (Lancer and Flak designs, extraction, opening ore, faster yards) up to the probe core. Shipments are passive for now. Tests your progression loop and whether the grind stays minor.
+- **B. Supply lines:** overworld lanes with capacity; you send each reclaimed area's output to the stockpile or into the area you're fighting in. No research yet. Tests overworld logistics.
+- **C. Area runs with research:** no map; after each area, pick the next from 2–3 cards; research between areas. Cheapest, but drops the overworld and areas that keep producing.
+
+Answer with a letter. Default if unanswered: A.
+
+**Answer:**
 
 ## Answered
 
