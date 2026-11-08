@@ -844,8 +844,9 @@ export function drawProbeCore(ctx: Ctx, r: number, t: number, frac: number): voi
   const f = Math.max(0, Math.min(1, frac));
   ctx.save();
   ctx.lineJoin = 'round';
-  ctx.fillStyle = palette.probeGlow;
-  ctx.globalAlpha = 0.25 + 0.75 * f;
+  // Empty core: a cool pale glow, no amber. Amber glow only once there is something in the core.
+  ctx.fillStyle = f > 0 ? palette.probeGlow : palette.starBright;
+  ctx.globalAlpha = f > 0 ? 0.25 + 0.75 * f : 0.12;
   disc(ctx, 0, 0, r * (0.9 + 0.06 * Math.sin(t * 2)));
   ctx.fill();
   ctx.globalAlpha = 1;
@@ -876,8 +877,10 @@ export function drawProbeCore(ctx: Ctx, r: number, t: number, frac: number): voi
   ctx.stroke();
   // Inner hexagon: the seed, dark once the core is complete.
   polygon(ctx, 6, hex * 0.42, -t * 0.4);
-  ctx.fillStyle = f >= 1 ? palette.space : palette.probeGlow;
+  ctx.fillStyle = f >= 1 ? palette.space : f > 0 ? palette.probeGlow : palette.starBright;
+  ctx.globalAlpha = f > 0 ? 1 : 0.3;
   ctx.fill();
+  ctx.globalAlpha = 1;
   if (f >= 1) {
     ctx.strokeStyle = palette.space;
     ctx.lineWidth = Math.max(1, r * 0.07);

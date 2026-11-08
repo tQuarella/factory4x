@@ -314,7 +314,7 @@ for (const s of ['closed', 'open', 'owned'] as LaneState[]) {
   boundLines.push(`lane ${s}: ${measure((c) => drawLane(c, -150, 0, 150, 0, 1.1, s), dist).toFixed(2)} px from segment (limit 4)`);
 }
 const boundsEl = document.getElementById('bounds');
-if (boundsEl) boundsEl.textContent = boundLines.join('\n');
+if (boundsEl) boundsEl.textContent = ['(pixel scan includes antialiasing: 1.002 r or 4.00 px is the limit; exact geometry is checked in test/h4-art.test.ts)', ...boundLines].join('\n');
 
 // ---- Overworld mock at 375x667 ----
 {

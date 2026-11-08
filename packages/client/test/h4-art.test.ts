@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { palette } from '../src/palette.ts';
 import {
   type AreaNodeState,
   type ResearchIconId,
@@ -17,7 +18,8 @@ type P = { x: number; y: number; pad: number };
  * Curves are sampled by their control points and arcs by 24 rim points, so the
  * measured extent is conservative. Clips are ignored.
  */
-function recorder(): { ctx: CanvasRenderingContext2D; hits: P[] } {
+function recorder(): { ctx: CanvasRenderingContext2D; hits: P[]; styles: string[] } {
+  const styles: string[] = [];
   type M = [number, number, number, number, number, number];
   let m: M = [1, 0, 0, 1, 0, 0];
   const stack: M[] = [];
@@ -76,11 +78,12 @@ function recorder(): { ctx: CanvasRenderingContext2D; hits: P[] } {
   const ctx = new Proxy(target, {
     get: (t, k: string) => methods[k] ?? t[k],
     set: (t, k: string, v) => {
+      if (k === 'fillStyle' || k === 'strokeStyle') styles.push(String(v));
       t[k] = v;
       return true;
     },
   }) as unknown as CanvasRenderingContext2D;
-  return { ctx, hits };
+  return { ctx, hits, styles };
 }
 
 const R = 50;
@@ -90,6 +93,37 @@ const icons: ResearchIconId[] = ['lancer', 'flak', 'opening', 'extract', 'rigs',
 function maxRadius(hits: P[]): number {
   return Math.max(...hits.map((p) => Math.hypot(p.x, p.y) + p.pad));
 }
+
+describe('H4 amber rule: amber marks reclaimed areas only', () => {
+  const amber = [palette.probe, palette.probeGlow, palette.laneOwned];
+  it('an empty probe core (frac 0) uses no amber', () => {
+    for (const t of [0, 0.8, 1.6]) {
+      const { ctx, styles } = recorder();
+      drawProbeCore(ctx, R, t, 0);
+      expect(styles.length).toBeGreaterThan(0);
+      for (const a of amber) expect(styles).not.toContain(a);
+    }
+  });
+  it('a filled probe core does use amber', () => {
+    const { ctx, styles } = recorder();
+    drawProbeCore(ctx, R, 0, 1);
+    expect(styles).toContain(palette.probe);
+  });
+  for (const state of ['locked', 'open'] as const) {
+    it(`a ${state} area node uses no amber`, () => {
+      for (const tier of [0, 1, 2, 3]) {
+        const { ctx, styles } = recorder();
+        drawAreaNode(ctx, R, 0.7, tier, state);
+        for (const a of amber) expect(styles).not.toContain(a);
+      }
+    });
+  }
+  it('a reclaimed area node does use amber', () => {
+    const { ctx, styles } = recorder();
+    drawAreaNode(ctx, R, 0.7, 1, 'reclaimed');
+    expect(styles).toContain(palette.probe);
+  });
+});
 
 describe('H4 draw bounds', () => {
   for (const state of states) {
