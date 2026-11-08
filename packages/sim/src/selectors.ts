@@ -154,10 +154,11 @@ export interface NodeStatus {
   extractorsCommitted: number;
   /** Units per minute one extractor yields here with Extraction research applied, whole units (floor). */
   perExtractorPerMin: number;
-  /** The same in tenths of a unit per minute, exact for the shipped steps (12.5 -> 125). */
+  /** The same in tenths of a unit per minute, rounded down: 12.5 -> 125, but the heart's 31.25 shows as 31.2. Totals below are not built from this rounded figure. */
   perExtractorPerMinX10: number;
   /** extractors x per-extractor rate with research applied, whole units (floor). */
   extractPerMin: number;
+  /** The total in tenths, from the unrounded product (4 heart extractors at +25%: 1250). */
   extractPerMinX10: number;
   buffer: number;
   bufferCap: number;
@@ -192,6 +193,8 @@ function boostedX10(world: Readonly<World>, kind: World['nodes'][number]['kind']
 export function nodeStatus(world: Readonly<World>, node: number): NodeStatus {
   const n = world.nodes[node]!;
   const perX10 = boostedX10(world, n.kind);
+  // Totals come from the unrounded product, as `extraction` in step.ts accumulates it.
+  const totalX100 = n.extractors * perExtractorPerMin(world.tun, n.kind) * extractPct(world);
   const route = routeFrom(world, node);
   const bufferCap = world.tun['node.bufferCap'];
   return {
@@ -201,8 +204,8 @@ export function nodeStatus(world: Readonly<World>, node: number): NodeStatus {
     extractorsCommitted: n.extractors + pendingOf(world, 'extractor', node),
     perExtractorPerMin: Math.floor(perX10 / 10),
     perExtractorPerMinX10: perX10,
-    extractPerMin: Math.floor((n.extractors * perX10) / 10),
-    extractPerMinX10: Math.floor(n.extractors * perX10),
+    extractPerMin: Math.floor(totalX100 / 100),
+    extractPerMinX10: Math.floor(totalX100 / 10),
     buffer: n.buffer,
     bufferCap,
     backedUp: n.extractors > 0 && n.buffer >= bufferCap,
