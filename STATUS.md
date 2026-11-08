@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 5, hypothesis H5: Fleet cap)
-**State:** Awaiting owner feedback on build-20261108-4 (M2 H5: Fleet cap). Only Can wait work until feedback arrives. Next: retro, then stop.
+**State:** Awaiting owner feedback on build-20261108-4 (M2 H5: Fleet cap). Only Can wait work until feedback arrives. Retro done; team stopped until the owner answers the three H5 fun questions in QUESTIONS.md. Can wait candidates: cw-worktree-prune, cw-veil-starved-tag.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-4 (H5 Fleet cap), commit f9ddf20, live (CI gates and deploy green; site shows f9ddf20 · data v9).
@@ -30,7 +30,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r11 | core-engineer | h5-client | resume | Fix round 2, reassigned per deadlock rule (resumed the h5-sim core-engineer); 0f29bec, green branch CI 42509986848 |
 | r14 | critic | h5-client | resume | Review round 3: APPROVE (00f424d); merged 0984b7f |
 | 8 | engineer | h5-bots | launch | Build (41ef624): bots gate red only because v8 lights are closed at L0; merges together with h5-design-data (see DECISIONS) |
-| 11 | retrospective | iteration 5 retro | launch | Retro after build-20261108-4 |
+| 11 | retrospective | iteration 5 retro | launch | Retro after build-20261108-4: engineer 'test the state the criterion is about' and 'never loosen a criterion in a test'; designer flags must exercise the behaviour; PROCESS 'Gates that wait on calibration' and Critic resumes across tasks; BACKLOG cw-worktree-prune |
 | 10 | critic | h5-bots | launch | Review round 1: REJECT (stranded probe ship freezes forced visits; red gate) |
 | r7 | engineer | h5-bots | resume | Fix round 1 (5280732): stranded ship fixed; v8 red is data |
 | r9 | critic | h5-bots | resume | Review round 2: APPROVE code (561a42b); merges only with h5-design-data |
@@ -39,7 +39,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r13 | critic | h5-design-data | resume | Review round 2: APPROVE (6f364ce); merged with h5-bots |
 | r4 | critic | h5-art | resume | Review round 1: APPROVE (f522965); green branch CI on 29a12ee; merged |
 
-Launches: 11 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 14.
+Launches: 11 / 12. Iteration 5 closed. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 14.
 
 ## Iteration 4 ledger
 
