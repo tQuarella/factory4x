@@ -8,9 +8,10 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
-import { defaultData } from '@factory4x/sim';
+import { defaultData, replayHashes } from '@factory4x/sim';
 import budgets from '../../../scripts/gates/budgets.json' with { type: 'json' };
-import { SAMPLE_MINUTES, SOFTLOCK_SEC, computeDepthFlags, runSeeds, type GameResult } from './runner.ts';
+import { referenceReplay } from './reference-replay.ts';
+import { H3_STRATEGIES, SAMPLE_MINUTES, SOFTLOCK_SEC, computeDepthFlags, layoutRows, mmss, runGame, runSeeds, type GameResult } from './runner.ts';
 import { strategies } from './strategies.ts';
 
 function arg(name: string, fallback: number): number {
@@ -49,7 +50,15 @@ for (const s of strategies) {
     if (r.captureSec === null) flags.push(`${s.name} seed ${r.seed} (${r.variantId}) never captured the heart within ${fmtMin(ticks / defaultData.tickRate)}`);
   }
 }
-const depthFlags = computeDepthFlags();
+// Flag 6: the reference replay hashed twice, and one bot game played twice, must match.
+const { determinismTicks, determinismHashEvery } = budgets;
+const ha = replayHashes(referenceReplay, defaultData, determinismTicks, determinismHashEvery);
+const hb = replayHashes(referenceReplay, defaultData, determinismTicks, determinismHashEvery);
+const replayOk = ha.length > 0 && ha.length === hb.length && ha.every((h, i) => h === hb[i]);
+const probe = strategies.find((x) => x.name === 'greedy')!;
+const g1 = results.find((r) => r.strategy === probe.name && r.seed === 1);
+const gameOk = g1 !== undefined && runGame(probe, 1, defaultData, ticks).finalHash === g1.finalHash;
+const depthFlags = computeDepthFlags(results, replayOk && gameOk, `reference replay ${replayOk ? 'matches' : 'DIVERGES'} over ${determinismTicks} ticks; greedy seed 1 replayed ${gameOk ? 'to the same hash' : 'to a DIFFERENT hash'}`);
 for (const f of depthFlags) if (!f.pass) flags.push(`depth flag missed: ${f.name} (${f.detail})`);
 
 const rows = strategies.map((s) => {
@@ -88,22 +97,29 @@ const md = [
   `# Bot suite: ${failures.length ? 'FAIL' : 'PASS'}`,
   '',
   `Data version ${defaultData.dataVersion}, ${seeds} seeds × ${ticks} ticks (${fmtMin(ticks / defaultData.tickRate)}), tick budget p95 ≤ ${budgets.tickBudgetMsP95} ms. Bots run time ${runSec.toFixed(1)} s.`,
-  'Every seed runs its own game (seeds 1, 2 and 3 are Glass Thicket, Twin Seams and Frost Gate). The strategies are INTERIM (h3-sim) until h3-bots lands the H3 four. Ships built/lost and waves are as of the heart capture; the whole-run totals (to the tick cap) are in the JSON under `wholeRun`.',
+  'Every seed runs its own game (seeds 1, 2 and 3 are Glass Thicket, Twin Seams and Frost Gate). Ships built/lost and waves are as of the heart capture; the whole-run totals (to the tick cap) are in the JSON under `wholeRun`.',
   '',
-  '| Strategy | Seed | Layout | Captured | Capture time | Root cut | Lost (at capture) | Lost at Root | Guards withered | Waves (Root / Heart) | First ship | Built (at capture) | Repelled | Peak ore/min | Tick p50 / p95 (ms) |',
-  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  '| Strategy | Seed | Layout | Captured | Capture time | Capture order | Lost d / l / f (at capture) | Waves sent / repelled | Root cut | First ice / crystal | Built | Peak ore/min | Tick p50 / p95 (ms) |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ...real.flatMap((s) =>
     results
       .filter((r) => r.strategy === s.name)
-      .map(
-        (r) =>
-          `| ${s.name} | ${r.seed} | ${r.variantId} | ${r.outcome === 'won' ? 'yes' : r.outcome} | ${fmtMin(r.captureSec)} | ${r.rootCutSec === null ? 'never' : fmtMin(r.rootCutSec)} | ${r.shipsLost} | ${r.rootShipsLost} | ${r.guardsWithered} | ${r.rootWavesSent} / ${r.heartWavesSent} | ${r.firstShipSec === null ? 'never' : `${r.firstShipSec} s`} | ${r.shipsBuilt} | ${r.wavesRepelled} | ${r.peakPerMin} | ${r.tickMsP50.toFixed(4)} / ${r.tickMsP95.toFixed(4)} |`,
-      ),
+      .map((r) => {
+        const l = r.shipsLostByType;
+        const order = r.captureOrder.map((c) => `${c.id} ${mmss(c.sec)}`).join(' > ');
+        return `| ${s.name} | ${r.seed} | ${r.variantId} | ${r.outcome === 'won' ? 'yes' : r.outcome} | ${mmss(r.captureSec)} | ${order} | ${l.drone} / ${l.lancer} / ${l.flak} (${r.shipsLost}) | ${r.wavesSent} / ${r.wavesRepelled} | ${mmss(r.rootCutSec)} | ${mmss(r.firstDeliveredSec.ice)} / ${mmss(r.firstDeliveredSec.crystal)} | ${r.shipsBuilt} | ${r.peakPerMin} | ${r.tickMsP50.toFixed(4)} / ${r.tickMsP95.toFixed(4)} |`;
+      }),
   ),
+  '',
+  '### Heart capture time per layout (lowest seed per layout; ships lost at capture in brackets)',
+  '',
+  `| Layout | Seed | ${H3_STRATEGIES.join(' | ')} |`,
+  `| --- | --- | ${H3_STRATEGIES.map(() => '---').join(' | ')} |`,
+  ...layoutRows(results).map((row) => `| ${row.variantName} | ${row.seed} | ${H3_STRATEGIES.map((s) => { const r = row.byStrategy[s]; return r ? `${mmss(r.captureSec)} (lost ${r.shipsLost})` : '-'; }).join(' | ')} |`),
   '',
   '### Depth flags (report lines, not gates)',
   '',
-  ...(depthFlags.length ? depthFlags.map((f) => `- ${f.pass ? 'MET' : 'MISSED'}: ${f.name} (${f.detail})`) : ['None yet: the H3 flags land with h3-bots.']),
+  ...depthFlags.map((f, i) => `${i + 1}. ${f.pass ? 'MET' : 'MISSED'}: ${f.name} (${f.detail})`),
   '',
   `Throughput (ore/min delivered by routes) at game minutes ${SAMPLE_MINUTES.join(', ')}:`,
   '',
@@ -114,7 +130,7 @@ const md = [
     return r ? [`| ${s.name} | ${SAMPLE_MINUTES.map((m) => n(r.throughputAtMin[String(m)] ?? null)).join(' | ')} |`] : [];
   }),
   '',
-  `Stubs (no behavior, not reported): ${strategies.filter((s) => s.stub).map((s) => s.name).join(', ')}.`,
+  strategies.some((s) => s.stub) ? `Stubs (no behavior, not reported): ${strategies.filter((s) => s.stub).map((s) => s.name).join(', ')}.` : '',
   '',
   `## Flags (tuning targets and captures, not gate failures)\n\n${flags.length ? flags.map((f) => `- ${f}`).join('\n') : 'None: every target is met.'}`,
   '',

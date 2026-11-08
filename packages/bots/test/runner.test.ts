@@ -5,7 +5,6 @@ import { strategies, type Strategy } from '../src/strategies.ts';
 
 const TICKS_30_MIN = 54000;
 const dronesOnly: Strategy = strategies.find((s) => s.name === 'drones-only')!;
-const greedy: Strategy = strategies.find((s) => s.name === 'greedy')!;
 
 describe('runner', () => {
   it('reports a softlock when nothing is delivered and no ship is built for 5 game minutes', () => {
@@ -100,9 +99,22 @@ describe('runner', () => {
     expect(r.shipsLost).toBeLessThanOrEqual(r.wholeRun.shipsLost);
   });
 
-  it('plays both interim strategies to the heart in every layout', () => {
-    for (const st of [dronesOnly, greedy]) {
-      for (const r of runSeeds(st, 3, defaultData, TICKS_30_MIN)) expect(r.outcome, `${st.name} ${r.variantId}`).toBe('won');
+  it('plays all four strategies to the heart in every layout', () => {
+    for (const st of strategies) {
+      const rs = runSeeds(st, 3, defaultData, TICKS_30_MIN);
+      for (const r of rs) expect(r.outcome, `${st.name} ${r.variantId}`).toBe('won');
+      expect(new Set(rs.map((r) => r.variantId)).size).toBe(3);
     }
+  });
+
+  it('reports the capture order, losses by type and first deliveries', () => {
+    const r = runGame(strategies.find((s) => s.name === 'ice-first')!, 3, defaultData, TICKS_30_MIN);
+    expect(r.captureOrder.at(-1)!.id).toBe('heart');
+    expect(r.captureOrder.at(-1)!.sec).toBe(r.captureSec);
+    expect(r.captureOrder.some((c) => c.id === 'root')).toBe(true);
+    const l = r.shipsLostByType;
+    expect(l.drone + l.lancer + l.flak).toBe(r.shipsLost);
+    expect(r.firstDeliveredSec.ice).not.toBeNull();
+    expect(r.firstDeliveredSec.crystal).not.toBeNull();
   });
 });
