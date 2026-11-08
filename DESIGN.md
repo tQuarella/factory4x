@@ -290,7 +290,13 @@ Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per
 | root | none | 0 | 6 / 12 | 26 / 22 / 28 | Even (134) / Even (90) |
 | heart | ore | 4 | 12 / 42, starved 8 / 21 | 52 / 47 / 47; starved 27 / 21 / 23 | Even (110) / Even (114) |
 
-**Tag accuracy at these numbers.** Say a type's tag is "right" when Strong means it needs at most 80% of the drones' wave, Weak means it needs more than the drones, and Even is anything in between. By that test, 35 of 36 tags are right. The exception is flak at Twin Seams p1 (and the identical p2): it needs 23 ships to the drones' 20 but reads Even, which is close enough.
+**Tag accuracy at these numbers.** Say a type's tag is "right" when Strong means it needs at most 80% of the drones' wave, Weak means it needs more than the drones, and Even is anything in between. By that test (as measured by the report in `packages/sim/test/min-waves.test.ts`), 33 of the 36 tags at full caps are right, and 38 of 42 when the starved heart is included. The four misreads, all in Twin Seams:
+- **p1 flak:** needs 23 against the drones' 20 (15% more) and reads Even; by the test it should read Weak. The Designer's calibration called this close enough.
+- **p2 flak:** the same mix as p1, so the same numbers and the same misread.
+- **Root flak:** needs 28 against the drones' 26 (8% more) and reads Even; it should read Weak. Not covered by the earlier "close enough" call; needs a Designer judgment.
+- **Starved heart lancer:** needs 21 against the drones' 27 (78%) and reads Even; it should read Strong. It is just past the 80% line, in the final fight; needs a Designer judgment (or the tag-formula follow-up below).
+
+Twin Seams reads Even/Even for both counters at its Root and at its heart, fed and starved, so there the tags give no guidance in the final fight. Whether that is intended for the symmetric layout is a Designer follow-up (Critic note).
 
 The H2-era mixes are kept in git history (data v4).
 
@@ -587,37 +593,39 @@ The changes from v4:
 
 `guard.capPct` stays at 100, so it's still a neutral live knob. `counter.*` is unchanged.
 
-Bot suite, `--seeds 3`, heart capture in game minutes:
+Bot suite, `--seeds 3`, data v5 with the round-robin yards (current; `reports/bots-latest.md`), heart capture in game time (m:ss):
 
 | Layout | drones-only | ice-first | crystal-first | greedy |
 | --- | --- | --- | --- | --- |
-| Frost Gate | 25.3 | 18.9 | 21.1 | 18.9 |
-| Glass Thicket | 27.9 | 18.4 | 20.5 | 20.5 |
-| Twin Seams | 25.4 | 20.2 | 22.2 | 20.2 |
+| Frost Gate | 25:17 | 20:40 | 20:27 | 19:33 |
+| Glass Thicket | 27:51 | 21:58 | 21:45 | 21:45 |
+| Twin Seams | 25:27 | 19:42 | 19:16 | 19:42 |
 
-| Flag | v4 (before) | v5 (after) |
-| --- | --- | --- |
-| 1. All capture within 15-45 min | **missed** (12.0-15.7) | met (18.4-27.9) |
-| 2. Counters matter | met on time only (20-31% later) | met on time (26-52% later); the "40% more losses" half still fails (drones-only loses about as many ships) |
-| 3. Two viable doors | met (gaps 0-5%) | met in 3 of 3 (gaps 10-12%) |
-| 4. No fixed best opening | met on knife edges (3 s, 17 s, 33 s gaps) | **missed**: ice-first is faster in every layout by about 2 min |
-| 5. Order varies | met | met |
-| 6. Determinism | met | met |
+Before round-robin (fixed yard order, same v5 data) ice-first / crystal-first were 18:54 / 21:08, 18:24 / 20:31 and 20:12 / 22:12; drones-only is unchanged.
+
+| Flag | v4 | v5, before round-robin | v5, current (round-robin yards) |
+| --- | --- | --- | --- |
+| 1. All capture within 15-45 min | **missed** (12.0-15.7) | met (18:24-27:51) | met (19:16-27:51) |
+| 2. Counters matter | met on time only (20-31% later) | met on time only (26-52% later) | met on time only (drones-only 28-32% later than the best); the "40% more losses" half still fails (52/57/51 lost against 42/47/38) |
+| 3. Two viable doors | met (gaps 0-5%) | met (gaps 10-12%) | met in 3 of 3 (gaps 1-2%) |
+| 4. No fixed best opening | met on knife edges (3 s, 17 s, 33 s gaps) | **missed**: ice-first faster everywhere by about 2 min | **missed**: crystal-first faster in all three layouts, by 13-26 s |
+| 5. Order varies | met | met | met |
+| 6. Determinism | met | met | met |
 
 Answers to the open questions:
 1. **Pacing.**
-   - **Bots:** the first pocket falls at 10-11 min, because the bots finish their economy plan first. The heart falls at 18-22 min with counters and 25-28 min with drones only.
+   - **Bots:** the first pocket falls at 10-11 min, because the bots finish their economy plan first. The heart falls at 19-22 min with counters and 25-28 min with drones only.
    - **Players:** they take decisions and attack late, so a session should land at about 25-35 min, inside the spec's 20-35 target.
    - **Why I didn't go slower:** drones-only would cross the bot suite's 30-minute tick cap and show as "never captured".
-2. **Prize throughput.** At 6/min, the counter strategies built only about 10-15 component ships, so counters barely showed. At 12/min per extractor, a light pocket gives about 6 components/min. Components are visibly the main fleet, but at the bots' current yard order there are still far more lancers than flak (see below).
+2. **Prize throughput.** At 6/min, the counter strategies built only about 10-15 component ships, so counters barely showed. At 12/min per extractor, a light pocket gives about 6 components/min. Components are visibly the main fleet. With the fixed yard order the counter fleets were lancer-heavy (see 3a). Since the round-robin yards, both types appear in every counter game: lancers / flak lost by heart capture are 5/6, 4/7 and 2/9 for ice-first and 9/6, 6/4 and 10/1 for crystal-first (before: 12/1, 23/3, 3/8 and 21/0, 34/0, 27/0). Each door still leans towards its own counter.
 3. **Door balance.** Flag 3 holds. Flag 4 can't be held robustly with data, for two structural reasons:
-   - **(a) Yard order.** Yards are served lancer, then flak, then drone (rule 5b), so when ore is short, lancers take it all and flak is starved. Every counter strategy ends up lancer-heavy. A mixed heart then punishes the crystal-first path, which never gets flak going.
+   - **(a) Yard order (fixed since; see "Sim fix done" below).** Yards were served lancer, then flak, then drone (rule 5b as first written), so when ore is short, lancers take it all and flak is starved. Every counter strategy ends up lancer-heavy. A mixed heart then punishes the crystal-first path, which never gets flak going.
    - **(b) Bot target choice.** The bots pick targets by `need / prizeWeight` and ignore their own fleet's counters, so the order doesn't react to which door was taken.
 
    Every data lever I tried (Root swaps, light-pocket mixes, lens cost, Thorn repair, Spore regrowth) moved flag 4 by seconds, not structurally. Proposed sim fix: serve idle yards **round-robin** (the yard that started a ship least recently goes first), not in fixed order. Proposed bot fix: choose targets by the estimated fleet needed *with the current types*.
 
    **Sim fix done (h3-design-data, engineering):** rule 5b now serves lancer and flak round-robin. On the same v5 data, ice-first's lead of about 2 min is gone: the two doors finish within 13-26 s of each other in every layout (flag 3 gaps 1-2%), with crystal-first a hair faster in all three, so flag 4 is still missed, now on a knife edge. The bot fix is not done. Numbers are in DECISIONS.md.
-4. **Drones as the fallback.** They finish every layout, 26-52% slower. They lose about as many ships as the counter strategies, because the bots misuse counters too (all-in waves include lancers sent against Spores). `ship.drone.damage` stays at 2.
+4. **Drones as the fallback.** They finish every layout, 28-32% slower than the best strategy (26-52% before the round-robin yards). They lose about as many ships as the counter strategies, because the bots misuse counters too (all-in waves include lancers sent against Spores). `ship.drone.damage` stays at 2.
 5. **Spore regrowth at 20 ticks.** Fine. No repelled-trickle problems, and no wave was repelled except one bot misread.
 6. **Combat order.** The lancer-first combat order isn't the issue. The yard order (3a) is.
 7. **The bot estimator.** Unchanged. It is good enough, with zero or one repel per game.
