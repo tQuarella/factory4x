@@ -271,7 +271,7 @@ The owner's feedback on build-20261108-3 (PLAYTEST_LOG.md, 2026-11-08) proposes 
 - **A ship limit:** "Consider a ship limit so you need to build the right composition within that limit rather than just swarming drones. Could increase the limit with research."
 - **An open world:** "The overworld feels too linear. Consider going more open-world. Panning is fine, it doesn't need to all fit on the same screen. (steelman that before agreeing). That'd give the player the option to continue reclaiming and build strength before tackling the next challenge."
 
-This section argues for each as strongly as I can, then against, then says what would have to be true for each to work. It is a direction, not a spec. The slices are under "H5 candidates (awaiting the owner's pick)".
+This section argues for each as strongly as I can, then against, then says what would have to be true for each to work. It is a direction, not a spec. The owner picked the fleet cap (Q17); its spec is "H5 (Milestone 2, iteration 5, spec ready): Fleet cap" under Hypotheses, and where the two differ, the spec wins.
 
 ### The root cause both proposals attack
 
@@ -428,79 +428,372 @@ H4 (build-20261108-3, spec below) wrapped the field in a campaign:
 
 ## Hypotheses
 
-### H5 candidates (awaiting the owner's pick)
+### H5 (Milestone 2, iteration 5, spec ready): Fleet cap
 
-Background: "Owner direction 2026-11-08b: open world and a fleet cap (steelman)" above, and the H4 triage in PLAYTEST_LOG.md (2026-11-08). Each slice keeps H4 (overworld, areas, research, Landfall start) and the H3 rules inside an area unless it says otherwise. Each is one iteration of about 5 tasks. Only one will be specced, after the owner picks (QUESTIONS.md Q17).
+The owner picked A, "Fleet cap" (QUESTIONS.md Q17, 2026-11-08), and asked for no VISION.md edit yet (Q18). The cap ships as an experiment under the current pillar 1 wording. The background is "Owner direction 2026-11-08b: open world and a fleet cap (steelman)" above.
 
-**A lesson for every candidate:** a bot flag that claims a choice must measure capability, not a time gap. Each candidate's flags say what you *can't* do without the choice.
+**Not picked:**
+- **B, Open frontier:** without a cap, "build strength" means a bigger swarm.
+- **C, Cap and command areas:** over budget, and hard to read if it fails.
 
-#### H5-A: Fleet cap (recommended)
+The open map is H6, on top of the cap, if this holds.
 
-- **Claim:** a limit on ships alive per area, raised by research, makes the composition of your fleet the answer instead of its size. Heavier areas feel stronger because some are closed until your cap or your mix allows them, and a cap raise is a step you feel.
-- **Built:**
-  - `fleet.cap` per area: all types count, and yards pause at the limit ("idle: fleet full").
-  - A **Recycle** order at the probe (per-type stepper, partial ore refund), so you can refit.
-  - A **Command limit** research item (3 levels).
-  - A "Fleet 9/12" HUD chip, and the area sheet shows your cap.
-  - **Recalibration:** at each tier's expected cap, drones alone can't take the hearts, the best mix you can build locally fits, and at least one fed heart needs its Root cut. Each medium needs both counters, so neither side is "the Flak side".
-- **Tunables:** `fleet.cap` (12, 0–60; 0 is H4 as built, so the owner can A/B it in the tuning panel), `research.fleet.step` (6, 2–12), `fleet.recycleRefundPct` (50, 0–100). The ends are in the steelman table.
-- **Flags (capability, not time):**
-  1. `drones-only` fails every tier 1+ heart at its tier's cap.
-  2. A composition-aware bot reclaims every area.
-  3. The best mix differs between at least two hearts in every run.
-  4. A no-cap-research strategy can't take The Deep's fed heart.
-- **Tasks (about 5):**
-  - h5-sim: cap, recycle input, research item;
-  - h5-client: chip, yard state, recycle row, sheet line;
-  - h5-bots: composition-aware engine and capability flags;
-  - h5-design-data: measure shipped mix minima, set the cap, levels and hearts;
-  - h5-art (small): a fleet-limit icon and a recycle icon.
-- **Deferred:** the open map, scouting, new area kinds, lane logistics, new ship or guard types.
-- **Fun questions:**
-  1. Did the ship limit make you think about which ships to build? Did you ever recycle ships to change your mix?
-  2. Was there an area you couldn't take until a limit raise, a better mix or a Root cut? Did that area feel stronger?
-  3. Did a limit raise feel like a big step?
-- **Risk:** the cap fills fast, so the economy feels pointless; or "wait for the next cap level" becomes the new swarm. The second is why each cap level costs a resource only a heavier area gives.
+Everything not mentioned here is H4 (below) and H3 inside an area. Where this spec and BACKLOG.md differ, the spec wins.
 
-#### H5-B: Open frontier (no cap)
+#### Claim
 
-- **Claim:** a bigger, scouted overworld with more areas than you need makes *which* areas you take a real choice, and lets you build strength before a challenge, without the climb going flat. Areas that differ in kind make the fifth area feel different from the first.
-- **Built:**
-  - About 12 areas, a panned overworld and a "next decision" list;
-  - scouting: beyond your border you see the ring and prize, not the counts;
-  - the probe core needs about 7 areas;
-  - `areas.repeatHaulPct` (60, 25–100): each further area of the same prize kind hauls less;
-  - one new area kind, an **overworld Root**: an area whose capture starves the hearts of its lane neighbours, built on the existing wilt rules.
-- **Tunables:** `areas.repeatHaulPct` (60, 25–100; 25: grinding easy areas is pointless / 100: H4 hauls), `overworld.rootStarvePct` (50, 0–100; how far neighbours' caps drop).
-- **Flags:** in every run, the strategies leave different areas untaken, and at least two different area sets reach the core.
-- **Deferred:** the fleet cap, lane capacity, new ship or guard types.
-- **Fun questions:**
-  1. Did you leave areas untaken on purpose? Why those?
-  2. Did you ever stop to build strength before a harder area, and did that feel good or like a chore?
-  3. Did cutting the overworld Root feel like a big step?
-- **Risk:** without a cap, "build strength" still means "more ore, a bigger swarm", which is the steelman's main case against. I expect "max economy then swarm" again, on a bigger map. It is also the largest slice (map, pan, scouting and a new area kind).
+**A limit on how many ships you can field in an area, raised by research, makes the composition of your fleet the answer instead of its size.**
+- Heavier areas feel stronger, because some are closed until a limit raise, a better mix or a Root cut opens them.
+- A limit raise is a step you feel, because it opens something.
+- "Max economy, then swarm" stops working, because past the limit more ships aren't possible.
 
-#### H5-C: Cap and command areas
+What would disprove it:
+- The owner still describes the run as "max economy then build a fleet and attack".
+- The owner fills the limit with whatever the yards make and never thinks about the mix.
+- The limit feels like an arbitrary wall: they can't tell why a wave failed or what would fix it.
+- The economy feels pointless once the limit is full.
 
-- **Claim:** A's cap, plus a slightly wider overworld where some cap raises are *found*, not bought. Choosing where to earn your next raise makes the overworld a choice, and the cap makes that raise matter.
-- **Built:** everything in A, plus:
-  - 2–3 extra areas (about 8–9 in all, panned if needed), with not every area required;
-  - one or two **command areas** whose prize is +1 cap level instead of resources.
-- **Tunables:** A's, plus `command.capStep` (6, 2–12).
-- **Fun questions:** A's 1 and 3, plus "Did choosing where to earn your next limit raise feel like your call?"
-- **Deferred:** scouting, the overworld Root, lane logistics.
-- **Risk:** about 6–7 tasks, over one iteration's budget. If it fails, we won't know whether the cap or the map failed.
+#### The smallest mechanics that test it
 
-#### Recommendation: A
+1. **A fleet limit per area.** Ships alive in the area plus ships being built count against `fleetCap`. A yard can't start a ship at the limit.
+2. **Recycle:** a new order. It scraps your ships parked at a node for part of their ore, so you can change your mix.
+3. **Command limit:** a new research item, 3 levels. Each level raises the limit by `research.fleet.step`, and each needs a heavier area reclaimed first.
+4. **The A/B switch:** `fleet.cap` 0 means no limit, which is H4's rules.
+5. **Recalibration (h5-design-data):** areas are retuned to the capability windows below, measured by a minimum-wave probe on the real sim.
 
-- It is the cheapest test of the owner's own proposal.
-- It goes at the root cause of H2, H3 and H4 (every choice paid in time), and at fun questions 1 and 3 directly.
-- It carries an A/B inside the build (`fleet.cap` 0 in the tuning panel is H4 as built).
-- The open world's promise, "build strength before the next challenge", only means something once strength is a capability. If A holds, the open map (B, or C's command areas) is H6, on top of the cap. If A fails, we've learned that cheaply, before building a bigger map on it.
+New input: `recycleShips`. Nothing else in the input set changes.
+
+#### The fleet limit
+
+- **`fleetCap(world)`** = `fleet.cap + level(fleet) × research.fleet.step` when `fleet.cap > 0`, otherwise null (no limit). It is derived from tunables and research, and never stored.
+- **`fleetCount(world)`** = the ships in `world.ships`, plus the yards with `ticksLeft > 0`.
+  - Every ship counts, whatever it's doing: parked at any node, in transit, or fighting. In H4 every ship in `world.ships` belongs to the active area.
+  - A ship in a yard counts from the moment the yard starts it. This way the yards can never overshoot the limit.
+- **Rule 5b (yards), start step:** a yard *can start* only if, in addition to the H4 conditions, `fleetCap` is null or `fleetCount < fleetCap`. The count is recomputed after each start within the tick, so with a limit of 12 and 11 counted, only the first yard in rotation order starts. Rotation order and `yardTurn` are unchanged. A yard that can't start because of the limit keeps its turn (as with "no component").
+- **Over the limit.** Ships are never removed to meet the limit. Landing starts with no ships, and research is bought only on the overworld, where no ships exist, so a raise never meets a fleet. The only way to be over is lowering `fleet.cap` live in the tuning panel. Then existing ships stay, and yards don't start until the count is below the limit. Raising it live lets yards start on the next tick.
+- **Leaving an area** loses its ships, as in H4.
+- **Losses** free slots at once. The yards refill from throughput, so pillar 1 still sets how fast you rebuild.
+
+#### Recycle
+
+- **Input `recycleShips {node, counts: {drone, lancer, flak}}`.** Valid while an area is active and before the win, if all of the following hold:
+  - `node` is a node index;
+  - `node` is not a living guarded node (no recycling in a battle);
+  - the clamped total is ≥ 1.
+
+  Each count is clamped to the ships of that type parked `at` `node` (not in transit), and the lowest-id ships of each type go, as `sendShips` does.
+- **Effect:** for each ship recycled, `stock.ore += floor(ship.<type>.cost × fleet.recycleRefundPct / 100)`. The component is lost. The ships are removed at once.
+- **Stats:** `stats.shipsRecycled` per type and `stats.oreRefunded`. Recycled ships do not count as lost.
+- **Valid when `fleet.cap` is 0:** harmless.
+- **Rule order:** inputs (rule 1), as all orders.
+
+#### Command limit (data `research`)
+
+New rows for the H4 "Research" table, in the same format. h5-sim adds them to that table.
+
+| id | name | kind | level | ore | ice | crystal | requires | effect |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `fleet` | Command limit | limit | 1 | 60 | 20 | 20 | a tier 1 area reclaimed | fleet limit +`research.fleet.step` (6): 12 → 18 |
+| `fleet` | Command limit | limit | 2 | 140 | 40 | 40 | a tier 2 area reclaimed | +6 more: 24 |
+| `fleet` | Command limit | limit | 3 | 240 | 60 | 60 | two tier 2 areas reclaimed | +6 more: 30 |
+
+- **A new requirement kind:** `{ "tier": T, "count": N }` holds when at least N reclaimed areas have tier ≥ T. `parseSimData` rejects T outside the data's tiers, and N < 1 or N greater than the number of areas with tier ≥ T. `unmetRequirements` and `researchStatus` report it ("Needs a medium area reclaimed", "Needs both medium areas reclaimed").
+- **A new kind, `limit`:** a meaty step, drawn as a large card like the designs. The probe core doesn't require it.
+- **With `fleet.cap` 0,** `buyResearch` of `fleet` is invalid, and `researchStatus` reports the reason `capOff` ("Fleet limit is off (tuning)"). That keeps the A/B clean.
+- **"Only heavier areas give it".** Ice and crystal come from every tier today, so the gate is the reclaim requirement plus amounts the light hauls can't cover:
+  - After both light areas and both designs, you hold 40 ice and 40 crystal: enough for level 1, not level 2.
+  - Level 2 needs a medium's haul, and level 3 needs both mediums'.
+- **Hauls rise to keep the invariant** Σ haul ≥ Σ research cost (enforced by `parseSimData`). h5-sim updates the H4 "Areas" table and its totals line with the data.
+
+  | Area | Haul v7 (ore / ice / crystal) | Haul v8 |
+  | --- | --- | --- |
+  | `veil` | 300 / 60 / 40 | 420 / 90 / 70 |
+  | `garden` | 300 / 40 / 60 | 420 / 70 / 90 |
+  | `deep` | 720 / 60 / 60 | 920 / 100 / 100 |
+
+  Totals at v8:
+  - hauls: 2120 ore, 340 ice, 340 crystal;
+  - research, every level: 2100 ore, 340 ice, 340 crystal (H4's 1660 / 220 / 220 plus Command limit's 440 / 120 / 120).
+
+  Exports, the other hauls, and every area guard are unchanged at v8. h5-design-data retunes them.
+
+#### Root cuts, regrowth and trickling under the limit
+
+- **Root cuts are unchanged** (H3 rule 8). Under the limit they become a gate. A medium's fed heart is calibrated not to fit the base limit while its starved heart does, so at Command limit 0 you take a medium by cutting its Root, and at level 1 you may skip the cut.
+- **Regrowth is unchanged.** Guards regrow faster than yards rebuild: one Spore every 20 ticks and one Thorn every 60 per guarded node, against one ship every 90–120 ticks per yard. A failed wave can't be topped up while the node recovers.
+- **Trickling.** Rally may still point at a living guarded node, so rebuilt ships stream into the fight. At most `fleetCap` ships can be in it, so a stream adds no more than the limit. Bot flag 2 checks that drones can't win this way either: the `drones-only` campaign plays with the rally at its staging rock and refills between waves.
+- **No "ships needed" number.** Estimating stays the puzzle (H3). Instead:
+  - the limit is on the HUD, the probe sheet and every area sheet;
+  - a repelled wave that was sent at the limit gets a hint (see Client).
+
+#### The A/B switch
+
+`fleet.cap` 0 restores H4's rules: no limit, Command limit can't be bought, and Recycle still works. It keeps the H5 numbers (heavier hearts, higher hauls), so it is "H4's rules on H5's areas", which is the fair comparison. The tuning panel labels it "Fleet limit (0 = none)". Live: it applies on the next tick.
+
+#### Capability windows (the calibration targets; bot flags 2–6 measure them)
+
+Definitions:
+- **The tier's limits:** L0 = `fleet.cap` (12), L1 = L0 + step (18), L2 = L0 + 2 × step (24), at defaults.
+- **Locally buildable:** drones always; lancers if the area has a crystal prize; flak if it has an ice prize. Both designs are assumed. In H4's areas:
+  - Frost Shelf: drones and flak;
+  - Glass Shoal: drones and lancers;
+  - mediums and The Deep: all three.
+- **Fits at L:** the minimum winning simultaneous wave of locally buildable types is ≤ L − 2. Two spare slots allow for imperfect play.
+- **Closed at L:** that minimum is > L.
+- **The weakest state:** starved (Root cut) if the area has a Root; otherwise fed.
+
+| Tier | Window at defaults |
+| --- | --- |
+| 1 (light) | The heart fits at L0, **with drones alone**. Your first light area comes before any design, so it must be drone-takeable. Light areas teach the limit; they don't gate. |
+| 2 (medium) | Fed: closed at L0, fits at L1, and **no single type fits at L1** (both counters needed, so neither medium is "the Flak side"). Starved: fits at L0. Drones alone, starved: closed at L1. |
+| 3 (The Deep, each layout) | Starved: fits at L1, closed at L0. Fed: closed at L1, fits at L2. Drones alone, starved: closed at L2. |
+
+What these windows mean in play:
+- At level 0, a medium needs its Root cut. At level 1 its fed heart opens.
+- The Deep needs at least level 1 with a cut, or level 2 without.
+- Drones never take a tier 2 or tier 3 heart at the limit you have when you get there.
+- Level 3 (30) is comfort: it makes The Deep's fed heart easier.
+
+#### Entities and state: changes
+
+- `world.campaign.research.fleet`: the Command limit level (0–3).
+- `stats.shipsRecycled` (per type) and `stats.oreRefunded`.
+- The campaign area record gains `shipsRecycled` (the visit total).
+- A battle or attack record gains `capAtSend`: the limit when the wave was sent, or null when off. The repelled hint uses it. The core engineer puts it where the battle report already lives.
+- Nothing else. The limit and the count are derived.
+
+#### Player inputs: changes
+
+| Input | Rule |
+| --- | --- |
+| `recycleShips {node, counts}` | New (above). |
+| `buyResearch {item}` | As H4, plus the `tier` requirement kind, and `fleet` is invalid while `fleet.cap` is 0. |
+| `setTunable` | Accepts the H5 keys; all three are live. |
+
+#### Rules per tick: changes
+
+- **Rule 1 (inputs):** `recycleShips`.
+- **Rule 5b (yards):** the limit check on start (above).
+- **Determinism:** integer only, fixed orders, no RNG.
+
+#### Tunables (H5, data/sim.json, all integers)
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `fleet.cap` | 12 | 0–60 | 0: no limit (H4's rules, the A/B) / 6: every ship precious, tiny fights / 60: no real limit, the swarm returns |
+| `research.fleet.step` | 6 | 2–12 | per Command limit level. 2: raises go unnoticed / 12: one level doubles the fleet |
+| `fleet.recycleRefundPct` | 50 | 0–100 | 0: a wrong build is wasted until it dies / 100: free refits, so composition is never a commitment |
+
+All three are live and sim-scoped.
+
+#### Save, data version and replay
+
+- **`dataVersion` 8.** A v7 save fails the data-version check and is discarded with the existing toast. No migration: a v7 campaign has no Command limit level and was balanced without a limit.
+- **h5-design-data bumps to 9** if it changes any value. h5-sim's v8 will already have deployed by then. The test that pins the version changes with it (`packages/sim/test/data-h4.test.ts`, "is data version 7", or wherever h5-sim moves it).
+- **The save** grows by a few integers.
+- **The reference replay** is regenerated. It covers:
+  - Landfall;
+  - a Command limit purchase (bought from a `campaignWorld` start with a tier 1 area reclaimed);
+  - landing with the raised limit;
+  - a yard paused at the limit (using `setTunable fleet.cap` to a small value to stay short);
+  - a `recycleShips`;
+  - a capture.
+
+  The determinism hashes are re-baselined.
+
+#### What changes for H4 content
+
+- **The H4 tables in DESIGN.md** ("Areas" hauls and totals, "Research" and its totals line) are updated by h5-sim to the v8 values above, with a dated note under each. The data tests read them. The H4 prose stays as the record of what H4 tested.
+- **The area result and win panels** gain "Recycled: N ships (+M ore)".
+- **Landing** is unchanged, except that the landing notice names the limit.
+- **Bots:** the H4 strategies are retired except `greedy`, which runs once per seed with `fleet.cap` 0 as the cap-off reference row.
+
+#### Client: screens and phone UI
+
+The H1–H4 rules hold: 375 px portrait, no hover, every target ≥ 44 px, every action ≤ 2 taps from its screen (confirms and panels excepted), nothing in either HUD wraps under the wide-font stress. All numbers come from sim selectors or live tunables.
+
+**Inside an area:**
+- **HUD:** a **fleet chip**, "Fleet 9/12", with the fleet icon, next to the ship chips.
+  - It turns to the "full" style at the limit.
+  - It is hidden when `fleet.cap` is 0.
+- **Probe sheet, Yards block:**
+  - a header line, "Fleet 9/12 · Command limit 1/3";
+  - a new yard state, **`fleetFull`**, "idle: fleet full (12/12)". It comes after `off` and before `needsComponent`, so a capped yard never says "needs lens" when the real reason is the limit.
+- **Recycle:**
+  - Every node sheet where your ships are parked has a **Recycle…** button next to **Choose…**, except a living guarded node's sheet.
+  - It opens the send-panel pattern: one row per type with a −/+ stepper (44 px), the count and "All". Every row defaults to **0**, not all.
+  - Below the rows: a live refund preview ("+27 ore") from the `recycleRefund` selector, then **Recycle** (primary) and Cancel.
+  - Confirming shows a notice: "Recycled 3 drones: +27 ore."
+- **The first time the fleet fills in a visit,** a notice: "Fleet full (12/12): yards paused. Recycle ships at a node to change your mix."
+- **Repelled hint:** if a repelled wave's sent count was ≥ `capAtSend` − 1, the H3 repelled toast adds: "You sent a full fleet. Change the mix, cut the Root, or raise the limit (Command limit)." If the heart is fed, "cut the Root" leads.
+- **The landing notice** adds "fleet limit 18".
+
+**Overworld:**
+- **Area sheet:** a line "Your fleet limit: 18" under the heart's tags. There's no ships-needed number.
+- **Research sheet:** a **Command limit card** in the meaty-step group, next to the designs:
+  - the fleet icon and "Fleet limit 12 → 18";
+  - level pips, "1/3";
+  - cost chips;
+  - the requirement line ("Needs a medium area reclaimed");
+  - **Research**.
+
+  Disabled reasons come from `researchStatus`, including "Fleet limit is off (tuning)".
+- **Notice on purchase:** "Command limit 1: fleet limit now 18."
+
+**Tuning panel:** the three keys. `fleet.cap` is labelled "Fleet limit (0 = none)".
+
+**Phone checks:** the fleet chip and the ship chips fit one row at 375 px under the wide-font stress, and the Recycle panel fits 375x667 with the keyboard closed.
+
+#### Art needs (for Art Direction, within ART_STYLE.md)
+
+- **Fleet icon:** three small player-blue chevrons inside a bracket, meaning "a fleet of N". It's used on the chip, the sheet header and the research card. A `full` variant has a closed bracket, the bracket in amber.
+- **Recycle icon:** a ship chevron inside a circular arrow, meaning "scrap back into ore", in the ore teal family.
+- **Research icon `fleet`:** the fleet icon inside the dashed blueprint square used by the design icons.
+
+All must be told apart at 24 px from each other and from the H4 research icons. Any new colour gets a palette key and an ART_STYLE.md row. Everything stays within r.
+
+Draw contract (h5-client calls these before h5-art merges, with placeholders until then):
+- `drawFleetIcon(ctx, r, full)`, with `full` a boolean;
+- `drawRecycleIcon(ctx, r)`;
+- `drawResearchIcon(ctx, r, id)` accepts `'fleet'`.
+
+Existing draw functions keep working.
+
+#### Selectors (sim, read-only)
+
+- **`fleetStatus(world)`:** `{ cap: number | null, count, building, byType: {drone, lancer, flak}, full: boolean, level, maxLevel }`.
+- **`recycleRefund(world, counts)`:** ore refunded, after clamping at no particular node. The panel passes the clamped counts.
+- **`yardStatus`:** the `fleetFull` state.
+- **`researchStatus`:** the `fleet` row (kind `limit`, effect now and next as limits), the `tier` requirement and the `capOff` reason.
+- **`landingEffects`:** `fleetCap`.
+- **`campaignSummary` and the area result:** ships recycled and ore refunded.
+
+#### Bots: strategies and the probe
+
+**The composer engine** (replaces the H3 in-area engine for every H5 strategy; deterministic, integer only):
+1. **Economy:** as H4 (the economy plan, then build out captures). Rally at a5.
+2. **Buildable types:** drones; plus lancer or flak if researched and the area has that type's prize, captured or not.
+3. **Allocation** for a target and a limit C (when the cap is off, C = the H3 engine's current fleet):
+   - Search every (lancers l, flak f) with l + f ≤ C over buildable types, with drones = C − l − f.
+   - Pick the highest `fleetPower` estimate (H3 formula, at the target's caps).
+   - Ties go to fewer component ships, then more lancers.
+4. **Target:**
+   - Among living guarded nodes, take the H3 `nextTarget` order, skipping nodes whose best allocation at the limit fails the H3 attack test (`power × 3 ≥ need + 20`).
+   - If the heart fails and its Root is alive, target the Root.
+   - If nothing passes, the area is **closed**: withdraw at once and record it.
+5. **Yards:** a type's yard is on while its counted ships (alive + building) are below the allocation.
+6. **Recycle:** when the fleet is full and a type at a5 is above its allocation, recycle the surplus at a5.
+7. **Attack:** send everything at a5 when the ships at a5 match the allocation, or the H3 threshold is met with what is there. Repelled waves raise the threshold as in H3.
+
+**Area choice:** greedy (H4) among open areas, skipping any area recorded closed at the current limit and designs. If every open area is closed, land in the cheapest by estimate anyway. The 30-minute visit cap and the softlock rule then apply. A closed record clears when the limit or designs change.
+
+**Research policy** (all but `no-command` and `drones-only`): H4's list with Command limit inserted:
+1. core;
+2. lancer, flak;
+3. fleet 1;
+4. opening 1, extract 1;
+5. fleet 2;
+6. rigs 1, yards 1;
+7. fleet 3;
+8. then H4's remainder.
+
+**Strategies:**
+- `composer`: greedy area choice.
+- `ice-first`: Landfall, Frost Shelf, then composer.
+- `crystal-first`: Landfall, Glass Shoal, then composer.
+- `no-command`: composer, but never buys Command limit.
+- `drones-only`: the composer engine with drones as the only buildable type. It buys only grind research: no designs, no Command limit, no core.
+- **Reference:** `greedy` (H4, unchanged) with `fleet.cap` 0, one row per seed.
+
+**The probe** (new, `packages/bots/src/waves.ts`): the minimum-wave search from `packages/sim/test/min-wave.ts`, moved or copied into the bots package.
+- It lands each area from `campaignWorld` (both designs), cuts the Root for the starved state, and finds:
+  - the minimum single-type waves, drones / lancers / flak;
+  - the best mix of locally buildable types, with that fleet.
+
+  It does this for every tier ≥ 1 heart, fed and starved, and for The Deep on each seed's layout.
+- The search is capped at 80 ships per type and at the tier's L2 + 6 for mixes. It prints progress per area.
+- The full report runs it. The bot gate may skip it if it is slow, and DECISIONS.md says so.
+
+**Report:**
+- **Per strategy and seed:**
+  - outcome and play time;
+  - area order with visit times;
+  - withdrawals marked "closed";
+  - Command limit purchase times;
+  - for each area, Root cut before the heart (yes/no);
+  - ships built, lost and recycled;
+  - the capturing wave's composition per heart;
+  - tick p50/p95.
+- **A probe table:** per heart, fed and starved: d / l / f / best mix (fleet), with the tier's L0, L1 and L2, and each window from "Capability windows" marked met or missed.
+- **A per-seed comparison table.**
+
+**H5 flags** (report lines, not merge gates). Each measures what can or can't be done, never a time gap:
+1. **No softlock:** `composer`, `ice-first` and `crystal-first` buy the probe core on every seed within 120 game minutes of play.
+2. **Drones don't fit:** the probe shows every tier 2 and tier 3 heart closed to drones alone at the tier's limit (starved: tier 2 at L1, tier 3 at L2). And `drones-only` reclaims no tier 2 or tier 3 area on any seed.
+3. **The best local mix fits:** every window's "fits" cell holds in the probe: tier 1 at L0 with drones, tier 2 starved at L0 and fed at L1, tier 3 starved at L1 and fed at L2.
+4. **Both counters needed:** no single type fits either medium's fed heart at L1, and the best mix does.
+5. **A raise opens an area:** every medium's fed heart is closed at L0, and every Deep layout's fed heart is closed at L1 and fits at L2. And `no-command` does not buy the core on any seed.
+6. **Composition varies:** on every seed, the lancer share of the best mix differs by at least 30 percentage points between at least two tier ≥ 2 hearts (fed or starved).
+7. Determinism and the reference replay pass.
+
+**Reported, not flagged:**
+- run length and area times (no band; the owner judges pace);
+- recycles per run;
+- the cap-off reference time against `composer`.
+
+The engineers report the numbers and don't retune; h5-design-data retunes.
+
+**Tests must not pin tuned values.** Strategy, allocation and flag tests use `fixtureData` (or a frozen v8 fixture) with explicit premises. A shipped-data test asserts only calibration-proof facts. No test runs over about 5 s, and none has a runtime that grows with game length.
+
+#### Calibration (h5-design-data)
+
+**Assume fix-extract-rate is on `main`** (the bots read the true boosted extraction rate; per STATUS.md, the best H4 run fell to about 43:35).
+
+1. **First job: measure.** Run the h5-bots probe on v8 and commit its report. That gives the minimum winning mixes per heart. Every mix number in DESIGN.md comes from that committed report, not from a scratch model.
+2. **Retune, in priority order:**
+   1. no softlock (flag 1);
+   2. the windows (flags 2–5);
+   3. composition varies (flag 6).
+
+   The levers:
+   - area guard counts (H4 "Area guards");
+   - The Deep's layouts (H3 "Layouts" tables; the data tests read them);
+   - hauls and Command limit costs (keeping Σ haul ≥ Σ cost);
+   - the three H5 tunables.
+3. **Bump `dataVersion` to 9** if any value changes, and update the pin.
+4. **Update every table** the data tests read, with the data, and search DESIGN.md for stale statements of what changed.
+
+#### Success criteria (the owner, one 30–40 minute phone session; 4x is fine)
+
+1. The owner reclaims at least 4 areas, counting Landfall.
+2. They can name one fight where the limit made them choose or change a mix (including a recycle).
+3. They can name one area that was closed until a limit raise, a better mix or a Root cut.
+4. They don't describe the run as "max economy then build a fleet and attack".
+5. They never ask why a yard is idle; the row says "fleet full".
+6. Every action is ≤ 2 taps from its screen (confirms and panels excepted), and nothing in either HUD wraps at 375 px.
+
+Optional: they try `fleet.cap` 0 in the tuning panel and say which they prefer.
+
+#### Fun questions for the handoff
+
+1. Did the ship limit make you think about which ships to build? Did you ever recycle ships to change your mix?
+2. Was there an area you couldn't take until a limit raise, a better mix or a Root cut? Did that area feel stronger?
+3. Did a limit raise feel like a big step?
+
+#### Out of scope for H5
+
+- **The open map** (H6): pan, scouting, more areas than you need, `areas.repeatHaulPct`, an overworld Root, command areas.
+- **New ship or guard types** (Warden, Lash), tier 2 resources and sap.
+- **Lane logistics:** capacity, imports, ships or stock crossing areas.
+- **A "ships needed" number** on any sheet.
+- **Carrying the limit into new game+**, and new game+ itself.
+- **Adaptive guards**, guards that escalate, and guards that attack.
+- **Re-entering reclaimed areas,** and research bought mid-area.
+- **The H3 and H4 follow-ups** in BACKLOG "Can wait".
 
 ### H4 (Milestone 2, iteration 4, tested on build-20261108-3): Reclaim ladder
 
-**Result (owner, 2026-11-08):** not supported. Areas didn't feel stronger, the approach stayed "max economy then swarm", the counters didn't feel necessary, the ice side was obvious, and later areas were a repeat with no big step. The bots' flags 3, 5 and 6 were met but measured only time gaps and permutations. The owner proposed a ship limit and a more open world. See PLAYTEST_LOG.md, "Owner direction 2026-11-08b" and "H5 candidates" above.
+**Result (owner, 2026-11-08):** not supported. Areas didn't feel stronger, the approach stayed "max economy then swarm", the counters didn't feel necessary, the ice side was obvious, and later areas were a repeat with no big step. The bots' flags 3, 5 and 6 were met but measured only time gaps and permutations. The owner proposed a ship limit and a more open world. See PLAYTEST_LOG.md, "Owner direction 2026-11-08b" and the H5 spec above.
 
 The owner picked A, "Reclaim ladder" (QUESTIONS.md Q16, 2026-11-08). The direction is "Owner direction 2026-11-08: the overworld (steelman)" above. **Not picked:** B "Supply lines" (lane capacity, sending output into the active area), because routing only matters once there is progression to route for, and the owner rated in-area logistics "may be fine"; C "Area runs with research", because a card draft drops the overworld and the areas that keep producing. B is the likely next slice if A holds.
 
