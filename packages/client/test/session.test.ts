@@ -3,7 +3,7 @@ import { createWorld, defaultData, lastBattle, replayHashes, rootIndex, shipCoun
 import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
-import { bannerLines, battleReport, feedsBloomText, supplyLine } from '../src/report.ts';
+import { bannerLines, battleReport, feedsBloomText, regrowChange, supplyLine } from '../src/report.ts';
 import { clampInt, fmt10, mmss, shortVersion, stepFor, ticksText } from '../src/format.ts';
 import { guardedReach, ringGeom } from '../src/view.ts';
 import { fitMap } from '../src/fit.ts';
@@ -325,6 +325,21 @@ describe('H2 readouts', () => {
     expect(lines).toHaveLength(2);
     expect(lines[0]).toMatch(/^BLOOM · strip \d+(\.\d)?\/s · regrow 0\.5\/s · \d+ lost$/);
     expect(lines[1]).toMatch(/^ROOT · strip /);
+  });
+
+  it('regrowChange is computed from raw tick counts', () => {
+    const w = idleWorld();
+    w.tun['guardian.regrowTicks'] = 60;
+    w.tun['bloom.starvedRegrowTicks'] = 30;
+    expect(regrowChange(w)).toBe('regrows 2× faster');
+    w.tun['bloom.starvedRegrowTicks'] = 15;
+    expect(regrowChange(w)).toBe('regrows 4× faster');
+    w.tun['bloom.starvedRegrowTicks'] = 60;
+    expect(regrowChange(w)).toBe('regrows at the same speed');
+    w.tun['bloom.starvedRegrowTicks'] = 90;
+    expect(regrowChange(w)).toBe('regrows 1.5× slower');
+    w.tun['bloom.starvedRegrowTicks'] = 300;
+    expect(regrowChange(w)).toBe('regrows 5× slower');
   });
 
   it('tick values also show seconds', () => {

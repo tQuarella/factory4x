@@ -86,6 +86,19 @@ test('the tuning panel shows variant names and tick values in seconds; New run m
   await expect.poll(() => page.evaluate(() => window.__factory4x!.systemName())).toBe(order[(order.indexOf(before) + 1) % 3]);
 });
 
+test('forcing system.variant 3 and starting a New run gives the Deep Root, and the replay still matches', async ({ page }) => {
+  await ready(page);
+  await page.locator('#b-tune').click();
+  const field = page.getByLabel('system.variant', { exact: true });
+  await field.fill('3');
+  await field.dispatchEvent('change');
+  await page.locator('#tuning button', { hasText: 'New run' }).click();
+  await page.locator('.card button', { hasText: 'Yes, new run' }).click();
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.systemName())).toBe('Deep Root');
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
+});
+
 test('every control is at least 44 px', async ({ page }) => {
   await ready(page);
   await tapNode(page, 0);

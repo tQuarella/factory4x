@@ -51,11 +51,14 @@ export function bannerLines(world: Readonly<World>): string[] {
 }
 
 /** How much slower (or faster) the starved Bloom regrows, as "5× slower". */
-function regrowChange(world: Readonly<World>): string {
+export function regrowChange(world: Readonly<World>): string {
   const s = supplyStatus(world);
-  const x10 = Math.round((s.starvedBloom.regrowTicks * 10) / Math.max(1, s.fedBloom.regrowTicks));
-  if (x10 === 10) return 'regrows at the same speed';
-  return x10 > 10 ? `regrows ${fmt10(x10)}× slower` : `regrows ${fmt10(Math.round(1000 / Math.max(1, x10)))}× faster`;
+  const fed = Math.max(1, s.fedBloom.regrowTicks);
+  const starved = Math.max(1, s.starvedBloom.regrowTicks);
+  if (starved === fed) return 'regrows at the same speed';
+  return starved > fed
+    ? `regrows ${fmt10(Math.round((starved * 10) / fed))}× slower`
+    : `regrows ${fmt10(Math.round((fed * 10) / starved))}× faster`;
 }
 
 /**

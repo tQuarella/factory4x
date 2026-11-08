@@ -290,7 +290,7 @@ export function showResult(root: HTMLElement, session: Session, onKeep: () => vo
   line('Time to capture', s.captureSec === null ? '-' : mmss(s.captureSec));
   line('Peak ore/min', String(s.peakPerMin));
   line('Ships built', String(s.shipsBuilt));
-  line('Root', s.rootCutSec === null ? 'Root left standing' : `Root cut at ${mmss(s.rootCutSec)}`);
+  line('Supply', s.rootCutSec === null ? 'Root left standing' : `Root cut at ${mmss(s.rootCutSec)}`);
   line('Ships lost', String(s.shipsLost));
   line('Waves sent', String(s.wavesSent));
   const row = h('div', 'ov-actions', '', card);
