@@ -303,7 +303,9 @@ export class ResearchSheet {
     return {
       set: (r, world) => {
         const item = this.host.session.data.research[r.index]!;
-        const parts = item.requires.map((q) => {
+        // h5-sim: compile-only support for the H5 requirement kinds; h5-client words them.
+        const parts = item.requires.filter((q) => q.atLevel === undefined || q.atLevel === r.level + 1).map((q) => {
+          if ('tier' in q) return `${q.count} tier ${q.tier}+ area${q.count === 1 ? '' : 's'} reclaimed`;
           if ('item' in q) {
             const ok = (world.campaign.research[q.item] ?? 0) >= q.level;
             return `${this.itemLabel(q.item, q.level)}${ok ? ' ✓' : ''}`;
@@ -381,7 +383,8 @@ export class ResearchSheet {
     const row = h('section', 'rcard design', '', this.root);
     row.dataset.item = item.id;
     const top = h('div', 'rc-top', '', row);
-    researchIcon(top, 56, item.id);
+    // h5-sim: the fleet icon comes with h5-art and h5-client.
+    if (item.id !== 'fleet') researchIcon(top, 56, item.id);
     const text = h('div', 'rc-text', '', top);
     h('b', 'rc-name', item.name, text);
     const phrase = item.id === 'lancer' || item.id === 'flak' ? COUNTER_PHRASE[item.id] : '';
@@ -406,7 +409,7 @@ export class ResearchSheet {
     const row = h('section', 'rcard grind', '', this.root);
     row.dataset.item = item.id;
     const top = h('div', 'rc-top', '', row);
-    researchIcon(top, 32, item.id);
+    if (item.id !== 'fleet') researchIcon(top, 32, item.id);
     const text = h('div', 'rc-text', '', top);
     const nameLine = h('div', 'rc-nameline', '', text);
     h('b', 'rc-name', item.name, nameLine);

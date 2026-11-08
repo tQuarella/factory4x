@@ -851,11 +851,13 @@ What is open when:
 | `landfall` | Landfall | 0 | 500 | 1150 | probe a1 a2 a3 a4 a5 heart | 100 / 0 / 0 | 4 / 0 / 0 |
 | `shelf` | Frost Shelf | 1 | 220 | 870 | probe a1 a2 a3 a5 p1 heart | 130 / 80 / 0 | 3 / 2 / 0 |
 | `shoal` | Glass Shoal | 1 | 780 | 870 | probe a1 a2 a4 a5 p1 heart | 130 / 0 / 80 | 3 / 0 / 2 |
-| `veil` | Spore Veil | 2 | 220 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 300 / 60 / 40 | 5 / 3 / 0 |
-| `garden` | Thorn Garden | 2 | 780 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 300 / 40 / 60 | 5 / 0 / 3 |
-| `deep` | The Deep | 3 | 500 | 200 | all 16 | 720 / 60 / 60 | 8 / 3 / 3 |
+| `veil` | Spore Veil | 2 | 220 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 420 / 90 / 70 | 5 / 3 / 0 |
+| `garden` | Thorn Garden | 2 | 780 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 420 / 70 / 90 | 5 / 0 / 3 |
+| `deep` | The Deep | 3 | 500 | 200 | all 16 | 920 / 100 / 100 | 8 / 3 / 3 |
 
-Totals: haul 1680 / 240 / 240 (calibrated by h4-design-data), which covers every research level (1660 / 220 / 220; see "Research"). The sim's data validation enforces haul ≥ research cost per resource, so a player who takes every area can always afford the probe core, whatever they bought first. No softlock.
+Totals: haul 2120 / 340 / 340 (data v8), which covers every research level (2100 / 340 / 340; see "Research"). The sim's data validation enforces haul ≥ research cost per resource, so a player who takes every area can always afford the probe core, whatever they bought first. No softlock.
+
+*Updated 2026-11-08 by h5-sim (data v8):* the `veil`, `garden` and `deep` hauls rose from 300 / 60 / 40, 300 / 40 / 60 and 720 / 60 / 60 (v7, calibrated by h4-design-data; totals then 1680 / 240 / 240 against 1660 / 220 / 220) to cover the H5 Command limit levels (H5 spec, "Command limit"). The prose below is the record of what H4 tested at v7.
 
 **Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). First derived from the H3 layouts at about 20% (light) and 60% (medium) and pushed toward each side's theme, then calibrated by h4-design-data (see "Calibration result (h4-design-data, data v7)"). The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
 
@@ -944,8 +946,13 @@ Bought on the overworld only (not inside an area), one level at a time. Cost per
 | `yards` | Fast yards | grind | 1 | 60 | 20 | 20 | none | ship build time −`research.yards.stepPct` (20)% |
 | `yards` | Fast yards | grind | 2 | 120 | 40 | 40 | none | −20% more |
 | `core` | Probe core | win | 1 | 400 | 120 | 120 | lancer 1, flak 1, The Deep reclaimed | launches the new probe: the win panel |
+| `fleet` | Command limit | limit | 1 | 60 | 20 | 20 | a tier 1 area reclaimed | fleet limit +`research.fleet.step` (6): 12 → 18 |
+| `fleet` | Command limit | limit | 2 | 140 | 40 | 40 | a tier 2 area reclaimed | +6 more: 24 |
+| `fleet` | Command limit | limit | 3 | 240 | 60 | 60 | two tier 2 areas reclaimed | +6 more: 30 |
 
-Totals over every level: 1660 ore, 220 ice, 220 crystal.
+Totals over every level: 2100 ore, 340 ice, 340 crystal.
+
+*Updated 2026-11-08 by h5-sim (data v8):* the three Command limit rows are H5's (see the H5 spec, "Command limit"); a "tier T" requirement holds when enough reclaimed areas have tier ≥ T, and each of these applies only to its own level. Before them the totals were 1660 ore, 220 ice, 220 crystal. The H4 items are unchanged.
 
 Effects in the sim, all integer:
 - **Extraction** (rule 3): a node's accumulator adds `extractors × perExtractorPerMin × (100 + level × research.extract.stepPct)` per tick, and yields a unit each time it reaches `ticksPerMin × 100`. Asteroids, pockets and the captured heart; not probe mining.

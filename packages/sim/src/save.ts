@@ -50,7 +50,7 @@ function campaignOk(c: unknown, data: SimData): c is Record<string, unknown> {
         isObj(a) &&
         isIntOrNull(a.reclaimedTick) &&
         isIntOrNull(a.reclaimPlayTicks) &&
-        ['entries', 'withdrawals', 'playTicks', 'shipsBuilt', 'shipsLost'].every((k) => isInt(a[k])),
+        ['entries', 'withdrawals', 'playTicks', 'shipsBuilt', 'shipsLost', 'shipsRecycled', 'oreRefunded'].every((k) => isInt(a[k])),
     ) &&
     Array.isArray(c.reclaimOrder) &&
     c.reclaimOrder.every((a: unknown) => isInt(a) && a >= 0 && a < n) &&

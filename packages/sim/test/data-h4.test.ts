@@ -3,10 +3,12 @@ import design from '../../../DESIGN.md?raw';
 import shippedRaw from '../../../data/sim.json' with { type: 'json' };
 import {
   RAW_RESOURCES,
+  appliesAtLevel,
   areaStatus,
   counterTag,
   createWorld,
   defaultData,
+  isTierRequirement,
   parseSimData,
   tagFor,
   tunableMeta,
@@ -23,6 +25,10 @@ import rawData from './fixtures/sim-v4.json' with { type: 'json' };
  * H4 tables ("Areas", "Area guards", "Research", "Tunables (H4 …)"), so a
  * retune edits data and DESIGN.md together and no test. The frozen fixture
  * carries the spec's H4 values as they were at h4-sim, for the rule tests.
+ *
+ * h5-sim: the dataVersion pin moved to data-h5.test.ts. The "Research" table
+ * gained the Command limit rows (one requirement per level, `atLevel`), and
+ * the "Areas" table the v8 hauls; the frozen v4 fixture has no Command limit.
  */
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -59,13 +65,24 @@ const areaRows = (d: SimData): string[][] =>
     RAW_RESOURCES.map((r) => a.export[r]).join(' / '),
   ]);
 
-/** Research levels in the row form of the DESIGN.md "Research" table (without the effect column). */
+/** "a tier 1 area reclaimed", "two tier 2 areas reclaimed" (H5 tier requirements, as the table words them). */
+const tierText = (tier: number, count: number): string =>
+  count === 1 ? `a tier ${tier} area reclaimed` : `${count === 2 ? 'two' : String(count)} tier ${tier} areas reclaimed`;
+
+/** Research levels in the row form of the DESIGN.md "Research" table (without the effect column). Each level lists the requirements that apply to it. */
 function researchRows(d: SimData): string[][] {
-  const req = (it: ResearchItem): string =>
-    it.requires.length === 0
-      ? 'none'
-      : it.requires.map((q) => ('area' in q ? `${d.map.areas.find((a) => a.id === q.area)!.name} reclaimed` : `${q.item} ${q.level}`)).join(', ');
-  return d.research.flatMap((it) => it.levels.map((lv, k) => [it.id, it.name, it.kind, String(k + 1), String(lv.ore), String(lv.ice), String(lv.crystal), req(it)]));
+  const req = (it: ResearchItem, level: number): string => {
+    const qs = it.requires.filter((q) => appliesAtLevel(q, level));
+    if (qs.length === 0) return 'none';
+    return qs
+      .map((q) => {
+        if (isTierRequirement(q)) return tierText(q.tier, q.count);
+        if ('area' in q) return `${d.map.areas.find((a) => a.id === q.area)!.name} reclaimed`;
+        return `${q.item} ${q.level}`;
+      })
+      .join(', ');
+  };
+  return d.research.flatMap((it) => it.levels.map((lv, k) => [it.id, it.name, it.kind, String(k + 1), String(lv.ore), String(lv.ice), String(lv.crystal), req(it, k + 1)]));
 }
 
 /** The H4 tunables, as the spec gives them: key → [default, min, max]. */
@@ -122,10 +139,6 @@ describe('the frozen fixture carries the H4 spec values (as of h4-sim)', () => {
 });
 
 describe('data/sim.json (shipped) against the DESIGN.md H4 tables', () => {
-  it('is data version 7', () => {
-    expect(defaultData.dataVersion).toBe(7);
-  });
-
   it('matches the "Areas" table', () => {
     const rows = h4Table('#### Areas (data `map.areas`)', '**Area guards**').map((r) => r.map(strip));
     expect(areaRows(defaultData)).toEqual(rows);
@@ -227,7 +240,8 @@ describe('data/sim.json (shipped) against the DESIGN.md H4 tables', () => {
     const hauls = design.slice(h4At).match(/Totals: haul (\d+) \/ (\d+) \/ (\d+)/)!;
     const haul = (res: 'ore' | 'ice' | 'crystal'): number => defaultData.map.areas.reduce((s, a) => s + a.haul[res], 0);
     expect([haul('ore'), haul('ice'), haul('crystal')]).toEqual([Number(hauls[1]), Number(hauls[2]), Number(hauls[3])]);
-    const meta = tunableMeta(defaultData).filter((m) => m.key.startsWith('research.') || m.key.startsWith('shipments.'));
+    // research.fleet.step is H5's (data-h5.test.ts).
+    const meta = tunableMeta(defaultData).filter((m) => (m.key.startsWith('research.') && m.key !== 'research.fleet.step') || m.key.startsWith('shipments.'));
     expect(meta.map((m) => [m.key, m.live, m.newRunOnly, m.scope])).toEqual(Object.keys(H4_TUNABLES).map((k) => [k, true, false, 'sim']));
   });
 });
@@ -289,9 +303,10 @@ describe('parseSimData rejects bad H4 data', () => {
   });
 });
 
-it('the shipped data parses and agrees with the fixture on structure (areas, lanes, research ids)', () => {
+it('the shipped data parses and agrees with the fixture on structure (areas, lanes, research ids; H5 adds only Command limit)', () => {
   const d = parseSimData(clone(shippedRaw));
   expect(d.map.areas.map((a) => [a.id, a.nodes])).toEqual(fixtureData.map.areas.map((a) => [a.id, a.nodes]));
   expect(d.map.lanes).toEqual(fixtureData.map.lanes);
-  expect(d.research.map((r) => [r.id, r.levels.length])).toEqual(fixtureData.research.map((r) => [r.id, r.levels.length]));
+  expect(d.research.filter((r) => r.id !== 'fleet').map((r) => [r.id, r.levels.length])).toEqual(fixtureData.research.map((r) => [r.id, r.levels.length]));
+  expect(d.research.filter((r) => r.id === 'fleet').map((r) => r.kind)).toEqual(['limit']);
 });

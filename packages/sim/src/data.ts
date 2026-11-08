@@ -46,7 +46,7 @@ export const COMPONENT_INPUT: Readonly<Record<Component, Prize>> = { lens: 'crys
 /** The component each ship type consumes (null: ore only). */
 export const SHIP_COMPONENT: Readonly<Record<ShipType, Component | null>> = { drone: null, lancer: 'lens', flak: 'plating' };
 
-/** Every tunable in DESIGN.md (H1 economy keys, H3 "Tunables" and H4 "Tunables"), in display order. The order is fixed and is the only order the sim iterates in. */
+/** Every tunable in DESIGN.md (H1 economy keys, H3, H4 and H5 "Tunables"), in display order. The order is fixed and is the only order the sim iterates in. */
 export const TUNABLE_KEYS = [
   'economy.startStock',
   'economy.probeOrePerMin',
@@ -100,9 +100,12 @@ export const TUNABLE_KEYS = [
   'component.plating.ice',
   'component.buildTicks',
   'component.stockCap',
+  'fleet.cap',
+  'fleet.recycleRefundPct',
   'research.opening.step',
   'research.extract.stepPct',
   'research.yards.stepPct',
+  'research.fleet.step',
   'research.costPct',
   'shipments.pct',
   'system.variant',
@@ -213,15 +216,30 @@ export interface MapArea {
 export type MapLane = [string, string];
 
 /** The research item ids the sim gives effects to (DESIGN.md H4 "Research"). */
-export const RESEARCH_IDS = ['lancer', 'flak', 'opening', 'extract', 'rigs', 'yards', 'core'] as const;
+export const RESEARCH_IDS = ['lancer', 'flak', 'opening', 'extract', 'rigs', 'yards', 'core', 'fleet'] as const;
 export type ResearchId = (typeof RESEARCH_IDS)[number];
 
-export type ResearchKind = 'design' | 'grind' | 'win';
+/** H5 adds 'limit' (Command limit): a meaty step, drawn as a large card like the designs. */
+export type ResearchKind = 'design' | 'grind' | 'win' | 'limit';
 
-/** A research requirement: another item at a level, or an area reclaimed. */
-export type ResearchRequirement = { item: string; level: number } | { area: string };
+/**
+ * A research requirement: another item at a level, an area reclaimed, or (H5)
+ * at least `count` reclaimed areas of tier ≥ `tier`. `atLevel` (H5, optional)
+ * limits it to buying that one level; without it, it holds for every level.
+ */
+export type ResearchRequirement = ({ item: string; level: number } | { area: string } | { tier: number; count: number }) & { atLevel?: number };
 
-/** One research item: a cost per level (before research.costPct), and requirements that hold for every level. */
+/** True for the H5 `{tier, count}` requirement. */
+export function isTierRequirement(q: ResearchRequirement): q is { tier: number; count: number } & { atLevel?: number } {
+  return 'tier' in q;
+}
+
+/** True if `q` applies to buying level `level` (1-based) of its item. */
+export function appliesAtLevel(q: ResearchRequirement, level: number): boolean {
+  return q.atLevel === undefined || q.atLevel === level;
+}
+
+/** One research item: a cost per level (before research.costPct), and requirements (each for every level, or for its `atLevel`). */
 export interface ResearchItem {
   id: ResearchId;
   name: string;
@@ -358,7 +376,7 @@ export function parseSimData(raw: unknown): SimData {
   if (forced.min !== 0 || forced.max > layouts.length) fail(`system.variant range must be 0..${layouts.length} or narrower`);
   const areaIds = parseAreas(map.areas, nodes as MapNode[]);
   parseLanes(map.lanes, areaIds);
-  const research = parseResearch(r.research, areaIds);
+  const research = parseResearch(r.research, map.areas as MapArea[]);
   // No softlock (DESIGN.md H4 "Areas"): taking every area always pays for every research level, at the costPct maximum.
   const costMax = (tunRec['research.costPct'] as unknown as TunableSpec).max;
   const areas = map.areas as MapArea[];
@@ -461,7 +479,11 @@ function parseLanes(raw: unknown, areaIds: readonly string[]): void {
   });
 }
 
-function parseResearch(raw: unknown, areaIds: readonly string[]): ResearchItem[] {
+/** Research ids a data file may leave out (H5: data without the Command limit item simply has no limit research; the frozen v4 fixture). */
+const OPTIONAL_RESEARCH: readonly string[] = ['fleet'];
+
+function parseResearch(raw: unknown, areas: readonly MapArea[]): ResearchItem[] {
+  const areaIds = areas.map((a) => a.id);
   if (!Array.isArray(raw)) fail('research missing');
   const ids: string[] = [];
   let wins = 0;
@@ -472,7 +494,8 @@ function parseResearch(raw: unknown, areaIds: readonly string[]): ResearchItem[]
     if (ids.includes(it.id)) fail(`${at}.id ${it.id} is repeated`);
     ids.push(it.id);
     if (typeof it.name !== 'string' || it.name === '') fail(`${at} needs a name`);
-    if (it.kind !== 'design' && it.kind !== 'grind' && it.kind !== 'win') fail(`${at}.kind must be design, grind or win`);
+    if (it.kind !== 'design' && it.kind !== 'grind' && it.kind !== 'win' && it.kind !== 'limit') fail(`${at}.kind must be design, grind, win or limit`);
+    if ((it.id === 'fleet') !== (it.kind === 'limit')) fail(`${at}: kind limit is the fleet item's, and only its`);
     if (it.kind === 'win') wins++;
     if (!Array.isArray(it.levels) || it.levels.length < 1) fail(`${at}.levels missing`);
     (it.levels as unknown[]).forEach((lv, k) => checkTriple(lv, `${at}.levels[${k}]`));
@@ -480,13 +503,22 @@ function parseResearch(raw: unknown, areaIds: readonly string[]): ResearchItem[]
     if (it.id === 'rigs' && it.levels.length > RIG_NODES.length) fail(`${at} (rigs) has at most ${RIG_NODES.length} levels`);
     if (!Array.isArray(it.requires)) fail(`${at}.requires missing`);
   });
-  for (const id of RESEARCH_IDS) if (!ids.includes(id)) fail(`research item ${id} missing`);
+  for (const id of RESEARCH_IDS) if (!ids.includes(id) && !OPTIONAL_RESEARCH.includes(id)) fail(`research item ${id} missing`);
   if (wins !== 1) fail('research needs exactly one win item');
   const items = raw as ResearchItem[];
+  const tiers = areas.map((a) => a.tier);
   items.forEach((it, i) => {
     it.requires.forEach((q: unknown, k) => {
       const at = `research[${i}].requires[${k}]`;
       if (!isObj(q)) fail(`${at} not an object`);
+      if (q.atLevel !== undefined && (!isInt(q.atLevel) || q.atLevel < 1 || q.atLevel > it.levels.length)) fail(`${at}.atLevel must be 1..${it.levels.length}`);
+      if ('tier' in q) {
+        // H5: at least `count` reclaimed areas of tier ≥ `tier`.
+        if (!isInt(q.tier) || !tiers.includes(q.tier)) fail(`${at}.tier must be one of the area tiers (${[...new Set(tiers)].sort().join(', ')})`);
+        const available = tiers.filter((t) => t >= (q.tier as number)).length;
+        if (!isInt(q.count) || q.count < 1 || q.count > available) fail(`${at}.count must be 1..${available} (areas of tier >= ${q.tier})`);
+        return;
+      }
       if ('area' in q) {
         if (typeof q.area !== 'string' || !areaIds.includes(q.area)) fail(`${at}: ${String(q.area)} is not an area`);
         return;

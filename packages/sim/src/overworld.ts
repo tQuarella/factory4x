@@ -1,6 +1,7 @@
 import {
   canBuyResearch,
   designResearched,
+  isCapOff,
   extractPct,
   isAreaOpen,
   isReclaimed,
@@ -12,7 +13,9 @@ import {
   shortfall,
   unmetRequirements,
   yardTimePct,
+  type TierShortfall,
 } from './campaign.ts';
+import { fleetCap } from './fleet.ts';
 import {
   RAW_RESOURCES,
   RIG_NODES,
@@ -174,15 +177,21 @@ export interface ResearchRow {
   cost: ResourceTriple | null;
   /** The stockpile covers `cost` (false at max). */
   affordable: boolean;
-  /** What blocks a purchase: per-resource shortfalls (0 where covered), items below their level, areas not reclaimed. */
-  missing: { resources: ResourceTriple; items: Array<{ id: string; level: number }>; areas: string[] };
+  /**
+   * What blocks a purchase: per-resource shortfalls (0 where covered), items below their level, areas not
+   * reclaimed, (H5) tier requirements short of reclaimed areas ("Needs a medium area reclaimed": tier 2, count 1;
+   * "Needs both medium areas reclaimed": tier 2, count 2), and capOff: a limit item while fleet.cap is 0
+   * ("Fleet limit is off (tuning)").
+   */
+  missing: { resources: ResourceTriple; items: Array<{ id: string; level: number }>; areas: string[]; tiers: TierShortfall[]; capOff: boolean };
   /** `buyResearch` would be valid now (also false inside an area and after the win). */
   canBuy: boolean;
   /**
    * The effect as a number, now and at the next level (null at max):
    * opening: ore at each landing (economy.startStock + level × step); extract: extraction percent (100 + level × stepPct);
    * yards: ship build time percent (100 − level × stepPct, before the 15-tick floor); rigs: nodes rigged at landing;
-   * lancer, flak, core: 0 or 1.
+   * lancer, flak, core: 0 or 1; fleet (H5, kind limit): the fleet limit, fleet.cap + level × research.fleet.step,
+   * or 0 when the limit is off (fleet.cap 0).
    */
   effect: number;
   nextEffect: number | null;
@@ -194,6 +203,7 @@ export function researchEffect(world: Readonly<World>, id: ResearchId, level: nu
   if (id === 'opening') return t['economy.startStock'] + level * t['research.opening.step'];
   if (id === 'extract') return 100 + level * t['research.extract.stepPct'];
   if (id === 'yards') return 100 - level * t['research.yards.stepPct'];
+  if (id === 'fleet') return t['fleet.cap'] <= 0 ? 0 : t['fleet.cap'] + level * t['research.fleet.step'];
   return level;
 }
 
@@ -214,7 +224,7 @@ export function researchStatus(world: Readonly<World>, data: SimData): ResearchR
       maxLevel: max,
       cost,
       affordable: cost !== null && RAW_RESOURCES.every((r) => resources[r] === 0),
-      missing: { resources, items: unmet.items, areas: unmet.areas },
+      missing: { resources, items: unmet.items, areas: unmet.areas, tiers: unmet.tiers, capOff: isCapOff(world, item) },
       canBuy: canBuyResearch(world, data, index),
       effect: researchEffect(world, item.id, level),
       nextEffect: level < max ? researchEffect(world, item.id, level + 1) : null,
@@ -233,6 +243,8 @@ export interface LandingEffects {
   yardTimePct: number;
   /** Which designs are researched (their yards start on). */
   designs: { lancer: boolean; flak: boolean };
+  /** H5: the fleet limit in an area now (fleet.cap + Command limit level × step), or null when the limit is off. */
+  fleetCap: number | null;
 }
 
 /** What research does at the next landing (or did at this one): the landing notice and the probe sheet. */
@@ -244,6 +256,7 @@ export function landingEffects(world: Readonly<World>): LandingEffects {
     extractPct: extractPct(world),
     yardTimePct: yardTimePct(world),
     designs: { lancer: designResearched(world, 'lancer'), flak: designResearched(world, 'flak') },
+    fleetCap: fleetCap(world),
   };
 }
 
@@ -271,6 +284,9 @@ export interface CampaignSummary {
   totalPlayTicks: number;
   shipsBuilt: number;
   shipsLost: number;
+  /** H5: ships recycled and ore refunded, over the recorded visits (as shipsBuilt). */
+  shipsRecycled: number;
+  oreRefunded: number;
   hauled: ResourceTriple;
   shipped: ResourceTriple;
   wonTick: number | null;
@@ -283,10 +299,14 @@ export function campaignSummary(world: Readonly<World>, data: SimData): Campaign
   let total = 0;
   let built = 0;
   let lost = 0;
+  let recycled = 0;
+  let refunded = 0;
   for (const r of camp.areas) {
     total += r.playTicks;
     built += r.shipsBuilt;
     lost += r.shipsLost;
+    recycled += r.shipsRecycled;
+    refunded += r.oreRefunded;
   }
   if (camp.active !== null && !isReclaimed(world, camp.active)) total += world.tick - camp.areaStartTick;
   return {
@@ -300,6 +320,8 @@ export function campaignSummary(world: Readonly<World>, data: SimData): Campaign
     totalPlayTicks: total,
     shipsBuilt: built,
     shipsLost: lost,
+    shipsRecycled: recycled,
+    oreRefunded: refunded,
     hauled: { ...camp.totals.hauled },
     shipped: { ...camp.totals.shipped },
     wonTick: camp.wonTick,

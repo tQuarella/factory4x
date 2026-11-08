@@ -1,4 +1,4 @@
-import { RAW_RESOURCES, RESEARCH_IDS, type ResearchId, type ResearchItem, type ResourceTriple, type ShipType, type SimData } from './data.ts';
+import { RAW_RESOURCES, RESEARCH_IDS, appliesAtLevel, isTierRequirement, type ResearchId, type ResearchItem, type ResourceTriple, type ShipType, type SimData } from './data.ts';
 import { clearArea, createWorld, landArea, researchLevel, ticksPerMin, type World } from './world.ts';
 
 /**
@@ -61,16 +61,56 @@ export function nextLevelCost(world: Readonly<World>, item: ResearchItem): Resou
   return raw === undefined ? null : scaledCost(world, raw);
 }
 
-/** What still blocks `item`'s requirements: items below their level, areas not reclaimed (data order). */
-export function unmetRequirements(world: Readonly<World>, data: SimData, item: ResearchItem): { items: Array<{ id: string; level: number }>; areas: string[] } {
+/** An unmet H5 tier requirement: `count` reclaimed areas of tier ≥ `tier` are needed, `have` are reclaimed. */
+export interface TierShortfall {
+  tier: number;
+  count: number;
+  have: number;
+}
+
+/** Reclaimed areas of tier ≥ `tier`. */
+export function reclaimedAtTier(world: Readonly<World>, data: SimData, tier: number): number {
+  let n = 0;
+  data.map.areas.forEach((area, a) => {
+    if (area.tier >= tier && isReclaimed(world, a)) n++;
+  });
+  return n;
+}
+
+/** What blocks a research item's requirements. */
+export interface Unmet {
+  items: Array<{ id: string; level: number }>;
+  areas: string[];
+  /** H5: tier requirements not met yet. */
+  tiers: TierShortfall[];
+}
+
+/**
+ * What still blocks buying the next level of `item` (in requirement order):
+ * items below their level, areas not reclaimed, and (H5) too few reclaimed
+ * areas of a tier. A requirement with an `atLevel` counts only for that level,
+ * so at max level only the requirements without one are checked.
+ */
+export function unmetRequirements(world: Readonly<World>, data: SimData, item: ResearchItem): Unmet {
   const items: Array<{ id: string; level: number }> = [];
   const areas: string[] = [];
+  const tiers: TierShortfall[] = [];
+  const next = researchLevel(world, item.id) + 1;
   for (const q of item.requires) {
-    if ('area' in q) {
+    if (!appliesAtLevel(q, next)) continue;
+    if (isTierRequirement(q)) {
+      const have = reclaimedAtTier(world, data, q.tier);
+      if (have < q.count) tiers.push({ tier: q.tier, count: q.count, have });
+    } else if ('area' in q) {
       if (!isReclaimed(world, areaIndex(data, q.area))) areas.push(q.area);
     } else if (researchLevel(world, q.item as ResearchId) < q.level) items.push({ id: q.item, level: q.level });
   }
-  return { items, areas };
+  return { items, areas, tiers };
+}
+
+/** H5: the fleet limit is off (fleet.cap 0), so a `limit` item (Command limit) can't be bought: the `capOff` reason. */
+export function isCapOff(world: Readonly<World>, item: ResearchItem): boolean {
+  return item.kind === 'limit' && world.tun['fleet.cap'] <= 0;
 }
 
 /** Per resource, how much the stockpile lacks for `cost` (0 where it covers it). */
@@ -79,14 +119,15 @@ export function shortfall(world: Readonly<World>, cost: Readonly<ResourceTriple>
   return { ore: Math.max(0, cost.ore - s.ore), ice: Math.max(0, cost.ice - s.ice), crystal: Math.max(0, cost.crystal - s.crystal) };
 }
 
-/** True if `buyResearch {item}` is valid now (on the overworld, not won, below max, requirements met, affordable). */
+/** True if `buyResearch {item}` is valid now (on the overworld, not won, below max, not a limit item while fleet.cap is 0, requirements met, affordable). */
 export function canBuyResearch(world: Readonly<World>, data: SimData, i: number): boolean {
   const item = data.research[i];
   if (item === undefined || world.campaign.active !== null || isWon(world)) return false;
   const cost = nextLevelCost(world, item);
   if (cost === null) return false;
+  if (isCapOff(world, item)) return false;
   const unmet = unmetRequirements(world, data, item);
-  if (unmet.items.length > 0 || unmet.areas.length > 0) return false;
+  if (unmet.items.length > 0 || unmet.areas.length > 0 || unmet.tiers.length > 0) return false;
   const short = shortfall(world, cost);
   return short.ore === 0 && short.ice === 0 && short.crystal === 0;
 }
@@ -103,11 +144,12 @@ export function buyResearch(world: World, data: SimData, i: number): void {
   if (item.kind === 'win') camp.wonTick = world.tick;
 }
 
-/** Ships built / lost so far in this visit's stats. */
-function shipTotals(world: Readonly<World>): { built: number; lost: number } {
+/** Ships built / lost / recycled and ore refunded so far in this visit's stats. */
+function shipTotals(world: Readonly<World>): { built: number; lost: number; recycled: number; refunded: number } {
   const b = world.stats.shipsBuilt;
   const l = world.stats.shipsLost;
-  return { built: b.drone + b.lancer + b.flak, lost: l.drone + l.lancer + l.flak };
+  const r = world.stats.shipsRecycled;
+  return { built: b.drone + b.lancer + b.flak, lost: l.drone + l.lancer + l.flak, recycled: r.drone + r.lancer + r.flak, refunded: world.stats.oreRefunded };
 }
 
 /** Rule 8, heart: the active area is reclaimed. Records the visit and pays its haul into the stockpile, once. */
@@ -124,6 +166,8 @@ export function reclaimActive(world: World, data: SimData): void {
   rec.playTicks += visit;
   rec.shipsBuilt += ships.built;
   rec.shipsLost += ships.lost;
+  rec.shipsRecycled += ships.recycled;
+  rec.oreRefunded += ships.refunded;
   camp.reclaimOrder.push(a);
   const haul = data.map.areas[a]!.haul;
   for (const res of RAW_RESOURCES) {
@@ -144,6 +188,8 @@ export function leaveActive(world: World, data: SimData): void {
     rec.playTicks += world.tick - camp.areaStartTick;
     rec.shipsBuilt += ships.built;
     rec.shipsLost += ships.lost;
+    rec.shipsRecycled += ships.recycled;
+    rec.oreRefunded += ships.refunded;
   }
   clearArea(world, data);
   camp.active = null;
@@ -240,7 +286,8 @@ export function campaignWorld(seed: number, data: SimData, start: Readonly<Campa
   for (const id of RESEARCH_IDS) {
     const level = start.research?.[id];
     if (level === undefined) continue;
-    const item = data.research[researchIndex(data, id)]!;
+    const item = data.research[researchIndex(data, id)];
+    if (item === undefined) throw new Error(`campaignWorld: research ${id} is not in this data`);
     if (!Number.isInteger(level) || level < 0 || level > item.levels.length) throw new Error(`campaignWorld: research ${id} level ${level} out of 0..${item.levels.length}`);
     camp.research[id] = level;
   }

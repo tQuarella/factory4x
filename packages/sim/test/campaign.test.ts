@@ -665,7 +665,7 @@ describe('campaign selectors', () => {
       ['rigs', 0, 1],
       ['yards', 20, null],
     ]);
-    expect(landingEffects(w)).toEqual({ openingOre: 0, rigNodes: [], extractPct: 150, yardTimePct: 20, designs: { lancer: false, flak: false } });
+    expect(landingEffects(w)).toEqual({ openingOre: 0, rigNodes: [], extractPct: 150, yardTimePct: 20, designs: { lancer: false, flak: false }, fleetCap: null });
     const noExtract = researchStatus(campaignWorld(1, data, { stockpile: { ore: 500 } }), data)[R.rigs]!;
     expect(noExtract).toMatchObject({ affordable: true, canBuy: false, missing: { items: [{ id: 'extract', level: 1 }] } });
   });
