@@ -4,7 +4,7 @@
  * placeholders.ts get pixel radii, so line widths and sprites stay crisp at any
  * map scale. Ships and pods interpolate between ticks using session.alpha.
  */
-import { activeBattles, guardianStatus, isCaptured, isRootCut, lastBattle, nodeStatus, rootIndex, richIndex, shipCounts, type Node, type World } from '@factory4x/sim';
+import { activeBattles, guardianStatus, heartIndex, isCaptured, isRootCut, lastBattle, nodeStatus, rootIndex, shipCounts, type Node, type World } from '@factory4x/sim';
 import { palette } from './palette.ts';
 import {
   drawAsteroid,
@@ -51,9 +51,18 @@ interface WiltAnim {
   to: number;
 }
 
+/** The heart's wilt as total guard counts before and after, or null. */
 function wiltOf(world: Readonly<World>): { from: number; to: number } | null {
   const b = lastBattle(world, rootIndex(world));
-  return b && b.outcome === 'captured' && b.wilt && b.wilt.from > b.wilt.to ? b.wilt : null;
+  if (!b || b.outcome !== 'captured' || !b.wilt) return null;
+  const from = b.wilt.from.thorn + b.wilt.from.spore;
+  const to = b.wilt.to.thorn + b.wilt.to.spore;
+  return from > to ? { from, to } : null;
+}
+
+/** Pockets, the Root and the heart have guardians. */
+function guardedKind(n: Pick<Node, 'kind'>): boolean {
+  return n.kind === 'pocket' || n.kind === 'root' || n.kind === 'heart';
 }
 
 export class MapView {
@@ -129,8 +138,8 @@ export class MapView {
       const dx = px - this.sx(n.x);
       const dy = py - this.sy(n.y);
       const d = Math.sqrt(dx * dx + dy * dy);
-      const g = n.kind === 'rich' || n.kind === 'root' ? guardianStatus(this.session.world, n.index) : null;
-      const reach = g && g.alive ? guardedReach(this.nodeR(n), g.thorns) : Math.max(MIN_HIT, this.nodeR(n) + 4);
+      const g = guardedKind(n) ? guardianStatus(this.session.world, n.index) : null;
+      const reach = g && g.alive ? guardedReach(this.nodeR(n), g.total) : Math.max(MIN_HIT, this.nodeR(n) + 4);
       if (d <= reach && d < bestD) {
         best = n.index;
         bestD = d;
@@ -194,7 +203,7 @@ export class MapView {
     // The vine, under the nodes: pink and pulsing toward the Bloom while the Root lives, grey once it is cut.
     {
       const a = this.nodePos(rootIndex(world));
-      const b = this.nodePos(richIndex(world));
+      const b = this.nodePos(heartIndex(world));
       drawVine(ctx, a.x, a.y, b.x, b.y, t, isRootCut(world));
     }
 
@@ -205,17 +214,18 @@ export class MapView {
       ctx.save();
       ctx.translate(x, y);
       if (n.kind === 'probe') drawProbe(ctx, rr, t);
-      else if (n.kind === 'asteroid') drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
+      // Interim (h3-sim): pockets draw as asteroids until h3-client uses drawPocket.
+      else if (n.kind === 'asteroid' || n.kind === 'pocket') drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
       else if (n.kind === 'root') drawRoot(ctx, rr, t, isRootCut(world));
       else drawRichNode(ctx, rr, t, isCaptured(world));
       ctx.restore();
 
       let labelTop = y - rr - 15;
       let selR = rr + 6;
-      const guard = n.kind === 'rich' || n.kind === 'root' ? guardianStatus(world, n.index) : null;
+      const guard = guardedKind(n) ? guardianStatus(world, n.index) : null;
       if (guard && guard.alive) {
-        const wilt = n.kind === 'rich' ? this.wilt : null;
-        const count = wilt ? wilt.from : guard.thorns;
+        const wilt = n.kind === 'heart' ? this.wilt : null;
+        const count = wilt ? wilt.from : guard.total;
         const { ringR, thornR } = ringGeom(rr, count);
         for (let i = 0; i < count; i++) {
           const ang = (i / count) * Math.PI * 2 + t * 0.12;
@@ -227,7 +237,11 @@ export class MapView {
             ctx.translate(0, frac * thornR * 3);
             ctx.rotate((wilt.startMs / 1000) * 0.8);
             drawWiltingThorn(ctx, thornR, frac);
-          } else drawThorn(ctx, thornR, t, guard.thornHps[i]! / Math.max(1, guard.thornHp));
+          } else {
+            // Interim (h3-sim): Spores draw as Thorns until h3-client uses drawSpore.
+            const gd = guard.guardHps[i] ?? { type: 'thorn' as const, hp: 0 };
+            drawThorn(ctx, thornR, t, gd.hp / Math.max(1, guard.guards[gd.type].hp));
+          }
           ctx.restore();
         }
         selR = ringR + thornR + 3;
@@ -308,7 +322,7 @@ export class MapView {
 /** Short on-map name. */
 export function nodeLabel(n: Pick<Node, 'id' | 'kind'>): string {
   if (n.kind === 'probe') return 'PROBE';
-  if (n.kind === 'rich') return 'BLOOM';
+  if (n.kind === 'heart') return 'HEART';
   if (n.kind === 'root') return 'ROOT';
   return n.id.toUpperCase();
 }

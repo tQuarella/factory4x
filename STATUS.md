@@ -2,8 +2,8 @@
 
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
-**Milestone:** 1 — First playable (iteration 2, hypothesis H2: decision depth)
-**State:** Iteration 3 Plan step. Owner played build-20261108-1 (feedback in PLAYTEST_LOG.md) and, instead of picking an H3 candidate, asked for a more radical direction (Q13: a large persistent asteroid field, resource combos into components, ship types, counter triangle vs Bloom guard types, deeper logistics) and asked the team to steelman it. Designer is writing the steelman and an M2 hypothesis plan into DESIGN.md.
+**Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
+**State:** Iteration 3 Build step. Owner approved the Q14 VISION edits (applied b3b7a86) and chose H3 Counter web. Spec in DESIGN.md (e83c3aa), tasks in BACKLOG.md (625d9ca). h3-sim merged (9bb36ae). h3-art in fix round 1 after a Critic reject. h3-client and h3-bots building in parallel.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-1 (H2 decision depth), commit 13201db, live and passing the live smoke test.
@@ -82,13 +82,23 @@ Launches: 4. Resumes: 0. Both tasks done. Follow-ups from the reviews (not block
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | H2 triage + H3 candidates | launch | Plan (triage done; candidates A/B/C, commit ab31453) |
-| r1 | designer | H3 steelman of owner direction | resume | Owner asked for the asteroid-field direction instead (Q13) |
+| r1 | designer | H3 steelman of owner direction | resume | Owner asked for the asteroid-field direction instead (Q13); steelman + M2 plan + Q14 (1159e74) |
+| r2 | designer | H3 spec | resume | Owner approved Q14 and Counter web; full spec (e83c3aa) |
+| 2 | core-engineer | h3-sim | launch | Build (worktree, branch `task/h3-sim`) |
+| 3 | art-direction | h3-art | launch | Build (worktree, branch `task/h3-art`), parallel with h3-sim; green 8847e96 |
+| 4 | critic | h3-art | launch | Round 1: REJECT (draw bounds on lancer/flak/plating, gallery rows overflow, labels, tidy) |
+| r3 | art-direction | h3-art | resume | Fix round 1 |
+| 5 | critic | h3-sim | launch | Round 1: APPROVE (reviewed local 2104a1a). Force-push of the cleaned history is denied by settings, so origin's WIP history was kept via an ours-merge (tree unchanged); green CI on 14634e4; merged 9bb36ae |
+| 6 | engineer | h3-client | launch | Build (worktree, `task/h3-client`); may use `h3-art-shim.ts` until h3-art merges |
+| 7 | engineer | h3-bots | launch | Build (worktree, `task/h3-bots`) |
 
-Launches: 1 / 12. Resumes: 1. Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
+Launches: 7 / 12. Resumes: 3. Remaining plan: Critic h3-art r2 (resume), Critic h3-client, Critic h3-bots, h3-design-data (designer resume). That's 2 more launches, leaving 3 spare. Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
 
 ## Next step
 
-Designer (iteration 3 ledger r1) returns the steelman and M2 hypothesis plan. Director presents it to the owner for sign-off, including any VISION.md change (needs `APPROVED-PROTECTED: VISION.md`). Then Spec H3, Split into BACKLOG.md, Build.
+1. When h3-sim and h3-art report green: one Critic each (branch + task id only). h3-art is browser-facing: merge main into it, push, green CI on that commit before `merge-task`. h3-sim touches `packages/client/` compile fixes, so treat it as browser-facing too.
+2. After h3-sim merges: launch h3-client (engineer) and h3-bots (engineer) in parallel, then Critics.
+3. h3-design-data after h3-bots reports. Then release gates, `/handoff`, `/retro`.
 
 ## Moving to another machine
 

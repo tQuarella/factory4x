@@ -10,7 +10,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import { defaultData } from '@factory4x/sim';
 import budgets from '../../../scripts/gates/budgets.json' with { type: 'json' };
-import { SAMPLE_MINUTES, SOFTLOCK_SEC, VARIANT_IDS, computeDepthFlags, runSeeds, type GameResult } from './runner.ts';
+import { SAMPLE_MINUTES, SOFTLOCK_SEC, computeDepthFlags, runSeeds, type GameResult } from './runner.ts';
 import { strategies } from './strategies.ts';
 
 function arg(name: string, fallback: number): number {
@@ -41,32 +41,15 @@ for (const s of strategies) {
   if (p95 > budgets.tickBudgetMsP95) failures.push(`${s.name}: tick p95 ${p95.toFixed(3)}ms exceeds budget ${budgets.tickBudgetMsP95}ms`);
 }
 
-// Flags: capture, the H1 targets that still apply, and the H2 depth flags (report lines, never gates).
+// Flags: heart captures, and the depth flags (report lines, never gates; the H3 flags land with h3-bots).
 const first = (name: string): GameResult | undefined => results.find((r) => r.strategy === name && r.seed === 1);
 for (const s of strategies) {
   if (s.stub) continue;
   for (const r of results.filter((x) => x.strategy === s.name)) {
-    if (r.captureSec === null) flags.push(`${s.name} seed ${r.seed} (${r.variantId}) never captured the rich node within ${fmtMin(ticks / defaultData.tickRate)}`);
+    if (r.captureSec === null) flags.push(`${s.name} seed ${r.seed} (${r.variantId}) never captured the heart within ${fmtMin(ticks / defaultData.tickRate)}`);
   }
 }
-const turtle = first('turtle');
-const rush = first('rush');
-if (turtle) {
-  if (turtle.wavesSent < 1 || turtle.wavesSent > 2) flags.push(`turtle sent ${turtle.wavesSent} waves (target 1-2)`);
-  // "Still rising at minute 10" is measured as throughput at 12 min above throughput at 10 min (not plateaued).
-  const t10 = turtle.throughputAtMin['10'];
-  const t12 = turtle.throughputAtMin['12'];
-  if (t10 == null || t12 == null || t12 <= t10) flags.push(`turtle throughput is not still rising at minute 10 (${t10 ?? 'n/a'}/min at 10 min, ${t12 ?? 'n/a'}/min at 12 min)`);
-}
-if (rush) {
-  if (rush.firstWaveOutcome !== 'repelled') flags.push(`rush's first wave did not fail (outcome ${rush.firstWaveOutcome ?? 'no battle'})`);
-  if (turtle && rush.captureSec !== null && turtle.captureSec !== null) {
-    const later = rush.captureSec > turtle.captureSec;
-    const lossy = rush.shipsLost >= 3 * turtle.shipsLost;
-    if (!later && !lossy) flags.push(`rush neither captures later than turtle nor loses 3x the ships (${rush.shipsLost} vs ${turtle.shipsLost})`);
-  }
-}
-const depthFlags = computeDepthFlags(results);
+const depthFlags = computeDepthFlags();
 for (const f of depthFlags) if (!f.pass) flags.push(`depth flag missed: ${f.name} (${f.detail})`);
 
 const rows = strategies.map((s) => {
@@ -105,33 +88,22 @@ const md = [
   `# Bot suite: ${failures.length ? 'FAIL' : 'PASS'}`,
   '',
   `Data version ${defaultData.dataVersion}, ${seeds} seeds × ${ticks} ticks (${fmtMin(ticks / defaultData.tickRate)}), tick budget p95 ≤ ${budgets.tickBudgetMsP95} ms. Bots run time ${runSec.toFixed(1)} s.`,
-  'Every seed runs its own game (seeds 1, 2 and 3 are knotted, deep and thin). Ships built/lost and waves are as of capture; the whole-run totals (to the tick cap) are in the JSON under `wholeRun`.',
+  'Every seed runs its own game (seeds 1, 2 and 3 are Glass Thicket, Twin Seams and Frost Gate). The strategies are INTERIM (h3-sim) until h3-bots lands the H3 four. Ships built/lost and waves are as of the heart capture; the whole-run totals (to the tick cap) are in the JSON under `wholeRun`.',
   '',
-  '| Strategy | Seed | Variant | Captured | Capture time | Root cut | Lost (at capture) | Lost at Root | Thorns withered | Waves (Root / Bloom) | First ship | Built (at capture) | Repelled | Peak ore/min | Tick p50 / p95 (ms) |',
+  '| Strategy | Seed | Layout | Captured | Capture time | Root cut | Lost (at capture) | Lost at Root | Guards withered | Waves (Root / Heart) | First ship | Built (at capture) | Repelled | Peak ore/min | Tick p50 / p95 (ms) |',
   '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ...real.flatMap((s) =>
     results
       .filter((r) => r.strategy === s.name)
       .map(
         (r) =>
-          `| ${s.name} | ${r.seed} | ${r.variantId} | ${r.outcome === 'won' ? 'yes' : r.outcome} | ${fmtMin(r.captureSec)} | ${r.rootCutSec === null ? 'never' : fmtMin(r.rootCutSec)} | ${r.shipsLost} | ${r.rootShipsLost} | ${r.thornsWithered} | ${r.rootWavesSent} / ${r.bloomWavesSent} | ${r.firstShipSec === null ? 'never' : `${r.firstShipSec} s`} | ${r.shipsBuilt} | ${r.wavesRepelled} | ${r.peakPerMin} | ${r.tickMsP50.toFixed(4)} / ${r.tickMsP95.toFixed(4)} |`,
+          `| ${s.name} | ${r.seed} | ${r.variantId} | ${r.outcome === 'won' ? 'yes' : r.outcome} | ${fmtMin(r.captureSec)} | ${r.rootCutSec === null ? 'never' : fmtMin(r.rootCutSec)} | ${r.shipsLost} | ${r.rootShipsLost} | ${r.guardsWithered} | ${r.rootWavesSent} / ${r.heartWavesSent} | ${r.firstShipSec === null ? 'never' : `${r.firstShipSec} s`} | ${r.shipsBuilt} | ${r.wavesRepelled} | ${r.peakPerMin} | ${r.tickMsP50.toFixed(4)} / ${r.tickMsP95.toFixed(4)} |`,
       ),
   ),
   '',
-  '### Per variant: turtle vs raid-supply (first seed of each variant; ships lost as of capture)',
+  '### Depth flags (report lines, not gates)',
   '',
-  '| Variant | turtle capture | turtle lost | raid-supply capture | raid-supply lost | raid-supply Root cut | Faster |',
-  '| --- | --- | --- | --- | --- | --- | --- |',
-  ...VARIANT_IDS.map((id) => {
-    const t = results.find((r) => r.strategy === 'turtle' && r.variantId === id);
-    const r = results.find((x) => x.strategy === 'raid-supply' && x.variantId === id);
-    const faster = !t || !r || t.captureSec === null || r.captureSec === null ? '-' : t.captureSec === r.captureSec ? 'tie' : t.captureSec < r.captureSec ? `turtle by ${r.captureSec - t.captureSec} s` : `raid-supply by ${t.captureSec - r.captureSec} s`;
-    return `| ${id} | ${t ? fmtMin(t.captureSec) : '-'} | ${t?.shipsLost ?? '-'} | ${r ? fmtMin(r.captureSec) : '-'} | ${r?.shipsLost ?? '-'} | ${r?.rootCutSec == null ? '-' : fmtMin(r.rootCutSec)} | ${faster} |`;
-  }),
-  '',
-  '### H2 depth flags (report lines, not gates)',
-  '',
-  ...depthFlags.map((f) => `- ${f.pass ? 'MET' : 'MISSED'}: ${f.name} (${f.detail})`),
+  ...(depthFlags.length ? depthFlags.map((f) => `- ${f.pass ? 'MET' : 'MISSED'}: ${f.name} (${f.detail})`) : ['None yet: the H3 flags land with h3-bots.']),
   '',
   `Throughput (ore/min delivered by routes) at game minutes ${SAMPLE_MINUTES.join(', ')}:`,
   '',

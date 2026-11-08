@@ -14,9 +14,10 @@ import {
   isValidInput,
   nodeStatus,
   queueStatus,
+  SEND_ALL,
   shipCounts,
-  shipyardStatus,
   shipsPerMinX10,
+  yardStatus,
   systemStatus,
   type BuildKind,
   type Input,
@@ -39,13 +40,14 @@ export interface SheetHost {
 const KIND_LABEL: Record<BuildKind, string> = { extractor: 'Ext', route: 'Route', upgrade: 'Upg' };
 
 export function shortName(n: Pick<Node, 'id' | 'kind'>): string {
-  return n.kind === 'probe' ? 'Probe' : n.kind === 'rich' ? 'Rich' : n.kind === 'root' ? 'Root' : n.id.toUpperCase();
+  return n.kind === 'probe' ? 'Probe' : n.kind === 'heart' ? 'Heart' : n.kind === 'root' ? 'Root' : n.id.toUpperCase();
 }
 
 function longName(n: Pick<Node, 'id' | 'kind'>, captured: boolean, rootCut: boolean): string {
   if (n.kind === 'probe') return 'Probe';
-  if (n.kind === 'root') return rootCut ? 'Root (cut)' : 'Root · feeds the Bloom';
-  if (n.kind === 'rich') return captured ? 'Rich node (yours)' : 'Rich node · the Bloom';
+  if (n.kind === 'root') return rootCut ? 'Root (cut)' : 'Root · feeds the Heart';
+  if (n.kind === 'heart') return captured ? 'Heart (yours)' : 'The Bloom heart';
+  if (n.kind === 'pocket') return `Pocket ${n.id.toUpperCase()}`;
   return `Asteroid ${n.id.toUpperCase()}`;
 }
 
@@ -239,7 +241,8 @@ export class Sheet {
     const sys = h('div', 'note sys', '', this.root);
     this.ups.push(() => setText(sys, `System: ${systemStatus(this.world).name}`));
     const yard = h('section', '', '', this.root);
-    const yardBtn = btn(yard, '', () => this.host.send({ type: 'setShipyard', on: !this.world.shipyard.on }), 'primary');
+    // Interim (h3-sim): the drone yard only; h3-client adds the three Yards rows and the Assembly block.
+    const yardBtn = btn(yard, '', () => this.host.send({ type: 'setShipyard', shipType: 'drone', on: !this.world.yards.drone.on }), 'primary');
     const yardBar = bar(yard, 'yard');
     const yardInfo = this.row(yard, 'Ships');
     const mining = this.row(yard, 'Probe mining');
@@ -263,13 +266,14 @@ export class Sheet {
 
     this.ups.push(() => {
       const w = this.world;
-      const y = shipyardStatus(w);
+      const ys = yardStatus(w);
+      const y = ys.yards.find((r) => r.type === 'drone')!;
       yardBtn.set(y.on ? 'Shipyard ON · tap to stop' : 'Shipyard OFF · tap to start');
       toggleClass(yardBtn.el, 'on', y.on);
       yardBar.set(y.ticksLeft > 0 ? (y.totalTicks - y.ticksLeft) / y.totalTicks : 0);
       const perMin = shipsPerMinX10(w);
       setText(yardInfo.val, `${w.ships.length} · ${y.on ? `${fmt10(perMin)}/min at this income` : 'paused'}`);
-      setText(mining.val, `+${y.probeOrePerMin}/min`);
+      setText(mining.val, `+${ys.probeOrePerMin}/min`);
 
       const q = queueStatus(w);
       setText(qHead.val, `${q.orders.length}/${q.queueMax}${q.reserved > 0 ? ` · ${q.reserved} ore reserved` : ''}`);
@@ -304,12 +308,12 @@ export class Sheet {
     });
   }
 
-  // --- the guarded rich node -----------------------------------------------
+  // --- guarded nodes: pockets, the Root, the heart ----------------------------
 
   /** The Root sheet's "Feeds the Bloom" box; returns the text element. */
   private feedsBox(parent: HTMLElement): HTMLElement {
     const box = h('div', 'feeds-box', '', parent);
-    h('b', '', 'Feeds the Bloom', box);
+    h('b', '', 'Feeds the Heart', box);
     return h('div', '', '', box);
   }
 
@@ -326,12 +330,13 @@ export class Sheet {
     });
   }
 
-  /** The Bloom's or the live Root's sheet: thorns, regrowth, ships, the live battle. */
+  /** A living guarded node's sheet: guards, regrowth, ships, the live battle (interim H3 text; h3-client owns the final sheet). */
   private guardedSections(n: Node): void {
     const isRoot = n.kind === 'root';
-    const name = isRoot ? 'Root' : 'Bloom';
+    const name = guardName(this.world, n.index);
+    const isHeart = n.kind === 'heart';
     const sec = h('section', '', '', this.root);
-    const thornRow = this.row(sec, 'Thorns');
+    const thornRow = this.row(sec, 'Guards');
     const supply = h('div', 'note supply', '', sec);
     const feeds = isRoot ? this.feedsBox(sec) : null;
     const ringWrap = h('div', 'regrow', '', sec);
@@ -348,37 +353,39 @@ export class Sheet {
     const lines = h('div', 'lines', '', battle);
     const bLine = h('div', '', '', lines);
     const bLost = h('div', '', '', lines);
-    const retreat = btn(battle, '', () => this.host.send({ type: 'sendShips', from: n.index, to: 0, count: 0 }), 'danger');
+    const retreat = btn(battle, '', () => this.host.send({ type: 'sendShips', from: n.index, to: 0, counts: SEND_ALL }), 'danger');
 
     this.ups.push(() => {
       const w = this.world;
       const g = guardianStatus(w, n.index);
-      setText(thornRow.val, `${g.thorns} / ${g.cap}`);
-      if (!isRoot) setText(supply, supplyLine(w));
+      setText(thornRow.val, `${g.guards.thorn.count} Thorns ${g.guards.spore.count} Spores / ${g.totalCap}`);
+      if (isHeart) setText(supply, supplyLine(w));
       else setHidden(supply, true);
       if (feeds) setText(feeds, feedsBloomText(w, isCaptured(w)));
-      const atCap = g.thorns >= g.cap;
-      const secX10 = Math.round((g.regrowTicks * 10) / w.tickRate);
-      setText(regrow, atCap ? `${name} at full strength · regrows 1 thorn / ${fmt10(secX10)} s when hurt` : `Regrows 1 thorn / ${fmt10(secX10)} s`);
-      drawRing(ring, atCap ? 0 : g.regrowProgress / Math.max(1, g.regrowTicks));
+      const atCap = g.total >= g.totalCap;
+      const th = g.guards.thorn;
+      const sp = g.guards.spore;
+      const secX10 = Math.round((th.regrowTicks * 10) / w.tickRate);
+      setText(regrow, atCap ? `${name} at full strength · regrows 1 Thorn / ${fmt10(secX10)} s when hurt` : `Regrows 1 Thorn / ${fmt10(secX10)} s`);
+      drawRing(ring, th.count >= th.cap ? 0 : th.regrowProgress / Math.max(1, th.regrowTicks));
       setText(
         stats,
-        `Thorn: ${g.thornHp} hp, hits ${g.thornDamage}/round, heals ${g.repairPerRound}/round. Ship: ${g.shipHp} hp, hits ${g.shipDamage}/round.`,
+        `Thorn: ${th.hp} hp, hits ${th.damage}/round, heals ${th.repairPerRound}/round. Spore: ${sp.hp} hp, hits ${sp.damage}/round, heals ${sp.repairPerRound}/round.`,
       );
       const c = shipCounts(w);
       setText(ships.val, `${c.at[n.index]} / ${c.enRoute[n.index]}`);
       const total = c.total;
-      const r = combatRates(w, total, n.index);
+      const r = combatRates(w, n.index, c.byType);
       setText(
         hint,
         total === 0
           ? 'No ships yet. Waves must out-strip regrowth.'
-          : `All ${total} ships together: strip ${fmt10(r.killPerSecX10)} thorns/s vs ${name} regrows ${fmt10(r.regrowPerSecX10)}/s.`,
+          : `All ${total} ships together: strip ${fmt10(r.killPerSecX10)} guards/s vs ${name} regrows ${fmt10(r.regrowPerSecX10)}/s.`,
       );
       const b = battleStatus(w, n.index);
       if (b) {
-        setText(bLine, `Battle: you strip ${fmt10(b.killPerSecX10)} thorns/s · ${name} regrows ${fmt10(b.regrowPerSecX10)}/s`);
-        setText(bLost, `Ships lost so far: ${b.shipsLost} · thorns stripped: ${b.thornsKilled}`);
+        setText(bLine, `Battle: you strip ${fmt10(b.killPerSecX10)} guards/s · ${name} regrows ${fmt10(b.regrowPerSecX10)}/s`);
+        setText(bLost, `Ships lost so far: ${b.shipsLost} · guards stripped: ${b.guardsKilled}`);
       } else {
         setText(bLine, 'No battle running.');
         setText(bLost, '');
@@ -398,14 +405,14 @@ export class Sheet {
     const attack = (): boolean => isGuarded(this.world, n.index);
     for (const m of nodes) {
       if (m.index === n.index) continue;
-      const b = btn(sec, '', () => this.host.send({ type: 'sendShips', from: m.index, to: n.index, count: 0 }), 'send-btn');
+      const b = btn(sec, '', () => this.host.send({ type: 'sendShips', from: m.index, to: n.index, counts: SEND_ALL }), 'send-btn');
       sources.push({ node: m.index, b });
     }
     // One press, one tick: every source's order goes in a single batch (see Session.sendAll).
     const all = btn(sec, '', () => {
       const at = shipCounts(this.world).at;
       const orders: Input[] = [];
-      for (const s of sources) if (at[s.node]! > 0) orders.push({ type: 'sendShips', from: s.node, to: n.index, count: 0 });
+      for (const s of sources) if (at[s.node]! > 0) orders.push({ type: 'sendShips', from: s.node, to: n.index, counts: SEND_ALL });
       this.host.sendAll(orders);
     }, 'send-btn all');
     this.ups.push(() => {

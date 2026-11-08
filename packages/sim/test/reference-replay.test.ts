@@ -2,56 +2,63 @@ import { describe, expect, it } from 'vitest';
 import { createWorld, isValidInput, step, type BattleResult, type Input } from '../src/index.ts';
 import { referenceReplay } from '../../bots/src/reference-replay.ts';
 import { applyInput } from '../src/inputs.ts';
-import { clone, data } from './helpers.ts';
-
-declare const console: { log(...args: unknown[]): void };
+import { N, clone, data } from './helpers.ts';
 
 /**
- * m1-sim acceptance 7 and h2-sim acceptance 6: the reference replay
- * (determinism gate and browser cross-engine check) reaches combat, cuts the
- * Root (wilt and starvation), captures the Bloom, and every input type in it
- * does something.
+ * h3-sim acceptance 6: the reference replay (determinism gate and browser
+ * cross-engine check) captures a pocket, assembles a component, builds flak,
+ * cuts the Root (wilt and starvation) and captures the heart, all before tick
+ * 3000; and every input type in it does something.
  */
 describe('reference replay', () => {
   const w = createWorld(referenceReplay.seed, data);
   const battles: BattleResult[] = [];
   const typesApplied = new Set<string>();
-  let ignored = 0;
-  const ignoredLog: string[] = [];
+  const ignored: string[] = [];
+  let firstComponentTick: number | null = null;
+  let firstFlakTick: number | null = null;
+  let flakAtHeartCapture = 0;
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
     // Judge validity in log order, as step does: earlier inputs of the tick apply first.
     const probe = inputs.length > 0 ? clone(w) : w;
     for (const input of inputs) {
       if (isValidInput(probe, data, input)) typesApplied.add(input.type);
-      else {
-        ignored++;
-        ignoredLog.push(`${t} ${JSON.stringify(input)} stock ${probe.stock} queue ${probe.queue.length} ships@5 ${probe.ships.filter((s) => s.at === 5).length}`);
-      }
+      else ignored.push(`${t} ${JSON.stringify(input)}`);
       applyInput(probe, data, input);
     }
     const prev = w.lastBattle;
     step(w, data, inputs);
     if (w.lastBattle !== prev && w.lastBattle) battles.push(w.lastBattle);
+    if (firstComponentTick === null && w.stats.componentsBuilt.plating > 0) firstComponentTick = w.tick;
+    if (firstFlakTick === null && w.stats.shipsBuilt.flak > 0) firstFlakTick = w.tick;
+    if (w.capturedTick !== null && w.capturedTick === w.tick - 1) flakAtHeartCapture = w.ships.filter((s) => s.at === N.heart && s.type === 'flak').length;
   }
 
-  it('before tick 3000 (the browser check length): a repelled wave, the Root cut with the wilt, then the starved Bloom captured', () => {
-    console.log(ignoredLog.join('\n'));
-    console.log(battles.map((b) => `${b.outcome} @${b.startTick}-${b.endTick} engaged ${b.shipsEngaged} lost ${b.shipsLost} thorns ${b.thornsKilled}`).join('\n'));
-    expect(w.system.id).toBe('thin');
+  it('is Frost Gate', () => {
+    expect(w.system.id).toBe('frost');
+  });
+
+  it('before tick 3000: a wave repelled at p2, p1 captured, plating and flak built, the Root cut with the wilt, then the starved heart captured with flak in the wave', () => {
     expect(battles.map((b) => [b.node, b.outcome])).toEqual([
-      [6, 'repelled'],
-      [7, 'captured'],
-      [6, 'captured'],
+      [N.p2, 'repelled'],
+      [N.p1, 'captured'],
+      [N.root, 'captured'],
+      [N.heart, 'captured'],
     ]);
-    expect(battles[0]).toMatchObject({ shipsEngaged: 3, shipsLost: 3, wilt: null });
-    // The Root grew to 6 thorns (root.capBonus 2) before the cut; the Bloom wilted 12 → 8.
-    expect(battles[1]).toMatchObject({ thornsKilled: 6, wilt: { from: 12, to: 8 } });
-    expect(w.stats.thornsWithered).toBe(4);
+    expect(w.stats.captures.map((c) => c.node)).toEqual([N.p1, N.root, N.heart]);
+    // The ice route delivers, the plating assembler runs, and the flak yard builds, before the Root fight.
+    expect(w.stats.firstDeliveredTick.ice!).toBeLessThan(firstComponentTick!);
+    expect(firstComponentTick!).toBeLessThan(firstFlakTick!);
+    expect(firstFlakTick!).toBeLessThan(w.capturedTick!);
+    // The heart started full (10 Thorns, 14 Spores) and wilts to its starved caps at guard.capPct 50: 3 and 3.
+    expect(battles[2]!.wilt).toEqual({ from: { thorn: 10, spore: 14 }, to: { thorn: 3, spore: 3 } });
+    expect(w.stats.guardsWithered).toBe(18);
     expect(w.stats.rootCutTick!).toBeLessThan(w.capturedTick!);
-    // Starved regrowth (tuned to 30 ticks) acted during the Bloom fight: more thorns killed than the 8 it had.
-    expect(battles[2]!.thornsKilled).toBeGreaterThan(8);
-    expect(battles[2]!.startTick).toBeGreaterThan(w.stats.rootCutTick!);
+    // Starved regrowth (multiplier tuned to 1) acted during the heart fight: more guards killed than the 6 it had.
+    expect(battles[3]!.guardsKilled).toBeGreaterThan(6);
+    expect(battles[3]!.engagedByType.flak).toBeGreaterThan(0);
+    expect(flakAtHeartCapture).toBeGreaterThan(0);
     expect(w.capturedTick!).toBeLessThan(3000);
   });
 
@@ -59,11 +66,12 @@ describe('reference replay', () => {
     expect([...typesApplied].sort()).toEqual(
       ['buildExtractor', 'buildRoute', 'cancelBuild', 'sendShips', 'setRally', 'setShipyard', 'setTunable', 'upgradeRoute'].sort(),
     );
-    expect(ignored).toBe(1);
+    expect(ignored).toEqual([`0 ${JSON.stringify({ type: 'buildExtractor', node: N.p1 })}`]);
   });
 
-  it('builds out the rich node after capture', () => {
-    expect(w.nodes[6]!.extractors).toBe(2);
-    expect(w.routes.find((r) => r.from === 6)?.level).toBe(2);
+  it('builds out the captured pocket and the heart', () => {
+    expect(w.nodes[N.p1]!.extractors).toBe(2);
+    expect(w.nodes[N.heart]!.extractors).toBe(2);
+    expect(w.routes.find((r) => r.from === N.heart)?.level).toBe(2);
   });
 });
