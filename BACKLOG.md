@@ -392,6 +392,142 @@ Only the minimal edits needed to keep `packages/client/src/*` and `packages/bots
 4. Every number written in DESIGN.md or DECISIONS.md is copied from a committed report or test output and names its source.
 5. Re-run the bot suite and gates, and report which flags hold. The reference replay still passes (re-baseline only if the tooling requires it, and say so).
 
+## Milestone 2, iteration 5: H5 Fleet cap (spec in `DESIGN.md` → "H5 (Milestone 2, iteration 5, spec ready): Fleet cap")
+
+The owner chose this slice on 2026-11-08 (Q17: "A. Fleet cap"; Q18: no VISION edit yet). Where this backlog and the spec differ, the spec wins.
+
+Order:
+- h5-sim and h5-art run in parallel.
+- After h5-sim merges, h5-client and h5-bots run in parallel.
+- h5-design-data starts after h5-bots merges. It may overlap h5-client, whose tests must not pin data values.
+- fix-extract-rate (in review) should merge before h5-bots starts, because calibration assumes it.
+
+Planned launches: 4 builders and 5 Critic reviews (one per task, h5-design-data included), plus the Retrospective. h5-design-data is a **resume** of this iteration's Designer. The Director reconciles this with the ledger; fix-extract-rate has already used launches this iteration.
+
+| Id | Task | Owner | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| h5-sim | Fleet limit and yard check, `recycleShips`, Command limit item with the `tier` requirement and `limit` kind, `capAtSend`, selectors, data v8 (tunables, research rows, hauls), DESIGN.md H4 tables, save, reference replay | core-engineer | none | Ready |
+| h5-art | Fleet icon (normal and full), recycle icon, `fleet` research icon; gallery; ART_STYLE | art-direction | none (draw contract in the spec) | Ready |
+| h5-client | Fleet chip, `fleetFull` yard state, Recycle panel, Command limit card, area-sheet limit line, notices, repelled hint, tuning labels | engineer | h5-sim merged | Blocked |
+| h5-bots | Composer engine, five strategies plus the cap-off reference, the probe (`waves.ts`), report, H5 flags | engineer | h5-sim merged (and fix-extract-rate) | Blocked |
+| h5-design-data | Measure the minimum mixes with the probe, then retune to the capability windows | designer (resume) | h5-bots merged | Blocked |
+
+### h5-sim (core-engineer)
+
+**Files:**
+- `packages/sim/**` (new tests, plus a frozen v8 fixture if rule tests need one);
+- `data/sim.json`;
+- `DESIGN.md`: only the H4 "Areas" table and its "Totals: haul" line, and the H4 "Research" table and its "Totals over every level" line, each with a dated note under it;
+- `packages/bots/src/reference-replay.ts` and the determinism baselines.
+
+Only the minimal edits needed to keep `packages/client/src/*` and `packages/bots/src/*` compiling and the smoke test booting. No feature work there, and not `placeholders.ts`, `palette.ts` or the gallery.
+
+**Acceptance:**
+1. The spec's "The fleet limit", "Recycle", "Command limit", "Entities and state: changes", "Player inputs: changes" and "Rules per tick: changes" are implemented in integer math, with fixed orders and no RNG:
+   - `fleetCap` and `fleetCount` (ships in all states, plus yards building);
+   - the yard start check, recomputed after each start, with the turn kept when capped;
+   - ships are never removed when over the limit;
+   - `recycleShips` validity, clamping, lowest-id first, the refund, and stats;
+   - the `fleet` research item, the `{tier, count}` requirement, the `limit` kind, and `fleet` invalid while `fleet.cap` is 0;
+   - `capAtSend` on the attack or battle record.
+2. `data/sim.json` is `dataVersion` 8, with:
+   - the three H5 tunables and their ranges;
+   - the Command limit rows;
+   - the v8 hauls for `veil`, `garden` and `deep` (spec table).
+
+   `parseSimData` validates the `tier` requirement and keeps Σ haul ≥ Σ research cost per resource. Bump the version pin in `packages/sim/test/data-h4.test.ts` (or move it to a new `data-h5.test.ts` and say so).
+3. Data tests compare `data/sim.json` with:
+   - the updated H4 "Areas" and "Research" tables and both totals lines;
+   - the new "Tunables (H5, data/sim.json, all integers)" table (a new test).
+
+   The H3 and H4 table tests keep passing.
+4. Selectors: `fleetStatus`, `recycleRefund`, the `yardStatus` state `fleetFull` (after `off`, before `needsComponent`), the `researchStatus` fleet row with the `tier` and `capOff` reasons, `landingEffects.fleetCap`, and recycle totals in `campaignSummary`.
+5. Unit tests cover at least:
+   - the yards stop at the limit, a building ship counts, and two idle yards with one slot start only one;
+   - losses free slots;
+   - lowering `fleet.cap` live keeps ships and pauses yards; raising it resumes them;
+   - `fleet.cap` 0 means no limit, and Command limit can't be bought;
+   - each Command level raises the limit by the step;
+   - each `tier` requirement case;
+   - `recycleShips` on a living guarded node, in transit, with a zero total, and the refund rounding;
+   - the serialize round trip, and a v7 save refused.
+6. The reference replay is regenerated as the spec describes (Command limit purchase, a capped yard, a recycle, a capture), and the determinism hashes are re-baselined. `npm run gates -- --base main` passes.
+
+### h5-art (art-direction, parallel with h5-sim)
+
+**Files:** `packages/client/src/placeholders.ts`, `packages/client/src/palette.ts`, the art gallery files, `ART_STYLE.md`. Nothing else in the client.
+
+**Acceptance:**
+1. The spec's draw contract exists with these exact signatures, and existing draw functions keep working:
+   - `drawFleetIcon(ctx, r, full)`;
+   - `drawRecycleIcon(ctx, r)`;
+   - `drawResearchIcon(ctx, r, 'fleet')`.
+2. At 24 px:
+   - the fleet icon, its full variant, the recycle icon and the `fleet` research icon are told apart from each other and from every H4 research icon (show a greyscale row);
+   - player amber appears only in the full variant's bracket.
+3. Bounds are measured and shown in the gallery (each icon within r).
+4. Every new palette key has a matching ART_STYLE.md row and passes the contrast test, or is on the allow-list.
+5. The gallery shows each icon at 24 px and full size, plus a mock HUD row (ship chips and the fleet chip) at 375 px. Gates pass, with green branch CI.
+
+### h5-client (engineer, after h5-sim merges; parallel with h5-bots)
+
+**Files:** `packages/client/src/**` except the h5-art files, and `tests/smoke/**`.
+
+**Acceptance:**
+1. Everything in the spec's "Client: screens and phone UI":
+   - the fleet chip (with a full style; hidden when `fleet.cap` is 0);
+   - the Yards header line and the `fleetFull` row text;
+   - Recycle… on every eligible node sheet, opening a panel that defaults to 0 per type, with a live refund preview from `recycleRefund`;
+   - the notices (first fleet-full in a visit, recycle, purchase);
+   - the repelled hint from `capAtSend`;
+   - the landing-notice limit;
+   - the area-sheet limit line;
+   - the Command limit card with its disabled reasons;
+   - recycle totals on the area result and win panels;
+   - the tuning labels.
+2. Every number comes from sim selectors or live tunables. Smoke tests don't pin data values.
+3. 375 px portrait, targets ≥ 44 px, every action ≤ 2 taps from its screen (confirms and panels excepted). The fleet chip and the ship chips stay on one row under the wide-font stress.
+4. Smoke tests at desktop and phone cover:
+   - fill the fleet (a dev hook sets a small `fleet.cap`) and see "fleet full" on a yard row;
+   - recycle from a node sheet and see the stock rise by the preview;
+   - buy Command limit from a dev-hook `campaignWorld` and see the new limit in the next landing notice;
+   - `fleet.cap` 0 hides the chip.
+
+   New smoke tests pass `--repeat-each 5` on both projects.
+5. A v7 save starts fresh with the existing toast. Gates pass, with green branch CI.
+
+### h5-bots (engineer, after h5-sim merges; parallel with h5-client)
+
+**Files:** `packages/bots/src/strategies.ts`, `runner.ts`, `cli.ts`, a new `packages/bots/src/waves.ts`, and `packages/bots/test/**`. Not the reference replay.
+
+**Acceptance:**
+1. The composer engine (allocation, target with closed areas, yards by allocation, recycle at a5, attack rule), the area choice with closed records, the research policy with Command limit, and the five strategies (`composer`, `ice-first`, `crystal-first`, `no-command`, `drones-only`), all exactly as the spec's "Bots: strategies and the probe" says. Plus the cap-off `greedy` reference row.
+2. The probe in `waves.ts`: minimum single-type waves and the best locally buildable mix, for every tier ≥ 1 heart, fed and starved, and The Deep per seed's layout. It is bounded as the spec says and prints progress.
+3. The report: the per-run columns, the probe table with the windows marked, the per-seed table, and the seven H5 flags as report lines (not gates).
+4. Bot gate: no crash, tick p95 within budget, and no softlock **for `composer`, `ice-first` and `crystal-first` only**. `drones-only` and `no-command` are expected to fail, and are reported, not gated. If the probe or the suite is too slow for the gate, the gate runs a shorter configuration and the full report runs separately; say which in DECISIONS.md.
+5. Tests cover the allocation (ties included), closed-area handling, the research policy and the flag computations, on `fixtureData` or a frozen fixture with explicit premises. No tuned value is pinned, no test runs over about 5 s, and none grows with game length. Report the numbers; don't retune. Gates pass.
+
+### h5-design-data (designer, resume; after h5-bots merges)
+
+**Files:**
+- `data/sim.json` (values only);
+- `DESIGN.md`;
+- `DECISIONS.md`;
+- the `dataVersion` pin test (`packages/sim/test/data-h4.test.ts`, or the `data-h5.test.ts` h5-sim moved it to): the version line and its title only;
+- the committed reports `reports/archive/h5-probe-v8.{md,json}` and `reports/archive/h5-design-data-v9.{md,json}`.
+
+**Acceptance:**
+1. **First,** run the h5-bots probe on v8 and commit it as `reports/archive/h5-probe-v8.*`. Every mix number cited comes from a committed report.
+2. Retune the area guards, The Deep's layouts, hauls, Command limit costs and the H5 tunables toward the spec's capability windows, in its priority order:
+   1. flag 1;
+   2. flags 2–5;
+   3. flag 6.
+
+   Keep Σ haul ≥ Σ cost. Put the reasoning in DECISIONS.md.
+3. Bump `dataVersion` to 9 if any value changed, and update the pin and its test title together.
+4. Update every DESIGN.md table the data tests read (H3 "Layouts", H4 "Area guards", "Areas", "Research", H5 "Tunables") together with the data. Search DESIGN.md for stale statements of what changed. Recompute every derived claim from its table.
+5. Re-run the bot suite and the gates, commit the report as `reports/archive/h5-design-data-v9.*`, and report which flags hold. Put any out-of-scope leftover at the top of the report as a blocker.
+
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-h3-review-notes** (Designer to judge, then engineer; from the H3 Critic reviews, 2026-11-07):
