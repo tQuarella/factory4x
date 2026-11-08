@@ -4,7 +4,37 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
-## Build build-20261108-3 is ready (2026-11-08): H4, the Reclaim ladder
+## Build build-20261108-4 is ready (2026-11-08): H5, the Fleet cap
+
+Play: https://factory4x.pages.dev (on your phone, portrait). A full run to the probe core is about 40 game minutes, roughly 10–12 real minutes at 4x plus your decisions. Your old save is from an older data version, so the game starts fresh on the overworld.
+
+What changed:
+- A fleet limit: each area lets you field 12 ships at once (ships still being built count). A yard at the limit shows "idle: fleet full", and Recycle scraps parked ships for half their ore back so you can change your mix.
+- New research, Command limit, raises the limit to 18, 24 and 30. Each level needs a harder area reclaimed first. Medium areas with their Root intact now need both Lancers and Flak at 18, and The Deep's intact heart needs 24.
+- Fixed: the asteroid, pocket and heart sheets now show the extraction rate with your Extraction research applied. On phones the resource chips drop "/min" so the top bar fits in two rows.
+
+Try this: take the two light areas with drones, then land in Spore Veil or Thorn Garden at a limit of 12 and open the heart's sheet before you commit. Try taking a medium heart with its Root intact once you have Command limit 1 (limit 18), using a Lancer and Flak mix, instead of cutting the Root first. If you want to compare with H4, set "Fleet limit (0 = none)" to 0 in the tuning panel.
+
+Fun questions (the H5 hypothesis):
+1. Did the ship limit make you think about which ships to build? Did you ever recycle ships to change your mix?
+2. Was there an area you couldn't take until a limit raise, a better mix or a Root cut? Did that area feel stronger?
+3. Did a limit raise feel like a big step?
+
+Known from the bots (not hidden from you): the bots get around the limit by cutting every Root first and often take the heart with one ship type, so they never fight a heart that needs a mix. Whether the limit makes your mix matter is exactly what question 1 tests. The windows sit at their edges (both medium hearts need exactly 16 ships with the Root intact, two Deep layouts exactly 22), so one guard more or less changes what's open. A run is about 40 game minutes, no longer than with the limit off. A few sheets misread a counter tag: Spore Veil's heart with its Root cut says Even for Flak, which is actually Strong, and some small Twin Seams pockets read Even/Even where drones are the better pick (the first is logged as a backlog item). Also new on main since your last build: the extraction-rate display fix you reported.
+
+Feedback: plain answers in chat work best. The speech-bubble button also opens a prefilled GitHub issue with a replay of your session.
+
+Also open (none blocks anything): Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
+
+Protected files changed this build: none. Every merge passed the protected-files gate.
+
+## Blocking
+
+None.
+
+## Answered
+
+### Build build-20261108-3 handoff (2026-11-08): H4, the Reclaim ladder
 
 Play: https://factory4x.pages.dev (on your phone, portrait). A full run to the probe core is about 46–51 game minutes, roughly 12–15 real minutes at 4x plus your decisions, so one 30–40 minute session should reach the win. Your old save is from an older data version, so the game starts fresh on the overworld.
 
@@ -29,12 +59,6 @@ Feedback: plain answers in chat work best. The speech-bubble button also opens a
 Also open (none blocks anything): Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
 
 Protected files changed this build: none. Every merge passed the protected-files gate.
-
-## Blocking
-
-None.
-
-## Answered
 
 ### Q17. Which slice should the next build test? (2026-11-08, Designer)
 

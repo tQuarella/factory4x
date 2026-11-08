@@ -6,6 +6,12 @@ Player-facing changes per build. Three plain lines per build, written by the Dir
 
 Nothing yet.
 
+## build-20261108-4 (2026-11-08, commit f9ddf20) · Milestone 2, H5: Fleet cap
+
+- A fleet limit: each area lets you field 12 ships at once (ships still being built count). A yard at the limit shows "idle: fleet full", and Recycle scraps parked ships for half their ore back so you can change your mix.
+- New research, Command limit, raises the limit to 18, 24 and 30. Each level needs a harder area reclaimed first. Medium areas with their Root intact now need both Lancers and Flak at 18, and The Deep's intact heart needs 24.
+- Fixed: the asteroid, pocket and heart sheets now show the extraction rate with your Extraction research applied. On phones the resource chips drop "/min" so the top bar fits in two rows.
+
 ## build-20261108-3 (2026-11-08, commit 631e4f9) · Milestone 2, H4: Reclaim ladder
 
 - A new overworld of six areas. You start with nothing at Landfall, an undefended field your first ship reclaims. Each area you reclaim pays a haul and keeps shipping resources home while you play.
