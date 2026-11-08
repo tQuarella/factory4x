@@ -22,11 +22,20 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 4 | art-direction | h5-art | launch | Build (green, ee66b9f) |
 | 5 | core-engineer | h5-sim | launch | Build (green, 93699f3). Director accepts its out-of-scope one-line smoke edit (H3 play-through sets fleet.cap 0) and the interim H4 bots at cap 0 |
 | 6 | critic | h5-sim | launch | Review round 1: APPROVE; green branch CI on 93395d6; merged 8799be2 |
-| 7 | engineer | h5-client | launch | Build |
-| 8 | engineer | h5-bots | launch | Build |
+| 7 | engineer | h5-client | launch | Build (green, bd32246; smoke 96/96) |
+| 9 | critic | h5-client | launch | Review round 1: REJECT (fleet chip wraps to its own HUD row at 375 px) |
+| r5 | engineer | h5-client | resume | Fix round 1 (942fcd1): wide-font Deep still 3 rows |
+| r8 | engineer | h5-client | resume | Director layout call before re-review: shorter phone resource chips, keep ≤2 rows (dc899e8) |
+| r10 | critic | h5-client | resume | Review round 2: REJECT (ship chips off-screen in landscape/desktop) |
+| r11 | core-engineer | h5-client | resume | Fix round 2, reassigned per deadlock rule (resumed the h5-sim core-engineer); round 3 reject parks it |
+| 8 | engineer | h5-bots | launch | Build (41ef624): bots gate red only because v8 lights are closed at L0; merges together with h5-design-data (see DECISIONS) |
+| 10 | critic | h5-bots | launch | Review round 1: REJECT (stranded probe ship freezes forced visits; red gate) |
+| r7 | engineer | h5-bots | resume | Fix round 1 (5280732): stranded ship fixed; v8 red is data |
+| r9 | critic | h5-bots | resume | Review round 2: APPROVE code (561a42b); merges only with h5-design-data |
+| r6 | designer | h5-design-data | resume | Calibrate on a branch cut from task/h5-bots |
 | r4 | critic | h5-art | resume | Review round 1: APPROVE (f522965); green branch CI on 29a12ee; merged |
 
-Launches: 8 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 4.
+Launches: 10 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 11.
 
 ## Iteration 4 ledger
 
