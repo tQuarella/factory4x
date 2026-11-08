@@ -30,6 +30,10 @@ Protected files changed this build: none. Every merge passed the protected-files
 
 ## Blocking
 
+None.
+
+## Answered
+
 ### Q19. Which slice should H6 test? (2026-11-08, Designer)
 
 The fleet limit worked: you thought about your mix, recycled, and an area felt stronger. Two things didn't. A limit raise felt small, and cutting the Root was the only sensible play. They share one cause: a Root cut does the same job as a raise, so the raise only saves a fight. Details: DESIGN.md → "H6 candidates".
@@ -42,7 +46,8 @@ The fleet limit worked: you thought about your mix, recycled, and an area felt s
 
 Answer with a letter, plus "remove the Root" if you want that over the graft. Default if unanswered: A with the graft.
 
-## Answered
+**Answer (owner, in chat, 2026-11-08):** A. Open frontier. Remove the Root (not the graft).
+
 
 ### Build build-20261108-3 handoff (2026-11-08): H4, the Reclaim ladder
 
@@ -287,6 +292,12 @@ APPROVED-PROTECTED: VISION.md
 **Answer (owner, 2026-11-06):** Cloudflare Pages.
 
 ## Can wait
+
+### Q20. Pillar 3 wording, now that the Root is gone (2026-11-08, Director)
+
+Pillar 3 in VISION.md ends "Win a node by out-producing their replacement, or cut their supply first." You chose to remove the Root, so "cut their supply first" no longer describes the game. Suggested edit: drop that clause, so the pillar reads "Win a node by out-producing their replacement." This changes only the pillar text. VISION.md is protected, so it needs your yes. It blocks nothing; H6 goes ahead either way.
+
+**Answer:**
 
 ### Q10. Let agents list secret names (2026-11-06, Retrospective)
 
