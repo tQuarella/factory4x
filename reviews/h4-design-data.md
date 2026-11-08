@@ -50,3 +50,35 @@ Required changes:
 - [ ] Re-run `npm run gates -- --base main`. Confirm all flags still hold, with the same numbers. The values are unchanged, so they should be identical.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+Reviewed head bdaa801 (`git diff 65cdea5..bdaa801`: `data/sim.json`, `packages/sim/test/data-h4.test.ts`, `DESIGN.md`, `DECISIONS.md`, the archive renamed from v6 to v7).
+
+Pillar fit: Unchanged from round 1. The calibrated values are identical, and only the version stamp and the docs changed.
+
+Quality: Most of round 1's required changes are done well:
+- `dataVersion` is 7. The one test pin follows it, in the scope the Director widened.
+- DESIGN.md "Save, data version and replay" says why the version was bumped, and that a v6 save is discarded with the existing toast.
+- The calibration section and DECISIONS.md give the reason for the bump. The new DECISIONS.md entry supersedes the old one instead of rewriting it.
+- The report of record is `reports/archive/h4-design-data-v7.{md,json}`, and the v6 copies are gone.
+- "3/12 pushed it to 10:37" is gone.
+- The margin line reads 0.9 / 0.8 min.
+- The stale run-length sentence now quotes the v7 report. I checked 45:47–50:47 and 67:46, and about 82–122k ticks at 30 ticks per second is correct.
+
+I regenerated the bot report on the branch. Every game result in it matches the committed v7 archive. Only the wall-clock tick timing columns differ, by a few microseconds.
+
+Two defects remain. Both are in text this round wrote or touched:
+1. **A false derived claim (acceptance 4).** The new "What the numbers say" bullet in DESIGN.md says: "Both medium hearts grew by more than half." Spore Veil's heart did, from 3/30 (33 guards) to 1/50 (51). Thorn Garden's grew from 17/9 (26) to 24/13 (37). That is +42%, not more than half, by the calibration table directly above the bullet.
+2. **A test title that contradicts its assertion.** In `packages/sim/test/data-h4.test.ts`, line 125 reads `it('is data version 6', ...)` and line 126 now asserts `toBe(7)`. A test whose name states the wrong version is misleading code that this change produced. DECISIONS.md calls it "a later one-word fix", which is the kind of approve-and-fix-later I may not accept. It belongs to this change.
+
+Gates: I ran `npm run gates -- --base main` on bdaa801, and all six passed: typecheck 4.3 s, lint 2.2 s, test 6.4 s, determinism 0.6 s, bots 18.3 s, and protected-files (7 files, none protected). The report header says "Data version 7". All seven H4 flags are MET with the round 1 numbers. The reference replay passes without re-recording.
+
+Required changes:
+- [ ] DESIGN.md, "What the numbers say", the economy-bound bullet: correct "Both medium hearts grew by more than half". For example: "Spore Veil's heart grew from 33 to 51 guards and Thorn Garden's from 26 to 37", with figures taken from the calibration table.
+- [ ] `packages/sim/test/data-h4.test.ts:125`: rename the test to `'is data version 7'`. The Director should widen the scope to this line as well. It is the same test as line 126.
+- [ ] Re-run `npm run gates -- --base main`.
+
+If round 3 is rejected, that is this task's third rejection, and PROCESS.md parks it. Both fixes are one line each.
+
+VERDICT: REJECT
