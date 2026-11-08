@@ -122,7 +122,7 @@ describe('the frozen fixture carries the H4 spec values (as of h4-sim)', () => {
 });
 
 describe('data/sim.json (shipped) against the DESIGN.md H4 tables', () => {
-  it('is data version 6', () => {
+  it('is data version 7', () => {
     expect(defaultData.dataVersion).toBe(7);
   });
 

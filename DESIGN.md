@@ -713,7 +713,7 @@ The shipped share is 25–29% for the researching strategies and 36–37% for no
 
 What the numbers say:
 - **Flags 3 and 6 were one problem: the ice side met The Deep without Lancers.** Before the change, ice-line's Deep took 22:27–25:32 against crystal-line's 14:01–15:05. Ten more crystal in Spore Veil's haul lets ice-line buy the Lancer design after Spore Veil. Its Deep now takes 14:31–16:20, the same as crystal-line's.
-- **Medium areas are mostly economy-bound for the bots.** Both medium hearts grew by more than half. Yet the mean times moved only from 8:58 to 9:04 (Spore Veil) and from 9:57 to 10:29 (Thorn Garden), comparing the two reports. That fits the bots building their economy first and then attacking. Intermediate runs (not committed) pointed the same way: the smaller early ore hauls, which delay the early grind, carried most of the run-length gain.
+- **Medium areas are mostly economy-bound for the bots.** The medium hearts grew by 42% to 55%: Thorn Garden's from 26 to 37 guards (+42%) and Spore Veil's from 33 to 51 (+55%). Yet the mean times moved only from 8:58 to 9:04 (Spore Veil) and from 9:57 to 10:29 (Thorn Garden), comparing the two reports. That fits the bots building their economy first and then attacking. Intermediate runs (not committed) pointed the same way: the smaller early ore hauls, which delay the early grind, carried most of the run-length gain.
 - **Margins are thin.**
   - The best run clears 45 min by 0.9 min on seed 2 (45:54) and 0.8 min on seed 3 (45:47).
   - The Deep's mean (15:42) is inside 16:00, but Glass Thicket alone is 16:50. The Deep is the H3 layouts unchanged; making it shorter would mean retuning the H3 tables, which I left alone.
