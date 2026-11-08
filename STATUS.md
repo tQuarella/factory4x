@@ -21,7 +21,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r3 | designer | H5 spec (Fleet cap) | resume | Spec done (b4830e7) |
 | 4 | art-direction | h5-art | launch | Build (green, ee66b9f) |
 | 5 | core-engineer | h5-sim | launch | Build |
-| r4 | critic | h5-art | resume | Review round 1 (resume of the fix-extract-rate Critic) |
+| r4 | critic | h5-art | resume | Review round 1: APPROVE (f522965); green branch CI on 29a12ee; merged |
 
 Launches: 5 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 4.
 
