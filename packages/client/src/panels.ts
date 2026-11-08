@@ -1,9 +1,10 @@
 /** Full-screen panels: tuning, feedback, result, and the New run confirmation. */
-import { runSummary, tunableMeta, type Input, type SimData, type TunableMeta } from '@factory4x/sim';
+import { SHIP_TYPES, runSummary, tunableMeta, type CaptureEntry, type Input, type ShipTypeCounts, type SimData, type TunableMeta } from '@factory4x/sim';
 import { btn, h, setText, toggleClass, type Btn } from './dom.ts';
 import { buildNote } from './feedback.ts';
 import { clampInt, mmss, shortVersion, stepFor, ticksText } from './format.ts';
 import type { Settings } from './persist.ts';
+import { RES_NAME, SHIP_NAME } from './report.ts';
 import type { Session } from './session.ts';
 
 export interface PanelHost {
@@ -275,6 +276,23 @@ export class FeedbackPanel {
 
 // ---------------------------------------------------------------------------
 
+/** "Ice (P1) 4:10": one step of the capture order. */
+export function captureLabel(c: Readonly<CaptureEntry>): string {
+  const name = c.kind === 'pocket' ? `${RES_NAME[c.prize ?? 'ore']} (${c.id.toUpperCase()})` : c.kind === 'root' ? 'Root' : 'Heart';
+  return `${name} ${mmss(c.sec)}`;
+}
+
+/** "Ice (P1) 4:10 → Crystal (P4) 11:30 → Root 15:02 → Heart 19:45". */
+export function captureOrderText(captures: readonly CaptureEntry[]): string {
+  return captures.map(captureLabel).join(' → ');
+}
+
+/** "6 Drone · 3 Lancer · 1 Flak", only the types that appear (or "0"). */
+export function byTypeText(c: Readonly<ShipTypeCounts>): string {
+  const parts = SHIP_TYPES.filter((t) => c[t] > 0).map((t) => `${c[t]} ${SHIP_NAME[t]}`);
+  return parts.length > 0 ? parts.join(' · ') : '0';
+}
+
 /** The capture result panel. */
 export function showResult(root: HTMLElement, session: Session, onKeep: () => void, onNewRun: () => void): void {
   const s = runSummary(session.world);
@@ -288,10 +306,14 @@ export function showResult(root: HTMLElement, session: Session, onKeep: () => vo
     h('b', '', value, r);
   };
   line('Time to capture', s.captureSec === null ? '-' : mmss(s.captureSec));
+  const order = h('div', 'capture-order', '', card);
+  h('span', 'lbl', 'Capture order', order);
+  h('b', '', captureOrderText(s.captures), order);
   line('Peak ore/min', String(s.peakPerMin));
-  line('Ships built', String(s.shipsBuilt));
+  line('Ships built', byTypeText(s.shipsBuiltByType));
+  line('Ships lost', byTypeText(s.shipsLostByType));
+  line('Guards withered', String(s.guardsWithered));
   line('Supply', s.rootCutSec === null ? 'Root left standing' : `Root cut at ${mmss(s.rootCutSec)}`);
-  line('Ships lost', String(s.shipsLost));
   line('Waves sent', String(s.wavesSent));
   const row = h('div', 'ov-actions', '', card);
   btn(row, 'Keep playing', () => {

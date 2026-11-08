@@ -31,9 +31,9 @@ body { font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
 /* ---- bars (portrait: two 48 px rows on top) ---- */
 #bars { padding-top: var(--safe-t); background: var(--panel); border-bottom: 1px solid var(--line); }
-#stats { display: flex; height: 48px; align-items: center; padding: 0 10px; gap: 8px; }
+#stats { display: flex; min-height: 48px; align-items: center; padding: 0 10px; gap: 8px; }
 .stat { display: flex; flex-direction: column; min-width: 0; flex: 1 1 0; line-height: 1.1; }
-.stat.big { flex: 1.4 1 0; }
+.stat.big { flex: 0 0 auto; min-width: 96px; }
 .stat .lbl { font-size: 10px; letter-spacing: 0.08em; color: var(--dim); }
 .stat .num { font-size: 18px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .stat.big .num { font-size: 28px; color: var(--teal); line-height: 1; }
@@ -181,4 +181,46 @@ textarea { width: 100%; min-height: 120px; background: var(--panel2); color: var
 @media (min-aspect-ratio: 1/1) and (min-width: 900px) {
   #bars { width: 156px; }
   #controls { grid-template-columns: repeat(2, 52px); }
+}
+
+/* ---- H3: HUD chips, yards and assembly, guard rows, tags, send panel ---- */
+#chips { display: flex; flex: 1 1 0; min-width: 0; flex-wrap: wrap; justify-content: flex-end; align-content: center; gap: 2px 10px; padding: 2px 0; }
+.chip { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: 4px; min-height: 24px; font-size: 14px; }
+.chip b { font-size: 15px; color: var(--ink); }
+.chip small { grid-column: 1 / -1; font-size: 10px; color: var(--dim); line-height: 1.1; }
+canvas.icon { display: block; flex: 0 0 auto; }
+.yard-row { padding: 4px 0; border-top: 1px solid var(--line); }
+.yr-top, .gr-top, .tr-top { display: flex; align-items: center; gap: 8px; min-height: 28px; flex-wrap: wrap; }
+.yr-name, .gr-name, .tr-name { font-size: 14px; flex: 1 1 auto; min-width: 0; }
+.yr-stock { margin-left: auto; font-weight: 700; }
+.yr-cost, .yr-status, .gr-stats, .tr-phrase { font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+.yr-status.bad { color: var(--gold); }
+.btn.tog { width: auto; min-width: 64px; flex: 0 0 auto; margin-left: auto; }
+.locked-hint { margin: 2px 0; font-style: italic; }
+.prize-line { font-size: 13px; color: var(--ink); margin: 2px 0 6px; overflow-wrap: anywhere; }
+.guard-row { padding: 4px 0; border-top: 1px solid var(--line); }
+.gr-regrow { font-size: 12px; color: var(--dim); margin-left: auto; }
+.bar.regrow { height: 5px; margin: 3px 0 0; }
+.bar.regrow .bar-fill { background: var(--bloom); }
+.tag-row { padding: 3px 0; }
+.tag-badge { margin-left: auto; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); white-space: nowrap; }
+.tag-badge.strong { color: #6be28f; border-color: #6be28f; }
+.tag-badge.weak { color: var(--danger); border-color: var(--danger); }
+.tag-badge.even { color: var(--dim); }
+.send-row { display: flex; gap: 6px; flex: 1 1 100%; }
+.send-row .send-btn { flex: 1 1 0; min-width: 0; }
+.btn.choose-btn { width: auto; flex: 0 0 auto; min-width: 96px; border-color: #3a5c8a; }
+section.send > .send-btn.all { flex: 1 1 100%; }
+.send-card h2 { font-size: 15px; overflow-wrap: anywhere; }
+.sp-row { display: flex; align-items: center; gap: 4px; min-height: 52px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.sp-label { display: flex; align-items: center; gap: 8px; flex: 1 1 100px; min-width: 0; font-size: 14px; }
+.sp-name { overflow-wrap: anywhere; }
+.sp-name small { color: var(--dim); font-size: 11px; }
+.sp-count { min-width: 56px; text-align: center; font-size: 15px; }
+.btn.sp-step { width: 44px; padding: 0; font-size: 20px; flex: 0 0 auto; }
+.btn.sp-all { width: auto; min-width: 48px; padding: 0 8px; flex: 0 0 auto; }
+.capture-order { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.capture-order b { display: block; color: var(--teal); margin-top: 2px; overflow-wrap: anywhere; }
+@media (min-aspect-ratio: 1/1) {
+  #chips { flex: none; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 2px; padding: 0 4px 6px; }
 }

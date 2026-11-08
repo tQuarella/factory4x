@@ -28,6 +28,11 @@ const roles: Record<keyof typeof palette, string> = {
   rootRockEdge: 'Root rock edge (5:1)',
   vine: 'Vine (alive)',
   vinePulse: 'Vine pulse',
+  spore: 'Spore',
+  sporeGlow: 'Spore glow',
+  ice: 'Ice icon',
+  crystal: 'Crystal icon',
+  plating: 'Plating icon',
 };
 
 function tableRows(): Map<string, string> {

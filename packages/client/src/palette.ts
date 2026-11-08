@@ -26,4 +26,10 @@ export const palette = {
   rootRockEdge: '#94788a',
   vine: '#d93d78',
   vinePulse: '#ffb3cc',
+  // H3 additions
+  spore: '#e056d6',
+  sporeGlow: 'rgba(224, 86, 214, 0.28)',
+  ice: '#bdf3ff',
+  crystal: '#b79cff',
+  plating: '#a8b3c7',
 } as const;
