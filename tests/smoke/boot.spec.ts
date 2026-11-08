@@ -859,6 +859,8 @@ async function h3PlayThrough(page: Page): Promise<void> {
       'ship.lancer.buildTicks': 30,
       'component.buildTicks': 30,
       'pocket.resourcePerMin': 40,
+      // H5: no fleet limit (H4's rules), so the first wave's drones don't keep the Lancer yard waiting for a slot.
+      'fleet.cap': 0,
     },
     { ...DEEP_START, research: { lancer: 1 } },
   );
