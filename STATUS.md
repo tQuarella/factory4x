@@ -27,7 +27,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r8 | engineer | h4-client | resume | Fix round 1 (2246c80, smoke 72/72) |
 | r10 | critic | h4-client | resume | Review round 2: REJECT (withdraw mode change lags 100 ms; flaky smoke 1 in 10) |
 | r12 | core-engineer | h4-client | resume | Fix round 2, reassigned per deadlock rule; c0aab81, smoke 74/74, withdraw repeat-each 80/80 |
-| r13 | critic | h4-client | resume | Review round 3: APPROVE (d7db3b5). Merge after h4-design-data, then merge main + branch CI |
+| r13 | critic | h4-client | resume | Review round 3: APPROVE (d7db3b5). main merged into branch (6c975b1), green branch CI run 42492196114; merged b84a080 |
 | r14 | core-engineer | h4-design-data | resume | Fix round 2, reassigned per deadlock rule; 8705399 |
 | r15 | critic | h4-design-data | resume | Review round 3 (reject parks it) |
 | 9 | critic | h4-bots | launch | Review round 1: REJECT (runner tests pinned to shipped data) |
