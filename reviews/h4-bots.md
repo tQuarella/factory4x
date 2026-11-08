@@ -55,3 +55,35 @@ Required changes:
 This is the second rejection. Per PROCESS.md, a third rejection parks the task.
 
 VERDICT: REJECT
+
+## Round 3 · 2026-11-08
+
+This is the third round on h4-bots. The core-engineer made the fix after the deadlock rule reassigned it, at head 57d789f on origin/task/h4-bots; the diff since round 2 is `runner.test.ts` and DECISIONS.md. The round is an approval, so the third-rejection parking rule does not apply.
+
+Pillar fit: Unchanged. Bots and tests only. Gameplay, data and protected files are untouched.
+
+Quality: Both round 2 items are done.
+- The 15-campaign shipped-data unit test is gone. Crash and softlock on shipped data are left to the `bots` gate, which plays the same 15 campaigns and fails on either. A DECISIONS.md correction entry says so.
+- The two shipped-data tests that remain (determinism, value-free report shape) now stop after a fixed 10 game minutes of play (`SHIPPED_PLAY_CAP`). A retune that lengthens campaigns therefore can't lengthen them.
+- The shape test now checks only values that hold under any calibration: no error, play time within the cap, at least one visit and one reclaim. Landfall is undefended and ≤ 1 min by spec, so a reclaim within 10 minutes is a fair premise.
+- "Runs every seed as its own game" moved to the fixture, and gained a check that the two seeds' final hashes differ.
+- Round 1's fixes are intact. All tuned outcomes run on `fixtureData` with premises built explicitly. h4-design-data can now retune `data/sim.json` without touching a test.
+
+Gates: I ran `npm run gates -- --base main` on the branch at 57d789f and all six passed:
+- typecheck 4.3 s, lint 2.3 s;
+- test 6.3 s (373 tests, down from 27.7 s in round 2);
+- determinism 0.7 s;
+- bots 16.6 s, with the report identical to the archive: flags 1, 5 and 7 met, flags 2, 3, 4 and 6 missed (h4-design-data will retune for them);
+- protected-files: 10 files changed, none protected.
+
+`runner.test.ts` alone: the slowest test is 1.56 s (the flag 4 probes on the fixture), and both shipped-data tests are under 0.5 s.
+
+Every acceptance criterion is met:
+1. The runner, the five strategies, the research policy and both caps match the spec (reviewed in round 1).
+2. The report has per-run fields, the per-seed table and the seven flags, with flag 4 played from `campaignWorld`.
+3. The bot gate runs the full suite, which DECISIONS.md records.
+4. Tests cover the research policy, area choice and flag computation. The numbers are reported, not retuned. Gates pass.
+
+Required changes: none.
+
+VERDICT: APPROVE
