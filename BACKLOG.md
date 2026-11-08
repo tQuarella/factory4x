@@ -394,6 +394,8 @@ Only the minimal edits needed to keep `packages/client/src/*` and `packages/bots
 
 ## Milestone 2, iteration 5: H5 Fleet cap (spec in `DESIGN.md` → "H5 (Milestone 2, iteration 5, spec ready): Fleet cap")
 
+> **Merge path (Director, 2026-11-08):** h5-bots' bots gate is red on untuned v8 by design. h5-design-data branches from `task/h5-bots`, calibrates there, and `merge-task h5-design-data` merges both together once both have Critic approval and every gate is green. h5-bots is not merged alone. See DECISIONS.md.
+
 The owner chose this slice on 2026-11-08 (Q17: "A. Fleet cap"; Q18: no VISION edit yet). Where this backlog and the spec differ, the spec wins.
 
 Order:

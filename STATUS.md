@@ -26,11 +26,12 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 9 | critic | h5-client | launch | Review round 1: REJECT (fleet chip wraps to its own HUD row at 375 px) |
 | r5 | engineer | h5-client | resume | Fix round 1 |
 | 8 | engineer | h5-bots | launch | Build (41ef624): bots gate red only because v8 lights are closed at L0; merges together with h5-design-data (see DECISIONS) |
-| 10 | critic | h5-bots | launch | Review round 1 (code; gate red on data is expected) |
+| 10 | critic | h5-bots | launch | Review round 1: REJECT (stranded probe ship freezes forced visits; red gate) |
+| r7 | engineer | h5-bots | resume | Fix round 1 |
 | r6 | designer | h5-design-data | resume | Calibrate on a branch cut from task/h5-bots |
 | r4 | critic | h5-art | resume | Review round 1: APPROVE (f522965); green branch CI on 29a12ee; merged |
 
-Launches: 10 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 6.
+Launches: 10 / 12. Plan: h5-sim, h5-client, h5-bots launches; Critics for h5-sim, h5-client, h5-bots launched; Critics for h5-art and h5-design-data as resumes; retro. Total 11, 1 spare. Resumes: 7.
 
 ## Iteration 4 ledger
 
