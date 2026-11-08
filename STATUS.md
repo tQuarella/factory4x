@@ -23,9 +23,10 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 6 | critic | h4-sim | launch | Review round 1: APPROVE; green branch CI on 4f01607; merged caa81b1 |
 | 7 | engineer | h4-client | launch | Build |
 | 8 | engineer | h4-bots | launch | Build (green, 234c1b0; flags 1,5,7 met, 2,3,4,6 missed on uncalibrated data) |
-| 9 | critic | h4-bots | launch | Review round 1 |
+| 9 | critic | h4-bots | launch | Review round 1: REJECT (runner tests pinned to shipped data) |
+| r3 | engineer | h4-bots | resume | Fix round 1 |
 
-Launches: 9 / 12. Resumes: 2. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 9 / 12. Resumes: 3. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 
