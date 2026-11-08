@@ -12,16 +12,17 @@ import {
   type BattleResult,
   replayHashes,
   shipCounts,
-  shipsPerMinX10,
   throughputPerMin,
   worldHash,
   type Input,
 } from '@factory4x/sim';
 import { h, setHidden, setText, toggleClass } from './dom.ts';
-import { fmt10, shortVersion } from './format.ts';
+import { shortVersion } from './format.ts';
+import { Hud } from './hud.ts';
 import { FeedbackPanel, TuningPanel, showResult, type PanelHost } from './panels.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
 import { bannerLines, battleReport } from './report.ts';
+import { SendPanel } from './sendpanel.ts';
 import { Session, dataWithDefaults, replayData, type Speed } from './session.ts';
 import { Sheet } from './sheet.ts';
 import { MapView } from './view.ts';
@@ -59,8 +60,10 @@ const sheet = new Sheet($('sheet'), {
   },
   send,
   sendAll,
+  choose: (from, to) => sendPanel.open(from, to),
   close: () => closeSheet(),
 });
+const sendPanel = new SendPanel($('sendpanel'), { world: () => app.session.world, sendAll });
 
 function send(input: Input): void {
   sendAll([input]);
@@ -108,6 +111,7 @@ const feedback = new FeedbackPanel($('feedback'), panelHost);
 function newRun(): void {
   app.session = new Session(dataWithDefaults(data, app.session.world.tun), { seed: nextSeed(app.session.seed) });
   sheet.close();
+  sendPanel.close();
   toast.hide();
   writeSave(app.session);
   refreshUi();
@@ -157,12 +161,10 @@ $('b-note').addEventListener('click', () => feedback.open());
 
 // --- HUD ----------------------------------------------------------------------------------
 $('version').textContent = shortVersion(fullVersion);
+const hud = new Hud($('chips'));
 const el = {
   thr: $('thr'),
   arrow: $('thr-arrow'),
-  stock: $('stock'),
-  ships: $('ships'),
-  rate: $('ships-rate'),
   pause: $('b-pause'),
   paused: $('paused'),
   banner: $('banner'),
@@ -181,9 +183,7 @@ function refreshUi(): void {
   setText(el.arrow, dir === 'up' ? '▲' : dir === 'down' ? '▼' : '');
   toggleClass(el.arrow, 'up', dir === 'up');
   toggleClass(el.arrow, 'down', dir === 'down');
-  setText(el.stock, String(w.stock.ore));
-  setText(el.ships, String(w.ships.length));
-  setText(el.rate, `${fmt10(shipsPerMinX10(w))}/min`);
+  hud.update(w);
   setText(el.pause, s.paused ? 'Play' : 'Pause');
   toggleClass(el.pause, 'on', s.paused);
   setHidden(el.paused, !s.paused);
@@ -192,7 +192,7 @@ function refreshUi(): void {
   const lines = bannerLines(w);
   const showBanner = lines.length > 0 || forceBanner;
   setHidden(el.banner, !showBanner);
-  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'ROOT · 6 Thorn 0 Spore · strip 0.8/s · 2 lost');
+  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'ROOT · 6 Thorn 4 Spore · strip 0.8/s · 2 lost');
   if (showBanner && el.banner.dataset.text !== lines.join('|')) {
     el.banner.dataset.text = lines.join('|');
     el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
@@ -215,6 +215,7 @@ function refreshUi(): void {
     }
   }
   sheet.update();
+  sendPanel.update();
   tuning.update();
 }
 

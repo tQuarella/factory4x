@@ -4,6 +4,9 @@
  * All numbers come from the sim's selectors; buttons grey out via isValidInput.
  */
 import {
+  SEND_ALL,
+  SHIP_TYPES,
+  assemblerStatus,
   battleStatus,
   combatRates,
   guardianStatus,
@@ -14,19 +17,38 @@ import {
   isValidInput,
   nodeStatus,
   queueStatus,
-  SEND_ALL,
   shipCounts,
-  shipsPerMinX10,
-  yardStatus,
   systemStatus,
+  unlockStatus,
+  yardStatus,
+  type AssemblerRow,
+  type AssemblerState,
+  type Component,
   type BuildKind,
   type Input,
   type Node,
+  type ShipType,
+  type ShipTypeCounts,
+  type Tag,
+  type YardRow,
+  type YardState,
 } from '@factory4x/sim';
 import { palette } from './palette.ts';
 import { bar, btn, h, setHidden, setText, toggleClass, type Btn } from './dom.ts';
 import { fmt10 } from './format.ts';
-import { feedsBloomText, guardName, supplyLine } from './report.ts';
+import { guardIcon, resourceIcon, shipIcon } from './icons.ts';
+import {
+  COUNTER_PHRASE,
+  GUARD_NAME,
+  RES_NAME,
+  SHIP_NAME,
+  SHIP_PLURAL,
+  UNLOCKS,
+  feedsBloomText,
+  guardName,
+  supplyLine,
+  unlockHint,
+} from './report.ts';
 import type { Session } from './session.ts';
 
 export interface SheetHost {
@@ -34,8 +56,33 @@ export interface SheetHost {
   send(input: Input): void;
   /** Applies all inputs of one press in the same tick (Session.sendAll). */
   sendAll(inputs: readonly Input[]): void;
+  /** Opens the "Choose…" send panel for a fleet at `from` going to `to`. */
+  choose(from: number, to: number): void;
   close(): void;
 }
+
+/** "3 Drones, 2 Lancers", or "none". */
+export function shipsText(c: Readonly<ShipTypeCounts>): string {
+  const parts = SHIP_TYPES.filter((t) => c[t] > 0).map((t) => `${c[t]} ${c[t] === 1 ? SHIP_NAME[t] : SHIP_PLURAL[t]}`);
+  return parts.length > 0 ? parts.join(', ') : 'none';
+}
+
+const TAG_TEXT: Record<Tag, string> = { strong: '✓ Strong', even: 'Even', weak: '✗ Weak' };
+
+const YARD_STATE_TEXT: Record<YardState, (component: string | null) => string> = {
+  building: () => 'building',
+  off: () => 'off',
+  needsComponent: (c) => `idle: needs ${c ?? 'a component'}`,
+  needsOre: () => 'idle: needs ore',
+  ready: () => 'starting',
+};
+const ASSEMBLER_STATE_TEXT: Record<AssemblerState, (input: string) => string> = {
+  making: () => 'making',
+  full: () => 'full',
+  needsInput: (i) => `needs ${i}`,
+  needsOre: () => 'needs ore',
+  ready: () => 'starting',
+};
 
 const KIND_LABEL: Record<BuildKind, string> = { extractor: 'Ext', route: 'Route', upgrade: 'Upg' };
 
@@ -43,11 +90,11 @@ export function shortName(n: Pick<Node, 'id' | 'kind'>): string {
   return n.kind === 'probe' ? 'Probe' : n.kind === 'heart' ? 'Heart' : n.kind === 'root' ? 'Root' : n.id.toUpperCase();
 }
 
-function longName(n: Pick<Node, 'id' | 'kind'>, captured: boolean, rootCut: boolean): string {
+function longName(n: Pick<Node, 'id' | 'kind' | 'prize'>, captured: boolean, rootCut: boolean): string {
   if (n.kind === 'probe') return 'Probe';
   if (n.kind === 'root') return rootCut ? 'Root (cut)' : 'Root · feeds the Heart';
   if (n.kind === 'heart') return captured ? 'Heart (yours)' : 'The Bloom heart';
-  if (n.kind === 'pocket') return `Pocket ${n.id.toUpperCase()}`;
+  if (n.kind === 'pocket') return `Pocket ${n.id.toUpperCase()}${n.prize ? ` · ${RES_NAME[n.prize]}` : ''}`;
   return `Asteroid ${n.id.toUpperCase()}`;
 }
 
@@ -162,6 +209,7 @@ export class Sheet {
     const pips: HTMLElement[] = [];
     for (let i = 0; i < n.slots; i++) pips.push(h('span', 'pip', '', pipRow));
     const pipText = h('span', 'pip-text', '', pipRow);
+    const yields = this.row(sec, 'Yields');
     const extract = this.row(sec, 'Extracting');
     const route = this.row(sec, 'Route');
     const bufRow = h('div', 'row', '', sec);
@@ -215,6 +263,7 @@ export class Sheet {
       });
       const queued = st.extractorsCommitted - st.extractors;
       setText(pipText, `${st.extractors}/${st.slots}${queued > 0 ? ` (+${queued} queued)` : ''}`);
+      setText(yields.val, st.prize ? `${RES_NAME[st.prize]} · ${st.perExtractorPerMin}/min each` : '-');
       setText(extract.val, `+${st.extractPerMin}/min`);
       if (st.route) {
         const up = st.route.pendingUpgrades > 0 ? ` (+${st.route.pendingUpgrades} queued)` : '';
@@ -240,12 +289,13 @@ export class Sheet {
   private probeSections(): void {
     const sys = h('div', 'note sys', '', this.root);
     this.ups.push(() => setText(sys, `System: ${systemStatus(this.world).name}`));
-    const yard = h('section', '', '', this.root);
-    // Interim (h3-sim): the drone yard only; h3-client adds the three Yards rows and the Assembly block.
-    const yardBtn = btn(yard, '', () => this.host.send({ type: 'setShipyard', shipType: 'drone', on: !this.world.yards.drone.on }), 'primary');
-    const yardBar = bar(yard, 'yard');
-    const yardInfo = this.row(yard, 'Ships');
+    const yard = h('section', 'yards', '', this.root);
+    h('div', 'lbl', 'Yards', yard);
+    const yardRows = SHIP_TYPES.map((type) => this.yardRow(yard, type));
     const mining = this.row(yard, 'Probe mining');
+    const asm = h('section', 'assembly', '', this.root);
+    h('div', 'lbl', 'Assembly (automatic)', asm);
+    const asmRows = assemblerStatus(this.world).map((r) => this.assemblerRow(asm, r.component));
 
     const qsec = h('section', '', '', this.root);
     const qHead = this.row(qsec, 'Build queue');
@@ -267,13 +317,11 @@ export class Sheet {
     this.ups.push(() => {
       const w = this.world;
       const ys = yardStatus(w);
-      const y = ys.yards.find((r) => r.type === 'drone')!;
-      yardBtn.set(y.on ? 'Shipyard ON · tap to stop' : 'Shipyard OFF · tap to start');
-      toggleClass(yardBtn.el, 'on', y.on);
-      yardBar.set(y.ticksLeft > 0 ? (y.totalTicks - y.ticksLeft) / y.totalTicks : 0);
-      const perMin = shipsPerMinX10(w);
-      setText(yardInfo.val, `${w.ships.length} · ${y.on ? `${fmt10(perMin)}/min at this income` : 'paused'}`);
+      ys.yards.forEach((y, i) => yardRows[i]!.update(y, w.tickRate));
       setText(mining.val, `+${ys.probeOrePerMin}/min`);
+      const asms = assemblerStatus(w);
+      asms.forEach((r, i) => asmRows[i]!.update(r, w.tickRate));
+      setHidden(asm, !asms.some((r) => r.unlocked));
 
       const q = queueStatus(w);
       setText(qHead.val, `${q.orders.length}/${q.queueMax}${q.reserved > 0 ? ` · ${q.reserved} ore reserved` : ''}`);
@@ -308,6 +356,56 @@ export class Sheet {
     });
   }
 
+  /** One yard row: icon, name, an on/off toggle, the cost line and a status; hidden (with its unlock hint) until unlocked. */
+  private yardRow(parent: HTMLElement, type: ShipType): { update(y: YardRow, tickRate: number): void } {
+    const wrap = h('div', 'yard-row', '', parent);
+    wrap.dataset.yard = type;
+    const hint = h('div', 'note locked-hint', unlockHint(type), parent);
+    const top = h('div', 'yr-top', '', wrap);
+    shipIcon(top, 24, type);
+    h('b', 'yr-name', SHIP_NAME[type], top);
+    const tog = btn(top, '', () => this.host.send({ type: 'setShipyard', shipType: type, on: !this.world.yards[type].on }), 'tog');
+    const cost = h('div', 'yr-cost', '', wrap);
+    const status = h('div', 'yr-status', '', wrap);
+    const progress = bar(wrap, 'yard');
+    return {
+      update: (y, tickRate) => {
+        setHidden(wrap, !y.unlocked);
+        setHidden(hint, y.unlocked || type === 'drone');
+        tog.set(y.on ? 'ON' : 'OFF');
+        tog.el.setAttribute('aria-label', `${SHIP_NAME[type]} yard ${y.on ? 'on, tap to stop' : 'off, tap to start'}`);
+        toggleClass(tog.el, 'on', y.on);
+        setText(cost, `${y.cost} ore${y.component ? ` + 1 ${y.component}` : ''} · ${(y.totalTicks / tickRate).toFixed(1)} s`);
+        setText(status, YARD_STATE_TEXT[y.state](y.component));
+        toggleClass(status, 'bad', y.state === 'needsComponent' || y.state === 'needsOre');
+        progress.set(y.ticksLeft > 0 ? (y.totalTicks - y.ticksLeft) / y.totalTicks : 0);
+      },
+    };
+  }
+
+  /** One assembler row: stock/cap, recipe and status; hidden until its input has been delivered. */
+  private assemblerRow(parent: HTMLElement, component: Component): { update(r: AssemblerRow, tickRate: number): void } {
+    const wrap = h('div', 'yard-row asm-row', '', parent);
+    wrap.dataset.assembler = component;
+    const top = h('div', 'yr-top', '', wrap);
+    resourceIcon(top, 22, component);
+    h('b', 'yr-name', RES_NAME[component], top);
+    const stock = h('span', 'yr-stock', '', top);
+    const recipe = h('div', 'yr-cost', '', wrap);
+    const status = h('div', 'yr-status', '', wrap);
+    const progress = bar(wrap, 'build');
+    return {
+      update: (r, tickRate) => {
+        setHidden(wrap, !r.unlocked);
+        setText(stock, `${r.stock}/${r.stockCap}`);
+        setText(recipe, `${r.ore} ore + ${r.inputAmount} ${r.input} · ${(r.totalTicks / tickRate).toFixed(1)} s`);
+        setText(status, ASSEMBLER_STATE_TEXT[r.state](r.input));
+        toggleClass(status, 'bad', r.state === 'needsInput' || r.state === 'needsOre');
+        progress.set(r.ticksLeft > 0 ? (r.totalTicks - r.ticksLeft) / r.totalTicks : 0);
+      },
+    };
+  }
+
   // --- guarded nodes: pockets, the Root, the heart ----------------------------
 
   /** The Root sheet's "Feeds the Bloom" box; returns the text element. */
@@ -330,23 +428,47 @@ export class Sheet {
     });
   }
 
-  /** A living guarded node's sheet: guards, regrowth, ships, the live battle (interim H3 text; h3-client owns the final sheet). */
+  /** A living guarded node's sheet: prize, guards per type, ship tags, ships here, the live battle. */
   private guardedSections(n: Node): void {
     const isRoot = n.kind === 'root';
     const name = guardName(this.world, n.index);
     const isHeart = n.kind === 'heart';
     const sec = h('section', '', '', this.root);
-    const thornRow = this.row(sec, 'Guards');
+    const prize = h('div', 'prize-line', '', sec);
     const supply = h('div', 'note supply', '', sec);
     const feeds = isRoot ? this.feedsBox(sec) : null;
-    const ringWrap = h('div', 'regrow', '', sec);
-    const ring = h('canvas', 'ring', '', ringWrap);
-    ring.width = 56;
-    ring.height = 56;
-    const regrow = h('span', '', '', ringWrap);
-    const stats = h('div', 'note', '', sec);
-    const ships = this.row(sec, 'Ships here / en route');
-    const hint = h('div', 'note', '', sec);
+
+    // One row per guard type: icon, count/cap, regrow, hp and damage, a thin regrow bar.
+    const guardRows = (['thorn', 'spore'] as const).map((type) => {
+      const wrap = h('div', 'guard-row', '', sec);
+      wrap.dataset.guard = type;
+      const top = h('div', 'gr-top', '', wrap);
+      guardIcon(top, 22, type);
+      const label = h('b', 'gr-name', '', top);
+      const regrow = h('span', 'gr-regrow', '', top);
+      const stats = h('div', 'gr-stats', '', wrap);
+      const progress = bar(wrap, 'regrow');
+      return { type, wrap, label, regrow, stats, progress };
+    });
+
+    // Your ships here: one tag per unlocked ship type, from the sim's guardian selector.
+    const tagSec = h('section', 'tags', '', this.root);
+    h('div', 'lbl', 'Your ships vs this guard', tagSec);
+    const tagRows = SHIP_TYPES.map((type) => {
+      const wrap = h('div', 'tag-row', '', tagSec);
+      wrap.dataset.ship = type;
+      const top = h('div', 'tr-top', '', wrap);
+      shipIcon(top, 22, type);
+      h('b', 'tr-name', SHIP_NAME[type], top);
+      const badge = h('span', 'tag-badge', '', top);
+      h('div', 'tr-phrase', COUNTER_PHRASE[type], wrap);
+      return { type, wrap, badge };
+    });
+
+    const here = h('section', '', '', this.root);
+    const ships = this.row(here, 'Ships here');
+    const enRoute = this.row(here, 'En route');
+    const hint = h('div', 'note', '', here);
 
     // Always shown, with its space reserved, so Retreat never appears where "Attack from" was.
     const battle = h('section', 'battle', '', this.root);
@@ -358,22 +480,40 @@ export class Sheet {
     this.ups.push(() => {
       const w = this.world;
       const g = guardianStatus(w, n.index);
-      setText(thornRow.val, `${g.guards.thorn.count} Thorns ${g.guards.spore.count} Spores / ${g.totalCap}`);
+      const unlocked = unlockStatus(w);
+      // Prize line.
+      if (isRoot) setText(prize, 'No prize · feeds the Heart');
+      else if (g.prize === null) setText(prize, '-');
+      else {
+        const u = g.prize === 'ice' || g.prize === 'crystal' ? UNLOCKS[g.prize] : null;
+        const unlock = u ? ` · unlocks ${u.component} → ${SHIP_NAME[u.ship]}` : '';
+        setText(
+          prize,
+          isHeart
+            ? `Prize: ${RES_NAME[g.prize]} · ${g.slots} slots`
+            : `Prize: ${RES_NAME[g.prize]} · ${g.slots} slots · ${g.prizePerMinPerExtractor}/min each${unlock}`,
+        );
+      }
       if (isHeart) setText(supply, supplyLine(w));
       else setHidden(supply, true);
       if (feeds) setText(feeds, feedsBloomText(w, isCaptured(w)));
-      const atCap = g.total >= g.totalCap;
-      const th = g.guards.thorn;
-      const sp = g.guards.spore;
-      const secX10 = Math.round((th.regrowTicks * 10) / w.tickRate);
-      setText(regrow, atCap ? `${name} at full strength · regrows 1 Thorn / ${fmt10(secX10)} s when hurt` : `Regrows 1 Thorn / ${fmt10(secX10)} s`);
-      drawRing(ring, th.count >= th.cap ? 0 : th.regrowProgress / Math.max(1, th.regrowTicks));
-      setText(
-        stats,
-        `Thorn: ${th.hp} hp, hits ${th.damage}/round, heals ${th.repairPerRound}/round. Spore: ${sp.hp} hp, hits ${sp.damage}/round, heals ${sp.repairPerRound}/round.`,
-      );
+      for (const r of guardRows) {
+        const row = g.guards[r.type];
+        setHidden(r.wrap, row.count === 0 && row.cap === 0);
+        setText(r.label, `${GUARD_NAME[r.type]} ${row.count}/${row.cap}`);
+        setText(r.regrow, `regrows 1 / ${fmt10(Math.round((row.regrowTicks * 10) / w.tickRate))} s`);
+        setText(r.stats, `${row.hp} hp · hits ${row.damage}/round · heals ${row.repairPerRound}/round`);
+        r.progress.set(row.count >= row.cap ? 0 : row.regrowProgress / Math.max(1, row.regrowTicks));
+      }
+      for (const r of tagRows) {
+        setHidden(r.wrap, !unlocked.ships[r.type]);
+        const tag = g.tags[r.type].tag;
+        setText(r.badge, TAG_TEXT[tag]);
+        r.badge.className = `tag-badge ${tag}`;
+      }
       const c = shipCounts(w);
-      setText(ships.val, `${c.at[n.index]} / ${c.enRoute[n.index]}`);
+      setText(ships.val, shipsText(c.atByType[n.index]!));
+      setText(enRoute.val, shipsText(c.enRouteByType[n.index]!));
       const total = c.total;
       const r = combatRates(w, n.index, c.byType);
       setText(
@@ -390,8 +530,8 @@ export class Sheet {
         setText(bLine, 'No battle running.');
         setText(bLost, '');
       }
-      const here = c.at[n.index]!;
-      retreat.set(`Retreat to Probe · ${here}`, here > 0);
+      const parked = c.at[n.index]!;
+      retreat.set(`Retreat to Probe · ${parked}`, parked > 0);
     });
   }
 
@@ -401,12 +541,15 @@ export class Sheet {
     const sec = h('section', 'send', '', this.root);
     const title = h('div', 'lbl', '', sec);
     const nodes = this.world.nodes;
-    const sources: Array<{ node: number; b: Btn }> = [];
+    const sources: Array<{ node: number; row: HTMLElement; b: Btn; choose: Btn }> = [];
     const attack = (): boolean => isGuarded(this.world, n.index);
     for (const m of nodes) {
       if (m.index === n.index) continue;
-      const b = btn(sec, '', () => this.host.send({ type: 'sendShips', from: m.index, to: n.index, counts: SEND_ALL }), 'send-btn');
-      sources.push({ node: m.index, b });
+      const row = h('div', 'send-row', '', sec);
+      const b = btn(row, '', () => this.host.send({ type: 'sendShips', from: m.index, to: n.index, counts: SEND_ALL }), 'send-btn');
+      // "Choose…" opens the per-type send panel (DESIGN.md H3 "Attack").
+      const choose = btn(row, 'Choose…', () => this.host.choose(m.index, n.index), 'choose-btn');
+      sources.push({ node: m.index, row, b, choose });
     }
     // One press, one tick: every source's order goes in a single batch (see Session.sendAll).
     const all = btn(sec, '', () => {
@@ -423,11 +566,11 @@ export class Sheet {
         const k = c.at[s.node]!;
         total += k;
         if (k > 0) live++;
-        setHidden(s.b.el, k === 0);
-        s.b.set(`${attack() ? 'Attack from' : 'From'} ${shortName(nodes[s.node]!)} · ${k}`);
+        setHidden(s.row, k === 0);
+        s.b.set(`${attack() ? 'Attack with all from' : 'Send all from'} ${shortName(nodes[s.node]!)} · ${k}`);
       }
       setHidden(all.el, live < 2);
-      all.set(`${attack() ? 'Attack with all' : 'All'} · ${total}`);
+      all.set(`${attack() ? 'Attack with all sources' : 'Send from all sources'} · ${total}`);
       setHidden(sec, total === 0);
       setText(title, attack() ? `Attack the ${guardName(this.world, n.index)}` : 'Send ships here');
     });
@@ -470,21 +613,4 @@ function drawSpark(canvas: HTMLCanvasElement, history: readonly number[]): void 
   ctx.fillStyle = '#9fb4d6';
   ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
   ctx.fillText(`max ${max}`, 4, 10);
-}
-
-function drawRing(canvas: HTMLCanvasElement, frac: number): void {
-  const ctx = canvas.getContext('2d')!;
-  const s = canvas.width;
-  ctx.clearRect(0, 0, s, s);
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.beginPath();
-  ctx.arc(s / 2, s / 2, s / 2 - 5, 0, Math.PI * 2);
-  ctx.stroke();
-  if (frac > 0) {
-    ctx.strokeStyle = palette.bloom;
-    ctx.beginPath();
-    ctx.arc(s / 2, s / 2, s / 2 - 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, frac));
-    ctx.stroke();
-  }
 }

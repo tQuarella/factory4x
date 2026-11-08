@@ -4,7 +4,7 @@
  * placeholders.ts get pixel radii, so line widths and sprites stay crisp at any
  * map scale. Ships and pods interpolate between ticks using session.alpha.
  */
-import { activeBattles, guardianStatus, heartIndex, isCaptured, isRootCut, lastBattle, nodeStatus, rootIndex, shipCounts, type Node, type World } from '@factory4x/sim';
+import { activeBattles, guardianStatus, heartIndex, isCaptured, isGuarded, isRootCut, lastBattle, nodeStatus, rootIndex, shipCounts, type Node, type World } from '@factory4x/sim';
 import { palette } from './palette.ts';
 import {
   drawAsteroid,
@@ -15,11 +15,12 @@ import {
   drawRichNode,
   drawRoot,
   drawRoute,
-  drawShip,
   drawThorn,
   drawVine,
   drawWiltingThorn,
 } from './placeholders.ts';
+// Until h3-art merges, the H3 draw functions come from the shim (same signatures); the Director swaps this import.
+import { drawGuardRing, drawPocket, drawResourceIcon, drawShip, drawSpore } from './h3-art-shim.ts';
 import { fitMap, type Fit } from './fit.ts';
 import { lerp, podTotalTicks, progressFrac } from './interp.ts';
 import type { Session } from './session.ts';
@@ -39,10 +40,18 @@ export function ringGeom(rr: number, count: number): { ringR: number; thornR: nu
   return { ringR, thornR };
 }
 
-/** Radius that a tap on a guarded node may land in: the whole thorn ring, and at least a 44 px target. */
-export function guardedReach(rr: number, count: number): number {
+/**
+ * Outer radius of the guard ring (two arcs, Thorn and Spore colour) in px. Pockets draw the ring only, at `ringR`;
+ * the Root and the heart also draw each guard, so their ring sits just outside those.
+ */
+export function guardRingOuter(rr: number, count: number, individuals: boolean): number {
   const { ringR, thornR } = ringGeom(rr, count);
-  return Math.max(MIN_HIT, ringR + thornR + 3);
+  return individuals ? (ringR + thornR + 2) / 0.84 : ringR;
+}
+
+/** Radius that a tap on a guarded node may land in: the whole guard ring, and at least a 44 px target. */
+export function guardedReach(rr: number, count: number, individuals = true): number {
+  return Math.max(MIN_HIT, guardRingOuter(rr, count, individuals) + 3);
 }
 
 interface WiltAnim {
@@ -139,7 +148,7 @@ export class MapView {
       const dy = py - this.sy(n.y);
       const d = Math.sqrt(dx * dx + dy * dy);
       const g = guardedKind(n) ? guardianStatus(this.session.world, n.index) : null;
-      const reach = g && g.alive ? guardedReach(this.nodeR(n), g.total) : Math.max(MIN_HIT, this.nodeR(n) + 4);
+      const reach = g && g.alive ? guardedReach(this.nodeR(n), g.total, n.kind !== 'pocket') : Math.max(MIN_HIT, this.nodeR(n) + 4);
       if (d <= reach && d < bestD) {
         best = n.index;
         bestD = d;
@@ -214,8 +223,12 @@ export class MapView {
       ctx.save();
       ctx.translate(x, y);
       if (n.kind === 'probe') drawProbe(ctx, rr, t);
-      // Interim (h3-sim): pockets draw as asteroids until h3-client uses drawPocket.
-      else if (n.kind === 'asteroid' || n.kind === 'pocket') drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
+      else if (n.kind === 'pocket' && isGuarded(world, n.index)) drawPocket(ctx, rr, t, true, n.prize ?? 'ore');
+      else if (n.kind === 'asteroid' || n.kind === 'pocket') {
+        drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
+        // A captured pocket is a rock that shows its prize.
+        if (n.kind === 'pocket') drawResourceIcon(ctx, rr * 0.4, n.prize ?? 'ore');
+      }
       else if (n.kind === 'root') drawRoot(ctx, rr, t, isRootCut(world));
       else drawRichNode(ctx, rr, t, isCaptured(world));
       ctx.restore();
@@ -225,32 +238,43 @@ export class MapView {
       const guard = guardedKind(n) ? guardianStatus(world, n.index) : null;
       if (guard && guard.alive) {
         const wilt = n.kind === 'heart' ? this.wilt : null;
+        const individuals = n.kind !== 'pocket';
         const count = wilt ? wilt.from : guard.total;
         const { ringR, thornR } = ringGeom(rr, count);
-        for (let i = 0; i < count; i++) {
-          const ang = (i / count) * Math.PI * 2 + t * 0.12;
-          ctx.save();
-          ctx.translate(x + Math.cos(ang) * ringR, y + Math.sin(ang) * ringR);
-          if (wilt && i >= wilt.to) {
-            // Falls with the angle it had spinning (drawThorn turns at t * 0.8), so it doesn't snap when it starts to wilt.
-            const frac = (nowMs - wilt.startMs) / WILT_MS;
-            ctx.translate(0, frac * thornR * 3);
-            ctx.rotate((wilt.startMs / 1000) * 0.8);
-            drawWiltingThorn(ctx, thornR, frac);
-          } else {
-            // Interim (h3-sim): Spores draw as Thorns until h3-client uses drawSpore.
-            const gd = guard.guardHps[i] ?? { type: 'thorn' as const, hp: 0 };
-            drawThorn(ctx, thornR, t, gd.hp / Math.max(1, guard.guards[gd.type].hp));
+        if (individuals) {
+          for (let i = 0; i < count; i++) {
+            const ang = (i / count) * Math.PI * 2 + t * 0.12;
+            ctx.save();
+            ctx.translate(x + Math.cos(ang) * ringR, y + Math.sin(ang) * ringR);
+            if (wilt && i >= wilt.to) {
+              // Falls with the angle it had spinning (drawThorn turns at t * 0.8), so it doesn't snap when it starts to wilt.
+              const frac = (nowMs - wilt.startMs) / WILT_MS;
+              ctx.translate(0, frac * thornR * 3);
+              ctx.rotate((wilt.startMs / 1000) * 0.8);
+              drawWiltingThorn(ctx, thornR, frac);
+            } else {
+              const gd = guard.guardHps[i] ?? { type: 'thorn' as const, hp: 0 };
+              const frac = gd.hp / Math.max(1, guard.guards[gd.type].hp);
+              if (gd.type === 'spore') drawSpore(ctx, thornR, t, frac);
+              else drawThorn(ctx, thornR, t, frac);
+            }
+            ctx.restore();
           }
-          ctx.restore();
         }
-        selR = ringR + thornR + 3;
-        labelTop = y - ringR - thornR - 12;
+        // The guard ring: Thorn and Spore arcs, each a share of the full strength (the caps), so it shrinks as guards die.
+        const outer = guardRingOuter(rr, count, individuals);
+        const cap = Math.max(1, guard.totalCap);
+        ctx.save();
+        ctx.translate(x, y);
+        drawGuardRing(ctx, outer, guard.guards.thorn.count / cap, guard.guards.spore.count / cap, t);
+        ctx.restore();
+        selR = outer + 3;
+        labelTop = y - outer - 10;
         const age = nowMs - this.hitAt;
         if (age < FLASH_MS && this.hitNodes.includes(n.index)) {
           ctx.save();
           ctx.translate(x, y);
-          drawHitFlash(ctx, ringR * 0.9, age / FLASH_MS);
+          drawHitFlash(ctx, outer * 0.9, age / FLASH_MS);
           ctx.restore();
         }
       }
@@ -297,7 +321,7 @@ export class MapView {
       const f = progressFrac(tr.ticksLeft, tr.totalTicks, alpha);
       ctx.save();
       ctx.translate(lerp(a.x, b.x, f), lerp(a.y, b.y, f));
-      drawShip(ctx, 6, Math.atan2(b.y - a.y, b.x - a.x));
+      drawShip(ctx, 6, Math.atan2(b.y - a.y, b.x - a.x), s.type);
       ctx.restore();
     }
   }
