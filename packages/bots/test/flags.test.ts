@@ -1,125 +1,142 @@
 import { describe, expect, it } from 'vitest';
-import { computeDepthFlags, layoutRows, type GameResult } from '../src/runner.ts';
+import { computeH4Flags, type CampaignResult, type Flag4Probes, type Visit } from '../src/runner.ts';
 
-const MIN = 60;
-type Four = [number, number, number, number];
-const NAMES = ['drones-only', 'ice-first', 'crystal-first', 'greedy'];
-const LAYOUTS = ['frost', 'glass', 'twin'];
+const TR = 30;
+const MIN = 60 * TR;
+const SEEDS = 3;
+const NAMES = ['ice-line', 'crystal-line', 'full-kit', 'greedy', 'no-research'];
+const data = { tickRate: TR };
 
-function fake(strategy: string, variantId: string, captureSec: number | null, shipsLost: number, order: string[]): GameResult {
+/** Reclaim visits at the spec's mid-window times; `openings` overrides an area's opening ticks. */
+function visits(order: string[], openings: Record<string, number | null> = {}): Visit[] {
+  const mid: Record<string, number> = { landfall: 0.3, shelf: 6, shoal: 6, veil: 9, garden: 9, deep: 12 };
+  const open: Record<string, number> = { landfall: -1, shelf: 120, shoal: 120, veil: 80, garden: 80, deep: 56 };
+  return order.map((area) => ({
+    area,
+    startTick: 0,
+    playTicks: Math.floor(mid[area]! * MIN),
+    result: 'reclaimed' as const,
+    openingTicks: area in openings ? openings[area]! : open[area] === -1 ? null : open[area]! * TR,
+    shipsBuilt: 0,
+    shipsLost: 0,
+  }));
+}
+
+function fake(strategy: string, seed: number, minutes: number, order: string[], extra: Partial<CampaignResult> = {}): CampaignResult {
   return {
     strategy,
-    seed: LAYOUTS.indexOf(variantId) + 1,
-    outcome: captureSec === null ? 'timeout' : 'won',
-    variantId,
-    variantName: variantId,
-    captureSec,
-    shipsLost,
-    captureOrder: order.map((id) => ({ id, prize: null, sec: 0 })),
-  } as unknown as GameResult;
+    seed,
+    outcome: 'won',
+    playTicks: Math.floor(minutes * MIN),
+    visits: visits(order),
+    reclaimOrder: order,
+    ...extra,
+  } as unknown as CampaignResult;
 }
 
-interface Spec {
-  times: Record<string, Four>;
-  lost: Record<string, Four>;
-  /** Greedy capture order per layout. */
-  order: Record<string, string[]>;
-}
-
-const same = (v: Four): Record<string, Four> => ({ frost: v, glass: v, twin: v });
-const base: Spec = {
-  times: same([20 * MIN, 20 * MIN, 20 * MIN, 20 * MIN]),
-  lost: same([14, 10, 10, 10]),
-  order: { frost: ['p1', 'heart'], glass: ['p2', 'heart'], twin: ['p3', 'heart'] },
+const ORDERS: Record<string, string[]> = {
+  'ice-line': ['landfall', 'shelf', 'veil', 'deep'],
+  'crystal-line': ['landfall', 'shoal', 'garden', 'deep'],
+  'full-kit': ['landfall', 'shelf', 'shoal', 'veil', 'garden', 'deep'],
+  greedy: ['landfall', 'shelf', 'veil', 'shoal', 'garden', 'deep'],
+  'no-research': ['landfall', 'shelf', 'veil', 'shoal', 'garden', 'deep'],
 };
+const TIMES: Record<string, number> = { 'ice-line': 55, 'crystal-line': 58, 'full-kit': 52, greedy: 54, 'no-research': 80 };
 
-function results(over: Partial<Spec> = {}): GameResult[] {
-  const s = { ...base, ...over };
-  return LAYOUTS.flatMap((v) => NAMES.map((n, i) => fake(n, v, s.times[v]![i]!, s.lost[v]![i]!, n === 'greedy' ? s.order[v]! : ['p1', 'heart'])));
+function all(times: Record<string, number> = TIMES, tweak: (r: CampaignResult) => CampaignResult = (r) => r): CampaignResult[] {
+  const out: CampaignResult[] = [];
+  for (let seed = 1; seed <= SEEDS; seed++) for (const n of NAMES) out.push(tweak(fake(n, seed, times[n]!, ORDERS[n]!)));
+  return out;
 }
-const pass = (rs: GameResult[], determinism = true) => computeDepthFlags(rs, determinism).map((f) => f.pass);
-const withTimes = (layout: string, t: Four): Record<string, Four> => ({ ...base.times, [layout]: t });
 
-describe('depth flags', () => {
-  it('are six lines, and flags 1-5 need all four strategies on all three layouts', () => {
-    expect(computeDepthFlags([], true)).toHaveLength(6);
-    expect(pass([])).toEqual([false, false, false, false, false, true]);
-    expect(pass(results().filter((r) => r.strategy !== 'greedy'))[0]).toBe(false);
+const GOOD_PROBES: Flag4Probes = { veilFlak: 600 * TR, veilLancer: 800 * TR, gardenLancer: 600 * TR, gardenFlak: 800 * TR };
+const flagsOf = (rs: CampaignResult[], probes: Flag4Probes | null = GOOD_PROBES, det = true) => computeH4Flags(rs, probes, data, SEEDS, det, 'x');
+const pass = (rs: CampaignResult[], probes: Flag4Probes | null = GOOD_PROBES, det = true): boolean[] => flagsOf(rs, probes, det).map((f) => f.pass);
+
+describe('H4 flags', () => {
+  it('reports seven flags, all met on a healthy set of results', () => {
+    const f = flagsOf(all());
+    expect(f).toHaveLength(7);
+    expect(f.map((x) => x.pass)).toEqual([true, true, true, true, true, true, true]);
   });
 
-  it('a good set meets all but flag 4 (all ties), and flag 6 follows the determinism input', () => {
-    expect(pass(results())).toEqual([true, true, true, false, true, true]);
-    expect(pass(results(), false)[5]).toBe(false);
+  it('flag 1: a strategy that does not buy the core, or buys it past 120 minutes, fails', () => {
+    expect(pass(all())[0]).toBe(true);
+    expect(pass(all(TIMES, (r) => (r.strategy === 'greedy' && r.seed === 2 ? ({ ...r, outcome: 'softlock' } as CampaignResult) : r)))[0]).toBe(false);
+    expect(pass(all(TIMES, (r) => (r.strategy === 'greedy' ? ({ ...r, outcome: 'timeout' } as CampaignResult) : r)))[0]).toBe(false);
+    expect(pass(all({ ...TIMES, 'no-research': 121 }))[0]).toBe(false);
   });
 
-  it('flag 1: the window is 15 to 45 minutes inclusive; never captured fails', () => {
-    const f1 = (sec: number | null) => pass(results({ times: withTimes('twin', [sec as number, 20 * MIN, 20 * MIN, 20 * MIN]) }))[0];
-    expect(f1(15 * MIN)).toBe(true);
-    expect(f1(45 * MIN)).toBe(true);
-    expect(f1(15 * MIN - 1)).toBe(false);
-    expect(f1(45 * MIN + 1)).toBe(false);
-    expect(f1(null)).toBe(false);
+  it('flag 2: the best full run is 45-75 minutes on every seed, and mean area times are inside their windows', () => {
+    const fastest = (m: number) => all({ 'ice-line': 60, 'crystal-line': 60, 'full-kit': m, greedy: 60, 'no-research': 80 });
+    expect(pass(fastest(45))[1]).toBe(true);
+    expect(pass(fastest(44.9))[1]).toBe(false);
+    expect(pass(fastest(75))[1]).toBe(true);
+    // Every researching strategy under 45 minutes: the best is outside.
+    expect(pass(all({ 'ice-line': 40, 'crystal-line': 41, 'full-kit': 42, greedy: 43, 'no-research': 80 }))[1]).toBe(false);
+    // Every strategy over 75.
+    expect(pass(all({ 'ice-line': 76, 'crystal-line': 77, 'full-kit': 78, greedy: 79, 'no-research': 90 }))[1]).toBe(false);
+    // The Deep mean at 17 minutes is over its 16 minute window.
+    const slowDeep = all(TIMES, (r) => ({ ...r, visits: r.visits.map((v) => (v.area === 'deep' ? { ...v, playTicks: 17 * MIN } : v)) }) as CampaignResult);
+    expect(pass(slowDeep)[1]).toBe(false);
+    // Landfall at 61 s is over its minute.
+    const slowLanding = all(TIMES, (r) => ({ ...r, visits: r.visits.map((v) => (v.area === 'landfall' ? { ...v, playTicks: 61 * TR } : v)) }) as CampaignResult);
+    expect(pass(slowLanding)[1]).toBe(false);
   });
 
-  it('flag 2: drones-only loses 40% more ships (exactly) or captures 20% later (exactly), in every layout', () => {
-    const f2 = (lost: Record<string, Four>, times: Record<string, Four> = base.times) => pass(results({ lost, times }))[1];
-    expect(f2(same([14, 10, 10, 10]))).toBe(true);
-    expect(f2(same([13, 10, 10, 10]))).toBe(false);
-    // The best strategy is the minimum over the other three.
-    expect(f2(same([14, 12, 10, 12]))).toBe(true);
-    expect(f2(same([14, 11, 11, 11]))).toBe(false);
-    // One layout failing the loss test is saved by capturing 20% later.
-    const lost = { ...same([14, 10, 10, 10]), glass: [10, 10, 10, 10] as Four };
-    expect(f2(lost)).toBe(false);
-    expect(f2(lost, withTimes('glass', [24 * MIN, 20 * MIN, 20 * MIN, 20 * MIN]))).toBe(true);
-    expect(f2(lost, withTimes('glass', [24 * MIN - 1, 20 * MIN, 20 * MIN, 20 * MIN]))).toBe(false);
+  it('flag 3: ice-line and crystal-line within 15% on at least 2 of 3 seeds', () => {
+    expect(pass(all({ ...TIMES, 'ice-line': 50, 'crystal-line': 57 }))[2]).toBe(true); // 14%
+    expect(pass(all({ ...TIMES, 'ice-line': 50, 'crystal-line': 58 }))[2]).toBe(false); // 16%
+    // Only one seed close.
+    const one = all(TIMES, (r) => (r.strategy === 'crystal-line' && r.seed !== 1 ? ({ ...r, playTicks: 70 * MIN } as CampaignResult) : r));
+    expect(pass(one)[2]).toBe(false);
+    // Two of three close.
+    const two = all(TIMES, (r) => (r.strategy === 'crystal-line' && r.seed === 3 ? ({ ...r, playTicks: 70 * MIN } as CampaignResult) : r));
+    expect(pass(two)[2]).toBe(true);
   });
 
-  it('flag 3: ice-first and crystal-first within 15% (of the faster) in at least 2 layouts', () => {
-    const t = (frost: number, glass: number, twin: number) => ({
-      frost: [20 * MIN, 20 * MIN, frost, 20 * MIN] as Four,
-      glass: [20 * MIN, 20 * MIN, glass, 20 * MIN] as Four,
-      twin: [20 * MIN, 20 * MIN, twin, 20 * MIN] as Four,
-    });
-    const f3 = (times: Record<string, Four>) => pass(results({ times }))[2];
-    expect(f3(t(23 * MIN, 23 * MIN, 30 * MIN))).toBe(true); // exactly 15% twice
-    expect(f3(t(23 * MIN + 1, 23 * MIN, 30 * MIN))).toBe(false);
-    expect(f3(t(20 * MIN, 20 * MIN, 20 * MIN))).toBe(true);
-    expect(f3(t(30 * MIN, 30 * MIN, 30 * MIN))).toBe(false);
+  it('flag 4: each design must be at least 20% faster on its own medium', () => {
+    expect(pass(all(), GOOD_PROBES)[3]).toBe(true);
+    expect(pass(all(), { ...GOOD_PROBES, veilFlak: 640 * TR })[3]).toBe(true); // exactly 20%
+    expect(pass(all(), { ...GOOD_PROBES, veilFlak: 641 * TR })[3]).toBe(false);
+    expect(pass(all(), { ...GOOD_PROBES, gardenLancer: 641 * TR })[3]).toBe(false);
+    // Flags the wrong way round.
+    expect(pass(all(), { ...GOOD_PROBES, veilFlak: 800 * TR, veilLancer: 600 * TR })[3]).toBe(false);
+    // A slower run that never finished counts as infinitely slow; a faster one that never finished fails.
+    expect(pass(all(), { ...GOOD_PROBES, veilLancer: null })[3]).toBe(true);
+    expect(pass(all(), { ...GOOD_PROBES, gardenLancer: null })[3]).toBe(false);
+    expect(pass(all(), null)[3]).toBe(false);
   });
 
-  it('flag 4: the faster of the two doors must not be the same in all three layouts; a tie is its own result', () => {
-    const t = (frost: Four, glass: Four, twin: Four) => ({ frost, glass, twin });
-    const iceWins: Four = [20 * MIN, 19 * MIN, 20 * MIN, 20 * MIN];
-    const crystalWins: Four = [20 * MIN, 20 * MIN, 19 * MIN, 20 * MIN];
-    const tie: Four = [20 * MIN, 20 * MIN, 20 * MIN, 20 * MIN];
-    const f4 = (times: Record<string, Four>) => pass(results({ times }))[3];
-    expect(f4(t(iceWins, iceWins, iceWins))).toBe(false);
-    expect(f4(t(crystalWins, crystalWins, crystalWins))).toBe(false);
-    expect(f4(t(iceWins, crystalWins, iceWins))).toBe(true);
-    expect(f4(t(iceWins, iceWins, tie))).toBe(true);
+  it('flag 5: no-research at least 25% slower than the best, and openings shrink to 60%', () => {
+    expect(pass(all({ ...TIMES, 'full-kit': 52, 'no-research': 65 }))[4]).toBe(true); // exactly 25%
+    expect(pass(all({ ...TIMES, 'full-kit': 52, 'no-research': 64 }))[4]).toBe(false);
+    // Last-area opening at 72 s against 120 s is exactly 60%; one second more fails.
+    const withOpening = (ticks: number) => all(TIMES, (r) => ({ ...r, visits: visits(r.reclaimOrder, { deep: ticks, veil: ticks, shelf: 120 * TR, shoal: 120 * TR }) }) as CampaignResult);
+    expect(pass(withOpening(72 * TR))[4]).toBe(true);
+    expect(pass(withOpening(72 * TR + 1))[4]).toBe(false);
+    // An opening the last area never reached cannot be compared.
+    expect(pass(withOpening(null as unknown as number))[4]).toBe(false);
   });
 
-  it('flag 5: the greedy capture order must differ in every layout', () => {
-    const f5 = (order: Record<string, string[]>) => pass(results({ order }))[4];
-    expect(f5(base.order)).toBe(true);
-    expect(f5({ frost: ['p1', 'heart'], glass: ['p1', 'heart'], twin: ['p3', 'heart'] })).toBe(false);
-    expect(f5({ frost: ['p1', 'p2', 'heart'], glass: ['p2', 'p1', 'heart'], twin: ['p1', 'heart'] })).toBe(true);
+  it('flag 6: at least two different area orders within 15% of the best on every seed', () => {
+    // greedy and no-research share an order, so ice-line, crystal-line, full-kit and greedy give 4 orders.
+    expect(pass(all({ 'ice-line': 50, 'crystal-line': 52, 'full-kit': 53, greedy: 54, 'no-research': 80 }))[5]).toBe(true);
+    // Everything else more than 15% behind the best.
+    expect(pass(all({ 'ice-line': 50, 'crystal-line': 60, 'full-kit': 61, greedy: 62, 'no-research': 80 }))[5]).toBe(false);
+    // Two strategies within 15% but with the same order count once.
+    const same = all({ 'ice-line': 50, 'crystal-line': 60, 'full-kit': 61, greedy: 52, 'no-research': 53 });
+    expect(pass(same)[5]).toBe(true); // ice-line's order and greedy's order
+    const oneOrder = all({ 'ice-line': 60, 'crystal-line': 61, 'full-kit': 62, greedy: 50, 'no-research': 52 });
+    expect(pass(oneOrder)[5]).toBe(false); // greedy and no-research share an order
   });
 
-  it('the report lines carry the numbers', () => {
-    const lines = computeDepthFlags(results(), true);
-    expect(lines[1]!.detail).toContain('lost 14 vs best 10');
-    expect(lines[4]!.detail).toContain('frost: p1 > heart');
+  it('flag 7: follows the determinism result', () => {
+    expect(pass(all(), GOOD_PROBES, true)[6]).toBe(true);
+    expect(pass(all(), GOOD_PROBES, false)[6]).toBe(false);
   });
-});
 
-describe('layout rows', () => {
-  it('group the lowest seed per layout, in layout order', () => {
-    const rs = [{ ...fake('greedy', 'glass', 1, 1, []), seed: 1 }, { ...fake('greedy', 'glass', 2, 2, []), seed: 4 }, { ...fake('greedy', 'frost', 3, 3, []), seed: 3 }];
-    expect(layoutRows(rs).map((r) => [r.variantId, r.seed, r.byStrategy['greedy']!.captureSec])).toEqual([
-      ['frost', 3, 3],
-      ['glass', 1, 1],
-    ]);
+  it('writes a detail line for every flag', () => {
+    for (const f of flagsOf(all())) expect(f.detail.length).toBeGreaterThan(0);
   });
 });

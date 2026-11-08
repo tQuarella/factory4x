@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
-**State:** Iteration 4 started 2026-11-08. Owner feedback on build-20261108-2 is in PLAYTEST_LOG.md (overworld idea). Owner picked H4 = A. Reclaim ladder (Q16). Spec done (ba817ea). Build: h4-art merged (5ca6921). h4-sim merged (caa81b1). h4-client and h4-bots building in parallel. Carry to h4-design-data: fix DESIGN.md "14 levels" (table has 13) and "under 1 KB" save growth (actual ~1.7 KB, test caps 2 KB); re-record the reference replay if guards/costs change. Can wait: Deep layout lookup duplicated in overworld.ts areaLayout and world.ts landArea. Then h4-client + h4-bots after h4-sim merges; h4-design-data as a Designer resume after h4-bots.
+**State:** Iteration 4 started 2026-11-08. Owner feedback on build-20261108-2 is in PLAYTEST_LOG.md (overworld idea). Owner picked H4 = A. Reclaim ladder (Q16). Spec done (ba817ea). Build: h4-art merged (5ca6921). h4-sim merged (caa81b1). h4-bots merged (ab8bd65). h4-client building; h4-design-data (Designer resume) calibrating in parallel. Carry to h4-design-data: fix DESIGN.md "14 levels" (table has 13) and "under 1 KB" save growth (actual ~1.7 KB, test caps 2 KB); re-record the reference replay if guards/costs change. Can wait: Deep layout lookup duplicated in overworld.ts areaLayout and world.ts landArea. Then h4-client + h4-bots after h4-sim merges; h4-design-data as a Designer resume after h4-bots.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-2 (H3 Counter web), commit a4096a7, live (CI gates and deploy green; site shows a4096a7).
@@ -22,9 +22,25 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r2 | critic | h4-art | resume | Review round 2: APPROVE; green branch CI on 34cae84; merged 5ca6921 |
 | 6 | critic | h4-sim | launch | Review round 1: APPROVE; green branch CI on 4f01607; merged caa81b1 |
 | 7 | engineer | h4-client | launch | Build |
-| 8 | engineer | h4-bots | launch | Build |
+| 8 | engineer | h4-bots | launch | Build (green, 234c1b0; flags 1,5,7 met, 2,3,4,6 missed on uncalibrated data) |
+| 10 | critic | h4-client | launch | Review round 1: REJECT (phone pause icon blank when paused; palette literals) |
+| r8 | engineer | h4-client | resume | Fix round 1 (2246c80, smoke 72/72) |
+| r10 | critic | h4-client | resume | Review round 2: REJECT (withdraw mode change lags 100 ms; flaky smoke 1 in 10) |
+| r12 | core-engineer | h4-client | resume | Fix round 2, reassigned per deadlock rule; c0aab81, smoke 74/74, withdraw repeat-each 80/80 |
+| r13 | critic | h4-client | resume | Review round 3: APPROVE (d7db3b5). Merge after h4-design-data, then merge main + branch CI |
+| r14 | core-engineer | h4-design-data | resume | Fix round 2, reassigned per deadlock rule; 8705399 |
+| r15 | critic | h4-design-data | resume | Review round 3 (reject parks it) |
+| 9 | critic | h4-bots | launch | Review round 1: REJECT (runner tests pinned to shipped data) |
+| r3 | engineer | h4-bots | resume | Fix round 1 (22c9396) |
+| r4 | critic | h4-bots | resume | Review round 2: REJECT (15-campaign unit test ~16 s, near 30 s limit) |
+| r5 | core-engineer | h4-bots | resume | Fix round 2, reassigned per deadlock rule (resumed the h4-sim core-engineer to stay within launch budget); 57d789f, test gate 6.4 s |
+| r6 | critic | h4-bots | resume | Review round 3: APPROVE; merged ab8bd65 (not browser-facing) |
+| r7 | designer | h4-design-data | resume | Calibrated (349b8b8): all 7 flags met |
+| 11 | critic | h4-design-data | launch | Review round 1: REJECT (bump dataVersion to 7; unsourced numbers) |
+| r9 | designer | h4-design-data | resume | Fix round 1 (scope widened to one test line for the v7 bump); bdaa801, dataVersion 7 |
+| r11 | critic | h4-design-data | resume | Review round 2: REJECT (one false sentence in DESIGN.md; stale test title line 125). Queued for the core-engineer after its h4-client fix (deadlock rule); round 3 reject parks it |
 
-Launches: 8 / 12. Resumes: 2. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 11 / 12. Resumes: 15. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 

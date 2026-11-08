@@ -259,7 +259,7 @@ Your probe arrives at the edge of a system broken into **areas**, asteroid clust
 2. **The grind feels like a chore (pillar 4).** Every area starts with the same build-out. If the third area feels like the first with bigger numbers, the loop has failed. Mitigations: research aims at the opening; every area differs in prize and mix; the overwhelm valve. Measurable: the bots report each area's time to first attack, which should fall from area to area.
 3. **The ladder is a line.** "Always take the easiest available area" could be the whole strategy, which is H1's "obvious" again. Mitigations: two doors per tier, prizes that differ in kind, a research tree that branches, and a bot check that at least two area orders are viable.
 4. **Session length on a phone.** An area must finish in 5–15 minutes, so most areas are smaller than the H3 field. A 30–40 minute playtest should reach 3–5 areas, including at least one meaty step.
-5. **Autosave size and sim cost.** Simulating every reclaimed area would multiply both. Reclaimed areas are summaries (integer rates per resource), one area at most is in progress, and research is a list of levels. The save should be the H3 save plus well under 1 KB. Overworld accrual uses integer per-tick accumulators, so determinism holds.
+5. **Autosave size and sim cost.** Simulating every reclaimed area would multiply both. Reclaimed areas are summaries (integer rates per resource), one area at most is in progress, and research is a list of levels. The save should be the H3 save plus about 2 KB (measured about 1.7 KB in h4-sim; a test caps the growth at 2 KB). Overworld accrual uses integer per-tick accumulators, so determinism holds.
 6. **Two gates on one ship can confuse.** "Why can't I build Lancers here?" can now mean "not researched" or "no crystal in this area". The yard row has to name which one.
 7. **Bot runs get long.** A whole campaign is many areas, longer than the 30-minute tick cap. Bots play area by area with the summary carried over, and report per area; the per-tick budget is unchanged.
 
@@ -303,7 +303,7 @@ What would disprove it:
 2. **Areas are cut from the H3 field.** Each area is the 16-node frame with some nodes left out, plus its own small layout (pocket prizes and slots, guard counts for its pockets, Root and heart) in the H3 layout format. The Deep is the full H3 field with the run's H3 layout, so it plays exactly like an H3 game.
 3. **Area lifecycle.** Land (enter), play H3 rules, then reclaim (capture the heart) or withdraw (the area resets). One area at a time. The overworld screen is paused.
 4. **A stockpile** of ore, ice and crystal on the overworld. Reclaiming an area pays its **haul** into the stockpile once. While you play any area that isn't yet reclaimed, every reclaimed area **ships** its export rates into the stockpile, in game time.
-5. **Research** (7 items, 14 levels), bought on the overworld from the stockpile: two ship designs (the meaty steps), four levelled grind items aimed at the opening, and the **probe core**, which wins the game.
+5. **Research** (7 items, 13 levels), bought on the overworld from the stockpile: two ship designs (the meaty steps), four levelled grind items aimed at the opening, and the **probe core**, which wins the game.
 6. **One rule change inside areas:** a lancer or flak yard needs its design researched **and** its component made locally. The yard row names which is missing.
 
 New inputs: `enterArea`, `leaveArea`, `buyResearch`. Nothing else in the input set changes.
@@ -336,32 +336,32 @@ What is open when:
 
 | id | name | tier | x | y | nodes | haul | export/min |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `landfall` | Landfall | 0 | 500 | 1150 | probe a1 a2 a3 a4 a5 heart | 150 / 0 / 0 | 4 / 0 / 0 |
-| `shelf` | Frost Shelf | 1 | 220 | 870 | probe a1 a2 a3 a5 p1 heart | 150 / 80 / 0 | 3 / 2 / 0 |
-| `shoal` | Glass Shoal | 1 | 780 | 870 | probe a1 a2 a4 a5 p1 heart | 150 / 0 / 80 | 3 / 0 / 2 |
-| `veil` | Spore Veil | 2 | 220 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 300 / 60 / 30 | 5 / 3 / 0 |
-| `garden` | Thorn Garden | 2 | 780 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 300 / 30 / 60 | 5 / 0 / 3 |
-| `deep` | The Deep | 3 | 500 | 200 | all 16 | 650 / 60 / 60 | 8 / 3 / 3 |
+| `landfall` | Landfall | 0 | 500 | 1150 | probe a1 a2 a3 a4 a5 heart | 100 / 0 / 0 | 4 / 0 / 0 |
+| `shelf` | Frost Shelf | 1 | 220 | 870 | probe a1 a2 a3 a5 p1 heart | 130 / 80 / 0 | 3 / 2 / 0 |
+| `shoal` | Glass Shoal | 1 | 780 | 870 | probe a1 a2 a4 a5 p1 heart | 130 / 0 / 80 | 3 / 0 / 2 |
+| `veil` | Spore Veil | 2 | 220 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 300 / 60 / 40 | 5 / 3 / 0 |
+| `garden` | Thorn Garden | 2 | 780 | 520 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 root heart | 300 / 40 / 60 | 5 / 0 / 3 |
+| `deep` | The Deep | 3 | 500 | 200 | all 16 | 720 / 60 / 60 | 8 / 3 / 3 |
 
-Totals: haul 1700 / 230 / 230, which covers every research level (1660 / 220 / 220; see "Research"). The sim's data validation enforces haul ≥ research cost per resource, so a player who takes every area can always afford the probe core, whatever they bought first. No softlock.
+Totals: haul 1680 / 240 / 240 (calibrated by h4-design-data), which covers every research level (1660 / 220 / 220; see "Research"). The sim's data validation enforces haul ≥ research cost per resource, so a player who takes every area can always afford the probe core, whatever they bought first. No softlock.
 
-**Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). Starting values, derived from the H3 layouts at about 20% (light) and 60% (medium) and then pushed toward each side's theme. h4-design-data calibrates them. The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
+**Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). First derived from the H3 layouts at about 20% (light) and 60% (medium) and pushed toward each side's theme, then calibrated by h4-design-data (see "Calibration result (h4-design-data, data v7)"). The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
 
 | Area | Node | Prize | Slots | Guards (T/S) | Tags l / f |
 | --- | --- | --- | --- | --- | --- |
 | landfall | heart | ore | 4 | 0 / 0 | none (no guards: the first ship to arrive reclaims it) |
 | shelf | p1 | ice | 2 | 0 / 4 | Weak (25) / Strong (200) |
-| shelf | heart | ore | 4 | 2 / 10 | Even (95) / Even (130) |
+| shelf | heart | ore | 4 | 2 / 12 | Even (87) / Even (137) |
 | shoal | p1 | crystal | 2 | 0 / 4 | Weak / Strong |
-| shoal | heart | ore | 4 | 5 / 3 | Strong (173) / Weak (51) |
+| shoal | heart | ore | 4 | 6 / 4 | Strong (170) / Weak (54) |
 | veil | p1 | ice | 2 | 2 / 6 | Even (117) / Even (107) |
 | veil | p2 | crystal | 2 | 2 / 6 | Even / Even |
-| veil | root | none | 0 | 0 / 12 | Weak / Strong |
-| veil | heart | ore | 4 | 3 / 30, starved 1 / 15 | Weak (68) / Strong (156); starved Weak (56) / Strong (168) |
+| veil | root | none | 0 | 0 / 16 | Weak / Strong |
+| veil | heart | ore | 4 | 1 / 50, starved 0 / 25 | Weak (35) / Strong (189); starved Weak (25) / Strong (200) |
 | garden | p1 | crystal | 2 | 1 / 12 | Weak (63) / Strong (161) |
 | garden | p2 | ice | 2 | 4 / 3 | Strong (167) / Weak (57) |
-| garden | root | none | 0 | 7 / 0 | Strong / Weak |
-| garden | heart | ore | 4 | 17 / 9, starved 9 / 4 | Strong (176) / Weak (48); starved Strong (179) / Weak (45) |
+| garden | root | none | 0 | 9 / 0 | Strong / Weak |
+| garden | heart | ore | 4 | 24 / 13, starved 11 / 5 | Strong (175) / Weak (49); starved Strong (179) / Weak (46) |
 | deep | all | as H3 | as H3 | the H3 layout tables | as H3 |
 
 How an H3 field is cut down:
@@ -376,7 +376,7 @@ Why these areas:
 - **Each side has a theme.** The ice side (Frost Shelf, Spore Veil) is held by Spore swarms; the crystal side (Glass Shoal, Thorn Garden) by Thorns. Spore Veil's heart and Root are Flak Strong; Thorn Garden's are Lancer Strong.
 - **Research decides the cheap medium.** The ice haul from the Shelf buys the Flak design, the crystal haul from the Shoal buys the Lancer design. So your first light area and your first design decide which medium is cheap. It's the owner's H3 read ("the heart is spore-heavy so go win the easiest flak node") one level up. Both mediums have both light pockets, so either design can be built in either.
 - **The probe core needs both designs and The Deep** (see Research), so every run crosses sides at some point; the order is yours.
-- **You can skip one area.** Both designs and the core need 160 ice and 160 crystal. Skipping a medium leaves 170–200 of each from hauls alone. Skipping a light area leaves 150 of its resource, and shipments close the gap of 10 if you didn't spend that resource on Fast yards. So whether to skip, and what, is a real choice. Four areas never do: one side's resource stops at 90, and nothing is left to ship during.
+- **You can skip one area, if you go light on Fast yards.** Both designs and the core need 160 ice and 160 crystal. Skipping a medium leaves 180–200 of each from hauls alone; skipping a light area leaves exactly 160 of its resource. Fast yards costs 20 then 40 more of each, so a player who buys both levels needs all six areas (hauls total 240 of each, plus shipments). Skipping is a trade-off between yard speed and one fewer area. Four areas never do: one side's resource stops at 100. In the h4-design-data bot report every strategy buys both yard levels before the core and so takes all six areas (`reports/archive/h4-design-data-v7.md`, "Skipped" column).
 
 #### Area lifecycle
 
@@ -445,7 +445,7 @@ Effects in the sim, all integer:
 Which items are which:
 - **Meaty steps:** Lancer design, Flak design, The Deep (an area, not research, but the biggest step in play), and the probe core. Seed rigs is the most visible grind item: you see the network already running when you land.
 - **The grind:** Opening ore, Extraction, Seed rigs and Fast yards, 10 levels in all, all aimed at the opening and the yard rate. Each is cheap in ore, so most overworld visits buy something.
-- **Rhythm at defaults:** Landfall's haul (150 ore) buys two grind levels before the first real area. The first light area's haul buys its design. The second design comes after area 3 or 4. The core comes after area 5 or 6. No stretch of more than two areas without a meaty step.
+- **Rhythm at defaults:** Landfall's haul (100 ore) buys one grind level (Opening ore 1) before the first real area. The first light area's haul buys its design. The second design comes after area 3 or 4. The core comes after area 5 or 6. No stretch of more than two areas without a meaty step.
 
 **Why it isn't a fixed ladder.** Two ice-side and two crystal-side runs, for example:
 - Landfall → Frost Shelf (Flak) → Spore Veil (flak-cheap) → The Deep → Glass Shoal or Thorn Garden (for crystal) → core.
@@ -463,7 +463,7 @@ The design you buy first changes which medium is cheap (bot flag 4 checks this),
   - `areas[]`, one per `map.areas` entry: `reclaimedTick` (or null), `entries`, `withdrawals`, `playTicks` (all visits), `reclaimPlayTicks` (the reclaiming visit), `shipsBuilt`, `shipsLost`.
   - `reclaimOrder`: area indices in reclaim order.
   - `research`: one level per `research` item id.
-  - `researchLog`: `{item, level, tick}` per purchase (at most 14 entries).
+  - `researchLog`: `{item, level, tick}` per purchase (at most 13 entries).
   - `stockpile` and `shipAccum`: `{ore, ice, crystal}`.
   - `totals`: `hauled` and `shipped` per resource.
   - `wonTick`: null until the probe core.
@@ -507,9 +507,9 @@ New keys, plus one changed default. Per-area numbers (guards, haul, export) and 
 
 #### Save, data version and replay
 
-- **`dataVersion` 6.** An H3 save (v5) fails the data-version check and is discarded with the existing toast ("Saved run was from an older version; starting fresh"). **No migration:** an H3 save is one field mid-game, and there's no honest way to map it onto a campaign. The owner loses one H3 run, which is a finished test.
-- **The save** is the world snapshot with `campaign` added (under 1 KB more than an H3 save) plus the client's input log, as now. `deserializeWorld` also checks the campaign's shape.
-- **The log grows over a campaign.** A full run is about 60–75 game minutes, or 110–135k ticks. The client stores inputs only (a few thousand), so the save stays well under 1 MB. A feedback replay re-runs the whole campaign; that's a few seconds in the browser. If it gets slow, area-boundary checkpoints are a follow-up, not H4 scope.
+- **`dataVersion` 7** (6 when h4-sim shipped; bumped by h4-design-data because the calibration changed area defaults, and a v6 save or replay must not load silently against different numbers). An H3 save (v5), or an H4 save made on v6 data, fails the data-version check and is discarded with the existing toast ("Saved run was from an older version; starting fresh"). **No migration:** an H3 save is one field mid-game, and there's no honest way to map it onto a campaign. The owner loses one H3 run, which is a finished test.
+- **The save** is the world snapshot with `campaign` added (about 1.7 KB more than an H3 save, measured in h4-sim; a test caps it at 2 KB) plus the client's input log, as now. `deserializeWorld` also checks the campaign's shape.
+- **The log grows over a campaign.** In the h4-design-data bot report (`reports/archive/h4-design-data-v7.md`) a full run takes 45:47–50:47 game minutes for the researching strategies and up to 67:46 for no-research, about 82–122k ticks at 30 ticks per second. The client stores inputs only (a few thousand), so the save stays well under 1 MB. A feedback replay re-runs the whole campaign; that's a few seconds in the browser. If it gets slow, area-boundary checkpoints are a follow-up, not H4 scope.
 - **The reference replay** is regenerated. It covers: landing in Landfall and reclaiming it; buying research (opening, extraction); landing in Frost Shelf; a withdraw; landing again (the opening includes the research); a pocket capture and a heart capture; leaving. It may use `setTunable` (for example `guard.capPct` 25) to stay short. The probe core and the win are covered by unit tests from `campaignWorld`. The determinism gate's run must land in an area (not idle on the overworld), and its hashes are re-baselined.
 
 #### What changes for H3 content
@@ -660,6 +660,65 @@ Reaching the probe core is a bonus in this session, not a criterion. A second se
 1. Did getting stronger between areas feel good? Which upgrade did you notice when you landed in the next area?
 2. After each area, was there more than one sensible next area? What decided it: a design you had, a prize, or the guard mix?
 3. Did your third or fourth area feel like a fresh puzzle or a repeat of the first? Was there a moment that felt like a big step?
+
+#### Calibration result (h4-design-data, data v7)
+
+Sources:
+- **Before:** `reports/archive/h4-bots-data-v6.md`, the h4-bots report on the data as first specced.
+- **After:** `reports/archive/h4-design-data-v7.md`, the current data (v7).
+
+Both are `npm run bots -- --seeds 3`. Seeds pick The Deep's layout: 1 Glass Thicket, 2 Twin Seams, 3 Frost Gate. Times are game minutes of play.
+
+Only data in `map.areas` changed. Research costs, tunables and the sim are unchanged. `dataVersion` goes from 6 to 7: the save format is the same, but the area defaults changed, and the deployed build already serves v6 with the old values. Without the bump, a v6 save or feedback replay would load silently against different data. With it, an old save is discarded with the existing toast.
+
+| Area | Change | Why |
+| --- | --- | --- |
+| Spore Veil | haul crystal 30 → 40 | lets the ice side afford the Lancer design (40 crystal) before The Deep (flags 3 and 6) |
+| Thorn Garden | haul ice 30 → 40 | the same for the crystal side and the Flak design |
+| Spore Veil | heart 3/30 (starved 1/15) → 1/50 (0/25); Root 0/12 → 0/16 | Flak vs Lancer gap (flag 4) and a longer medium (flag 2) |
+| Thorn Garden | heart 17/9 (starved 9/4) → 24/13 (11/5); Root 7/0 → 9/0 | a longer medium (flag 2), keeping the Lancer lead |
+| Frost Shelf | heart 2/10 → 2/12 | a slightly longer light area (flag 2), staying inside the 4–9 min band |
+| Glass Shoal | heart 5/3 → 6/4 | the same |
+| Landfall, Frost Shelf, Glass Shoal | haul ore 150 → 100, 130, 130 | slows the early grind purchases, which lengthens the first areas (flag 2) |
+| The Deep | haul ore 650 → 720 | keeps total ore hauls (1680) above total research ore (1660) |
+
+**Flags, per seed (before → after):**
+
+| Flag | Seed 1 | Seed 2 | Seed 3 | Result |
+| --- | --- | --- | --- | --- |
+| 1. No softlock | 15/15 runs bought the core → 15/15 | | | met → met |
+| 2. Best run 45–75 min | 37.0 → 47.6 | 36.2 → 45.9 | 35.9 → 45.8 | missed → met |
+| 2. Mean area times in band | The Deep 17:19 (over 16:00) → 15:42 | | | missed → met |
+| 3. ice-line vs crystal-line gap | 24% → 1% | 22% → 1% | 19% → 1% | missed → met |
+| 4. Veil: Flak faster than Lancer by | 15% → 44% | (seed 1 only) | | missed → met |
+| 4. Garden: Lancer faster than Flak by | 31% → 35% | | | met → met |
+| 5. no-research slower than best by | +83% → +42% | +81% → +43% | +83% → +44% | met → met |
+| 6. Orders within 15% of best | 1 → 4 | 1 → 4 | 1 → 4 | missed → met |
+| 7. Determinism and replay | met → met | | | met → met |
+
+Per-seed best runs (after): seed 1 ice-line 47:36, seed 2 ice-line 45:54, seed 3 ice-line 45:47. crystal-line is 34 s behind on each seed.
+
+Mean area times (after):
+
+| Area | Band | Mean |
+| --- | --- | --- |
+| Landfall | ≤ 1:00 | 0:11 |
+| Frost Shelf | 4:00–9:00 | 8:08 |
+| Glass Shoal | 4:00–9:00 | 7:41 |
+| Spore Veil | 6:00–13:00 | 9:04 |
+| Thorn Garden | 6:00–13:00 | 10:29 |
+| The Deep | 8:00–16:00 | 15:42 (seed 1, Glass Thicket: 16:50) |
+
+The shipped share is 25–29% for the researching strategies and 36–37% for no-research.
+
+What the numbers say:
+- **Flags 3 and 6 were one problem: the ice side met The Deep without Lancers.** Before the change, ice-line's Deep took 22:27–25:32 against crystal-line's 14:01–15:05. Ten more crystal in Spore Veil's haul lets ice-line buy the Lancer design after Spore Veil. Its Deep now takes 14:31–16:20, the same as crystal-line's.
+- **Medium areas are mostly economy-bound for the bots.** The medium hearts grew by 42% to 55%: Thorn Garden's from 26 to 37 guards (+42%) and Spore Veil's from 33 to 51 (+55%). Yet the mean times moved only from 8:58 to 9:04 (Spore Veil) and from 9:57 to 10:29 (Thorn Garden), comparing the two reports. That fits the bots building their economy first and then attacking. Intermediate runs (not committed) pointed the same way: the smaller early ore hauls, which delay the early grind, carried most of the run-length gain.
+- **Margins are thin.**
+  - The best run clears 45 min by 0.9 min on seed 2 (45:54) and 0.8 min on seed 3 (45:47).
+  - The Deep's mean (15:42) is inside 16:00, but Glass Thicket alone is 16:50. The Deep is the H3 layouts unchanged; making it shorter would mean retuning the H3 tables, which I left alone.
+- **No bot skips an area now.** The bots buy both Fast yards levels (60 ice and 60 crystal) before the core, so they need all six hauls. Skipping is still possible for a player who skips Fast yards; it isn't exercised by any strategy.
+- **The reference replay wasn't re-recorded.** Flag 7 and the determinism gate pass on the new data as is.
 
 #### Out of scope for H4
 
