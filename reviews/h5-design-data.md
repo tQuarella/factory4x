@@ -32,3 +32,21 @@ Notes (not blocking; for the backlog, `cw-*`):
 This is round 1.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+What changed since round 1: one merge commit, d6eb972, which merges `origin/task/h5-bots` (561a42b) into this branch. `git diff 415df00 d6eb972` touches only `reviews/h5-bots.md` (+27 lines, my h5-bots round 2), and that file now ends in `VERDICT: APPROVE`. No code or data changed, so my round 1 assessment of the calibration still stands.
+
+Gates: I ran `npm run gates -- --base main` myself on d6eb972. typecheck, lint, test, determinism, bots (48.3 s, the suite and the probe) and protected-files all PASS. `git merge-tree` against current `main` shows no conflicts. When `merge-task h5-design-data` runs, both tasks reach `main` with their approvals and a green bots gate, as the merge path requires.
+
+Round 1 required change: done.
+
+The round 1 notes stay open, and the Director has accepted them for the handoff and a `cw-*` item:
+- the bots win through Root cuts and so don't test the mix claim;
+- the starved Spore Veil heart's tags read Even/Even where the waves say flak is Strong;
+- Twin Seams tag accuracy is 36 of 42;
+- a full run is about 40 minutes.
+
+This is round 2.
+
+VERDICT: APPROVE
