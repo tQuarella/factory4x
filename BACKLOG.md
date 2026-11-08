@@ -104,7 +104,7 @@ Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait 
 | --- | --- | --- | --- |
 | h2-sim | Root node, supply link and wilt, starved Bloom, three variants, new tunables, data v3 | core-engineer | **Merged** dfdf62a (approved round 1) |
 | h2-art | Root, vine and wilting-thorn draw functions; gallery; ART_STYLE | art-direction | **Merged** 6176e1f (approved round 2) |
-| h2-client | Root sheet, vine and wilt on the map, banner and toasts, result panel, tuning, H1 carry-overs | engineer | Building |
+| h2-client | Root sheet, vine and wilt on the map, banner and toasts, result panel, tuning, H1 carry-overs | engineer | **Merged** 624b1e0 (approved round 2) |
 | h2-bots | raid-supply strategy, per-variant report and depth flags | engineer | **Merged** 3f5d5d1 (approved round 1) |
 
 ### h2-sim (core-engineer)
