@@ -86,10 +86,18 @@ export interface RunOptions {
   campaignCapTicks: number;
   /** Stop (outcome 'won' is not set; the caller reads the visits) after this many reclaims in this run. */
   stopAfterReclaims?: number;
+  /** H5: set `fleet.cap` to this with a setTunable on the first step (undefined: the data's default). */
+  fleetCap?: number;
 }
 
+/**
+ * h5-sim: the H4 strategies play H4's rules, so they run with fleet.cap 0 (no fleet limit; DESIGN.md H5
+ * "The A/B switch"). h5-bots replaces them with the H5 composer strategies, which play the limit.
+ */
+export const H4_FLEET_CAP = 0;
+
 export function defaultRunOptions(data: SimData, visitCapTicks: number): RunOptions {
-  return { visitCapTicks, campaignCapTicks: CAMPAIGN_CAP_MIN * 60 * data.tickRate };
+  return { visitCapTicks, campaignCapTicks: CAMPAIGN_CAP_MIN * 60 * data.tickRate, fleetCap: H4_FLEET_CAP };
 }
 
 function percentile(sorted: Float64Array, p: number): number {
@@ -126,6 +134,7 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
   let reclaims = 0;
   let outcome: Outcome = 'timeout';
   let error: string | undefined;
+  let firstInputs: Input[] = opts.fleetCap === undefined ? [] : [{ type: 'setTunable', key: 'fleet.cap', value: opts.fleetCap }];
 
   const finishVisit = (result: 'reclaimed' | 'withdrawn'): void => {
     if (visit === null) return;
@@ -178,6 +187,10 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
           break;
         }
         inputs = [input];
+      }
+      if (firstInputs.length > 0) {
+        inputs = [...firstInputs, ...inputs];
+        firstInputs = [];
       }
       const t0 = performance.now();
       step(world, data, inputs);
@@ -283,6 +296,7 @@ export function runFlag4Probes(data: SimData, visitCapTicks: number, seed = 1): 
       visitCapTicks,
       campaignCapTicks: visitCapTicks,
       stopAfterReclaims: 1,
+      fleetCap: H4_FLEET_CAP,
     });
     return reclaimVisit(r, area)?.playTicks ?? null;
   };

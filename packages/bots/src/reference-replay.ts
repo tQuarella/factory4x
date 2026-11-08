@@ -6,7 +6,7 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  * system. H4 (DESIGN.md "Save, data version and replay"): a campaign from
  * createWorld. It uses every Input type, and live tuning (setTunable,
  * including guard.capPct 50, research.costPct 25 and shipments.pct 300)
- * speeds it up so that, before tick 6000:
+ * speeds it up so that, before tick 6000 (H5: fleet.cap is 0, no limit, until Thorn Garden):
  *
  *   - Landfall (area 0): land, one drone takes the empty heart (reclaim, haul), leave.
  *   - Overworld: buy Opening ore 1 and Extraction 1. Land in Frost Shelf (area 1), queue
@@ -15,15 +15,19 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - Buy the Flak design; Spore Veil (area 3): the lancer yard is switched on but has no design
  *     (the design gate), a lone drone is repelled at the heart, drones take p1 (ice) and p2 (crystal),
  *     plating and flak are made, a mixed wave cuts the Root (the heart wilts and starves) and takes the heart.
- *   - Buy the Lancer design; Thorn Garden (area 4): both component yards take turns (rule 5b
- *     round-robin), lancers and flak cut the Root and take the heart.
- *   - Buy Seed rigs 1 and Fast yards 1; land in The Deep (area 5): A1 lands rigged, ships build faster.
+ *   - H5: set fleet.cap 4 and buy Command limit 1 (Frost Shelf, tier 1, is reclaimed): the limit is 4 + 6 = 10.
+ *     Buy the Lancer design; Thorn Garden (area 4) lands with the limit 10. Drones take p2 and p1, and the
+ *     yards pause at the limit (fleetFull). Six drones are recycled at p1 (ore refunded); in the freed slots
+ *     both component yards take turns (rule 5b round-robin), and lancers, flak and drones cut the Root and
+ *     take the heart. Every Garden battle records capAtSend 10.
+ *   - Buy Seed rigs 1 and Fast yards 1; land in The Deep (area 5): A1 lands rigged, ships build faster,
+ *     and the yards fill the limit again.
  *
  * One input is invalid on purpose (buyResearch inside an area) and must be ignored. Node indices are per
  * area (the area's nodes in frame order): Landfall 0 probe, 1-5 a1-a5, 6 heart; Frost Shelf 0 probe,
  * 1 a1, 2 a2, 3 a3, 4 a5, 5 p1, 6 heart; Spore Veil and Thorn Garden 0 probe, 1-7 a1-a7, 8 p1, 9 p2,
  * 10 root, 11 heart; The Deep the H3 indices (seed 20261106 gives Frost Gate). Research items:
- * 0 lancer, 1 flak, 2 opening, 3 extract, 4 rigs, 5 yards, 6 core.
+ * 0 lancer, 1 flak, 2 opening, 3 extract, 4 rigs, 5 yards, 6 core, 7 fleet (Command limit).
  *
  * It runs on the shipped data, so a calibration that changes areas, research costs or guards can break
  * the script (packages/sim/test/reference-replay.test.ts says so). The tunables it depends on are set at
@@ -66,6 +70,8 @@ export const referenceReplay: Replay = {
       // Cheap research, generous shipments.
       { type: 'setTunable', key: 'research.costPct', value: 25 },
       { type: 'setTunable', key: 'shipments.pct', value: 300 },
+      // H5: no fleet limit until Thorn Garden (H4's rules, the A/B), so the H4 part plays as recorded.
+      { type: 'setTunable', key: 'fleet.cap', value: 0 },
       // Landfall, and in the same tick its first extractor and route.
       { type: 'enterArea', area: 0 },
       { type: 'buildExtractor', node: 1 },
@@ -106,15 +112,26 @@ export const referenceReplay: Replay = {
     ...at(2444, { type: 'sendShips', from: 5, to: 10, counts: SEND_ALL }, { type: 'sendShips', from: 9, to: 10, counts: SEND_ALL }),
     ...at(2939, { type: 'sendShips', from: 5, to: 11, counts: SEND_ALL }, { type: 'sendShips', from: 10, to: 11, counts: SEND_ALL }),
     ...at(3001, { type: 'leaveArea' }),
-    // Lancer design (paid with the Veil's crystal), then Thorn Garden: both component yards run.
-    ...at(3002, { type: 'buyResearch', item: 0 }, { type: 'enterArea', area: 4 }),
+    // H5: a small fleet limit (4), Command limit 1 (+6: the limit is 10), the Lancer design (paid with the Veil's
+    // crystal), then Thorn Garden: both component yards run, up to the limit.
+    ...at(
+      3002,
+      { type: 'setTunable', key: 'fleet.cap', value: 4 },
+      { type: 'buyResearch', item: 7 },
+      { type: 'buyResearch', item: 0 },
+      { type: 'enterArea', area: 4 },
+    ),
     ...at(3003, { type: 'buildExtractor', node: 1 }, { type: 'buildRoute', from: 1, to: 0 }, { type: 'setRally', node: 5 }),
     ...at(3375, { type: 'sendShips', from: 5, to: 9, counts: SEND_ALL }),
     ...at(3451, { type: 'buildRoute', from: 9, to: 0 }),
     ...at(3944, { type: 'sendShips', from: 5, to: 8, counts: SEND_ALL }, { type: 'sendShips', from: 9, to: 8, counts: SEND_ALL }),
     ...at(4021, { type: 'buildRoute', from: 8, to: 0 }),
+    // H5: the fleet has been full (10/10) since the p2 fight, so the yards are paused. Recycle six drones at p1
+    // (refunded in ore); the freed slots go to lancers and flak as their components come in.
+    ...at(4500, { type: 'recycleShips', node: 8, counts: counts(6, 0, 0) }),
     ...at(4949, { type: 'sendShips', from: 5, to: 10, counts: SEND_ALL }, { type: 'sendShips', from: 8, to: 10, counts: SEND_ALL }),
-    ...at(5759, { type: 'sendShips', from: 5, to: 11, counts: SEND_ALL }, { type: 'sendShips', from: 10, to: 11, counts: SEND_ALL }),
+    // Everything is at the Root now (the yards are paused at the limit, so nothing waits at a5): it takes the heart.
+    ...at(5759, { type: 'sendShips', from: 10, to: 11, counts: SEND_ALL }),
     ...at(5821, { type: 'leaveArea' }),
     // Seed rigs 1 and Fast yards 1, then The Deep: A1 lands mined and routed, so its route can be upgraded at once.
     ...at(5822, { type: 'buyResearch', item: 4 }, { type: 'buyResearch', item: 5 }, { type: 'enterArea', area: 5 }),

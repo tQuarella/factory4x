@@ -1,10 +1,10 @@
 /**
- * @factory4x/sim — the deterministic game simulation (DESIGN.md H1, H2's Root and supply, H3 "Counter web"
- * and H4 "Reclaim ladder": the campaign of areas around them).
+ * @factory4x/sim — the deterministic game simulation (DESIGN.md H1, H2's Root and supply, H3 "Counter web",
+ * H4 "Reclaim ladder": the campaign of areas around them, and H5 "Fleet cap").
  *
  * PUBLIC API. The client, bots and tests depend only on what this file
  * exports. Treat it as stable: add, don't rename or remove, without a
- * DECISIONS.md entry (the H3 changes are logged under "h3-sim", the H4 ones under "h4-sim").
+ * DECISIONS.md entry (the H3 changes are logged under "h3-sim", the H4 ones under "h4-sim", the H5 ones under "h5-sim").
  *
  * Lifecycle
  *   defaultData                     validated data/sim.json (tunables, map.nodes, map.layouts, map.areas, map.lanes, research).
@@ -28,7 +28,8 @@
  * Campaign (H4; world.campaign, plain JSON). Areas, lanes and research are indexed in data order.
  *   campaign.active                 index into data.map.areas of the area being played, or null on the overworld.
  *   campaign.areaStartTick          tick of the current landing; area times are tick − areaStartTick.
- *   campaign.areas[i]               {reclaimedTick, entries, withdrawals, playTicks, reclaimPlayTicks, shipsBuilt, shipsLost}.
+ *   campaign.areas[i]               {reclaimedTick, entries, withdrawals, playTicks, reclaimPlayTicks, shipsBuilt, shipsLost,
+ *                                   shipsRecycled, oreRefunded} (H5: the recycle totals, recorded with shipsBuilt).
  *   campaign.reclaimOrder, research {id: level}, researchLog [{item, level, tick}], stockpile, shipAccum,
  *   totals {hauled, shipped}, wonTick (non-null after the probe core: only setTunable is valid then).
  *   The area fields (stock, nodes, routes, ships, guardians, yards, stats, capturedTick, ...) hold the active
@@ -50,6 +51,14 @@
  *   sendShips{from,to,counts}       counts = {drone, lancer, flak}, each an integer ≥ 0, clamped to the ships of
  *                                   that type at `from` (pass shipsAtByType(world, from) or SEND_ALL to send all).
  *                                   Valid if from ≠ to and the clamped total is ≥ 1.
+ *   recycleShips{node,counts}       H5: scrap ships parked at `node` (not in transit), counts clamped as sendShips,
+ *                                   lowest ids first. Valid at any node but a living guarded node, if the clamped
+ *                                   total is ≥ 1 (also while fleet.cap is 0). Each ship adds
+ *                                   floor(ship.<type>.cost × fleet.recycleRefundPct / 100) ore to stock; its
+ *                                   component is lost. stats.shipsRecycled (per type) and stats.oreRefunded count it.
+ *   buyResearch{item}               H5: also invalid for the Command limit (`fleet`, kind 'limit') while fleet.cap is 0,
+ *                                   and checks {tier, count} requirements (≥ count reclaimed areas of tier ≥ tier).
+ *                                   A requirement's `atLevel` limits it to that level.
  *   isValidInput(world, data, input)   would `step` accept it now? (grey out buttons with this)
  *   inputCost(world, input)            ore the build order would lock if queued now (0 for non-builds).
  *   clampSendCounts(world, from, counts)   what a sendShips order would really send.
@@ -62,6 +71,14 @@
  *   world.stock = {ore, ice, crystal, lens, plating}; world.yards and world.assemblers are at the probe.
  *   Yards (rule 5b): lancer and flak start before drones and take turns (world.yardTurn indexes YARD_ROTATION:
  *   the component yard tried first; each start passes the turn on), so neither starves the other when ore is short.
+ *
+ * Fleet limit (H5; derived, never stored)
+ *   fleetCap(world)                 fleet.cap + Command limit level × research.fleet.step, or null when fleet.cap is 0
+ *                                   (no limit: exactly H4's rules).
+ *   fleetCount(world)               world.ships (parked, in transit, fighting) + yards with a ship in progress.
+ *   A yard starts only while fleetCount < fleetCap (recomputed after each start in the tick); a yard held by the
+ *   limit keeps its round-robin turn. Ships are never removed to meet the limit (lowering fleet.cap live only
+ *   pauses the yards). Battle.capAtSend (and so BattleResult/lastBattle) is the limit the wave was sent at, or null.
  *
  * Selectors (read-only; rates needing a decimal are in tenths, `…X10`)
  *   isCaptured(world), isRootCut(world)   heart captured? / Root cut?
@@ -77,7 +94,10 @@
  *   queueStatus(world)              unpaid orders, reserved ore, active build progress.
  *   yardStatus(world)               Yards block: per type on/off, unlocked (resource delivered here), researched (design),
  *                                   progress, cost, component, state ('building' | 'needsDesign' | 'noSource' | 'off' |
- *                                   'needsComponent' | 'needsOre' | 'ready'); rally; probe mining.
+ *                                   'fleetFull' | 'needsComponent' | 'needsOre' | 'ready'); rally; probe mining.
+ *   fleetStatus(world, data)        H5: {cap (null = off), count, building, byType, buildingByType, full, level, maxLevel}
+ *                                   for the fleet chip and "Fleet 9/12 · Command limit 1/3".
+ *   recycleRefund(world, counts)    H5: ore those counts would refund, as given (pass clampSendCounts(world, node, c)).
  *   assemblerStatus(world)          Assembly block: per component stock/cap, recipe, progress, state
  *                                   ('making' | 'full' | 'needsInput' | 'needsOre' | 'ready').
  *   guardianStatus(world, node)     a guarded node's sheet: prize, slots, rate, guard rows per type (count, cap,
@@ -93,7 +113,8 @@
  *   lastBattle(world, node)         the last finished battle there (toasts): guards at start, ships engaged/lost
  *                                   by type, guards killed by type; a Root capture carries `wilt` {from, to}.
  *                                   world.lastBattle is the latest at any node.
- *   runSummary(world)               heart capture time, capture order, ships built/lost by type, waves, ore spent,
+ *   runSummary(world)               heart capture time, capture order, ships built/lost/recycled by type, ore refunded,
+ *                                   waves, ore spent,
  *                                   layout, Root cut, withered, delivered and first-delivered per resource, per target.
  *                                   Every `…Sec` is area-relative (since the landing); `…Tick` fields are world ticks.
  *   campaignStatus(world, data)     overworld HUD: active area, stockpile, shipPerMinX10, shipping, reclaimed count,
@@ -102,10 +123,11 @@
  *                                   lanes, haul, export, guarded nodes (caps, starved caps), hasRoot, heartTags
  *                                   {lancer, flak} with `researched`, and the visit record.
  *   researchStatus(world, data)     research sheet rows: level/max, next cost (after research.costPct), affordable,
- *                                   missing {resources, items, areas}, canBuy, effect and nextEffect (numbers).
- *   landingEffects(world)           openingOre, rigNodes, extractPct, yardTimePct, designs (the landing notice).
+ *                                   missing {resources, items, areas, tiers [{tier, count, have}], capOff}, canBuy,
+ *                                   effect and nextEffect (numbers; the fleet row's are fleet limits, 0 while off).
+ *   landingEffects(world)           openingOre, rigNodes, extractPct, yardTimePct, designs, fleetCap (the landing notice).
  *   campaignSummary(world, data)    win panel / bots: per area records, reclaim order, research order, total play
- *                                   ticks, ships built/lost, hauled and shipped.
+ *                                   ticks, ships built/lost/recycled, ore refunded, hauled and shipped.
  *   isAreaOpen(world, data, area), isWon(world), yardBuildTicks(world, type), extractPct(world), yardTimePct(world).
  *   nodeDistance(world, a, b)       integer distance used for routes and travel.
  *   heartIndex(world), rootIndex(world), PROBE   node index of the heart / the Root / the probe (always 0).
@@ -145,6 +167,8 @@ export {
   TUNABLE_KEYS,
   YARD_ORDER,
   YARD_ROTATION,
+  appliesAtLevel,
+  isTierRequirement,
   parseSimData,
   tunableMeta,
 } from './data.ts';
@@ -192,7 +216,7 @@ export {
   yardBuildTicks,
   yardTimePct,
 } from './campaign.ts';
-export type { CampaignStart } from './campaign.ts';
+export type { CampaignStart, TierShortfall } from './campaign.ts';
 export { areaStatus, campaignStatus, campaignSummary, landingEffects, researchEffect, researchStatus } from './overworld.ts';
 export type {
   AreaGuardedNode,
@@ -250,6 +274,8 @@ export type {
 export { clampSendCounts, inputCost, isValidInput } from './inputs.ts';
 export type { Input } from './inputs.ts';
 export { counterPct, step } from './step.ts';
+export { fleetCap, fleetCount, fleetStatus, isFleetFull, recycleRefund } from './fleet.ts';
+export type { FleetStatus } from './fleet.ts';
 export { replayHashes, worldHash } from './replay.ts';
 export type { Replay } from './replay.ts';
 export { deserializeWorld, serializeWorld } from './save.ts';

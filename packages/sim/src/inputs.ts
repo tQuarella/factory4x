@@ -1,12 +1,13 @@
 import { buyResearch, canBuyResearch, isAreaOpen, isWon, leaveActive } from './campaign.ts';
 import { SHIP_TYPES, isSimTunableKey, type ShipType, type SimData, type TunableKey } from './data.ts';
+import { fleetCap, recycleRefundEach } from './fleet.ts';
 import { ceilDiv } from './math.ts';
 import { PROBE, guardianAt, isGuarded, landArea, nodeDistance, routeFrom, type ShipTypeCounts, type World } from './world.ts';
 
 /**
  * Player intent (DESIGN.md H1 "Player inputs", with the H3 changes: the yard
- * toggle and the send order take ship types; and H4: the three campaign
- * inputs). Node parameters are node indices into the active area's nodes.
+ * toggle and the send order take ship types; H4: the three campaign
+ * inputs; H5: recycleShips). Node parameters are node indices into the active area's nodes.
  * Inputs are the only way the outside world changes the sim, and every one is
  * recorded in a replay's input log.
  */
@@ -25,6 +26,12 @@ export type Input =
   | { type: 'setShipyard'; shipType: ShipType; on: boolean }
   /** Each count is clamped to the ships of that type at `from`; the lowest-id ships of each type go. */
   | { type: 'sendShips'; from: number; to: number; counts: ShipTypeCounts }
+  /**
+   * H5: scrap ships parked at `node` for part of their ore. Each count is clamped to the ships of that type parked
+   * there (not in transit); the lowest-id ships of each type go. Valid in an area, before the win, at a node that
+   * isn't a living guarded node, if the clamped total is at least 1.
+   */
+  | { type: 'recycleShips'; node: number; counts: ShipTypeCounts }
   | { type: 'setRally'; node: number }
   | { type: 'setTunable'; key: TunableKey; value: number };
 
@@ -142,6 +149,11 @@ function validAreaInput(world: Readonly<World>, input: Input): boolean {
       const c = clampSendCounts(world, input.from, input.counts);
       return c.drone + c.lancer + c.flak >= 1;
     }
+    case 'recycleShips': {
+      if (!isIndex(world, input.node) || isGuarded(world, input.node) || !validCounts(input.counts)) return false;
+      const c = clampSendCounts(world, input.node, input.counts);
+      return c.drone + c.lancer + c.flak >= 1;
+    }
     case 'setRally':
       return isIndex(world, input.node);
     default:
@@ -219,7 +231,25 @@ export function applyInput(world: World, data: SimData, input: Input): void {
       if (target !== null && target.alive) {
         target.wavesSent++;
         world.stats.wavesSent++;
+        // H5: a running battle takes the limit this wave was sent at.
+        if (target.battle !== null) target.battle.capAtSend = fleetCap(world);
       }
+      return;
+    }
+    case 'recycleShips': {
+      const left = clampSendCounts(world, input.node, input.counts);
+      let refund = 0;
+      // Ships are in id order, so the first of each type found are the lowest ids.
+      const kept = world.ships.filter((s) => {
+        if (s.at !== input.node || left[s.type] === 0) return true;
+        left[s.type] -= 1;
+        refund += recycleRefundEach(world, s.type);
+        world.stats.shipsRecycled[s.type] += 1;
+        return false;
+      });
+      world.ships = kept;
+      world.stock.ore += refund;
+      world.stats.oreRefunded += refund;
       return;
     }
     case 'setRally':

@@ -14,6 +14,7 @@ import {
   type Tunables,
 } from './data.ts';
 import { designResearched, extractPct, yardBuildTicks } from './campaign.ts';
+import { isFleetFull } from './fleet.ts';
 import { shipsAtByType } from './inputs.ts';
 import { counterPct, deliveredInWindow, perExtractorPerMin, prizeInWindow, reservedOre } from './step.ts';
 import {
@@ -256,11 +257,13 @@ export function queueStatus(world: Readonly<World>): QueueStatus {
  * progress); H4 'needsDesign' (lancer or flak design not researched: it can't
  * run, on or off); H4 'noSource' (no component in stock and no node in this
  * area yields its input, so it can never get one here: "No crystal here");
- * 'off'; 'needsComponent' ("idle: needs lens"; the scarce input);
+ * 'off'; H5 'fleetFull' (on and idle, but the fleet is at its limit: "idle:
+ * fleet full (12/12)", before any component or ore reason); 'needsComponent'
+ * ("idle: needs lens"; the scarce input);
  * 'needsOre' ("idle: needs ore"); 'ready' (on, idle and affordable: it starts
  * on the next tick).
  */
-export type YardState = 'building' | 'needsDesign' | 'noSource' | 'off' | 'needsComponent' | 'needsOre' | 'ready';
+export type YardState = 'building' | 'needsDesign' | 'noSource' | 'off' | 'fleetFull' | 'needsComponent' | 'needsOre' | 'ready';
 
 export interface YardRow {
   type: ShipType;
@@ -295,6 +298,7 @@ export function yardStatus(world: Readonly<World>): YardStatus {
   const t = world.tun;
   const free = world.stock.ore - reservedOre(world);
   const unlocked = unlockStatus(world).ships;
+  const full = isFleetFull(world);
   const yards = SHIP_TYPES.map((type): YardRow => {
     const y = world.yards[type];
     const cost = t[`ship.${type}.cost`];
@@ -306,6 +310,7 @@ export function yardStatus(world: Readonly<World>): YardStatus {
     else if (!researched) state = 'needsDesign';
     else if (!source) state = 'noSource';
     else if (!y.on) state = 'off';
+    else if (full) state = 'fleetFull';
     else if (component !== null && world.stock[component] < 1) state = 'needsComponent';
     else if (free < cost) state = 'needsOre';
     else state = 'ready';
@@ -700,6 +705,10 @@ export interface RunSummary {
   shipsBuiltByType: ShipTypeCounts;
   shipsLost: number;
   shipsLostByType: ShipTypeCounts;
+  /** H5: ships recycled in this visit (total and by type) and the ore they refunded ("Recycled: 5 ships (+40 ore)"). */
+  shipsRecycled: number;
+  shipsRecycledByType: ShipTypeCounts;
+  oreRefunded: number;
   wavesSent: number;
   firstShipTick: number | null;
   oreSpentShips: number;
@@ -754,6 +763,9 @@ export function runSummary(world: Readonly<World>): RunSummary {
     shipsBuiltByType: { ...st.shipsBuilt },
     shipsLost: sumShips(st.shipsLost),
     shipsLostByType: { ...st.shipsLost },
+    shipsRecycled: sumShips(st.shipsRecycled),
+    shipsRecycledByType: { ...st.shipsRecycled },
+    oreRefunded: st.oreRefunded,
     wavesSent: st.wavesSent,
     firstShipTick: st.firstShipTick,
     oreSpentShips: st.oreSpentShips,

@@ -141,6 +141,12 @@ export interface Battle {
   lostByType: ShipTypeCounts;
   guardsKilled: number;
   killedByType: GuardCounts;
+  /**
+   * H5: the fleet limit (fleetCap) when the wave was sent, or null when the limit is off (the repelled hint).
+   * Set when the battle starts and refreshed by every attack order on this node while it runs; research is
+   * never bought inside an area, so it differs from the limit at send time only after live tuning.
+   */
+  capAtSend: number | null;
 }
 
 export type BattleOutcome = 'captured' | 'repelled' | 'withdrew';
@@ -222,6 +228,9 @@ export interface Stats {
   oreSpentShips: number;
   oreSpentEconomy: number;
   oreSpentComponents: number;
+  /** H5: ships scrapped by recycleShips, by type (not counted as lost), and the ore they refunded. */
+  shipsRecycled: ShipTypeCounts;
+  oreRefunded: number;
   /** Tick the Root was captured, or null. */
   rootCutTick: number | null;
   /** Every capture, in order. The heart's also sets `world.capturedTick`. */
@@ -253,6 +262,9 @@ export interface AreaRecord {
   /** Ships built and lost here while it was held, over every visit. */
   shipsBuilt: number;
   shipsLost: number;
+  /** H5: ships recycled here while it was held, and the ore they refunded, over every visit (recorded as shipsBuilt is). */
+  shipsRecycled: number;
+  oreRefunded: number;
 }
 
 /** One research purchase, in order. `item` is the research item id. */
@@ -486,6 +498,8 @@ function freshStats(data: SimData): Stats {
     oreSpentShips: 0,
     oreSpentEconomy: 0,
     oreSpentComponents: 0,
+    shipsRecycled: zeroShips(),
+    oreRefunded: 0,
     rootCutTick: null,
     captures: [],
   };
@@ -644,6 +658,8 @@ export function createWorld(seed: number, data: SimData): World {
         reclaimPlayTicks: null,
         shipsBuilt: 0,
         shipsLost: 0,
+        shipsRecycled: 0,
+        oreRefunded: 0,
       })),
       reclaimOrder: [],
       research,

@@ -13,6 +13,7 @@ import {
   type Tunables,
 } from './data.ts';
 import { designResearched, extractPct, reclaimActive, shipments, yardBuildTicks } from './campaign.ts';
+import { fleetCap, isFleetFull } from './fleet.ts';
 import { applyInput, startTransit, type Input } from './inputs.ts';
 import { ceilDiv } from './math.ts';
 import {
@@ -203,14 +204,16 @@ function newShip(world: World, type: ShipType): Ship {
 }
 
 /**
- * Starts a build at an idle, switched-on yard if its design is researched (H4)
- * and ore (net of reservations) and its component allow. The build takes
- * yardBuildTicks (H4 Fast yards). Returns true if it started.
+ * Starts a build at an idle, switched-on yard if its design is researched (H4),
+ * the fleet is below its limit (H5; the count includes builds started earlier
+ * this tick), and ore (net of reservations) and its component allow. The
+ * build takes yardBuildTicks (H4 Fast yards). Returns true if it started.
  */
 function startShip(world: World, type: ShipType): boolean {
   const t = world.tun;
   const yard = world.yards[type];
   if (!yard.on || yard.ticksLeft !== 0 || !designResearched(world, type)) return false;
+  if (isFleetFull(world)) return false;
   const cost = t[`ship.${type}.cost`];
   const comp = SHIP_COMPONENT[type];
   // Recomputed per yard: reservedOre doesn't change here, but stock does.
@@ -227,7 +230,8 @@ function startShip(world: World, type: ShipType): boolean {
  * Rule 5b. Builds in progress tick down and finished ships spawn in the order
  * lancer, flak, drone. Then idle yards start: the component yards first, in
  * turn from `world.yardTurn` (each start passes the turn to the yard after
- * it), then the drone yard.
+ * it), then the drone yard. H5: a yard that can't start because the fleet
+ * is full keeps its turn, like one waiting for a component.
  */
 function yards(world: World): void {
   for (const type of YARD_ORDER) {
@@ -337,6 +341,7 @@ function newBattle(world: World, g: Guardian): Battle {
     lostByType: { drone: 0, lancer: 0, flak: 0 },
     guardsKilled: 0,
     killedByType: { thorn: 0, spore: 0 },
+    capAtSend: fleetCap(world),
   };
 }
 

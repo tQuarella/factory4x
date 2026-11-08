@@ -77,6 +77,8 @@ export const YARD_STATE_TEXT: Record<YardState, (component: string | null) => st
   needsDesign: () => 'Design not researched (Research, on the overworld)',
   noSource: (c) => (c === 'lens' || c === 'plating' ? `No ${COMPONENT_SOURCE[c]} here: no ${c} source in this area` : 'No component source in this area'),
   off: () => 'off',
+  // h5-sim: compile-only placeholder; h5-client adds the counts ("idle: fleet full (12/12)").
+  fleetFull: () => 'idle: fleet full',
   needsComponent: (c) => `idle: needs ${c ?? 'a component'}`,
   needsOre: () => 'idle: needs ore',
   ready: () => 'starting',

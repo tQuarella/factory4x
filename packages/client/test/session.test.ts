@@ -351,6 +351,7 @@ function result(f: Pick<BattleResult, 'node' | 'outcome' | 'shipsEngaged' | 'shi
     startTick: 0,
     endTick: 10,
     wilt: null,
+    capAtSend: null,
     guardsAtStart: { thorn: 0, spore: 0 },
     engagedByType: { drone: f.shipsEngaged, lancer: 0, flak: 0 },
     lostByType: { drone: f.shipsLost, lancer: 0, flak: 0 },
