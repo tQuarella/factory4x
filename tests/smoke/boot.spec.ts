@@ -679,6 +679,27 @@ test.describe('375x667 portrait', () => {
     await expectHudNoWrap(page, 'overworld HUD with all three chips and rates');
   });
 
+  test('pause and play icons swap on each tap of the pause button', async ({ page }) => {
+    await ready(page);
+    await landByTaps(page, LANDFALL, 'Landfall');
+    const shown = (): Promise<string> =>
+      page.evaluate(() => {
+        const vis = (sel: string): boolean => {
+          const e = document.querySelector<SVGElement>(sel)!;
+          const r = e.getBoundingClientRect();
+          return getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility !== 'hidden' && r.width > 0 && r.height > 0;
+        };
+        return `${vis('#b-pause .i-pause') ? 'pause' : ''}${vis('#b-pause .i-play') ? 'play' : ''}`;
+      });
+    expect(await shown()).toBe('pause');
+    for (let i = 0; i < 2; i++) {
+      await page.locator('#b-pause').click();
+      await expect.poll(shown).toBe('play');
+      await page.locator('#b-pause').click();
+      await expect.poll(shown).toBe('pause');
+    }
+  });
+
   test('area HUD fits and does not wrap under a wide font, with the Overworld button', async ({ page }) => {
     await ready(page);
     await startCampaign(page, DEEP_START);

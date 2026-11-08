@@ -238,9 +238,7 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 #b-research { width: auto; flex: 1 1 auto; margin-right: 6px; font-size: 14px; border-color: #2f6c73; white-space: nowrap; }
 @media (max-width: 480px) and (max-aspect-ratio: 1/1) {
   #controls .ctl { width: 46px; }
-  #controls .ctl#b-pause .i-play, #b-pause.on .i-pause { display: none; }
-#b-pause.on .i-play { display: block; }
-#b-research { width: auto; }
+  #controls .ctl#b-research { width: auto; }
 }
 #sheet.world { padding-bottom: 0; }
 /* Portrait: the area sheet overlays the bottom of the overworld (the map pans the selected area clear of it), so selecting an area never shrinks the map. */

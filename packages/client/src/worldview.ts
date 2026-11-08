@@ -298,7 +298,7 @@ export class WorldView {
         ctx.beginPath();
         ctx.roundRect(lx - wd / 2, ly - 11, wd, 14, 4);
         ctx.fill();
-        ctx.fillStyle = k === 0 ? (l.reclaimed ? palette.probe : l.dim ? '#707b90' : '#cfe8ff') : palette.probe;
+        ctx.fillStyle = k === 0 ? (l.reclaimed ? palette.probe : l.dim ? palette.areaLocked : palette.starBright) : palette.probe;
         ctx.fillText(text, lx, ly);
       });
     }
