@@ -204,6 +204,8 @@ Broken main, top priority. On main 71cec57, CI on Linux fails "375x667 portrait 
 
 - **cw-flaky-test** (engineer): during the h2-art round 2 review, `npm run gates` failed the `test` gate once (28.5 s against the usual 10–14 s) and passed on rerun. Which test failed wasn't captured. Find it (likely a timing-sensitive test under load) and make it deterministic. A flaky gate weakens the gate.
 
+- **cw-palette-sync-test** (art-direction or engineer; added by the Retrospective after build-20261108-1): add a unit test that parses the Palette table in `ART_STYLE.md` and fails if any key in `packages/client/src/palette.ts` has no row with the same value, or a row's value differs. The same miss caused a Critic rejection in both m1-art and h2-art round 1. A test catches it at `npm run gates`, before review. Optional in the same task: assert that each opaque entity colour reaches 4.5:1 against `space`, with an explicit allow-list for documented outline-only colours. Acceptance: removing one row from the table makes `npm run gates` fail with a message naming the missing key.
+
 - cw-ci-hardening (needs owner approval: `.github/workflows/` is protected): bump `actions/*` to versions that run on Node 24 (GitHub warns Node 20 is deprecated), and have the live smoke step wait for the deployment URL to answer over HTTPS before testing. A new Pages subdomain's TLS certificate took about a minute on the first deploy and failed the first live smoke run.
 - ~~cw-gate-windows~~ **Done** 2026-11-06 (Q9): `protected-files.mjs` now calls git without a shell, so it no longer skips on Windows.
 - cw-bench: benchmark scenario with 10k entities for the tick budget once ECS lands

@@ -230,3 +230,39 @@ The Director session ended abruptly during a commit/push on 2026-11-06 23:37. Tw
 ## h2-client: banner lines, hint, fit margin (2026-11-07)
 
 - Battle banner is one nowrap, ellipsised line per battle (a wrapped two-battle banner in a wide font pushed the toast out of the capped notices strip). The first-run hint moved into that strip and hides while a banner or toast shows. New run seeds with old seed + 1 (no wrap). fit.ts top margin grew by 40 su so the Bloom label does not clip; labels that would still clip go below the node.
+
+## 2026-11-07 · Retrospective · build-20261108-1 (H2, decision depth)
+
+Scope: `git log build-20261106-2..build-20261108-1` (f1b1b33..13201db), `reviews/h2-*.md`, the iteration-2 ledger in `STATUS.md`, `BACKLOG.md`, `PROCESS.md` and this file.
+
+**Went well**
+- **Budget held.** 10 launches out of 12, including this retro: the designer, four builders and four first-round Critic reviews. Fix rounds and later review rounds all used resumes, as `PROCESS.md` now prefers. There was no escalation and no broken `main`. The per-run ledger worked: every run can be traced to a commit. Its rows are out of order (the h2-art rows sit below the stall note), so keep rows in run order.
+- **h2-sim and h2-bots passed on their first review.** For both, the acceptance criteria named exact numbers to report and said "do not retune".
+- **Last retro's changes paid off.**
+  - The `DECISIONS.md` union merge removed the hand-resolved conflicts. Four merges of `main` into task branches went through cleanly.
+  - Every browser-facing merge waited for green branch CI first. `main` stayed green.
+- **The Critic caught both real defects.** It worked out the effective contrast with alpha and the glow extents from the code. It reproduced the 10× toast error on the real sim with tuned values. It also reported the flaky `test` gate run instead of ignoring it. These checks stay.
+
+**Didn't go well**
+- **h2-art round 1 failed partly on the same miss as m1-art round 1: new colours missing from the ART_STYLE.md Palette table.** It also failed on a cut vine at 3.56:1 effective contrast (alpha 0.8) and a glow outside the stated radius. All three rules were already in ART_STYLE.md and the task's acceptance criteria. The M1 retro concluded that a prompt change wouldn't help. A second occurrence shows the agent doesn't check its own work against the guide before reporting, so this time a checklist is warranted, plus a test so the gates catch it.
+- **h2-client round 1: a player-facing factor was 10× wrong in the "faster" branch** (`1000 / x10` instead of `100 / x10`). The engineer's tests covered only the default tuning, which takes the "slower" branch. The same review also found that an acceptance criterion (a forced `system.variant` applying on New run) had no lasting test.
+- **Stalls (r4, r5, r6) and the dropped h2-sim run** were the laptop sleeping or losing its network (owner, 2026-11-07). That is not agent behaviour. No prompt change, as instructed. 4 of the 8 resumes were caused by this. The other 4 were productive fix and review rounds.
+- **Git metadata zeroed by the crashed session.** Already repaired and logged above (Director, 2026-11-07). It came from the same host problem, and there is no process gap to fix.
+- **A `gh run watch` network blip read as "CI failed"** until it was rechecked. That cost a recheck, not a wrong merge, but the opposite misreading of a CI result would be worse.
+- **A flaky `test` gate run** (h2-art round 2). It is already tracked as cw-flaky-test.
+- **Owner questions:** none were raised mid-iteration. The H2 direction (depth first) and the three fun questions in the handoff are the owner's calls. No team decision should have gone to the owner, and no owner decision was taken by the team.
+
+**Changes made**
+1. **`.claude/agents/art-direction.md`: new "Before you report" checklist.** It covers three checks: palette table vs `palette.ts`, compared by diff against `main`; contrast at the effective drawn colour in every state; and stated bounds, worked out with numbers. The results go in the report. Evidence: m1-art round 1 and h2-art round 1.
+2. **`.claude/agents/engineer.md`** (also used by core-engineer, and by art-direction in worktrees):
+   - Any player-facing number computed from tunables is unit-tested at the defaults and at non-default values that reach every branch, within the designed tuning range.
+   - Each acceptance criterion is shown by a lasting test, and the report names it.
+
+   Evidence: h2-client round 1.
+3. **`PROCESS.md` "Before merging":** if `gh run watch` errors, recheck the run's own conclusion with `gh run view` or `gh run list` before acting. Evidence: the merge-time false "CI failed".
+4. **`BACKLOG.md` (Can wait): cw-palette-sync-test.** A unit test that fails `npm run gates` when `palette.ts` and the ART_STYLE.md Palette table disagree. This makes change 1's first check mechanical. It adds a test and weakens nothing.
+
+**Not changed:**
+- The budget stays at 12 launches. H2 used 10 for four tasks with no escalation, which leaves room for one.
+- Still no resume cap: half of the resumes were host stalls, so the data doesn't support one.
+- No gate, guardrail or protected file was touched, and there is no new owner question.

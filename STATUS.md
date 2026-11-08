@@ -9,12 +9,18 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 **Last build:** build-20261108-1 (H2 decision depth), commit 13201db, live and passing the live smoke test.
 **Last updated:** 2026-11-07
 
-## Iteration 2 (H2) ledger
+## Iteration 2 (H2) ledger (closed)
+
+In run order.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | H2 triage + spec | launch | Plan + Spec (done) |
 | 2 | core-engineer | h2-sim | launch | Build (committed d9563ff; session dropped before its report) |
+| 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
+| 4 | critic | h2-art | launch | Review round 1: REJECT (vine/rock contrast, glow bounds, palette table) |
+| r1 | art-direction | h2-art | resume | Fix round 1 (77e159d) |
+| r2 | critic | h2-art | resume | Review round 2: APPROVE; merged 6176e1f after green branch CI. Critic saw one flaky `test` gate run (28.5 s, passed on rerun) |
 | r3 | core-engineer | h2-sim | resume | After session restart: merged main (4933aca), gates green, reported |
 | 5 | critic | h2-sim | launch | Review round 1: APPROVE; merged dfdf62a after green branch CI |
 | 6 | engineer | h2-client | launch | Build (green after resume r5; 238d38d) |
@@ -26,14 +32,11 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r6 | critic | h2-client | resume | Stalled 600 s; resumed. Round 1: REJECT (wilt toast "faster" factor 10x off; missing tests) |
 | r7 | engineer | h2-client | resume | Fix round 1 (e2a6d99) |
 | r8 | critic | h2-client | resume | Review round 2: APPROVE; green branch CI on 149b655; merged 624b1e0 |
+| 10 | retrospective | retro | launch | Retro after build-20261108-1 |
+
+Launches: 10 / 12. Resumes: 8.
 
 Stall cause (owner, 2026-11-07): the stalls in r4, r5 and r6 came from this computer losing its network connection or going to sleep, not from agent behaviour. The retro should not change agent prompts because of them.
-| 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
-| 4 | critic | h2-art | launch | Review round 1: REJECT (vine/rock contrast, glow bounds, palette table) |
-| r1 | art-direction | h2-art | resume | Fix round 1 (77e159d) |
-| r2 | critic | h2-art | resume | Review round 2: APPROVE; merged 6176e1f after green branch CI. Critic saw one flaky `test` gate run (28.5 s, passed on rerun) |
-
-Launches: 9 / 12. Resumes: 8.
 
 ## Iteration 1 (H1) plan, closed
 
@@ -62,7 +65,7 @@ Subagent launches: 11 / 12 (designer, core-engineer Ã—2, art-direction, critic Ã
 
 ## Next step
 
-Waiting on the owner's playtest of build-20261108-1 (handoff block at the top of QUESTIONS.md). When feedback arrives: record it verbatim in PLAYTEST_LOG.md, then the Designer triages it and picks H3. Retro for iteration 2 is done right after this handoff.
+Waiting on the owner's playtest of build-20261108-1 (handoff block at the top of QUESTIONS.md). When feedback arrives: record it verbatim in PLAYTEST_LOG.md, then the Designer triages it and picks H3. Retro for iteration 2 is done (DECISIONS.md, 2026-11-07). While waiting, Can wait work is allowed: cw-palette-sync-test and cw-flaky-test are good candidates.
 
 ## Moving to another machine
 

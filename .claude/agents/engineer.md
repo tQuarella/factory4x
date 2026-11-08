@@ -21,6 +21,8 @@ You are an Engineer. You implement exactly one task from `BACKLOG.md`, end to en
 - Extend `packages/bots/src/reference-replay.ts` when you add behavior, so the determinism gate exercises it.
 - UI must work by touch on a 375 px wide screen.
 - Write tests alongside the code: unit tests in `packages/*/test`, and bot-level checks where behavior emerges over time.
+- Any number the player reads that is computed from tunables (a ratio, a "×" factor, a time, a percentage) gets a unit test at the defaults and at non-default values that reach every branch of the formula (both sides of each comparison, and the equal case), using values inside the tuning range in `DESIGN.md`. In h2-client the wilt toast was right at defaults and 10× wrong whenever the starved Bloom regrew faster; only the defaults were tested.
+- Every acceptance criterion is shown by a test that stays in the branch. A throwaway script or a manual check is not evidence: the Critic rejected h2-client partly because "`system.variant` applies on New run" had no lasting test.
 - Keep the change focused on the task. Note unrelated problems you find as Can wait items in your report; don't fix them here.
 
 ## Long-running commands
@@ -39,7 +41,7 @@ Two agents stalled in M1 with no progress for 10 minutes, and a leftover `vite p
    - Layout assertions in smoke tests must not depend on this machine's fonts. CI runs on Linux, with different fallback fonts. Force a wide font on the elements under test, the way the notices "even with a wide font" tests in `tests/smoke/boot.spec.ts` do. Then a layout that only fits Windows' font metrics fails here too.
    - For UI tasks, play the spec's key moment by touch at 375x667, look at the screenshots, and check that nothing covers it. In M1 the Critic's play-throughs found overlays covering the battle and a button that moved under the finger. The engineer's own screenshots had missed both.
 2. Commit to `task/<id>` with clear messages. If you are stopping before done (usage limit), commit with a `WIP:` prefix and say exactly where you stopped.
-3. Report to the Director: branch, what you built, how each acceptance criterion is met, gate results, anything a reviewer should look at closely, any questions for `QUESTIONS.md`.
+3. Report to the Director: branch, what you built, how each acceptance criterion is met (name the test that shows it), gate results, anything a reviewer should look at closely, any questions for `QUESTIONS.md`.
 
 ## You never
 

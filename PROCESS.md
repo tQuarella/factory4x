@@ -38,6 +38,7 @@ Slash commands: `/resume`, `/iterate`, `/handoff`, `/retro`.
 ## Before merging
 
 - **Browser-facing tasks** (any change under `packages/client/`, including its Vite config, or under `tests/smoke/`, or to `playwright.config.ts`): after Critic approval, merge `main` into the task branch if `main` has moved, push `task/<id>`, and wait for the CI run on that exact commit to pass. Only then run `merge-task`. CI runs the smoke test on Linux, whose fallback fonts differ from Windows. A local pass on Windows doesn't prove the layout holds there: m1-client passed every local check and still turned `main` red. The push also deploys a branch preview. Pushing a task branch never deploys production.
+- **Reading the CI result:** if `gh run watch` exits with an error, that is not yet a CI failure. A network blip can end the watch. Before acting, recheck the run itself with `gh run view <run-id>` (or `gh run list --branch task/<id>`), and treat the run's own conclusion as the result. In H2 a dropped watch looked like a failed CI until it was rechecked.
 - **DECISIONS.md conflicts:** `.gitattributes` merges it with git's union driver, so entries appended on both sides are both kept with no conflict. A task branch cut before that line existed gets it the first time it merges `main`. Check the merged file once for an entry that lost its blank line, and keep the file append-only, because union merging would silently keep both versions of a line edited in place.
 
 ## Usage budget
