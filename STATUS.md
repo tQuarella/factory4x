@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 1 — First playable (iteration 2, hypothesis H2: decision depth)
-**State:** Owner chose "Depth first" for H2. H2 specced (DESIGN.md → H2: cut the Root vs overwhelm the Bloom, three variants). h2-art, h2-sim and h2-bots merged (all six H2 depth flags met). h2-client is building.
+**State:** Owner chose "Depth first" for H2. H2 specced (DESIGN.md → H2: cut the Root vs overwhelm the Bloom, three variants). h2-art, h2-sim and h2-bots merged (all six H2 depth flags met). h2-client: Critic round 1 rejected it (toast factor bug); fix round in progress.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261106-2 (M1 first playable), live and passing the live smoke test at desktop and phone sizes.
@@ -23,7 +23,8 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r4 | critic | h2-bots | resume | Stalled 600 s waiting on background gates; told to run in foreground |
 | r5 | engineer | h2-client | resume | Stalled 600 s at "Now tests"; told to WIP-commit and continue with time limits |
 | 9 | critic | h2-client | launch | Review round 1 |
-| r6 | critic | h2-client | resume | Stalled 600 s; resumed |
+| r6 | critic | h2-client | resume | Stalled 600 s; resumed. Round 1: REJECT (wilt toast "faster" factor 10x off; missing tests) |
+| r7 | engineer | h2-client | resume | Fix round 1 |
 
 Stall cause (owner, 2026-11-07): the stalls in r4, r5 and r6 came from this computer losing its network connection or going to sleep, not from agent behaviour. The retro should not change agent prompts because of them.
 | 3 | art-direction | h2-art | launch | Build (green, 0365ede) |
@@ -31,7 +32,7 @@ Stall cause (owner, 2026-11-07): the stalls in r4, r5 and r6 came from this comp
 | r1 | art-direction | h2-art | resume | Fix round 1 (77e159d) |
 | r2 | critic | h2-art | resume | Review round 2: APPROVE; merged 6176e1f after green branch CI. Critic saw one flaky `test` gate run (28.5 s, passed on rerun) |
 
-Launches: 9 / 12. Resumes: 6.
+Launches: 9 / 12. Resumes: 7.
 
 ## Iteration 1 (H1) plan, closed
 
@@ -60,4 +61,15 @@ Subagent launches: 11 / 12 (designer, core-engineer ×2, art-direction, critic �
 
 ## Next step
 
-When h2-sim merges, launch h2-client and h2-bots in parallel. Review each task with the Critic as it reports green.
+1. h2-client fix round 1 → Critic round 2. If the engineer or Critic agent from this session is gone (new session or machine), a fresh launch is fine: the review file on the branch carries the context.
+2. On approval: merge `main` into `task/h2-client`, push, and wait for green Linux CI on that commit. Then run `npm run merge-task -- h2-client` from `main`.
+3. `npm run release-gates`, push `main`, `/handoff`, `/retro`.
+
+## Moving to another machine
+
+From 2026-11-07 the owner runs sessions from their desktop instead of this laptop. Everything needed is on GitHub: `main` and every `task/*` branch, including `task/h2-client` with its review. Agent worktrees under `.claude/worktrees/` are local only, so check out `task/h2-client` fresh there.
+
+One-time desktop setup, done by the Director in the first desktop session (the owner only accepts prompts):
+- Node 26 (`.nvmrc`) and GitHub CLI (`gh auth login` is the owner's step);
+- `git config --global user.name tquarella-ProviderSoft` and `user.email tquarella@providersoftllc.com`;
+- `npm ci` and `npx playwright install chromium`.
