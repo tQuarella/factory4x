@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
-**State:** Iteration 4 started 2026-11-08. Owner feedback on build-20261108-2 is in PLAYTEST_LOG.md (overworld idea). Owner picked H4 = A. Reclaim ladder (Q16). Spec done (ba817ea). Build: h4-art merged (5ca6921). h4-sim merged (caa81b1). h4-client and h4-bots building in parallel. Carry to h4-design-data: fix DESIGN.md "14 levels" (table has 13) and "under 1 KB" save growth (actual ~1.7 KB, test caps 2 KB); re-record the reference replay if guards/costs change. Can wait: Deep layout lookup duplicated in overworld.ts areaLayout and world.ts landArea. Then h4-client + h4-bots after h4-sim merges; h4-design-data as a Designer resume after h4-bots.
+**State:** Iteration 4 started 2026-11-08. Owner feedback on build-20261108-2 is in PLAYTEST_LOG.md (overworld idea). Owner picked H4 = A. Reclaim ladder (Q16). Spec done (ba817ea). Build: h4-art merged (5ca6921). h4-sim merged (caa81b1). h4-bots merged (ab8bd65). h4-client building; h4-design-data (Designer resume) calibrating in parallel. Carry to h4-design-data: fix DESIGN.md "14 levels" (table has 13) and "under 1 KB" save growth (actual ~1.7 KB, test caps 2 KB); re-record the reference replay if guards/costs change. Can wait: Deep layout lookup duplicated in overworld.ts areaLayout and world.ts landArea. Then h4-client + h4-bots after h4-sim merges; h4-design-data as a Designer resume after h4-bots.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-2 (H3 Counter web), commit a4096a7, live (CI gates and deploy green; site shows a4096a7).
@@ -27,9 +27,10 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | r3 | engineer | h4-bots | resume | Fix round 1 (22c9396) |
 | r4 | critic | h4-bots | resume | Review round 2: REJECT (15-campaign unit test ~16 s, near 30 s limit) |
 | r5 | core-engineer | h4-bots | resume | Fix round 2, reassigned per deadlock rule (resumed the h4-sim core-engineer to stay within launch budget); 57d789f, test gate 6.4 s |
-| r6 | critic | h4-bots | resume | Review round 3 (a reject parks the task) |
+| r6 | critic | h4-bots | resume | Review round 3: APPROVE; merged ab8bd65 (not browser-facing) |
+| r7 | designer | h4-design-data | resume | Calibrate data against the H4 flags |
 
-Launches: 9 / 12. Resumes: 6. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 9 / 12. Resumes: 7. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 
