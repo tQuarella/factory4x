@@ -270,6 +270,42 @@ test('withdraw asks first; Stay keeps the area; Withdraw resets it', async ({ pa
   expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
 });
 
+test('a tap on the overworld in the first frame after a running withdraw keeps its sheet, and Land works', async ({ page }) => {
+  const errors = watchErrors(page);
+  await ready(page);
+  await landByTaps(page, LANDFALL, 'Landfall');
+  expect(await page.evaluate(() => window.__factory4x!.paused())).toBe(false);
+  await page.locator('#b-world').click();
+  await page.locator('section.overlay:not([id]) .card button', { hasText: 'Withdraw' }).click();
+  // The withdraw applies inside the frame loop (the game is running). Tap Landfall from inside the page in the
+  // first animation frame where onOverworld() is true: no Playwright round trip, so no time for a UI refresh.
+  const tapped = await page.evaluate(
+    (area) =>
+      new Promise<boolean>((resolve) => {
+        const poll = (): void => {
+          const f = window.__factory4x!;
+          if (!f.onOverworld()) {
+            requestAnimationFrame(poll);
+            return;
+          }
+          const p = f.areaScreenPos(area);
+          document.querySelector('canvas#view')!.dispatchEvent(new MouseEvent('click', { clientX: p.x, clientY: p.y, bubbles: true }));
+          resolve(true);
+        };
+        requestAnimationFrame(poll);
+      }),
+    LANDFALL,
+  );
+  expect(tapped).toBe(true);
+  // Several 100 ms UI refreshes later, the sheet the tap opened is still open.
+  await page.waitForTimeout(400);
+  await expect(page.locator('#sheet h2')).toHaveText('Landfall');
+  await page.locator('#sheet button.land').click();
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.activeArea())).toBe(LANDFALL);
+  expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('win: buy the probe core and reach the win panel; New system asks first', async ({ page }) => {
   const errors = watchErrors(page);
   await ready(page);

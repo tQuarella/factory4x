@@ -132,6 +132,8 @@ new ResizeObserver(() => resizeViews()).observe($('stage'));
 window.addEventListener('resize', () => resizeViews());
 
 canvas.addEventListener('click', (ev) => {
+  // A tap must land on the screen the sim is on now, after its transition (sheets closed, map re-fitted).
+  if (transitionPending()) refreshUi();
   const r = canvas.getBoundingClientRect();
   const x = ev.clientX - r.left;
   const y = ev.clientY - r.top;
@@ -320,6 +322,19 @@ function modeTransition(): void {
   toast.show(shipped === '' ? head : `${head}\n\n${shipped}`);
 }
 
+/**
+ * True when the sim changed screen state since the last refresh: another session, a landing or a leave
+ * (campaign.active), or a heart capture whose result panel hasn't been shown. The frame loop and the tap
+ * handler run refreshUi() at once when this holds, instead of waiting for the 100 ms UI cadence: a tap in that
+ * gap used to open a sheet the late transition then closed (h4-client round 2).
+ */
+function transitionPending(): boolean {
+  const s = app.session;
+  const w = s.world;
+  if (modeSeen.world !== w || modeSeen.active !== w.campaign.active) return true;
+  return !s.onOverworld && isCaptured(w) && !s.flags.resultShown;
+}
+
 function refreshUi(): void {
   modeTransition();
   const s = app.session;
@@ -444,16 +459,17 @@ function frame(now: number): void {
   const dt = now - last;
   last = now;
   app.session.advance(dt);
+  uiAcc += dt;
+  // Inputs applied in advance() (a running withdraw, a heart falling) change the screen now, before this frame draws.
+  if (uiAcc >= 100 || transitionPending()) {
+    uiAcc = 0;
+    refreshUi();
+  }
   if (app.session.onOverworld) {
     worldView.cover = sheetCover();
     worldView.draw(now, areaSheet.selected);
   }
   else view.draw(now, sheet.selected);
-  uiAcc += dt;
-  if (uiAcc >= 100) {
-    uiAcc = 0;
-    refreshUi();
-  }
   requestAnimationFrame(frame);
 }
 resizeViews();
