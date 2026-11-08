@@ -97,3 +97,44 @@ Required changes:
 - [ ] Branch CI must be green on the final commit.
 
 VERDICT: REJECT
+
+## Round 3 · 2026-11-08
+
+This is the third round on h5-client. I reviewed `origin/task/h5-client` at 0f29bec, which already includes main f0227dc (h5-design-data, data v9). The round 3 code commits are e9c22e6, e8b9fea and 78d9f5e, by the core-engineer, reassigned under the deadlock rule. Branch CI run 42509986848 passed on 0f29bec.
+
+Round 2 items:
+- **Column layout (landscape and desktop): met.** At `min-aspect-ratio: 1/1`, `.chip-row.ships` is `display: contents`. The ship chips and the fleet chip now stack in `#bars` the way the resource chips do, and the fleet chip comes right after the ships.
+  - I measured my own preview build of 0f29bec at 1280x720, 1000x1000, 667x375 and 812x375, in both fonts. I checked the real game state at The Deep landing and the Frost Shelf and Deep states with every chip shown, using 3-digit counts and "30/30" full. Every chip, and everything drawn inside it, lies within `#bars` (for example ink 14..141 against bars 0..156 on desktop). Nothing scrolls sideways.
+  - A 1280x720 screenshot shows the five resources, the three ships and the fleet icon with "30/30" in amber, all readable in the column.
+- **Portrait did not regress.** At 375x667 every state is two rows in both fonts, and the fleet chip sits on the drone chip's row.
+- **Landscape and desktop smoke test: met.** It runs at 1280x720 and 667x375, in both fonts and four states, and checks that every chip and its descendants stay inside `#bars`. Commit e9c22e6 records that it failed 32 of 32 on dc899e8's client. That matches my round 2 measurement, so the test catches the regression I found.
+- **DECISIONS.md folded into one entry: met.**
+- **Branch CI green on the final commit: met** (run 42509986848, success).
+
+The text change to judge: in the column layout only, the fleet chip hides the word "Fleet" and shows the fleet icon with "30/30". `textContent` and the tooltip keep "Fleet 30/30". I accept it.
+- The ship chips in that column already show only their icon and a number.
+- The fleet icon was drawn to mean "a fleet of N" (ART_STYLE / the H5 art needs).
+- The phone portrait layout, where the owner plays, keeps the spec's "Fleet 9/12".
+- It changes presentation only, not play.
+
+One inaccuracy in the docs, not a defect: DECISIONS.md lists the "/min" drop on the ice and crystal chip rates under "Portrait phones". In `hud.ts`, every layout drops it, so the desktop column shows "+12" too. The tooltip and the ORE/MIN label still give the unit. When the Director next edits DECISIONS.md, the entry should say "every layout".
+
+Checks I ran myself on 0f29bec:
+- `npm run gates -- --base origin/main`: all six pass (typecheck, lint, test, determinism, bots, protected-files). No protected file is touched.
+- The full smoke suite on desktop and phone, against my own preview build on port 4291: 144/144.
+- The H5 smoke tests with `--repeat-each 5`: 340/340.
+- The data v9 merge did not break any h5-client test; they read the data instead of pinning it.
+
+Every acceptance criterion from rounds 1 and 2 is now met and demonstrated:
+- the spec's UI list;
+- numbers taken from selectors and live tunables (tier ✓ from `missing.tiers`);
+- 375 px portrait with 44 px targets, ≤ 2 taps, and the fleet chip on the ships' row under the wide font;
+- the four required smoke flows, plus `--repeat-each 5`;
+- the v7 save toast;
+- gates and branch CI.
+
+I'd be comfortable with the owner playing this tonight.
+
+Required changes: none.
+
+VERDICT: APPROVE
