@@ -404,3 +404,10 @@ The owner picked A in Q16. The spec is in DESIGN.md → "H4 (Milestone 2, iterat
 - **One `World` with a `campaign` field, one log and one replay** rather than a world per area. It keeps the save, the hash, the determinism gate and the feedback replay as they are. The cost is a longer input log over a campaign, which is acceptable (DESIGN.md "Save"). Checkpoints are deferred.
 - **No migration of H3 saves** (dataVersion 6). An H3 save is one field mid-game and has no honest mapping onto a campaign.
 - **Budget:** 4 builder launches plus 5 Critic reviews, with h4-design-data run as a resume of the Designer, so 11 of 12 launches, leaving 1 spare.
+
+## 2026-11-08 · Art Direction · h4-art: overworld art
+
+- **Area node is a ring of four rocks round an open centre**, so the client's prize icon (or the probe core on The Deep) sits on a clear spot. Tier is the count of Bloom spikes (0 to 3) while held, per the spec; spikes, ring and rock tone differ per state so the three states survive greyscale.
+- **The Deep's `drawProbeCore(..., 0)` outline is pale, not amber.** The spec says amber marks reclaimed areas only, and the contract draws the core at `frac` 0 on an unreclaimed Deep. The core turns amber as `frac` rises.
+- **`areaLocked` and `laneClosed` are a passing colour (`#707b90`, 4.7:1) dimmed with alpha**, instead of a dim hex on the contrast allow-list. No allow-list growth.
+- **Bounds are tested with a recording 2D context** (`packages/client/test/h4-art.test.ts`), since no canvas package is installed; the gallery adds a pixel scan. The test ignores clips, so the probe core's fill is drawn as a cut polygon rather than a clipped rectangle.
