@@ -52,3 +52,25 @@ Required changes:
 Note for the Director: this is round 2. If round 3 is rejected, the task is parked per PROCESS.md.
 
 VERDICT: REJECT
+
+## Round 3 · 2026-11-08
+
+Reviewed c0aab81 (core-engineer, reassigned under the deadlock rule), compared with 2a37977. This is the third round, and it approves, so nothing is parked.
+
+Round 2 items:
+- [x] Screen changes are handled at once. `transitionPending()` in `main.ts` is true when any of these differs from what the last refresh saw: the session, `campaign.active`, or an unshown heart capture. `frame()` now calls `refreshUi()` right after `advance()` and before drawing whenever that holds, and otherwise every 100 ms. The canvas click handler does the same before hit-testing.
+  - It cannot spin. `modeTransition()` always records the world and the active area, and the capture branch always sets `resultShown`, so the condition clears after one refresh.
+  - It is a client-only UI change, so there is no sim or determinism impact.
+- [x] There is a regression smoke test: `a tap on the overworld in the first frame after a running withdraw keeps its sheet, and Land works`. It dispatches the tap from inside the page in the first animation frame where `onOverworld()` is true, so no Playwright round trip can hide the gap. I checked that it bites: with `main.ts` put back to 2246c80 and rebuilt, it failed 8 of 10 runs (`--repeat-each 5`, desktop and phone). With the fix it passes.
+- [x] Repeat runs: on c0aab81, `-g withdraw --repeat-each 10` passed 80 of 80 on desktop and phone.
+- [ ] Branch CI: per the Director, it runs after main is merged in. It must be green before `merge-task`. This is a merge precondition, not open work on the task.
+
+The DECISIONS.md entry explains the fix and the rejected alternatives (waiting in the test, refreshing every frame).
+
+Gates: `npm run gates -- --base main` on c0aab81: typecheck, lint, test, determinism, bots and protected-files all PASS. `npm run build && npm run smoke`: 74 of 74 passed. No protected files are touched, and there is no data change.
+
+Every acceptance item is now met. I'm comfortable with the owner playing this tonight on the phone.
+
+Required changes: none.
+
+VERDICT: APPROVE
