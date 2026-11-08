@@ -46,3 +46,28 @@ Recommended (not blocking):
 - In the result panel, the row reads "Root   Root cut at 8:12" because the label and value both say Root. Consider the label "Root" with the value "cut at 8:12" / "left standing", or no label at all.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-07
+
+Reviewed `task/h2-client` at e2a6d99. The only change since round 1 is that commit (4 files: `report.ts`, `panels.ts`, `session.test.ts`, `boot.spec.ts`). It still merges cleanly with `main`.
+
+Round-1 required changes:
+- [x] `regrowChange` now computes each factor from the raw tick counts: `starved * 10 / fed` when slower, `fed * 10 / starved` when faster, and an exact equality check for "same speed". The round-1 rounding loss is gone too. The 10× error is fixed.
+- [x] A new unit test, `regrowChange is computed from raw tick counts`, pins 60/30 → "2× faster", 60/15 → "4× faster", 60/60 → "same speed", 60/90 → "1.5× slower" and 60/300 → "5× slower". The existing wilt-toast test still checks the full toast string, so the helper is covered both on its own and in place.
+- [x] A new smoke test forces `system.variant` to 3, confirms New run, and checks for "Deep Root" and that `replayMatchesLive()` is still true. It passes at desktop and phone sizes.
+- Recommended item: the result panel label is now "Supply" ("Supply   Root cut at 8:12" / "Root left standing"), which removes the doubled word.
+
+Pillar fit: Unchanged from round 1, and good. The fix makes the wilt toast's "by how much" true under any tuning in the designed range. Nothing new in scope.
+
+Quality: The fix is small and clear. Exporting `regrowChange` for the test is reasonable. No dead code.
+
+Gates (run by me on e2a6d99):
+- `npm run gates -- --base main`: all PASS (typecheck, lint, test, determinism, bots, protected-files).
+- `npm run build`: OK.
+- `npx playwright test`: 38/38 passed (desktop and phone, including the new variant test and the 375x667 suite).
+
+Acceptance criteria 1–5 are met. Criterion 6 is met locally. Before running `merge-task`, the Director still has to merge `main` into the branch, push it, and get green Linux CI on that exact commit, per PROCESS.md "Before merging".
+
+Required changes: none.
+
+VERDICT: APPROVE
