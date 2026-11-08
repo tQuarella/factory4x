@@ -103,11 +103,13 @@ Launches: 4. Resumes: 0. Both tasks done. Follow-ups from the reviews (not block
 | r9 | core-engineer | h3-design-data | resume | Doc fix round (97afe69) |
 | r10 | critic | h3-design-data | resume | Round 2: APPROVE; green CI on 1dbe987; merged a4096a7. Release gates passed; deployed; handed off as build-20261108-2 |
 
-Launches: 11 / 12. Resumes: 10. Iteration closed except the retro. h3-art merged 4929fe6 after green CI on 31d61a2. Remaining: Critic h3-design-data (launch 11). One spare. Follow-up (not this build): bots pick targets without regard to their own counters (Designer note). Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
+| 12 | retrospective | iteration 3 retro | launch | Retro after build-20261108-2 (92e07f4): engineer/designer prompt changes, PROCESS.md rules (keep main still during branch CI, Critic for every task, new-machine checklist), Q15 |
+
+Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after green CI on 31d61a2. Remaining: Critic h3-design-data (launch 11). One spare. Follow-up (not this build): bots pick targets without regard to their own counters (Designer note). Planned: Critic h3-sim, Critic h3-art, then h3-client + h3-bots (after h3-sim merges) and their Critics, then h3-design-data (designer resume or launch). Plan: one Critic review per task, then `merge-task`. If a change touches `packages/client/` or smoke files, it is browser-facing: get green CI on the pushed branch head first.
 
 ## Next step
 
-Waiting on the owner's playtest of build-20261108-2 (handoff block at the top of QUESTIONS.md). When feedback arrives: record it verbatim in PLAYTEST_LOG.md, then the Designer triages it and plans H4 (Factories and reach, per DESIGN.md M2 plan). The iteration 3 retro runs right after this handoff. Can wait candidates are in BACKLOG.md.
+Waiting on the owner's playtest of build-20261108-2 (handoff block at the top of QUESTIONS.md). When feedback arrives: record it verbatim in PLAYTEST_LOG.md, then the Designer triages it and plans H4 (Factories and reach, per DESIGN.md M2 plan). The iteration 3 retro is done (92e07f4). Can wait candidates are in BACKLOG.md.
 
 ## Moving to another machine
 
