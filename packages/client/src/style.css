@@ -187,6 +187,11 @@ textarea { width: 100%; min-height: 120px; background: var(--panel2); color: var
 #chips { display: flex; flex: 1 1 0; min-width: 0; flex-wrap: wrap; justify-content: flex-end; align-content: center; gap: 2px 4px; padding: 2px 0; }
 /* H5: the resource chips flow as before; the ship chips and the fleet chip are one no-wrap group, so the fleet chip never leaves the ships it counts. */
 .chip-row.res { display: contents; }
+/* Phones: tighter chip gaps so all five resource chips share one row beside the ORE/MIN block. */
+@media (max-width: 480px) and (max-aspect-ratio: 1/1) {
+  #chips { column-gap: 2px; }
+  .chip-row.ships { column-gap: 2px; }
+}
 .chip-row.ships { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 2px 4px; max-width: 100%; }
 .chip-row.ships:not(:has(.chip:not([hidden]))) { display: none; }
 .chip-row .chip { white-space: nowrap; column-gap: 3px; }

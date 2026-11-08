@@ -72,7 +72,9 @@ export class Hud {
       setText(c.count, String(world.stock[r]));
       if (c.rate) {
         const v = r === 'ice' || r === 'crystal' ? perMin[r] : 0;
-        setText(c.rate, v > 0 ? `${v}/min` : '');
+        // "+3": the rate is per minute, as the ORE/MIN block and the sheets say; the unit stays in the tooltip so five resource chips fit a phone.
+        setText(c.rate, v > 0 ? `+${v}` : '');
+        if (v > 0) c.el.title = `${RES_NAME[r]}, +${v}/min from the pockets`;
       }
     }
     const counts = shipCounts(world).byType;
