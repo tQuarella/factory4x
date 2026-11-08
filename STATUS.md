@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
-**State:** Iteration 4 started 2026-11-08. Owner feedback on build-20261108-2 is in PLAYTEST_LOG.md (overworld idea). Owner picked H4 = A. Reclaim ladder (Q16). Spec done (ba817ea). Build: h4-art merged (5ca6921). h4-sim (core-engineer) still building. Then h4-client + h4-bots after h4-sim merges; h4-design-data as a Designer resume after h4-bots.
+**State:** Iteration 4 started 2026-11-08. Owner feedback on build-20261108-2 is in PLAYTEST_LOG.md (overworld idea). Owner picked H4 = A. Reclaim ladder (Q16). Spec done (ba817ea). Build: h4-art merged (5ca6921). h4-sim green (7cbdd29), Critic reviewing. Then h4-client + h4-bots after h4-sim merges; h4-design-data as a Designer resume after h4-bots.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-2 (H3 Counter web), commit a4096a7, live (CI gates and deploy green; site shows a4096a7).
@@ -20,8 +20,9 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 | 5 | critic | h4-art | launch | Review round 1: REJECT (probe core amber at frac 0) |
 | r1 | art-direction | h4-art | resume | Fix round 1 (cb67a8f) |
 | r2 | critic | h4-art | resume | Review round 2: APPROVE; green branch CI on 34cae84; merged 5ca6921 |
+| 6 | critic | h4-sim | launch | Review round 1 (h4-sim green, 7cbdd29) |
 
-Launches: 5 / 12. Resumes: 2. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
+Launches: 6 / 12. Resumes: 2. Plan: 12 (triage, spec, 4 builders, 5 Critics incl. design-data, retro); h4-design-data is a Designer resume.
 
 ## Iteration 2 (H2) ledger (closed)
 
