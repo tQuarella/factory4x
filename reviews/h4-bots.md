@@ -20,3 +20,38 @@ Required changes:
 - Re-run `npm run gates -- --base main` and confirm the test count and the bot report are unchanged.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+Reviewed head 22c9396 (`git diff c82246d..22c9396`: `runner.test.ts` and one DECISIONS.md line).
+
+Pillar fit: Unchanged from round 1. Bots and tests only, with no gameplay change.
+
+Quality: Round 1's required changes are mostly done, and done well. The tuned outcomes now run on `fixtureData`. Their premises are built explicitly: a 1-tick visit cap for the withdraw/softlock case, and a constructed start with the stockpile full and Landfall, Shelf and Veil reclaimed for the "skips areas" case. The opening check moved to a fixture run, and so did the flag 4 probes. The shipped-data block now has only retune-proof assertions, and DECISIONS.md says which and why.
+
+One new problem, which round 1's instructions invited ("a won outcome for every strategy"): the new shipped-data test `every strategy buys the probe core on every seed, with no crash or softlock` plays all 15 campaigns inside the unit-test gate. I measured it:
+- 16.3 s alone (`npx vitest run packages/bots/test/runner.test.ts --reporter=verbose`);
+- 16.9 s inside the full parallel suite;
+- the per-test `testTimeout` is 30 s (`vitest.config.ts`);
+- the test gate went from 11.9 s (round 1) to 27.7 s.
+
+That makes the gate likely to fail, for two reasons:
+- **Machine load.** `vitest.config.ts` itself records a loaded machine slowing a test run about 2.3x (12 s to 28 s, the cw-flaky-test incident). At that factor this one test passes 30 s and fails the gate for nothing. A flaky gate weakens the gate (BACKLOG cw-flaky-test).
+- **The next retune.** The test's runtime scales with game length. h4-design-data's top job after softlocks is to stretch the best run from about 36 min to 45-75 min, and the slower strategies stretch with it. That pushes this test toward or past 30 s from a data change alone. The designer can't fix that without a test change, which is the round 1 problem again in another form.
+
+It is also redundant. The `bots` gate already plays the same 15 campaigns on shipped data and fails on any crash or softlock, and flag 1 reports the 120-minute cap.
+
+Gates: I ran `npm run gates -- --base main` on 22c9396 and all six passed:
+- typecheck 4.4 s, lint 2.3 s, test 27.7 s (374 tests in 17 files);
+- determinism 0.6 s;
+- bots 16.6 s, with a report identical to round 1 and the archive;
+- protected-files: 10 files changed, none protected.
+
+Required changes:
+- Remove the 15-campaign shipped-data test from `runner.test.ts`, and let the `bots` gate cover crash and softlock on shipped data. Alternatively, cut it to something whose runtime doesn't grow with run length. Check: no single test in `npx vitest run --reporter=verbose` takes more than about 5 s, and the `test` gate is back near its round 1 time (about 12-15 s).
+- Keep the remaining shipped-data tests (determinism, report shape, per-seed games) as they are, or trim them the same way if they grow with run length. Update the DECISIONS.md line to say crash/softlock on shipped data is covered by the bots gate, not by a unit test.
+- Re-run `npm run gates -- --base main`.
+
+This is the second rejection. Per PROCESS.md, a third rejection parks the task.
+
+VERDICT: REJECT
