@@ -60,3 +60,49 @@ Determinism: the change is client only. It reads `world` and sends inputs throug
 - [ ] The guard-row regrow reads "1 / 2.0 s" (one decimal always), consistent with the spec and the Feeds box. Update the test.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-07
+
+Reviewed `task/h3-client` at f9ea031: the round-1 fixes plus a merge of origin/main 179ecbc. The diff against main still touches only `packages/client/src/**` (not placeholders.ts or palette.ts), `packages/client/index.html`, `packages/client/test/**`, `tests/smoke/**`, `DECISIONS.md` and this file. There are no sim, bots, data, art or protected-file changes.
+
+Gates, from a fresh worktree after `npm ci`:
+- `npm run gates -- --base main`: all six PASS.
+- `npm run build`: OK.
+- `CI=1 npm run smoke`: 42/42 passed.
+
+Played it again at 375x667 (touch) and 1280x800 under a global wide serif font with letter spacing. I forced all three layouts through the tuning panel's `system.variant` and compared each with a build of main at 179ecbc. Then I repeated the round-1 flow at both sizes:
+- took the crystal pocket;
+- routed it, and the unlock notice appeared;
+- tapped the notice, which opened the Probe sheet;
+- turned on the Lancer yard;
+- sent a lancers-only wave through Choose…, read the repelled toast, then opened the result panel.
+
+No console errors, no control under 44 px in any state, no sideways scroll.
+
+### Round-1 required changes
+
+1. **Rings and labels: done.**
+   - `guardRingOuter` for the Root and heart is now `ringR + thornR + 3`, the old selection or ring margin. So the ring stays within "r plus the existing ring margin", and the guards sit just inside the band.
+   - In the screenshots, the outer extent matches main's thorn ring on Frost Gate, Glass Thicket and Twin Seams.
+   - Labels are drawn in a last pass on a dark pill. ROOT, HEART, A5, P1–P4 and A1/A2 are all readable at 375 px and on desktop in all three layouts. On main they were partly covered by guard sprites.
+   - The heart and Root rings still touch each other where the two nodes are close. They did the same on main, and neither covers a name now.
+2. **Wide-font stress on every layout assertion: done.** `ready()` now adds one shared `WIDE_FONT` covering the sheet, send panel, result, chips, tuning, feedback, cards and notices. It applies to every test that uses `ready()`, including the per-sheet 44 px test at 375 (probe, asteroid, pocket, Root, heart), the desktop 44 px test and the overflow test.
+3. **Unlock notice: done.**
+   - On the first delivery, the toast adds "Crystal delivered: Lens and Lancers unlocked. Turn on the Lancer yard at the Probe. Tap here to open it." I saw it at both sizes.
+   - One tap opens the Probe sheet, so the counter is 2 taps from the map.
+   - A resumed or new run doesn't re-announce, because the snapshot is taken per world object.
+   - The reading (unlock on first delivery, not on capture) is recorded in DECISIONS.md. There is a unit test for the text, and the smoke play-through asserts the notice and the tap.
+4. **Text fixes: done.**
+   - The no-route line now reads "No route: this crystal goes nowhere."
+   - Regrow reads "1 / 2.0 s", via `regrowText`, with a test.
+   - Send-panel tags use the sheet's ✓ Strong / Even / ✗ Weak.
+   - "Attack P1" replaces "Attack the P1".
+
+### Notes (not blocking)
+
+- With a sheet open, the shrunken 16-node map is crowded, and the label pills stack over each other. Main is just as crowded there, and the pills are, if anything, easier to read. If the owner finds it noisy, a later design task could hide asteroid labels while a sheet is open.
+- A battle report that arrives before the unlock notice is tapped replaces it. This is the existing toast behaviour for any two notices. The HUD chips and the Probe's Yards row still show the unlock.
+
+The work meets the acceptance criteria, keeps to the spec (the one departure is recorded), and plays cleanly at both sizes.
+
+VERDICT: APPROVE
