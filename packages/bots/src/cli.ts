@@ -49,7 +49,7 @@ for (const s of strategies) {
     if (r.captureSec === null) flags.push(`${s.name} seed ${r.seed} (${r.variantId}) never captured the heart within ${fmtMin(ticks / defaultData.tickRate)}`);
   }
 }
-const depthFlags = computeDepthFlags(results);
+const depthFlags = computeDepthFlags();
 for (const f of depthFlags) if (!f.pass) flags.push(`depth flag missed: ${f.name} (${f.detail})`);
 
 const rows = strategies.map((s) => {

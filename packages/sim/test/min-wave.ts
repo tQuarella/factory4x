@@ -41,7 +41,7 @@ export function baseWorld(layout: number, starved: boolean, data: SimData = defa
 
 /** True if `fleet`, arriving together at `node` of `base`, captures it. */
 export function waveWins(base: Readonly<World>, node: number, fleet: Readonly<ShipTypeCounts>, data: SimData = defaultData): boolean {
-  const w = structuredClone(base) as World;
+  const w = JSON.parse(JSON.stringify(base)) as World;
   placeShips(w, node, fleet);
   const g = guardianAt(w, node)!;
   for (let i = 0; i < 100_000; i++) {

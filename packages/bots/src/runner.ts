@@ -185,6 +185,6 @@ export const VARIANT_IDS = ['frost', 'glass', 'twin'] as const;
  * which no longer exist; the six H3 flags (DESIGN.md H3 "Bot checks") land
  * with h3-bots. Until then there are none.
  */
-export function computeDepthFlags(_results: readonly GameResult[]): DepthFlag[] {
+export function computeDepthFlags(): DepthFlag[] {
   return [];
 }

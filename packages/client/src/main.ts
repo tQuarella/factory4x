@@ -181,7 +181,7 @@ function refreshUi(): void {
   setText(el.arrow, dir === 'up' ? '▲' : dir === 'down' ? '▼' : '');
   toggleClass(el.arrow, 'up', dir === 'up');
   toggleClass(el.arrow, 'down', dir === 'down');
-  setText(el.stock, String(w.stock));
+  setText(el.stock, String(w.stock.ore));
   setText(el.ships, String(w.ships.length));
   setText(el.rate, `${fmt10(shipsPerMinX10(w))}/min`);
   setText(el.pause, s.paused ? 'Play' : 'Pause');
@@ -192,7 +192,7 @@ function refreshUi(): void {
   const lines = bannerLines(w);
   const showBanner = lines.length > 0 || forceBanner;
   setHidden(el.banner, !showBanner);
-  if (lines.length === 0 && forceBanner) lines.push('BLOOM · strip 0.8/s · regrow 0.5/s · 6 lost', 'ROOT · strip 0.8/s · regrow 1/s · 2 lost');
+  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'ROOT · 6 Thorn 0 Spore · strip 0.8/s · 2 lost');
   if (showBanner && el.banner.dataset.text !== lines.join('|')) {
     el.banner.dataset.text = lines.join('|');
     el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
@@ -220,7 +220,7 @@ function refreshUi(): void {
 
 el.banner.addEventListener('click', () => {
   const first = activeBattles(app.session.world)[0];
-  const node = first ? first.node : app.session.world.nodes.findIndex((n) => n.kind === 'rich');
+  const node = first ? first.node : app.session.world.nodes.findIndex((n) => n.kind === 'heart');
   if (node >= 0) sheet.open(node);
 });
 
@@ -271,7 +271,7 @@ window.__factory4x = {
   },
   selected: () => sheet.selected,
   pendingBuilds: () => app.session.world.queue.length + (app.session.world.activeBuild ? 1 : 0),
-  stock: () => app.session.world.stock,
+  stock: () => app.session.world.stock.ore,
   paused: () => app.session.paused,
   inputCount: () => app.session.log.length,
   shipsAt: (node) => shipCounts(app.session.world).at[node] ?? 0,
@@ -285,7 +285,7 @@ window.__factory4x = {
   },
   debugShowNotices: (on) => {
     forceBanner = on;
-    if (on) toast.show('Root cut: 15 sent, 3 lost. The Bloom wilts: 12 → 8 thorns, regrows 5× slower.\n\nRoot held: 10 sent, 10 lost, 2 thorns stripped\nRegrowth outpaced the wave. 10 ships strip 0.6 thorns/s; the Root regrows 1/s.');
+    if (on) toast.show('Root cut: 15 sent, 3 lost. The Heart wilts: 10 Thorns 14 Spores → 6 Thorns 7 Spores, regrows 5× slower.\n\nP4 held: 10 sent, 10 lost, 2 guards stripped\nRegrowth outpaced the wave. 10 ships strip 0.6 guards/s; P4 regrows 1/s.');
     else toast.hide();
     refreshUi();
   },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createWorld, defaultData, guardianStatus, isValidInput, step, type Input, type World } from '@factory4x/sim';
+import { createWorld, defaultData, guardianStatus, isValidInput, step, type World } from '@factory4x/sim';
 import { fleetPower, guardNeed, nextEconomyOrder, nextTarget, nodeFinished, readyToAttack, strategies } from '../src/strategies.ts';
 
 const N = { probe: 0, a1: 1, a2: 2, a3: 3, a4: 4, a5: 5, p1: 10, p2: 11, p3: 12, p4: 13, root: 14, heart: 15 } as const;
