@@ -143,7 +143,8 @@ describe('overworld text comes from selectors and live tunables', () => {
 
   it('the landing notice names every research effect in play, and only those', () => {
     const none = landingEffects(campaignWorld(1, data, {}));
-    expect(landingNotice('Glass Shoal', none)).toBe(`Landed in Glass Shoal · ${none.openingOre} ore`);
+    expect(landingNotice('Glass Shoal', { ...none, fleetCap: null })).toBe(`Landed in Glass Shoal · ${none.openingOre} ore`);
+    expect(landingNotice('Glass Shoal', none)).toBe(`Landed in Glass Shoal · ${none.openingOre} ore · fleet limit ${none.fleetCap}`);
     const w = campaignWorld(1, data, { reclaimed: ['landfall'], research: { opening: 2, extract: 1, rigs: 2, yards: 1, lancer: 1, flak: 1 } });
     const fx = landingEffects(w);
     const text = landingNotice('Glass Shoal', fx);

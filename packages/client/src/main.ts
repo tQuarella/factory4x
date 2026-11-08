@@ -7,6 +7,7 @@ import {
   activeBattles,
   areaStatus,
   campaignStatus,
+  fleetStatus,
   defaultData,
   isCaptured,
   isReclaimed,
@@ -33,6 +34,7 @@ import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
 import {
   bannerLines,
   battleReport,
+  fleetFullNotice,
   landingNotice,
   openedByReclaim,
   reclaimNotice,
@@ -40,6 +42,7 @@ import {
   unlockNotice,
   withdrawNotice,
 } from './report.ts';
+import { RecyclePanel } from './recyclepanel.ts';
 import { SendPanel } from './sendpanel.ts';
 import { Session, dataWithDefaults, replayData, type Speed } from './session.ts';
 import { Sheet } from './sheet.ts';
@@ -81,9 +84,11 @@ const sheet = new Sheet($('sheet'), {
   send,
   sendAll,
   choose: (from, to) => sendPanel.open(from, to),
+  recycle: (node) => recyclePanel.open(node),
   close: () => closeSheet(),
 });
 const sendPanel = new SendPanel($('sendpanel'), { world: () => app.session.world, sendAll });
+const recyclePanel = new RecyclePanel($('recyclepanel'), { world: () => app.session.world, sendAll, notice: (text: string) => toast.show(text) });
 const worldHost = {
   get session() {
     return app.session;
@@ -169,6 +174,7 @@ function adopt(session: Session): void {
   sheet.close();
   closeWorldSheets();
   sendPanel.close();
+  recyclePanel.close();
   toast.hide();
   $('result').hidden = true;
   $('win').hidden = true;
@@ -278,6 +284,8 @@ const el = {
 let forceBanner = false;
 /** Unlocked ship types as of the last look, per area visit, so a resumed run doesn't announce old unlocks. */
 const unlockSeen: { world: unknown; ships: Record<string, boolean> } = { world: null, ships: {} };
+/** Whether the "fleet full" notice has been shown in this area visit (reset at each landing and on a new session). */
+const fleetSeen: { world: unknown; shown: boolean } = { world: null, shown: false };
 /** Which screen the last refresh showed, per world, so only a change inside one session raises a landing or return notice. */
 const modeSeen: { world: unknown; active: number | null } = { world: null, active: null };
 
@@ -298,9 +306,11 @@ function modeTransition(): void {
   modeSeen.active = active;
   sheet.close();
   sendPanel.close();
+  recyclePanel.close();
   closeWorldSheets();
   $('result').hidden = true;
   unlockSeen.world = null;
+  fleetSeen.world = null;
   resizeViews();
   if (active !== null) {
     // Landing: name every research effect in play.
@@ -354,7 +364,7 @@ function refreshUi(): void {
     setText(el.arrow, dir === 'up' ? '▲' : dir === 'down' ? '▼' : '');
     toggleClass(el.arrow, 'up', dir === 'up');
     toggleClass(el.arrow, 'down', dir === 'down');
-    hud.update(w);
+    hud.update(w, data);
     el.pause.setAttribute('aria-label', s.paused ? 'Play' : 'Pause');
     toggleClass(el.pause, 'on', s.paused);
     for (const b of document.querySelectorAll<HTMLElement>('.speed')) toggleClass(b, 'on', Number(b.dataset.speed) === s.speed);
@@ -377,7 +387,7 @@ function refreshUi(): void {
     if (ended.length > 0) {
       ended.sort((a, b) => a.endTick - b.endTick || a.node - b.node);
       s.flags.seenBattleEnd = ended[ended.length - 1]!.endTick;
-      toast.show(ended.map((r) => battleReport(w, r)).join('\n\n'));
+      toast.show(ended.map((r) => battleReport(w, r, data)).join('\n\n'));
     }
     // The first delivery that unlocks Lancers or Flak: say what their yard is doing; one tap opens the Probe.
     if (unlockSeen.world !== w) {
@@ -395,6 +405,17 @@ function refreshUi(): void {
         })
         .join('\n\n');
       toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`, () => sheet.open(0));
+    }
+    // H5: the first time the fleet fills in a visit, say why the yards stopped and what to do. A resumed, already full fleet isn't announced again.
+    const fleet = fleetStatus(w, data);
+    if (fleetSeen.world !== w) {
+      fleetSeen.world = w;
+      fleetSeen.shown = fleet.full;
+    }
+    if (fleet.full && !fleetSeen.shown && fleet.cap !== null) {
+      fleetSeen.shown = true;
+      const text = fleetFullNotice(fleet.count, fleet.cap);
+      toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`);
     }
   }
   // The first-run hints give way to notices, so the strip keeps room for them.
@@ -416,6 +437,7 @@ function refreshUi(): void {
   if (!onWorld) {
     sheet.update();
     sendPanel.update();
+    recyclePanel.update();
   }
   tuning.update();
 }

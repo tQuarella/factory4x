@@ -33,7 +33,7 @@ body { font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 #bars { padding-top: var(--safe-t); background: var(--panel); border-bottom: 1px solid var(--line); }
 #stats { display: flex; min-height: 48px; align-items: center; padding: 0 10px; gap: 8px; }
 .stat { display: flex; flex-direction: column; min-width: 0; flex: 1 1 0; line-height: 1.1; }
-.stat.big { flex: 0 0 auto; min-width: 96px; }
+.stat.big { flex: 0 0 auto; min-width: 84px; }
 .stat .lbl { font-size: 10px; letter-spacing: 0.08em; color: var(--dim); }
 .stat .num { font-size: 18px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .stat.big .num { font-size: 28px; color: var(--teal); line-height: 1; }
@@ -184,7 +184,17 @@ textarea { width: 100%; min-height: 120px; background: var(--panel2); color: var
 }
 
 /* ---- H3: HUD chips, yards and assembly, guard rows, tags, send panel ---- */
-#chips { display: flex; flex: 1 1 0; min-width: 0; flex-wrap: wrap; justify-content: flex-end; align-content: center; gap: 2px 10px; padding: 2px 0; }
+#chips { display: flex; flex: 1 1 0; min-width: 0; flex-wrap: wrap; justify-content: flex-end; align-content: center; gap: 2px 4px; padding: 2px 0; }
+/* H5: the resource chips flow as before; the ship chips and the fleet chip are one no-wrap group, so the fleet chip never leaves the ships it counts. */
+.chip-row.res { display: contents; }
+/* Phones: tighter chip gaps so all five resource chips share one row beside the ORE/MIN block. */
+@media (max-width: 480px) and (max-aspect-ratio: 1/1) {
+  #chips { column-gap: 2px; }
+  .chip-row.ships { column-gap: 2px; }
+}
+.chip-row.ships { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 2px 4px; max-width: 100%; }
+.chip-row.ships:not(:has(.chip:not([hidden]))) { display: none; }
+.chip-row .chip { white-space: nowrap; column-gap: 3px; }
 .chip { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: 4px; min-height: 24px; font-size: 14px; }
 .chip b { font-size: 15px; color: var(--ink); }
 .chip small { grid-column: 1 / -1; font-size: 10px; color: var(--dim); line-height: 1.1; }
@@ -223,6 +233,10 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 .capture-order b { display: block; color: var(--teal); margin-top: 2px; overflow-wrap: anywhere; }
 @media (min-aspect-ratio: 1/1) {
   #chips { flex: none; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 2px; padding: 0 4px 6px; }
+  /* H5: in the column the ship and fleet chips stack like the resource chips (a no-wrap row spilled out of the 132-156 px column),
+     and the fleet chip shows its icon and "9/12" without the word, which doesn't fit 132 px (the tooltip keeps it). */
+  .chip-row.ships { display: contents; }
+  .chip.fleet .fl-word { display: none; }
 }
 
 /* ---- H4: overworld HUD, area and research sheets, win panel ---- */
@@ -286,3 +300,14 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 @media (min-aspect-ratio: 1/1) {
   #b-research { grid-column: 1 / -1; margin: 0; width: auto; }
 }
+
+/* ---- H5: fleet chip, the Yards header, Recycle, the Command limit card ---- */
+/* The chip keeps a transparent 1 px edge so it never shifts when it turns amber (palette.probe, set in hud.ts) at the limit. */
+.chip.fleet { border: 1px solid transparent; border-radius: 8px; padding: 0 5px; white-space: nowrap; }
+.chip.fleet b { white-space: nowrap; }
+.chip.fleet.full b { color: var(--gold); }
+.fleet-line { font-size: 13px; color: var(--ink); padding: 2px 0 4px; overflow-wrap: anywhere; }
+.btn.recycle-btn { display: flex; align-items: center; justify-content: center; gap: 8px; border-color: #2f6c73; }
+.recycle-card h2 { display: flex; align-items: center; gap: 8px; }
+.recycle-preview { padding: 8px 0; font-size: 18px; font-weight: 700; color: var(--teal); text-align: center; border-top: 1px solid var(--line); }
+.rcard.limit { border-color: #3a5c8a; }

@@ -3,6 +3,7 @@ import {
   activeBattles,
   combatRates,
   counterTag,
+  fleetStatus,
   guardianStatus,
   supplyStatus,
   unlockStatus,
@@ -19,6 +20,7 @@ import {
   type RawResource,
   type Resource,
   type ShipType,
+  type ShipTypeCounts,
   type World,
 } from '@factory4x/sim';
 import { fmt10 } from './format.ts';
@@ -143,7 +145,7 @@ export function regrowChange(world: Readonly<World>): string {
  * Battle report toast text, plus a plain reason line so a failed wave reads
  * as a lesson: regrowth outpaced it, or the wave was too small.
  */
-export function battleReport(world: Readonly<World>, r: BattleResult): string {
+export function battleReport(world: Readonly<World>, r: BattleResult, data?: SimData): string {
   const sent = r.shipsEngaged;
   const counts = `${sent} sent, ${r.shipsLost} lost`;
   const name = guardName(world, r.node);
@@ -163,12 +165,70 @@ export function battleReport(world: Readonly<World>, r: BattleResult): string {
   const rates = combatRates(world, r.node, r.engagedByType);
   const rate = `${sent} ships strip ${fmt10(rates.killPerSecX10)} guards/s; ${name} regrows ${fmt10(rates.regrowPerSecX10)}/s.`;
   if (r.outcome === 'withdrew') return `Wave withdrew: ${counts}, ${r.guardsKilled} guards stripped\n${rate}`;
-  const first = `${name} held: ${counts}. ${repelHint(world, r)}`;
+  const first = `${name} held: ${counts}. ${repelHint(world, r)}${fullFleetHint(world, r, data)}`;
   const why =
     rates.killPerSecX10 <= rates.regrowPerSecX10
       ? 'Regrowth outpaced the wave.'
       : `Too few ships to strip all ${guardianStatus(world, r.node).totalCap} guards before the wave was lost. Send more at once.`;
   return `${first}\n${why} ${rate}`;
+}
+
+// ---------------------------------------------------------------------------
+// H5: the fleet limit.
+
+/** The fleet chip text, "Fleet 9/12". */
+export function fleetChipText(count: number, cap: number): string {
+  return `Fleet ${count}/${cap}`;
+}
+
+/** The probe sheet's Yards header, "Fleet 9/12 · Command limit 1/3" (no Command limit part when the data has none). */
+export function fleetLine(f: { count: number; cap: number; level: number; maxLevel: number }): string {
+  const head = fleetChipText(f.count, f.cap);
+  return f.maxLevel > 0 ? `${head} · Command limit ${f.level}/${f.maxLevel}` : head;
+}
+
+/** The first-time notice when the fleet reaches its limit in a visit. */
+export function fleetFullNotice(count: number, cap: number): string {
+  return `Fleet full (${count}/${cap}): yards paused. Recycle ships at a node to change your mix.`;
+}
+
+const SHIP_LOWER: Record<ShipType, { one: string; many: string }> = {
+  drone: { one: 'drone', many: 'drones' },
+  lancer: { one: 'lancer', many: 'lancers' },
+  flak: { one: 'flak', many: 'flak' },
+};
+
+/** "Recycled 3 drones: +27 ore." */
+export function recycleNotice(counts: Readonly<ShipTypeCounts>, ore: number): string {
+  const parts = SHIP_TYPES.filter((t) => counts[t] > 0).map((t) => `${counts[t]} ${counts[t] === 1 ? SHIP_LOWER[t].one : SHIP_LOWER[t].many}`);
+  return `Recycled ${parts.join(', ')}: +${ore} ore.`;
+}
+
+/**
+ * The repelled hint for a wave sent at the limit (at least capAtSend - 1 ships): " You sent a full fleet. Change the mix, cut the
+ * Root, or raise the limit (Command limit)." A fed Heart leads with the Root cut. With no Root to cut (or the Heart not the target)
+ * that part is left out, and so is "raise the limit" at the last Command limit level. Empty when the limit was off or the wave smaller.
+ */
+export function fullFleetHint(world: Readonly<World>, r: BattleResult, data?: SimData): string {
+  const cap = r.capAtSend;
+  if (cap === null || r.shipsEngaged < cap - 1) return '';
+  const sup = supplyStatus(world);
+  const fed = world.nodes[r.node]!.kind === 'heart' && sup.hasRoot && sup.rootAlive;
+  let canRaise = true;
+  if (data !== undefined) {
+    const f = fleetStatus(world, data);
+    canRaise = f.maxLevel > 0 && f.level < f.maxLevel;
+  }
+  const options = fed ? ['Cut the Root', 'change the mix'] : ['Change the mix'];
+  if (canRaise) options.push('raise the limit (Command limit)');
+  const last = options[options.length - 1]!;
+  const list = options.length === 1 ? last : `${options.slice(0, -1).join(', ')}${options.length > 2 ? ',' : ''} or ${last}`;
+  return ` You sent a full fleet. ${list}.`;
+}
+
+/** The area result and win panels' line, "5 ships (+40 ore)". */
+export function recycledText(ships: number, ore: number): string {
+  return `${ships} ${ships === 1 ? 'ship' : 'ships'} (+${ore} ore)`;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +281,7 @@ export function landingNotice(areaName: string, fx: LandingEffects): string {
   if (fx.yardTimePct < 100) parts.push(`ships build ${100 - fx.yardTimePct}% faster`);
   const designs = (['lancer', 'flak'] as const).filter((d) => fx.designs[d]).map((d) => SHIP_NAME[d]);
   if (designs.length > 0) parts.push(`${designs.join(' and ')} ${designs.length === 1 ? 'yard' : 'yards'} on`);
+  if (fx.fleetCap !== null) parts.push(`fleet limit ${fx.fleetCap}`);
   return parts.join(' · ');
 }
 
@@ -252,6 +313,8 @@ export function purchaseNotice(row: Pick<ResearchRow, 'id' | 'name' | 'level' | 
       return `${row.name} ${row.level}: you land with ${nodeList(rigNodes)} already mined`;
     case 'yards':
       return `${row.name} ${row.level}: ships build ${100 - row.effect}% faster`;
+    case 'fleet':
+      return `${row.name} ${row.level}: fleet limit now ${row.effect}.`;
     case 'lancer':
     case 'flak':
       return `${row.name} researched: its yard can run (each ship still needs its component made in the area)`;
@@ -260,13 +323,30 @@ export function purchaseNotice(row: Pick<ResearchRow, 'id' | 'name' | 'level' | 
   }
 }
 
-/** Why a research button is disabled, from `researchStatus`: items, then areas, then the shortest missing resource. */
+/** Lower-case tier name for the requirement wording ("medium"). */
+function tierWord(tier: number): string {
+  return (TIER_NAME[tier] ?? `tier ${tier}`).toLowerCase();
+}
+
+/** The tier requirement as the sheet words it, without "Needs": "a light area reclaimed", "both medium areas reclaimed". */
+export function tierRequirementText(tier: number, count: number): string {
+  if (count <= 1) return `a ${tierWord(tier)} area reclaimed`;
+  return `${count === 2 ? 'both' : String(count)} ${tierWord(tier)} areas reclaimed`;
+}
+
+/**
+ * Why a research button is disabled, from `researchStatus`: the limit being off (tuning), items, areas, tier counts, then the
+ * shortest missing resource.
+ */
 export function researchBlock(row: ResearchRow, itemLabel: (id: string, level: number) => string, areaName: (id: string) => string): string {
   if (row.cost === null) return 'Max';
+  if (row.missing.capOff) return 'Fleet limit is off (tuning)';
   const item = row.missing.items[0];
   if (item) return `Needs ${itemLabel(item.id, item.level)}`;
   const area = row.missing.areas[0];
   if (area) return `Needs ${areaName(area)} reclaimed`;
+  const tier = row.missing.tiers[0];
+  if (tier) return `Needs ${tierRequirementText(tier.tier, tier.count)}`;
   let best: RawResource | null = null;
   for (const r of RAW_ORDER) {
     const short = row.missing.resources[r];
@@ -309,6 +389,9 @@ export function effectText(row: Pick<ResearchRow, 'id' | 'level' | 'maxLevel' | 
       if (next === null) return `Land with ${list(row.effect)} mined`;
       return row.effect === 0 ? `Land with ${list(next)} mined` : `${list(row.effect)} mined → ${list(next)} mined`;
     }
+    case 'fleet':
+      if (row.effect === 0) return 'Fleet limit is off (tuning)';
+      return `Fleet limit ${arrow(String(row.effect), next === null ? null : String(next), '')}`;
     case 'lancer':
     case 'flak':
       return row.level > 0 ? 'Researched: its yard can run' : 'Unlocks its yard';

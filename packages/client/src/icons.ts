@@ -1,5 +1,5 @@
 /** Small canvas icons for the HUD chips, guard rows, yard rows and the send panel. Drawn once when built. */
-import { drawResearchIcon, drawResourceIcon, drawShip, drawSpore, drawStockpileIcon, drawThorn, type ResearchIconId, type ResourceKind, type ShipType } from './placeholders.ts';
+import { drawFleetIcon, drawRecycleIcon, drawResearchIcon, drawResourceIcon, drawShip, drawSpore, drawStockpileIcon, drawThorn, type ResearchIconId, type ResourceKind, type ShipType } from './placeholders.ts';
 import { h } from './dom.ts';
 
 /** Sets a canvas up for a `size` px square icon (crisp on 2x screens), clears it and draws `draw(ctx, r)` centred, r = half the size minus a pixel. */
@@ -33,5 +33,10 @@ export const guardIcon = (parent: HTMLElement, size: number, type: 'thorn' | 'sp
 
 export const researchIcon = (parent: HTMLElement, size: number, id: ResearchIconId): HTMLCanvasElement =>
   iconCanvas(parent, size, (ctx, r) => drawResearchIcon(ctx, r, id));
+
+/** The fleet icon (a trio between brackets; `full` closes the bracket in amber). Repaint with `paintIcon` when `full` changes. */
+export const fleetIcon = (parent: HTMLElement, size: number, full: boolean): HTMLCanvasElement => iconCanvas(parent, size, (ctx, r) => drawFleetIcon(ctx, r, full));
+
+export const recycleIcon = (parent: HTMLElement, size: number): HTMLCanvasElement => iconCanvas(parent, size, (ctx, r) => drawRecycleIcon(ctx, r));
 
 export const stockpileIcon = (parent: HTMLElement, size: number): HTMLCanvasElement => iconCanvas(parent, size, (ctx, r) => drawStockpileIcon(ctx, r));
