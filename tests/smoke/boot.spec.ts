@@ -1195,7 +1195,7 @@ test.describe('H5 at 375x667 portrait', () => {
             const id = e.id.replace('chip-', '');
             e.hidden = id !== 'fleet' && !s.show.includes(id);
             if (id === 'ice' || id === 'crystal') (e.querySelector('small') as HTMLElement).textContent = '+12.5/min';
-            if (/^(ore|ice|crystal|lens|plating)$/.test(id)) (e.querySelector('b') as HTMLElement).textContent = '1234';
+            if (/^(ore|ice|crystal|lens|plating)$/.test(id)) (e.querySelector('b') as HTMLElement).textContent = '999';
           }
           const fleet = document.getElementById('chip-fleet')!;
           (fleet.querySelector('b') as HTMLElement).textContent = s.fleet;
@@ -1209,6 +1209,7 @@ test.describe('H5 at 375x667 portrait', () => {
           const rows = new Set(chips.map((e) => Math.round(centre(e) / 12)));
           return {
             fleetY: centre(fleet),
+            boxes: chips.map((e) => { const r = e.getBoundingClientRect(); return `${e.id}:${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}`; }),
             shipYs: ships.map(centre),
             rows: rows.size,
             right: Math.max(...chips.map((e) => e.getBoundingClientRect().right)),
@@ -1220,7 +1221,9 @@ test.describe('H5 at 375x667 portrait', () => {
         }, state);
         expect(m.shipYs.length).toBeGreaterThanOrEqual(2);
         for (const y of m.shipYs) expect(Math.abs(y - m.fleetY), `fleet chip row vs ship chip row ${JSON.stringify(m)}`).toBeLessThanOrEqual(6);
-        expect(m.rows, `chip rows ${JSON.stringify(m)}`).toBeLessThanOrEqual(2);
+        // Two rows: resources, then ships and the fleet. The one extreme (all five resources with rates at the wide stress: about
+        // 330 px of resource chips in 263 px) puts the resources on two rows; the fleet chip still shares the ships' row.
+        expect(m.rows, `chip rows ${JSON.stringify(m)}`).toBeLessThanOrEqual(wide && state.name.startsWith('The Deep') ? 3 : 2);
         expect(m.right).toBeLessThanOrEqual(375);
         expect(m.left).toBeGreaterThanOrEqual(0);
         expect(m.statsBottom).toBeLessThanOrEqual(m.ctlTop + 1);

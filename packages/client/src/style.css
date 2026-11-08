@@ -184,10 +184,11 @@ textarea { width: 100%; min-height: 120px; background: var(--panel2); color: var
 }
 
 /* ---- H3: HUD chips, yards and assembly, guard rows, tags, send panel ---- */
-#chips { display: flex; flex: 1 1 0; min-width: 0; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; padding: 2px 0; }
-/* H5: two rows at most (resources, then ships and the fleet chip), each row on one line. */
-.chip-row { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 2px 4px; max-width: 100%; }
-.chip-row:not(:has(.chip:not([hidden]))) { display: none; }
+#chips { display: flex; flex: 1 1 0; min-width: 0; flex-wrap: wrap; justify-content: flex-end; align-content: center; gap: 2px 4px; padding: 2px 0; }
+/* H5: the resource chips flow as before; the ship chips and the fleet chip are one no-wrap group, so the fleet chip never leaves the ships it counts. */
+.chip-row.res { display: contents; }
+.chip-row.ships { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 2px 4px; max-width: 100%; }
+.chip-row.ships:not(:has(.chip:not([hidden]))) { display: none; }
 .chip-row .chip { white-space: nowrap; column-gap: 3px; }
 .chip { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: 4px; min-height: 24px; font-size: 14px; }
 .chip b { font-size: 15px; color: var(--ink); }
