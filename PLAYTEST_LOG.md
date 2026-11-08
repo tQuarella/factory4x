@@ -57,3 +57,13 @@ Owned by the Designer. Each entry: date, build, who (owner or friend name), the 
 - **Not a balance problem.** Retuning `map.variants` or `bloom.starved*` would move the 50 s margins around but leave the sequence alone. No retune is proposed.
 
 **Action:** DESIGN.md → "H3 candidates (awaiting the owner's pick)": three options, with Fight to grow recommended. QUESTIONS.md Q13 asks the owner to pick. No spec until then.
+
+### 2026-11-08 · build build-20261108-2 (M2 H3, Counter web) · owner
+
+> The mix of enemy ships at each node added choice. Eg, see the heart is spore-heavy so go win the easiest flak node.
+>
+> Logistics is still very simple. That may be fine at the scope of a small area.
+>
+> Idea: connect many areas through an overworld. Once an area is taken its resources can be sent elsewhere. Manage logistics in the overworld and choose the next areas to reclaim. Research persistent upgrades that make it possible to reclaim more heavily defended areas. That is the progression loop. Start with nothing (only able to reclaim an undefended area), that unlocks some additional strength, reclaim richer area, get stronger, repeat, until you have enough resources to build the new probe. That progression should be punctuated with some meatier steps throughout a miner (pun intended) grind. Progression includes new ship types (still need the required resources locally), extraction speed, starting resources, etc
+
+**Interpretation:** pending the Designer's triage (iteration 4).

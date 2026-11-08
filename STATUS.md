@@ -3,11 +3,19 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 3, hypothesis H3: Counter web)
-**State:** Awaiting owner feedback on build-20261108-2 (M2 H3: Counter web). Only Can wait work until feedback arrives.
+**State:** Iteration 4 started 2026-11-08. Owner feedback on build-20261108-2 is in PLAYTEST_LOG.md (overworld idea). Designer triaging and steelmanning; next hypothesis goes to the owner before any spec.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-2 (H3 Counter web), commit a4096a7, live (CI gates and deploy green; site shows a4096a7).
-**Last updated:** 2026-11-07 (desktop)
+**Last updated:** 2026-11-08 (desktop)
+
+## Iteration 4 ledger
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | triage build-20261108-2 feedback + overworld steelman | launch | Plan |
+
+Launches: 1 / 12. Resumes: 0.
 
 ## Iteration 2 (H2) ledger (closed)
 

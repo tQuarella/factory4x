@@ -15,6 +15,8 @@ What changed:
 
 Try this: build your asteroid economy, then open the sheets of two or three pockets and pick your first one by its prize and its ring. When its prize reaches the Probe, a notice tells you which ship unlocked: turn that yard on at the Probe. Before each next pocket, check the Strong/Weak tags and use "Choose…" to send a mix. If you have time, tap New run after the Heart for a different layout.
 
+**Owner's answer (2026-11-08, in chat):** recorded verbatim in PLAYTEST_LOG.md (2026-11-08 entry). The guard mix added real choice; logistics still simple; proposes an overworld of areas with persistent research as the progression loop.
+
 Fun questions (the H3 hypothesis):
 1. After your first pocket, did you have more than one sensible next target? What decided it?
 2. Did the ring and the Strong/Weak tags tell you which ships to bring? Did you ever send the wrong ships, and did it sting?
