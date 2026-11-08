@@ -530,6 +530,41 @@ Only the minimal edits needed to keep `packages/client/src/*` and `packages/bots
 4. Update every DESIGN.md table the data tests read (H3 "Layouts", H4 "Area guards", "Areas", "Research", H5 "Tunables") together with the data. Search DESIGN.md for stale statements of what changed. Recompute every derived claim from its table.
 5. Re-run the bot suite and the gates, commit the report as `reports/archive/h5-design-data-v9.*`, and report which flags hold. Put any out-of-scope leftover at the top of the report as a blocker.
 
+## Milestone 2, iteration 6: owner bugs from build-20261108-4 (ship regardless of the H6 pick)
+
+Both come from the owner's feedback on build-20261108-4 (PLAYTEST_LOG.md). They are client-only and ship in iteration 6 whatever Q19 picks. The Director may run them as one launch and one review (two ids, one branch), or fold them into the H6 client task. Each needs a smoke test that **fails on current `main`**, run and reported, before the fix.
+
+| Id | Task | Owner | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| h6-bug-topbar-oscillation | The in-area top bar shifts back and forth while resources are gained and spent | engineer | none | Ready |
+| h6-bug-buffer-toast-flicker | The "backed up" warning shows and hides rapidly while an asteroid buffer sits at full, moving the buttons under it | engineer | none | Ready |
+
+### h6-bug-topbar-oscillation (engineer)
+
+Owner: "The top bar content started oscillating while gaining and spending resources." The likely cause is chip widths changing as counts change digit count or glyph width (`#chips` wraps with `justify-content: flex-end`), but the engineer diagnoses. The fix may not hide or truncate digits.
+
+**Files:** `packages/client/src/hud.ts`, `packages/client/src/style.css`, `tests/smoke/**`, plus a dev hook if needed.
+
+**Acceptance (test the state the bug is about):**
+1. A smoke test holds the fullest realistic HUD: The Deep, all five resource chips, all three ship chips and the fleet chip. It changes the counts **every tick** for at least 200 frames at 4x, crossing digit boundaries both ways (0↔1, 9↔10, 99↔100, 999↔1000 for ore). Ice and crystal rates appear and disappear, and lens and plating rise and fall through 0.
+2. Across those frames, every HUD element (each chip, each chip row, the stat blocks and the buttons) keeps its x, y, width and height within 1 px, and the bar's row count doesn't change.
+3. The test runs at 375x667 portrait under the wide-font stress, and in the landscape and desktop layouts.
+4. No chip shows or hides while its count passes through 0 within a visit.
+5. It still fits the H5 rule (at most two rows at 375 px). New smoke tests pass `--repeat-each 5` on both projects, and gates pass with green branch CI.
+
+### h6-bug-buffer-toast-flicker (engineer)
+
+Owner: "When an asteroid buffer is full the toast warning shows and hides rapidly, shifting the buttons under them." The asteroid sheet's warning ("Backed up: route at capacity. Upgrade it.", `packages/client/src/sheet.ts`) and the map's "!" badge follow `nodeStatus(...).backedUp`, which is `buffer >= bufferCap` (`packages/sim/src/selectors.ts`). A pod leaving drops the buffer to cap − 1, and extraction refills it, so the flag flips every few ticks. The engineer picks the fix. For example: a steady definition (extraction rate above route capacity, or hysteresis over a window), and a reserved slot for the line so showing it never moves anything. A selector change is read-only and doesn't touch determinism. It needs core-engineer review if it lands in `packages/sim`.
+
+**Files:** `packages/client/src/sheet.ts`, `view.ts`, `style.css`, `tests/smoke/**`. Also `packages/sim/src/selectors.ts` and its tests, if the fix is in the selector.
+
+**Acceptance (test the state the bug is about):**
+1. A test builds an asteroid whose extraction exceeds its route capacity, so the buffer hovers at full (alternating cap and cap − 1). It keeps the sheet open for at least 10 game seconds at 1x and again at 4x.
+2. Across every frame, the warning is shown continuously (no hidden frame), the map badge and the dashed backed-up route don't blink, and every button below the warning keeps its position within 1 px.
+3. After the route is upgraded so its capacity covers extraction, the warning clears within 2 game seconds and stays cleared. Clearing it doesn't move the buttons either.
+4. The no-route warning still works.
+5. At 375x667 under the wide-font stress. New smoke tests pass `--repeat-each 5` on both projects, and gates pass with green branch CI.
+
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-worktree-prune** (engineer; added by the Retrospective after build-20261108-4): after H5 the repo has 14 worktrees besides the main checkout and 40 local branches besides `main`, every one already in `main` (`git branch --merged main`): agent worktrees under `.claude/worktrees/` (h3, h4 and h5 tasks), alias branches (`h4-bots-core`, `h4-client-core`, `h4-dd-core`, `h5-client-core`, `h5-art-merge`) and `worktree-agent-*` branches. `npm run worktree -- remove <id>` only knows `../Factory4X-wt/<id>`, so the reminder `merge-task` prints doesn't fit agent worktrees. Add `npm run worktree -- prune [--dry-run]` to `scripts/worktree.mjs`: remove every worktree and local branch whose head is already in `main` and has no local-only commits, skip locked worktrees and any with uncommitted changes (list them instead), and never touch `origin`. Acceptance: `--dry-run` lists exactly what would go and why each kept item stays; a test or scripted check with a temporary merged and unmerged branch. The Director then runs it after each handoff.

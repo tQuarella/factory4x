@@ -30,7 +30,17 @@ Protected files changed this build: none. Every merge passed the protected-files
 
 ## Blocking
 
-None.
+### Q19. Which slice should H6 test? (2026-11-08, Designer)
+
+The fleet limit worked: you thought about your mix, recycled, and an area felt stronger. Two things didn't. A limit raise felt small, and cutting the Root was the only sensible play. They share one cause: a Root cut does the same job as a raise, so the raise only saves a fight. Details: DESIGN.md → "H6 candidates".
+
+- **A. Open frontier with locked regions (recommended):** about 10–12 areas on a map you pan. The next region stays closed until you reclaim a command relay area, which raises your limit by 8 and opens the lanes on the map. You need only some of the areas. It's your open-world idea, built on the limit.
+- **B. Keys, not amounts:** the same six areas. Command limit becomes two bigger levels, each the only key to a specific area, and the map shows what each one opened. Smaller, but it doesn't touch "too linear".
+- **C. Node rigs** (your parked idea): later, not H6. It needs a VISION.md change ("not tile-by-tile belts"), and it's a second game in size.
+
+**Rides along with A or B, from your Root suggestion:** keep the Root, but reward taking the heart with its Root alive. The Root is grafted and your fleet limit rises by 4 for the rest of the system. A cut is quicker; a graft gets you further. Say "remove the Root" instead if you'd rather.
+
+Answer with a letter, plus "remove the Root" if you want that over the graft. Default if unanswered: A with the graft.
 
 ## Answered
 

@@ -426,9 +426,125 @@ H4 (build-20261108-3, spec below) wrapped the field in a campaign:
 - a stockpile filled by hauls and shipments;
 - seven research items, including the Lancer and Flak designs and the probe core, which wins the game.
 
+H5 (build-20261108-4, spec below) added a fleet limit per area (12, raised to 18, 24 and 30 by the Command limit research), the Recycle order and the `fleetFull` yard state, with areas recalibrated so drones alone can't take a medium or The Deep.
+
 ## Hypotheses
 
-### H5 (Milestone 2, iteration 5, spec ready): Fleet cap
+### H6 candidates (awaiting the owner's pick)
+
+*Iteration 6, 2026-11-08. The triage is in PLAYTEST_LOG.md (build-20261108-4). The owner picks in QUESTIONS.md Q19. No spec until then.*
+
+H5 worked where it was meant to bite: the limit made the owner think about the mix, they recycled, and an area felt stronger (Q1, Q2). It failed on one claim: a limit raise didn't feel like a big step (Q3). The open map the owner asked for after build-3 was held back until strength was a capability; it now is.
+
+#### Why +6 slots felt small (Q3)
+
+All numbers are from "Calibration result (h5-design-data, data v9)" below.
+1. **Most raises had a substitute.** Level 1 opens the mediums' fed hearts, which a Root cut already opened at 12 (starved best mix 9). Level 2 opens The Deep's fed heart, which a cut opens at 18 (starved 13–15). Level 3 opens nothing; the spec calls it comfort. The only thing in the ladder that nothing else opens is The Deep at level 1. So two raises out of three save a Root-cut fight, and a fight saved is time. That's the H2–H4 trap again, one level up.
+2. **The key comes before the lock.** Level 1 costs 60 / 20 / 20 and needs one light area. The bots buy it at about 12:42, right after the light areas and before either medium. A player who buys it then never stands in front of the closed door it opens.
+3. **The limit stops binding after level 1.** A player who cuts Roots never needs more than 15 slots (The Deep starved) against a limit of 18. Levels 2 and 3 raise a ceiling nobody is touching.
+4. **Nothing changes on screen.** The purchase is a notice ("fleet limit now 18") and a bigger number on a chip. No area opens on the map, no new yard or ship appears, and an 18-ship wave looks like a 12-ship wave. A design, by contrast, adds a yard row and a new silhouette.
+5. **It's an amount, not a kind.** +6, +6, +6 is a shrinking share each time (50%, 33%, 25%). The owner's own examples of meaty steps were new ship types: things you can now *do*.
+
+**So a meaty step needs:**
+- **a lock you've already hit**, so you feel the step from the closed side;
+- **no other key**: no Root cut, grind level or waiting opens the same thing;
+- **a visible opening** at the moment you take it, on the map;
+- **a kind, not an amount**, where possible: a region, a ship type, a new area kind;
+- **fewer, bigger steps**, each followed by fights that use the new limit, so it keeps binding.
+
+#### The Root: remove it, or reward the heart taken with it alive (rides along with A or B)
+
+The owner, after build-4: "either remove the root mechanic or give some reward for taking the heart without taking the root first. Right now, there's really no reasonable choice other than taking the root." The bots agree: every winner cut every Root (H5 calibration). A cut costs one small fight, and a fed heart pays exactly what a starved one does. So going for the heart directly is strictly worse. Worse still, the cut is the substitute that hollows out the limit raises (point 1 above).
+
+**Remove the Root (the case for).**
+- The bypass is gone, so a raise or a mix becomes the only key. That fixes Q3's point 1 by deletion.
+- Simpler to read and to calibrate. One guarded node fewer in every medium.
+
+**Remove the Root (the case against).**
+- It deletes the owner's favourite moment ("Cutting the root was satisfying", H2) and half of pillar 3 ("or cut their supply first").
+- A medium becomes one heart behind one lock. That's a gate, not a choice.
+
+**Reward the intact take (the case for).**
+- It keeps both ways and makes them a trade: cut now and take the heart with fewer slots, or fight the fed heart with a full, mixed fleet and get something the cut can never give.
+- The intact path is the one that needs both counters at a higher limit, so the reward pulls the player into exactly the behaviour no bot used (mixes against fed hearts).
+- It turns raises into keys to a prize. A raise no longer saves a cut; it opens the graft.
+
+**Reward the intact take (the case against).**
+- If the reward is only more ore or a bigger haul, it's time again (the H2–H4 trap), and players will still cut.
+- If the reward is too strong, "never cut" becomes the new single line.
+
+**The reward must change what you can do next, not how fast.** Proposal, **Graft:** take a heart while its Root is alive and the Root is grafted. It stays on the map in amber, and your fleet limit rises by `root.graftLimit` for the rest of the system (default 4, range 0–8; 0 is today's rules, the in-build A/B; 2 is barely worth a fed fight; 8 makes every Root a must-graft). A cut Root can't be grafted.
+- **With the fleet cap:** a graft is a raise you earn by beating a lock the hard way. Each graft can open a heart that was closed (The Deep fed, a next band), so the choice at every medium is "cut and move on" or "graft and reach further".
+- **With Q3:** it's the meaty-step pattern. You see the fed heart closed, raise the limit or bring the right mix, take it, and a visible change on the map pays you in capability.
+- **Not the only key:** grafts add to, never replace, the relay steps (A) or Command limit levels (B). The calibration keeps every winning path possible with cuts alone, so a graft is an option, never a requirement. That keeps it a choice.
+- **Considered for later:** a graft that yields **sap**, a new resource that pays for a third design. It's a step in kind, but it needs a new ship type, so not in H6.
+
+**Recommendation:** Graft, not removal. **Capability flags** (added to A's or B's):
+1. On every seed, a `graft` strategy (never cuts) wins and ends with a higher limit than `composer` with cuts.
+2. With `root.graftLimit` at its default, at least one winning strategy per seed grafts at least one Root. At 0, `composer` cuts every Root (the control).
+3. At least one heart per seed is open to a grafting player and closed at the same point to one who cut.
+
+**Size:** small. One rule at capture, one tunable, a Root sprite state, a line on the heart's sheet ("Take it with the Root alive to graft: +4 fleet limit"), and a bot strategy.
+
+#### A. Open frontier with locked regions (recommended)
+
+- **Claim:** on an open map where each fleet-limit step is earned at a place you choose and opens a region you could already see, steps feel big and which areas you take is your choice.
+- **What changes:**
+  - About 10–12 areas in three bands on a taller overworld you pan (no zoom). Areas two lanes beyond your border show only their tier; neighbours show their ring and prize, as now.
+  - **The limit comes from places, not the shop.** Each band has two **command relays** (a new area kind, one per side). Reclaiming either raises the limit by `fleet.relayStep` (default 8, range 4–12; 4 is barely felt, 12 makes the next band easy). Command limit research goes away.
+  - **Band gates have no bypass.** The next band's hearts are calibrated closed at the current limit with any local mix, fed or starved. Reclaiming a relay lights up the lanes into the next band on the map, at once.
+  - **More areas than you need.** The core still needs both designs and The Deep, so 3–4 areas are optional. A repeated prize pays less (`areas.repeatHaulPct`, default 50, range 0–100; 0 makes extra areas worthless, 100 lets you farm them).
+  - Kept: the H5 cap at 12, Recycle, both designs, Roots inside bands (with Graft, above).
+  - Left out: lane logistics, an overworld Root, the "next decision" list, new ship or guard types.
+- **Capability flags:**
+  1. The probe shows every next-band heart closed at the current limit (any local mix, fed and starved), and at least one fits at the new one.
+  2. A `no-relay` strategy reclaims nothing beyond band 1 on any seed.
+  3. Every winner leaves at least one area untaken, and at least two winners on each seed end with different sets of reclaimed areas.
+  4. A `no-cut` strategy (never cuts a Root) wins on every seed, with at least one capturing wave per run that has two counter types at 30% or more each. This is the retro rule: the mix must be used, not only possible.
+  5. `drones-only` and a grind-only bot reclaim nothing in band 2.
+- **Size:** large, about H4: sim, client (pan, relay sheet, lane reveal), art (relay icon, band markings), bots, design-data. With the two bug fixes it fills the 12-launch budget, so the "left out" list is a hard limit.
+- **Risks:**
+  - Scope.
+  - More areas on the same 16-node frame could read as "a repeat" (H4's Q3). Relays are the only new area kind.
+  - Free order makes difficulty uneven: an area is trivial if you come late.
+  - Bot campaigns get longer than today's 40 minutes; the 120-minute cap may need raising.
+
+#### B. Keys, not amounts (the small fix on today's map)
+
+- **Claim:** a limit raise feels big when it opens an area you've already found closed and that nothing else opens.
+- **What changes:**
+  - Command limit becomes two levels of +8 (12 → 20 → 28; `research.fleet.step` 8).
+  - Recalibrate so each level is the only key: one medium and The Deep lose the Root-cut bypass (their starved hearts are also closed at the level below). The other medium keeps its cut, so cutting stays a tool. With Graft (above), going for a fed heart pays a few extra slots.
+  - The overworld marks each area "beyond your command" or "within reach", from a calibrated per-area level in data. Buying a level pulses the areas it opened ("Command limit 1: Thorn Garden is within reach"). A tuning toggle hides the marks, as the A/B against estimating.
+  - Same six areas.
+- **Capability flags:**
+  1. The probe shows each level opening at least one heart that was closed one level below with any local mix, fed and starved.
+  2. In every winning run, each level is bought after the bot has recorded at least one area closed: the lock comes before the key.
+  3. `no-command` reclaims none of the areas a level opens.
+  4. `no-cut` wins, with a two-type capturing wave (as A's flag 4).
+- **Size:** small to medium: sim and data, client (marks and the purchase pulse), bots, design-data. Little art.
+- **Risks:** it leaves "too linear" (build-3) untouched; six areas is one session, so the owner judges one or two raises; the marks could turn the area choice into a lookup.
+
+#### C. Node rigs (the owner's parked idea): later, not H6
+
+- **Claim:** designing one node type's rig on a small tap grid is a satisfying puzzle, and because the result applies to every node of that type, a better rig is a felt step.
+- **The case for it.**
+  - It deepens pillar 1 and pillar 4 ("the challenge is building an efficient network") where the game is thinnest. The owner said "logistics is still very simple".
+  - It turns the grind (Extraction +25%) into something you design instead of buy.
+  - "Build once, applied everywhere" keeps it phone-sized: one puzzle per node type, not per node.
+  - New parts change the shape of a good rig, not just its score, so unlocking a part is a step in kind.
+  - On a phone, a 6×6 or 7×7 grid of 44 px cells fits 375 px, played by tap to place and tap to rotate, with no dragging.
+- **The case against.**
+  - **VISION conflict.** "Logistics are abstract routes between nodes, not tile-by-tile belts." Routes between nodes stay abstract, but a rig *is* tile-by-tile belts inside a node, so the letter conflicts. It needs an owner-approved VISION.md edit first, for example: "Logistics between nodes are abstract routes; a node's own rig is a small tap-to-place grid."
+  - **Rates are time.** In a game with no clock and a fleet limit, a better rig refills you faster, which is the trap H2–H4 fell into. It is only a capability if a rig gates something: for example, a component rig with no valid layout makes no lenses at all.
+  - **Scope.** It's a second game: a deterministic flow model, an editor screen, part art, and an optimizer so the bots and calibration can judge layouts. Two iterations or more.
+  - **Focus.** The macro loop has only just started working. A sub-game now splits the next few builds.
+- **Capability flag, if built:** a part unlock changes the optimizer's best layout's shape, not only its rate, and at least two layouts within 10% of the best exist for each part set. A rate gap alone doesn't count.
+- **Verdict:** H7 or later, once A or B holds. If the owner wants it sooner, the cheapest test is one ore rig screen on today's map, after the VISION edit.
+
+### H5 (Milestone 2, iteration 5, tested on build-20261108-4): Fleet cap
+
+**Result (owner, 2026-11-08):** mostly supported, on short answers. The limit made the owner think about the mix and they recycled (Q1); an area was closed until a raise, a mix or a Root cut, and it felt stronger (Q2). A limit raise did not feel like a big step (Q3); see "Why +6 slots felt small (Q3)" under "H6 candidates" above. The owner also found the Root cut the only reasonable choice; see "The Root" there. Keep the cap, Recycle and the capability windows. See PLAYTEST_LOG.md.
 
 The owner picked A, "Fleet cap" (QUESTIONS.md Q17, 2026-11-08), and asked for no VISION.md edit yet (Q18). The cap ships as an experiment under the current pillar 1 wording. The background is "Owner direction 2026-11-08b: open world and a fleet cap (steelman)" above.
 

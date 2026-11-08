@@ -125,4 +125,37 @@ Owned by the Designer. Each entry: date, build, who (owner or friend name), the 
 
 (Answers the three H5 fun questions in order, in chat: 1 "Did the ship limit make you think about which ships to build? Did you ever recycle ships to change your mix?" 2 "Was there an area you couldn't take until a limit raise, a better mix or a Root cut? Did that area feel stronger?" 3 "Did a limit raise feel like a big step?")
 
-**Interpretation:** pending Designer triage (iteration 6).
+A follow-up from the owner on the same build, relayed by the Director (2026-11-08):
+
+> Suggestion: either remove the root mechanic or give some reward for taking the heart without taking the root first.  Right now, there's really no reasonable choice other than taking the root
+
+**Interpretation (Designer, 2026-11-08, iteration 6):** H5 is the first build where the owner's answers support the core claims. The answers are a few words each, so they support little beyond the questions themselves. What's still unknown is listed below.
+- **Fun question 1 (did the limit make you think about which ships to build; did you recycle): supported, both halves.** "Yes and yes."
+  - The currency moved from ore to slots. A drone slot does 2 damage and a matched counter slot 8, so filling the limit with whatever the yards made stopped working, and Recycle was used to change a mix.
+  - This is the centre of the claim (composition is the answer, not size). It's the first time a counter was a requirement and not a speed-up, against H4's "even flak vs drone vs lancer didn't feel like a necessary choice".
+  - It's also what no bot exercised: every bot winner cut every Root and often captured with one type (DESIGN.md H5 "Calibration result"). The owner did something the bots didn't, which is the evidence we lacked. Success criterion 2 is met.
+- **Fun question 2 (an area closed until a raise, a mix or a Root cut; did it feel stronger): supported.** "Yes."
+  - This reverses H4's first complaint ("The areas didn't actually feel any stronger").
+  - The cause is the capability windows. The mediums' fed hearts are closed at 12, and The Deep is closed at 12 even with its Root cut (best mixes 13–15). Strength is now a wall you can see, not a longer wait. Criterion 3 is met.
+  - We don't know which of the three opened it. The follow-up says the Root, which matches the data: a cut opens a medium at 12 (starved best mix 9).
+- **Fun question 3 (did a limit raise feel like a big step): not supported.** "No." Diagnosis in DESIGN.md "H6 candidates" → "Why +6 slots felt small (Q3)". In short:
+  - Two of the three raises only replace a Root cut, which is a time saving again. Level 1 opens the fed mediums, which a cut already opened, and only The Deep needs it. Level 2 skips The Deep's cut, and level 3 opens nothing.
+  - The key comes before the lock. Level 1 is cheap and the bots buy it at about 12:42, before either medium, so the player never stands at the door it opens.
+  - After level 1 the limit stops binding for a Root-cutter (15 slots at most against 18).
+  - Nothing on the map changes when you buy one, and +6 is an amount, not a new kind of thing.
+- **The Root follow-up: supported by the data, and it's the same flaw as Q3.**
+  - A cut costs one small fight, and a fed heart pays exactly what a starved one does. So going for the heart directly is strictly worse, and the bots cut every Root for the same reason.
+  - The cut is also the substitute that empties the limit raises. Fixing one fixes most of the other.
+  - The owner offers two fixes (remove the Root, or reward the intact take). Both are steelmanned in DESIGN.md "H6 candidates" → "The Root". I recommend the reward, as long as it changes what you can do next, not how fast. The proposal is **Graft**: a heart taken with its Root alive grafts the Root and raises your fleet limit for the rest of the system. It rides along with whichever H6 is picked.
+- **Still unknown.**
+  - Criterion 4: the owner didn't say "max economy then build a fleet and attack" this time. That's encouraging, but an absence isn't evidence.
+  - Criterion 1 (4 areas): likely, since Q2 and Q3 imply a medium and a Command limit purchase, but not stated.
+  - Whether choosing a mix was a real trade-off or a mandatory lookup ("Spores, so Flak").
+  - Whether the economy felt pointless once the limit was full.
+  - Whether the six-area overworld still felt "too linear". The map didn't change and we didn't ask, so the build-3 complaint stands.
+  - The cap-off comparison wasn't mentioned.
+  - Criterion 6: both bugs are layout shifts, so "nothing in the HUD wraps or jumps" isn't met in the states they describe.
+- **Keep:** the fleet limit at 12, Recycle at 50%, capability windows as calibration targets, and capability-only bot flags. Don't retune the cap. Q18 (pillar 1 wording) was "revisit after play". The cap is now supported, so the Director can re-ask it.
+- **Bugs:** both are client layout bugs that ship in iteration 6 whatever H6 is picked: BACKLOG `h6-bug-topbar-oscillation` and `h6-bug-buffer-toast-flicker`.
+
+**Action:** DESIGN.md H5 marked tested. DESIGN.md "H6 candidates (awaiting the owner's pick)" has A, Open frontier with locked regions (recommended); B, Keys, not amounts; C, Node rigs (later, not H6); and Graft riding along with A or B. QUESTIONS.md Q19 asks the owner to pick. BACKLOG has the two bug items. No spec until the pick.
