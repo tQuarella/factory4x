@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createWorld, defaultData, lastBattle, replayHashes, rootIndex, shipCounts, step, worldHash, type Input, type World } from '@factory4x/sim';
+import { SEND_ALL, createWorld, defaultData, lastBattle, replayHashes, rootIndex, shipCounts, step, worldHash, type BattleResult, type Input, type World } from '@factory4x/sim';
 import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
@@ -30,7 +30,7 @@ const script: Record<number, Input[]> = {
   0: [
     { type: 'buildExtractor', node: 1 },
     { type: 'buildRoute', from: 1, to: 0 },
-    { type: 'setTunable', key: 'ship.cost', value: 5 },
+    { type: 'setTunable', key: 'ship.drone.cost', value: 5 },
   ],
   400: [{ type: 'setRally', node: 5 }],
   900: [{ type: 'buildExtractor', node: 2 }],
@@ -47,7 +47,7 @@ describe('session replay log', () => {
 
   it('drops invalid inputs without logging them', () => {
     const s = new Session(defaultData, { seed: 7 });
-    expect(s.send({ type: 'buildExtractor', node: 6 })).toBe(false);
+    expect(s.send({ type: 'buildExtractor', node: 15 })).toBe(false);
     expect(s.log.length).toBe(0);
   });
 
@@ -75,21 +75,22 @@ describe('session replay log', () => {
 /** A session with idle ships at both the Probe (0) and A5 (5), reached by play only, so the replay is valid. */
 function stagedAtProbeAndA5(): Session {
   const s = new Session(defaultData, { seed: 11 });
-  s.send({ type: 'setTunable', key: 'ship.cost', value: 5 });
-  s.send({ type: 'setTunable', key: 'ship.buildTicks', value: 15 });
+  s.send({ type: 'setTunable', key: 'ship.drone.cost', value: 5 });
+  s.send({ type: 'setTunable', key: 'ship.drone.buildTicks', value: 15 });
   let staged = false;
   for (let i = 0; i < 6000; i++) {
     const at = shipCounts(s.world).at;
-    if (!staged && at[0]! >= 2) staged = s.send({ type: 'sendShips', from: 0, to: 5, count: 0 });
+    if (!staged && at[0]! >= 2) staged = s.send({ type: 'sendShips', from: 0, to: 5, counts: SEND_ALL });
     if (staged && at[5]! >= 2 && at[0]! >= 1) return s;
     s.stepOnce();
   }
   throw new Error('ships never staged at Probe and A5');
 }
 
+/** Node 15 is the heart. */
 const attackAll: Input[] = [
-  { type: 'sendShips', from: 0, to: 6, count: 0 },
-  { type: 'sendShips', from: 5, to: 6, count: 0 },
+  { type: 'sendShips', from: 0, to: 15, counts: SEND_ALL },
+  { type: 'sendShips', from: 5, to: 15, counts: SEND_ALL },
 ];
 
 function replayMatches(s: Session): boolean {
@@ -124,13 +125,13 @@ describe('one press, one tick (sendAll)', () => {
   it('paused: drops invalid inputs, and steps nothing when none is valid', () => {
     const s = new Session(defaultData, { seed: 3 });
     s.paused = true;
-    expect(s.sendAll([{ type: 'buildExtractor', node: 6 }])).toBe(0);
+    expect(s.sendAll([{ type: 'buildExtractor', node: 15 }])).toBe(0);
     expect(s.world.tick).toBe(0);
     expect(
       s.sendAll([
-        { type: 'setTunable', key: 'ship.cost', value: 20 },
-        { type: 'buildExtractor', node: 6 },
-        { type: 'setTunable', key: 'ship.hp', value: 12 },
+        { type: 'setTunable', key: 'ship.drone.cost', value: 20 },
+        { type: 'buildExtractor', node: 15 },
+        { type: 'setTunable', key: 'ship.drone.hp', value: 12 },
       ]),
     ).toBe(2);
     expect(s.world.tick).toBe(1);
@@ -143,7 +144,7 @@ describe('autosave', () => {
   it('resume keeps the seed and full log so the replay still matches', () => {
     const s = new Session(defaultData, { seed: 99 });
     play(s, 700, script);
-    s.send({ type: 'setShipyard', on: false });
+    s.send({ type: 'setShipyard', shipType: 'drone', on: false });
     const out = decodeSave(encodeSave(s), defaultData);
     expect(out.kind).toBe('resumed');
     if (out.kind !== 'resumed') return;
@@ -195,14 +196,15 @@ describe('New run keeps tuning', () => {
   it('applies tuned values (startStock) and the replay and save still reproduce the world', () => {
     const old = new Session(defaultData, { seed: 1 });
     old.send({ type: 'setTunable', key: 'economy.startStock', value: 150 });
-    old.send({ type: 'setTunable', key: 'guardian.cap', value: 5 });
+    old.send({ type: 'setTunable', key: 'guard.capPct', value: 50 });
     old.stepOnce();
     const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2 });
-    expect(s.world.stock).toBe(150);
-    expect(s.world.guardians[0]!.thorns.length).toBe(5);
+    expect(s.world.stock.ore).toBe(150);
+    // Seed 2 is Twin Seams: p1 is 2 Thorns 5 Spores, so 1 and 2 at guard.capPct 50.
+    expect(s.world.guardians[0]!.guards.length).toBe(3);
     play(s, 800, script);
     const r = s.replay();
-    expect(r.startTunables).toEqual({ 'economy.startStock': 150, 'guardian.cap': 5 });
+    expect(r.startTunables).toEqual({ 'economy.startStock': 150, 'guard.capPct': 50 });
     expect(replayHashes(r, replayData(r), s.world.tick, s.world.tick)[0]).toBe(worldHash(s.world));
     const out = decodeSave(encodeSave(s), defaultData);
     expect(out.kind).toBe('resumed');
@@ -223,7 +225,7 @@ describe('feedback note', () => {
     expect(n.text).toContain('"seed":3');
     expect(n.url).not.toBeNull();
     play(s, 4000, { 100: [{ type: 'setRally', node: 5 }] });
-    for (let i = 0; i < 300; i++) s.log.push({ tick: 5000 + i, input: { type: 'setShipyard', on: i % 2 === 0 } });
+    for (let i = 0; i < 300; i++) s.log.push({ tick: 5000 + i, input: { type: 'setShipyard', shipType: 'drone', on: i % 2 === 0 } });
     const long = buildNote(s, defaultData, 'x', 'v', { viewport: 'a', userAgent: 'b' });
     expect(long.url).toBeNull();
     expect(long.shortUrl.length).toBeLessThan(2000);
@@ -265,80 +267,94 @@ describe('helpers', () => {
 
   it('battle report names the reason for a failed wave', () => {
     const s = new Session(defaultData, { seed: 1 });
-    const text = battleReport(s.world, { id: 1, node: 6, wilt: null, startTick: 0, endTick: 10, outcome: 'repelled', shipsEngaged: 6, shipsLost: 6, thornsKilled: 2 });
-    expect(text).toContain('Wave repelled: 6 sent, 6 lost, 2 thorns stripped');
+    const text = battleReport(s.world, result({ node: 15, outcome: 'repelled', shipsEngaged: 6, shipsLost: 6, guardsKilled: 2 }));
+    expect(text).toContain('Heart held: 6 sent, 6 lost, 2 guards stripped');
     expect(text).toMatch(/Regrowth outpaced|Too few ships/);
-    expect(battleReport(s.world, { id: 2, node: 6, wilt: null, startTick: 0, endTick: 10, outcome: 'captured', shipsEngaged: 30, shipsLost: 12, thornsKilled: 12 })).toBe('Captured: 30 sent, 12 lost');
+    expect(battleReport(s.world, result({ node: 15, outcome: 'captured', shipsEngaged: 30, shipsLost: 12, guardsKilled: 12 }))).toBe('Heart taken: 30 sent, 12 lost');
+    expect(battleReport(s.world, result({ node: 10, outcome: 'captured', shipsEngaged: 14, shipsLost: 3, guardsKilled: 9 }))).toBe('P1 taken: 14 sent, 3 lost');
   });
 });
 
-function ship(w: World, node: number, n: number): void {
-  for (let i = 0; i < n; i++) w.ships.push({ id: w.nextId++, hp: w.tun['ship.hp'], at: node, transit: null, engagedIn: -1 });
+/** A drone-only BattleResult with the given fields (test data). */
+function result(f: Pick<BattleResult, 'node' | 'outcome' | 'shipsEngaged' | 'shipsLost' | 'guardsKilled'>): BattleResult {
+  return {
+    id: 1,
+    startTick: 0,
+    endTick: 10,
+    wilt: null,
+    guardsAtStart: { thorn: 0, spore: 0 },
+    engagedByType: { drone: f.shipsEngaged, lancer: 0, flak: 0 },
+    lostByType: { drone: f.shipsLost, lancer: 0, flak: 0 },
+    killedByType: { thorn: f.guardsKilled, spore: 0 },
+    ...f,
+  };
 }
 
-/** Seed 3 is the Thin Root (4 thorns). Nothing happens unless a test sets it up. */
+function ship(w: World, node: number, n: number): void {
+  for (let i = 0; i < n; i++) w.ships.push({ id: w.nextId++, type: 'drone', hp: w.tun['ship.drone.hp'], at: node, transit: null, engagedIn: -1 });
+}
+
+/** Seed 3 is Frost Gate (Root 6 Thorns; heart 10/14, starved 6/7). Nothing happens unless a test sets it up. */
 function idleWorld(): World {
   const w = createWorld(3, defaultData);
-  w.stock = 0;
-  w.shipyard.on = false;
+  w.stock.ore = 0;
+  w.yards.drone.on = false;
   w.tun['economy.probeOrePerMin'] = 0;
   return w;
 }
 
-describe('H2 readouts', () => {
-  it('the Feeds the Bloom box and the rich-sheet line come from live tunables', () => {
+describe('supply readouts (interim H3 text)', () => {
+  it('the Feeds the Heart box and the heart-sheet line come from live tunables', () => {
     const w = idleWorld();
-    expect(feedsBloomText(w, false)).toBe('While the Root lives, the Bloom has 12 thorns, regrows 1 / 2.0 s, repairs 2. Cut it: 8 thorns, 1 / 10.0 s, no repair.');
-    expect(supplyLine(w)).toBe('Fed by the Root (cut it: 8 thorns, 1 / 10.0 s)');
-    w.tun['bloom.starvedCap'] = 5;
+    expect(feedsBloomText(w, false)).toBe(
+      'While the Root lives, the Heart has 10 Thorns 14 Spores, regrows 1 / 2.0 s and 1 / 0.7 s, repairs 2. Cut it: 6 Thorns 7 Spores, 1 / 10.0 s and 1 / 3.3 s, no repair.',
+    );
+    expect(supplyLine(w)).toBe('Fed by the Root (cut it: 6 Thorns 7 Spores, 1 / 10.0 s)');
+    w.tun['guard.capPct'] = 50;
     w.tun['bloom.starvedRepairPerRound'] = 2;
-    w.tun['guardian.regrowTicks'] = 30;
-    expect(feedsBloomText(w, false)).toContain('regrows 1 / 1.0 s, repairs 2. Cut it: 5 thorns, 1 / 10.0 s, repairs 2.');
-    expect(supplyLine(w)).toContain('cut it: 5 thorns');
+    w.tun['guard.thorn.regrowTicks'] = 30;
+    expect(feedsBloomText(w, false)).toContain('regrows 1 / 1.0 s and 1 / 0.7 s, repairs 2. Cut it: 3 Thorns 3 Spores, 1 / 5.0 s and 1 / 3.3 s, repairs 2.');
+    expect(supplyLine(w)).toContain('cut it: 3 Thorns 3 Spores');
+    expect(feedsBloomText(w, true)).toContain('already yours');
   });
 
-  it('cutting the Root reports the wilt and flips the Bloom to starved', () => {
+  it('cutting the Root reports the wilt and flips the heart to starved', () => {
     const w = idleWorld();
-    ship(w, rootIndex(w), 15);
+    ship(w, rootIndex(w), 20);
     for (let i = 0; i < 400 && lastBattle(w, rootIndex(w)) === null; i++) step(w, defaultData, []);
     const r = lastBattle(w, rootIndex(w))!;
     expect(r.outcome).toBe('captured');
-    expect(battleReport(w, r)).toBe(`Root cut: ${r.shipsEngaged} sent, ${r.shipsLost} lost. The Bloom wilts: 12 → 8 thorns, regrows 5× slower.`);
+    expect(battleReport(w, r)).toBe(`Root cut: ${r.shipsEngaged} sent, ${r.shipsLost} lost. The Heart wilts: 10 Thorns 14 Spores → 6 Thorns 7 Spores, regrows 5× slower.`);
     expect(supplyLine(w)).toBe('Starved: Root cut');
     expect(feedsBloomText(w, false)).toContain('The Root is cut');
   });
 
   it('a Root held report and a Root repelled reason name the Root', () => {
     const w = idleWorld();
-    const text = battleReport(w, { id: 1, node: rootIndex(w), wilt: null, startTick: 0, endTick: 10, outcome: 'repelled', shipsEngaged: 10, shipsLost: 10, thornsKilled: 2 });
-    expect(text).toContain('Root held: 10 sent, 10 lost, 2 thorns stripped');
-    expect(text).toContain('the Root regrows');
+    const text = battleReport(w, result({ node: rootIndex(w), outcome: 'repelled', shipsEngaged: 10, shipsLost: 10, guardsKilled: 2 }));
+    expect(text).toContain('Root held: 10 sent, 10 lost, 2 guards stripped');
+    expect(text).toContain('Root regrows');
   });
 
-  it('the banner has one prefixed line per running battle', () => {
+  it('the banner has one prefixed line per running battle, with the guard mix', () => {
     const w = idleWorld();
     expect(bannerLines(w)).toEqual([]);
     ship(w, rootIndex(w), 3);
-    ship(w, 6, 20);
+    ship(w, 15, 20);
     for (let i = 0; i < 31 && bannerLines(w).length < 2; i++) step(w, defaultData, []);
     const lines = bannerLines(w);
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatch(/^BLOOM · strip \d+(\.\d)?\/s · regrow 0\.5\/s · \d+ lost$/);
-    expect(lines[1]).toMatch(/^ROOT · strip /);
+    expect(lines[0]).toMatch(/^ROOT · \d+ Thorn 0 Spore · strip /);
+    expect(lines[1]).toMatch(/^HEART · \d+ Thorn \d+ Spore · strip \d+(\.\d)?\/s · \d+ lost$/);
   });
 
-  it('regrowChange is computed from raw tick counts', () => {
+  it('regrowChange follows bloom.starvedRegrowMul', () => {
     const w = idleWorld();
-    w.tun['guardian.regrowTicks'] = 60;
-    w.tun['bloom.starvedRegrowTicks'] = 30;
-    expect(regrowChange(w)).toBe('regrows 2× faster');
-    w.tun['bloom.starvedRegrowTicks'] = 15;
-    expect(regrowChange(w)).toBe('regrows 4× faster');
-    w.tun['bloom.starvedRegrowTicks'] = 60;
+    w.tun['bloom.starvedRegrowMul'] = 1;
     expect(regrowChange(w)).toBe('regrows at the same speed');
-    w.tun['bloom.starvedRegrowTicks'] = 90;
-    expect(regrowChange(w)).toBe('regrows 1.5× slower');
-    w.tun['bloom.starvedRegrowTicks'] = 300;
+    w.tun['bloom.starvedRegrowMul'] = 2;
+    expect(regrowChange(w)).toBe('regrows 2× slower');
+    w.tun['bloom.starvedRegrowMul'] = 5;
     expect(regrowChange(w)).toBe('regrows 5× slower');
   });
 

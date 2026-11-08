@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SEND_ALL,
   createWorld,
   defaultData,
   deserializeWorld,
@@ -31,14 +32,14 @@ describe('rng', () => {
   });
 });
 
-/** A busy game: network script, shipyard, a wave at minute 6, some tuning. */
+/** A busy game: network script, the drone yard, a wave at a pocket at minute 6, some tuning. */
 function busyGame(ticks: number): World {
   const w = createWorld(7, data);
   for (let i = 0; i < ticks; i++) {
     const inputs: Input[] = [];
     const next = networkStep(w);
     if (next) inputs.push(next);
-    if (w.tick === 30 * 60 * 6) inputs.push({ type: 'sendShips', from: N.probe, to: N.rich, count: 0 });
+    if (w.tick === 30 * 60 * 6) inputs.push({ type: 'sendShips', from: N.probe, to: N.p1, counts: SEND_ALL });
     if (w.tick === 30 * 60 * 7) inputs.push({ type: 'setTunable', key: 'route.podIntervalTicks', value: 60 });
     step(w, data, inputs);
   }
@@ -53,7 +54,7 @@ describe('world', () => {
       inputs: [
         { tick: 0, input: { type: 'buildExtractor', node: N.a1 } },
         { tick: 10, input: { type: 'buildRoute', from: N.a1, to: N.probe } },
-        { tick: 400, input: { type: 'setTunable', key: 'ship.cost', value: 5 } },
+        { tick: 400, input: { type: 'setTunable', key: 'ship.drone.cost', value: 5 } },
       ],
     };
     const a = replayHashes(replay, defaultData, 1800, 300);
@@ -107,13 +108,20 @@ describe('autosave', () => {
   it('refuses a save from another data version', () => {
     const w = createWorld(1, defaultData);
     const text = serializeWorld(w);
-    const r = deserializeWorld(text, { ...defaultData, dataVersion: 4 });
-    expect(r).toEqual({ ok: false, reason: 'dataVersion', saveDataVersion: 3 });
+    const r = deserializeWorld(text, { ...defaultData, dataVersion: 5 });
+    expect(r).toEqual({ ok: false, reason: 'dataVersion', saveDataVersion: 4 });
   });
 
   it('refuses corrupt saves', () => {
     expect(deserializeWorld('{not json', data)).toMatchObject({ ok: false, reason: 'corrupt' });
     expect(deserializeWorld('null', data)).toMatchObject({ ok: false, reason: 'corrupt' });
-    expect(deserializeWorld(JSON.stringify({ format: 1, dataVersion: 3, world: { tick: 1 } }), data)).toMatchObject({ ok: false, reason: 'corrupt' });
+    expect(deserializeWorld(JSON.stringify({ format: 1, dataVersion: 4, world: { tick: 1 } }), data)).toMatchObject({ ok: false, reason: 'corrupt' });
+    // An H2-shaped world (stock a number, one shipyard) stamped with version 4 is corrupt, not loaded.
+    const w = JSON.parse(serializeWorld(createWorld(1, data))) as { world: Record<string, unknown> };
+    w.world.stock = 30;
+    expect(deserializeWorld(JSON.stringify(w), data)).toMatchObject({ ok: false, reason: 'corrupt' });
+    const g = JSON.parse(serializeWorld(createWorld(1, data))) as { world: { guardians: unknown[] } };
+    g.world.guardians.pop();
+    expect(deserializeWorld(JSON.stringify(g), data)).toMatchObject({ ok: false, reason: 'corrupt' });
   });
 });

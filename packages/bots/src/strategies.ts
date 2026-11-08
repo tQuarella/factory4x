@@ -1,13 +1,15 @@
 import {
+  GUARD_TYPES,
   PROBE,
+  SEND_ALL,
+  SHIP_TYPES,
   guardianStatus,
-  isCaptured,
-  isRootCut,
+  isGuarded,
   nodeStatus,
-  richIndex,
-  rootIndex,
   routeCapacityPerMin,
   shipCounts,
+  unlockStatus,
+  weightedMultPct,
   type Input,
   type World,
 } from '@factory4x/sim';
@@ -18,9 +20,11 @@ import {
  * given (read-only, through the sim's selectors), so a strategy is a pure
  * function of the state. They issue Input commands only.
  *
- * rush and turtle follow DESIGN.md H1 "Bot strategies (M1)". greedy-expansion
- * is a STUB (no behavior, `stub: true`). raid-supply follows DESIGN.md H2 "Bot
- * strategies (H2)".
+ * INTERIM (h3-sim): the H1/H2 strategies (rush, turtle, raid-supply) cannot
+ * play the H3 map, so these two minimal strategies keep the bot gate honest
+ * (no crash, no softlock, tick budget) until h3-bots lands the four spec
+ * strategies (DESIGN.md H3 "Bot checks"). They follow the spec's shared rules
+ * in their simplest form.
  */
 export interface Strategy {
   name: string;
@@ -30,9 +34,7 @@ export interface Strategy {
   decide(world: Readonly<World>): Input[];
 }
 
-const NONE: Input[] = [];
-
-/** Node index by map id ('a1', 'rich'); -1 if the map lacks it. */
+/** Node index by map id ('a1', 'heart'); -1 if the map lacks it. */
 function nodeIndex(world: Readonly<World>, id: string): number {
   for (const n of world.nodes) if (n.id === id) return n.index;
   return -1;
@@ -75,129 +77,108 @@ function buildPlan(world: Readonly<World>, nodes: number[]): { done: boolean; or
   return { done: true, order: null };
 }
 
-/** Ships at or heading to the rich node. */
-function shipsAtOrHeadingRich(world: Readonly<World>): number {
-  const c = shipCounts(world);
-  const r = richIndex(world);
-  return c.at[r]! + c.enRoute[r]!;
+/** Spec prize weights: heavy pockets 3, light pockets 2, Root 2, heart 1. */
+function prizeWeight(world: Readonly<World>, node: number): number {
+  const n = world.nodes[node]!;
+  if (n.kind === 'pocket') return n.slots >= 3 ? 3 : 2;
+  return n.kind === 'root' ? 2 : 1;
 }
 
-const RUSH_FIRST_WAVE = 6;
-const RUSH_WAVE_STEP = 6;
-
-/** rush: small economy, frequent waves, growing after each failure. */
-export function rushDecide(world: Readonly<World>): Input[] {
-  const inputs: Input[] = [];
-  const rich = richIndex(world);
-  if (!world.shipyard.on) inputs.push({ type: 'setShipyard', on: true });
-  if (world.rally !== PROBE) inputs.push({ type: 'setRally', node: PROBE });
-
-  const captured = isCaptured(world);
-  const plan = buildPlan(world, captured ? [rich] : [nodeIndex(world, 'a1'), nodeIndex(world, 'a2')]);
-  if (plan.order) inputs.push(plan.order);
-
-  if (!captured && shipsAtOrHeadingRich(world) === 0) {
-    const wave = RUSH_FIRST_WAVE + RUSH_WAVE_STEP * world.stats.wavesSent;
-    if (shipCounts(world).at[PROBE]! >= wave) inputs.push({ type: 'sendShips', from: PROBE, to: rich, count: 0 });
-  }
-  return inputs;
+/** Spec estimate: need = Σ capEff × hp over guard types. */
+export function guardNeed(world: Readonly<World>, node: number): number {
+  const g = guardianStatus(world, node).guards;
+  let need = 0;
+  for (const t of GUARD_TYPES) need += g[t].cap * g[t].hp;
+  return need;
 }
 
-const TURTLE_WAVE = 32;
-
-/** turtle: economy first (shipyard off), then one big wave from a5. */
-export function turtleDecide(world: Readonly<World>): Input[] {
-  const inputs: Input[] = [];
-  const rich = richIndex(world);
-  const a5 = nodeIndex(world, 'a5');
-  const captured = isCaptured(world);
-  const plan = buildPlan(world, ['a1', 'a2', 'a3', 'a4', 'a5'].map((id) => nodeIndex(world, id)));
-
-  if (!plan.done) {
-    if (world.shipyard.on) inputs.push({ type: 'setShipyard', on: false });
-    if (plan.order) inputs.push(plan.order);
-    return inputs;
-  }
-  if (!world.shipyard.on) inputs.push({ type: 'setShipyard', on: true });
-  if (world.rally !== a5) inputs.push({ type: 'setRally', node: a5 });
-  if (captured) {
-    const out = buildPlan(world, [rich]);
-    if (out.order) inputs.push(out.order);
-  } else if (shipsAtOrHeadingRich(world) === 0 && shipCounts(world).at[a5]! >= TURTLE_WAVE) {
-    inputs.push({ type: 'sendShips', from: a5, to: rich, count: 0 });
-  }
-  return inputs;
+/** Spec estimate: a fleet's per-round power at `node`, Σ n × damage × weighted multiplier / 100 (multiplier from the caps). */
+export function fleetPower(world: Readonly<World>, node: number, fleet: Readonly<Record<(typeof SHIP_TYPES)[number], number>>): number {
+  const g = guardianStatus(world, node).guards;
+  const caps = { thorn: g.thorn.cap, spore: g.spore.cap };
+  let p = 0;
+  for (const t of SHIP_TYPES) p += Math.floor((fleet[t] * world.tun[`ship.${t}.damage`] * weightedMultPct(world.tun, t, caps)) / 100);
+  return p;
 }
 
-/** Ships needed to take the Root: ceil(rootThorns * 5 / 2) + 5 (15, 28 and 40 for the three variants). */
-export function rootWave(rootThorns: number): number {
-  return Math.ceil((rootThorns * 5) / 2) + 5;
-}
-
-/** Ships needed to take the starved Bloom: ceil(bloomThorns * 9 / 4) (18 at 8 thorns). */
-export function bloomWave(bloomThorns: number): number {
-  return Math.ceil((bloomThorns * 9) / 4);
-}
-
-/** Ships at or heading to `node`. */
-function shipsAtOrHeading(world: Readonly<World>, node: number): number {
-  const c = shipCounts(world);
-  return c.at[node]! + c.enRoute[node]!;
-}
-
-/**
- * raid-supply (the starve line): turtle's economy plan, then raid the Root
- * from the probe, regroup the survivors at a5, and take the wilted Bloom.
- */
-export function raidSupplyDecide(world: Readonly<World>): Input[] {
-  const inputs: Input[] = [];
-  const rich = richIndex(world);
-  const root = rootIndex(world);
-  const a5 = nodeIndex(world, 'a5');
-  const plan = buildPlan(world, ['a1', 'a2', 'a3', 'a4', 'a5'].map((id) => nodeIndex(world, id)));
-
-  if (!plan.done) {
-    if (world.shipyard.on) inputs.push({ type: 'setShipyard', on: false });
-    if (plan.order) inputs.push(plan.order);
-    return inputs;
-  }
-  if (!world.shipyard.on) inputs.push({ type: 'setShipyard', on: true });
-  const counts = shipCounts(world);
-
-  if (!isRootCut(world)) {
-    if (world.rally !== PROBE) inputs.push({ type: 'setRally', node: PROBE });
-    if (shipsAtOrHeading(world, root) === 0 && counts.at[PROBE]! >= rootWave(guardianStatus(world, root).thorns)) {
-      inputs.push({ type: 'sendShips', from: PROBE, to: root, count: 0 });
+/** The living guarded node with the lowest need / prizeWeight; the heart only when it is the last one. */
+export function nextTarget(world: Readonly<World>): number | null {
+  let best: number | null = null;
+  let bestScore = 0;
+  let heart: number | null = null;
+  for (const g of world.guardians) {
+    if (!g.alive) continue;
+    if (world.nodes[g.node]!.kind === 'heart') {
+      heart = g.node;
+      continue;
     }
+    // Compare need/weight by cross-multiplying (integers only).
+    const score = guardNeed(world, g.node);
+    const w = prizeWeight(world, g.node);
+    if (best === null || score * prizeWeight(world, best) < bestScore * w) {
+      best = g.node;
+      bestScore = score;
+    }
+  }
+  return best ?? heart;
+}
+
+/** Ready to attack: power × 3 ≥ (need + 20) × (5/4)^(waves already sent there). */
+export function readyToAttack(world: Readonly<World>, node: number, power: number): boolean {
+  const k = Math.min(12, world.guardians.find((g) => g.node === node)!.wavesSent);
+  return power * 3 * 4 ** k >= (guardNeed(world, node) + 20) * 5 ** k;
+}
+
+/** True while ships sit at, or fly to, a living guarded node (one wave at a time). */
+function waveInFlight(world: Readonly<World>): boolean {
+  const c = shipCounts(world);
+  for (const g of world.guardians) if (g.alive && c.at[g.node]! + c.enRoute[g.node]! > 0) return true;
+  return false;
+}
+
+function interimDecide(world: Readonly<World>, useCounters: boolean): Input[] {
+  const inputs: Input[] = [];
+  const a5 = nodeIndex(world, 'a5');
+  const plan = buildPlan(world, ['a1', 'a2', 'a3', 'a4', 'a5'].map((id) => nodeIndex(world, id)));
+  if (!plan.done) {
+    if (world.yards.drone.on) inputs.push({ type: 'setShipyard', shipType: 'drone', on: false });
+    if (plan.order) inputs.push(plan.order);
     return inputs;
   }
-
+  const unlocked = unlockStatus(world).ships;
+  for (const t of SHIP_TYPES) {
+    const want = t === 'drone' || (useCounters && unlocked[t]);
+    if (world.yards[t].on !== want) inputs.push({ type: 'setShipyard', shipType: t, on: want });
+  }
   if (world.rally !== a5) inputs.push({ type: 'setRally', node: a5 });
-  if (counts.at[root]! > 0) inputs.push({ type: 'sendShips', from: root, to: a5, count: 0 });
-  if (isCaptured(world)) {
-    const out = buildPlan(world, [rich]);
-    if (out.order) inputs.push(out.order);
-  } else if (shipsAtOrHeading(world, rich) === 0 && counts.at[a5]! >= bloomWave(guardianStatus(world, rich).thorns)) {
-    inputs.push({ type: 'sendShips', from: a5, to: rich, count: 0 });
+  // Build out captured pockets and the heart in capture order.
+  const owned = world.stats.captures.map((c) => c.node).filter((n) => world.nodes[n]!.kind !== 'root');
+  const out = buildPlan(world, owned);
+  if (out.order) inputs.push(out.order);
+  // Survivors parked at captured nodes regroup at a5.
+  const c = shipCounts(world);
+  for (const cap of world.stats.captures) {
+    if (c.at[cap.node]! > 0) inputs.push({ type: 'sendShips', from: cap.node, to: a5, counts: SEND_ALL });
+  }
+  if (waveInFlight(world)) return inputs;
+  const target = nextTarget(world);
+  if (target === null || !isGuarded(world, target)) return inputs;
+  const fleet = c.atByType[a5]!;
+  if (fleet.drone + fleet.lancer + fleet.flak > 0 && readyToAttack(world, target, fleetPower(world, target, fleet))) {
+    inputs.push({ type: 'sendShips', from: a5, to: target, counts: SEND_ALL });
   }
   return inputs;
 }
 
 export const strategies: Strategy[] = [
   {
-    name: 'rush',
-    description: 'Small economy (a1, a2), shipyard always on, a wave whenever the probe holds enough ships; each wave is 6 bigger.',
-    decide: rushDecide,
+    name: 'drones-only',
+    description: 'INTERIM (h3-sim): turtle economy a1-a5, then only drones; takes the cheapest target by estimate (heart last) when power × 3 ≥ need + 20.',
+    decide: (w) => interimDecide(w, false),
   },
   {
-    name: 'turtle',
-    description: 'Shipyard off until a1-a5 are fully built, then rally at a5 and send one wave of 32.',
-    decide: turtleDecide,
-  },
-  { name: 'greedy-expansion', description: 'STUB (no behavior): claim as many resource nodes as fast as possible.', stub: true, decide: () => NONE },
-  {
-    name: 'raid-supply',
-    description: 'Turtle economy, then a wave of ceil(rootThorns*5/2)+5 from the probe cuts the Root, survivors stage at a5, and a wave of ceil(bloomThorns*9/4) takes the starved Bloom.',
-    decide: raidSupplyDecide,
+    name: 'greedy',
+    description: 'INTERIM (h3-sim): as drones-only, with every unlocked yard on and the counter tags in the estimate.',
+    decide: (w) => interimDecide(w, true),
   },
 ];

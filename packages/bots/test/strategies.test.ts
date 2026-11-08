@@ -1,22 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createWorld, defaultData, isValidInput, step, type Input, type World } from '@factory4x/sim';
-import { nextEconomyOrder, nodeFinished, rushDecide, strategies, turtleDecide } from '../src/strategies.ts';
+import { createWorld, defaultData, guardianStatus, isValidInput, step, type World } from '@factory4x/sim';
+import { fleetPower, guardNeed, nextEconomyOrder, nextTarget, nodeFinished, readyToAttack, strategies } from '../src/strategies.ts';
 
-const N = { probe: 0, a1: 1, a2: 2, a3: 3, a4: 4, a5: 5, rich: 6 } as const;
-const fresh = (): World => createWorld(1, defaultData);
-
-/** Park `count` new ships at `node` (hand-built state: ships are plain data). */
-function parkShips(world: World, node: number, count: number): void {
-  for (let i = 0; i < count; i++) world.ships.push({ id: world.nextId++, hp: 10, at: node, transit: null, engagedIn: -1 });
-}
-
-const networkDone = (x: World): boolean => [N.a1, N.a2, N.a3, N.a4, N.a5].every((id) => nodeFinished(x, id));
-
-/** Plays a strategy until `pred` holds. */
-function playUntil(world: World, decide: (w: World) => Input[], pred: (w: World) => boolean, max: number): void {
-  for (let i = 0; i < max && !pred(world); i++) step(world, defaultData, decide(world));
-  if (!pred(world)) throw new Error('condition not met');
-}
+const N = { probe: 0, a1: 1, a2: 2, a3: 3, a4: 4, a5: 5, p1: 10, p2: 11, p3: 12, p4: 13, root: 14, heart: 15 } as const;
+/** Seed 0 is Frost Gate. */
+const fresh = (): World => createWorld(0, defaultData);
+const by = (name: string) => strategies.find((s) => s.name === name)!;
 
 describe('economy planner', () => {
   it('orders the first extractor, then the route, then more extractors', () => {
@@ -24,7 +13,7 @@ describe('economy planner', () => {
     expect(nextEconomyOrder(w, N.a1)).toEqual({ type: 'buildExtractor', node: N.a1 });
     w.nodes[N.a1]!.extractors = 1;
     expect(nextEconomyOrder(w, N.a1)).toEqual({ type: 'buildRoute', from: N.a1, to: N.probe });
-    w.routes.push({ id: 99, from: N.a1, to: N.probe, length: 247, level: 1, cooldown: 0, pods: [] });
+    w.routes.push({ id: 99, from: N.a1, to: N.probe, length: 262, level: 1, cooldown: 0, pods: [] });
     expect(nextEconomyOrder(w, N.a1)).toEqual({ type: 'buildExtractor', node: N.a1 });
   });
 
@@ -47,7 +36,7 @@ describe('economy planner', () => {
 
   it('does not upgrade past max level', () => {
     const w = fresh();
-    w.nodes[N.a5]!.extractors = 4;
+    w.nodes[N.a5]!.extractors = 3;
     w.tun['extractor.orePerMin'] = 40;
     w.routes.push({ id: 99, from: N.a5, to: N.probe, length: 300, level: 5, cooldown: 0, pods: [] });
     expect(nextEconomyOrder(w, N.a5)).toBeNull();
@@ -55,138 +44,54 @@ describe('economy planner', () => {
   });
 });
 
-describe('rush', () => {
-  it('starts a1 at tick 0 with the yard on and rally at the probe', () => {
-    const w = fresh();
-    expect(rushDecide(w)).toEqual([{ type: 'buildExtractor', node: N.a1 }]);
-    w.shipyard.on = false;
-    w.rally = N.a5;
-    const inputs = rushDecide(w);
-    expect(inputs).toContainEqual({ type: 'setShipyard', on: true });
-    expect(inputs).toContainEqual({ type: 'setRally', node: N.probe });
-  });
-
-  it('sends the first wave at 6 ships, not before', () => {
-    const w = fresh();
-    parkShips(w, N.probe, 5);
-    expect(rushDecide(w).some((i) => i.type === 'sendShips')).toBe(false);
-    parkShips(w, N.probe, 1);
-    expect(rushDecide(w)).toContainEqual({ type: 'sendShips', from: N.probe, to: N.rich, count: 0 });
-  });
-
-  it('raises the wave by 6 for each wave already sent', () => {
-    const w = fresh();
-    w.stats.wavesSent = 2; // next wave is 6 + 12 = 18
-    parkShips(w, N.probe, 17);
-    expect(rushDecide(w).some((i) => i.type === 'sendShips')).toBe(false);
-    parkShips(w, N.probe, 1);
-    expect(rushDecide(w).some((i) => i.type === 'sendShips')).toBe(true);
-  });
-
-  it('does not send while ships are at or heading to the rich node', () => {
-    const w = fresh();
-    parkShips(w, N.probe, 12);
-    parkShips(w, N.rich, 1);
-    expect(rushDecide(w).some((i) => i.type === 'sendShips')).toBe(false);
-  });
-
-  it('stops attacking and builds out the rich node after capture', () => {
-    const w = fresh();
-    w.capturedTick = 100;
-    w.nodes[N.rich]!.owned = true;
-    parkShips(w, N.probe, 20);
-    const inputs = rushDecide(w);
-    expect(inputs.some((i) => i.type === 'sendShips')).toBe(false);
-    expect(inputs).toContainEqual({ type: 'buildExtractor', node: N.rich });
-  });
-
-  it('only issues inputs the sim accepts', () => {
-    const w = fresh();
-    for (let i = 0; i < 6000; i++) {
-      const inputs = rushDecide(w);
-      for (const input of inputs) expect(isValidInput(w, defaultData, input), JSON.stringify(input)).toBe(true);
-      step(w, defaultData, inputs);
-    }
-  });
-});
-
-describe('turtle', () => {
-  it('turns the yard off and starts a1 at tick 0', () => {
-    const w = fresh();
-    expect(turtleDecide(w)).toEqual([
-      { type: 'setShipyard', on: false },
-      { type: 'buildExtractor', node: N.a1 },
+describe('interim H3 strategies (h3-sim; h3-bots replaces them)', () => {
+  it('are drones-only and greedy, neither a stub', () => {
+    expect(strategies.map((s) => [s.name, s.stub === true])).toEqual([
+      ['drones-only', false],
+      ['greedy', false],
     ]);
   });
 
-  it('keeps the yard off, then turns it on and rallies at a5 when the network is done', () => {
+  it('estimate need as Σ capEff × hp, and power with the weighted counter multiplier', () => {
     const w = fresh();
-    playUntil(w, turtleDecide, networkDone, 30 * 60 * 15);
-    expect(w.stats.shipsBuilt).toBe(0);
-    for (const id of [N.a1, N.a2, N.a3, N.a4, N.a5]) expect(nodeFinished(w, id)).toBe(true);
-    step(w, defaultData, turtleDecide(w));
-    expect(w.rally).toBe(N.a5);
+    expect(guardNeed(w, N.p1)).toBe(1 * 20 + 8 * 6);
+    expect(guardNeed(w, N.heart)).toBe(10 * 20 + 14 * 6);
+    // Frost Gate p2 (3/3): lancer multiplier 159 → 4 × 4 × 159 / 100 = 25; drones 10 × 2 = 20.
+    expect(fleetPower(w, N.p2, { drone: 0, lancer: 4, flak: 0 })).toBe(25);
+    expect(fleetPower(w, N.p2, { drone: 10, lancer: 0, flak: 0 })).toBe(20);
   });
 
-  it('sends the wave at 32 ships at a5, not at 31', () => {
+  it('pick the lowest need / prize weight, the heart only when it is the last', () => {
     const w = fresh();
-    playUntil(w, turtleDecide, networkDone, 30 * 60 * 15);
-    w.ships.length = 0;
-    parkShips(w, N.a5, 31);
-    expect(turtleDecide(w).some((i) => i.type === 'sendShips')).toBe(false);
-    parkShips(w, N.a5, 1);
-    expect(turtleDecide(w)).toContainEqual({ type: 'sendShips', from: N.a5, to: N.rich, count: 0 });
+    // Frost Gate: p1 68/2 = 34, p2 78/2 = 39, p3 204/3 = 68, p4 148/3 = 49.3, Root 120/2 = 60.
+    expect(nextTarget(w)).toBe(N.p1);
+    for (const g of w.guardians) if (g.node !== N.heart) g.alive = false;
+    expect(nextTarget(w)).toBe(N.heart);
   });
 
-  it('waits for 32 again after a repelled wave', () => {
+  it('attack when power × 3 ≥ need + 20, raising the bar by 5/4 per wave already sent there', () => {
     const w = fresh();
-    playUntil(w, turtleDecide, networkDone, 30 * 60 * 15);
-    w.ships.length = 0;
-    w.stats.wavesSent = 1;
-    parkShips(w, N.a5, 5);
-    expect(turtleDecide(w).some((i) => i.type === 'sendShips')).toBe(false);
-  });
-});
-
-describe('turtle yard timing', () => {
-  it('does not turn the yard on while the last extractor of a5 is still queued or under construction', () => {
-    const w = fresh();
-    playUntil(w, turtleDecide, networkDone, 30 * 60 * 15);
-    // Hand-build the state just before a5's last extractor completes.
-    w.nodes[N.a5]!.extractors -= 1;
-    w.shipyard.on = false;
-    w.rally = N.probe;
-    w.activeBuild = { kind: 'extractor', node: N.a5, ticksLeft: 50 };
-    expect(nodeFinished(w, N.a5)).toBe(false);
-    const inputs = turtleDecide(w);
-    expect(inputs.some((i) => i.type === 'setShipyard' && i.on)).toBe(false);
-    expect(inputs.some((i) => i.type === 'setRally')).toBe(false);
-    w.activeBuild = null;
-    w.queue.push({ kind: 'extractor', node: N.a5, cost: 20 });
-    expect(nodeFinished(w, N.a5)).toBe(false);
+    const need = guardNeed(w, N.p1); // 68 → 88
+    expect(readyToAttack(w, N.p1, 29)).toBe(false);
+    expect(readyToAttack(w, N.p1, 30)).toBe(true);
+    w.guardians.find((g) => g.node === N.p1)!.wavesSent = 1; // 110
+    expect(readyToAttack(w, N.p1, 36)).toBe(false);
+    expect(readyToAttack(w, N.p1, 37)).toBe(true);
+    expect(guardianStatus(w, N.p1).guards.thorn.cap * 20 + guardianStatus(w, N.p1).guards.spore.cap * 6).toBe(need);
   });
 
-  it('a full turtle game turns the yard off once at tick 0 and on exactly once', () => {
-    const w = fresh();
-    const log: { tick: number; on: boolean }[] = [];
-    for (let i = 0; i < 30 * 60 * 15; i++) {
-      const inputs = turtleDecide(w);
-      for (const input of inputs) if (input.type === 'setShipyard') log.push({ tick: w.tick, on: input.on });
-      step(w, defaultData, inputs);
-    }
-    expect(log.length).toBe(2);
-    expect(log[0]).toEqual({ tick: 0, on: false });
-    expect(log[1]!.on).toBe(true);
-  });
-});
-
-describe('stubs', () => {
-  it('greedy-expansion is a labelled stub that issues nothing', () => {
-    const stubs = strategies.filter((s) => s.stub);
-    expect(stubs.map((s) => s.name)).toEqual(['greedy-expansion']);
-    for (const s of stubs) {
-      expect(s.description).toContain('STUB');
-      expect(s.decide(fresh())).toEqual([]);
-    }
-  });
+  for (const name of ['drones-only', 'greedy']) {
+    it(`${name}: only issues inputs the sim accepts, and keeps its yards as described`, () => {
+      const w = fresh();
+      let flakSeen = false;
+      for (let i = 0; i < 30 * 60 * 14; i++) {
+        const inputs = by(name).decide(w);
+        for (const input of inputs) expect(isValidInput(w, defaultData, input), `${w.tick} ${JSON.stringify(input)}`).toBe(true);
+        step(w, defaultData, inputs);
+        if (w.yards.flak.on || w.yards.lancer.on) flakSeen = true;
+      }
+      expect(flakSeen).toBe(name === 'greedy');
+      expect(w.stats.captures.length).toBeGreaterThan(0);
+    });
+  }
 });

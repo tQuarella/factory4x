@@ -1,4 +1,4 @@
-import { SIM_TUNABLE_KEYS, type SimData } from './data.ts';
+import { RESOURCES, SHIP_TYPES, SIM_TUNABLE_KEYS, type SimData } from './data.ts';
 import type { World } from './world.ts';
 
 /**
@@ -39,16 +39,27 @@ export function deserializeWorld(text: string, data: SimData): LoadResult {
   const w = env.world as Record<string, unknown> | null;
   if (w === null || typeof w !== 'object') return { ok: false, reason: 'corrupt', saveDataVersion };
   const tun = w.tun as Record<string, unknown> | null;
+  const stock = w.stock as Record<string, unknown> | null;
+  const yards = w.yards as Record<string, unknown> | null;
+  const guarded = data.map.nodes.filter((n) => n.kind === 'pocket' || n.kind === 'root' || n.kind === 'heart').length;
   const wellFormed =
     w.dataVersion === data.dataVersion &&
     isInt(w.tick) &&
-    isInt(w.stock) &&
+    stock !== null &&
+    typeof stock === 'object' &&
+    RESOURCES.every((r) => isInt(stock[r])) &&
+    yards !== null &&
+    typeof yards === 'object' &&
+    SHIP_TYPES.every((t) => yards[t] !== null && typeof yards[t] === 'object') &&
+    w.assemblers !== null &&
+    typeof w.assemblers === 'object' &&
     Array.isArray(w.nodes) &&
     w.nodes.length === data.map.nodes.length &&
     Array.isArray(w.routes) &&
     Array.isArray(w.ships) &&
     Array.isArray(w.queue) &&
     Array.isArray(w.guardians) &&
+    w.guardians.length === guarded &&
     w.system !== null &&
     typeof w.system === 'object' &&
     w.stats !== null &&

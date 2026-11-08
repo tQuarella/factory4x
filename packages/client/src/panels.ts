@@ -141,7 +141,7 @@ export class TuningPanel {
       let now: HTMLElement | null = null;
       if (meta.key.endsWith('Ticks')) now = h('small', 't-now', '', name);
       if (meta.key === 'system.variant') {
-        const names = host.data.map.variants.map((v, i) => `${i + 1} ${v.name.replace(/ Root$/, '')}`);
+        const names = host.data.map.layouts.map((v, i) => `${i + 1} ${v.name.split(' ')[0]}`);
         h('small', '', `0 · by seed / ${names.join(' / ')}`, name);
       }
       const step = stepFor(meta.min, meta.max);
@@ -280,7 +280,7 @@ export function showResult(root: HTMLElement, session: Session, onKeep: () => vo
   const s = runSummary(session.world);
   root.replaceChildren();
   const card = h('div', 'card', '', root);
-  h('h2', '', 'Rich node captured', card);
+  h('h2', '', 'Heart captured', card);
   h('div', 'note sys', s.variantName, card);
   const line = (label: string, value: string): void => {
     const r = h('div', 'stat-line', '', card);

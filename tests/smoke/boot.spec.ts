@@ -56,37 +56,38 @@ test('tapping an asteroid opens its sheet; queuing an extractor changes the queu
   expect(errors).toEqual([]);
 });
 
-test('the Root sheet opens with the Feeds the Bloom box; the Bloom sheet says fed; the probe names the system', async ({ page }) => {
+test('the Root sheet opens with the Feeds the Heart box; the heart sheet says fed; the probe names the layout', async ({ page }) => {
   const errors = watchErrors(page);
   await ready(page);
   const root = await page.evaluate(() => window.__factory4x!.rootNode());
   await tapNode(page, root);
   await expect.poll(() => page.evaluate(() => window.__factory4x!.selected())).toBe(root);
   await expect(page.locator('#sheet h2')).toContainText('Root');
-  await expect(page.locator('#sheet')).toContainText('Feeds the Bloom');
-  await expect(page.locator('#sheet')).toContainText('Cut it: 8 thorns, 1 / 10.0 s, no repair');
-  await tapNode(page, 6);
+  await expect(page.locator('#sheet')).toContainText('Feeds the Heart');
+  await expect(page.locator('#sheet')).toContainText(/Cut it: \d+ Thorns \d+ Spores, 1 \/ 10\.0 s and 1 \/ 3\.3 s, no repair/);
+  // Node 15 is the heart.
+  await tapNode(page, 15);
   await expect(page.locator('#sheet')).toContainText('Fed by the Root');
   await tapNode(page, 0);
   const name = await page.evaluate(() => window.__factory4x!.systemName());
-  expect(name).toMatch(/^(Thin|Knotted|Deep) Root$/);
+  expect(name).toMatch(/^(Frost Gate|Glass Thicket|Twin Seams)$/);
   await expect(page.locator('#sheet')).toContainText(`System: ${name}`);
   expect(errors).toEqual([]);
 });
 
-test('the tuning panel shows variant names and tick values in seconds; New run moves to the next system', async ({ page }) => {
+test('the tuning panel shows layout names and tick values in seconds; New run moves to the next layout', async ({ page }) => {
   await ready(page);
   await page.locator('#b-tune').click();
-  await expect(page.locator('#tuning')).toContainText('0 · by seed / 1 Thin / 2 Knotted / 3 Deep');
+  await expect(page.locator('#tuning')).toContainText('0 · by seed / 1 Frost / 2 Glass / 3 Twin');
   await expect(page.locator('#tuning')).toContainText('60 · 2.0 s');
   const before = await page.evaluate(() => window.__factory4x!.systemName());
   await page.locator('#tuning button', { hasText: 'New run' }).click();
   await page.locator('.card button', { hasText: 'Yes, new run' }).click();
-  const order = ['Thin Root', 'Knotted Root', 'Deep Root'];
+  const order = ['Frost Gate', 'Glass Thicket', 'Twin Seams'];
   await expect.poll(() => page.evaluate(() => window.__factory4x!.systemName())).toBe(order[(order.indexOf(before) + 1) % 3]);
 });
 
-test('forcing system.variant 3 and starting a New run gives the Deep Root, and the replay still matches', async ({ page }) => {
+test('forcing system.variant 3 and starting a New run gives Twin Seams, and the replay still matches', async ({ page }) => {
   await ready(page);
   await page.locator('#b-tune').click();
   const field = page.getByLabel('system.variant', { exact: true });
@@ -94,7 +95,7 @@ test('forcing system.variant 3 and starting a New run gives the Deep Root, and t
   await field.dispatchEvent('change');
   await page.locator('#tuning button', { hasText: 'New run' }).click();
   await page.locator('.card button', { hasText: 'Yes, new run' }).click();
-  await expect.poll(() => page.evaluate(() => window.__factory4x!.systemName())).toBe('Deep Root');
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.systemName())).toBe('Twin Seams');
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
 });
@@ -176,20 +177,23 @@ test('browser sim matches Node sim (cross-engine determinism)', async ({ page })
 
 /**
  * Wide, tall text in the notices, so the check doesn't depend on which monospace
- * the OS falls back to (CI's Linux font wrapped the toast into the Bloom while
+ * the OS falls back to (CI's Linux font wrapped the toast into the heart while
  * Windows' Consolas didn't).
  */
 const WIDE_NOTICE_FONT = '#banner, #toast, #toast::after, #hint { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.25em !important; line-height: 1.6 !important; }';
 
+/** Node index of the Bloom heart on the H3 map. */
+const HEART = 15;
+
 async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
   await ready(page);
   if (stress) await page.addStyleTag({ content: WIDE_NOTICE_FONT });
-  await tapNode(page, 6);
+  await tapNode(page, HEART);
   await expect(page.locator('#sheet')).toBeVisible();
   await page.evaluate(() => window.__factory4x!.debugShowNotices(true));
   await expect(page.locator('#banner')).toBeVisible();
   await expect(page.locator('#toast')).toBeVisible();
-  await expect(page.locator('#banner')).toContainText('BLOOM ·');
+  await expect(page.locator('#banner')).toContainText('HEART ·');
   await expect(page.locator('#banner')).toContainText('ROOT ·');
   await expect(page.locator('#toast')).toContainText('Root cut:');
   const rootNode = await page.evaluate(() => window.__factory4x!.rootNode());
@@ -201,7 +205,7 @@ async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
   expect((await page.locator('#toast').boundingBox())!.height, 'toast stays tappable').toBeGreaterThanOrEqual(43.5);
   for (const sel of ['#banner', '#toast']) {
     const r = (await page.locator(sel).boundingBox())!;
-    for (const node of [6, rootNode]) {
+    for (const node of [HEART, rootNode]) {
       const pos = await page.evaluate((i) => window.__factory4x!.nodeScreenPos(i), node);
       // Generous box around each guarded node: thorn ring, label above it, badges.
       const box = { l: pos.x - 50, r: pos.x + 50, t: Math.max(view.y, pos.y - 62), b: pos.y + 50 };
@@ -213,11 +217,11 @@ async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
   }
 }
 
-test('battle banner and toast never cover the rich node', async ({ page }) => {
+test('battle banner and toast never cover the heart', async ({ page }) => {
   await noticesClearOfBloom(page);
 });
 
-test('battle banner and toast never cover the rich node, even with a wide font', async ({ page }) => {
+test('battle banner and toast never cover the heart, even with a wide font', async ({ page }) => {
   await noticesClearOfBloom(page, true);
 });
 
@@ -249,7 +253,7 @@ test('paused "Attack with all" from two sources is one press, one tick, one wave
   await ready(page);
   // Cheap, fast ships so two groups stage quickly.
   await page.locator('#b-tune').click();
-  for (const [key, value] of [['ship.cost', '5'], ['ship.buildTicks', '15']] as const) {
+  for (const [key, value] of [['ship.drone.cost', '5'], ['ship.drone.buildTicks', '15']] as const) {
     const field = page.getByLabel(key, { exact: true });
     await field.fill(value);
     await field.dispatchEvent('change');
@@ -267,7 +271,7 @@ test('paused "Attack with all" from two sources is one press, one tick, one wave
 
   await page.locator('#b-pause').click();
   await expect(page.locator('#paused')).toBeVisible();
-  await tapNode(page, 6);
+  await tapNode(page, HEART);
   const t0 = await page.evaluate(() => window.__factory4x!.tick());
   expect(await page.evaluate(() => window.__factory4x!.wavesSent())).toBe(0);
   await page.locator('#sheet button', { hasText: /^Attack with all/ }).click();
@@ -289,7 +293,8 @@ test.describe('375x667 portrait', () => {
 
   test('every visible control is at least 44 px with each sheet open', async ({ page }) => {
     await ready(page);
-    for (const node of [0, 1, 6, 7]) {
+    // Probe, an asteroid, a pocket, the Root and the heart.
+    for (const node of [0, 1, 10, 14, HEART]) {
       await tapNode(page, node);
       await expect(page.locator('#sheet')).toBeVisible();
       const small = await page.evaluate(() =>
@@ -304,11 +309,11 @@ test.describe('375x667 portrait', () => {
     }
   });
 
-  test('banner and toast never cover the rich node', async ({ page }) => {
+  test('banner and toast never cover the heart', async ({ page }) => {
     await noticesClearOfBloom(page);
   });
 
-  test('banner and toast never cover the rich node, even with a wide font', async ({ page }) => {
+  test('banner and toast never cover the heart, even with a wide font', async ({ page }) => {
     await noticesClearOfBloom(page, true);
   });
 });
