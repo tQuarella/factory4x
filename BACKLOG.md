@@ -555,6 +555,7 @@ That's 11, with 1 spare.
 | h6-art | Relay icon, lock badge, far area state, band label, lane modes; gallery; ART_STYLE | art-direction | none (draw contract in the spec) | Ready |
 | h6-client | Panned overworld, area states, band labels, relay and lock sheet lines, decayed haul, the step moment, research and tuning changes, Root smoke tests removed | engineer | h6-sim merged; both bug tasks merged | Blocked |
 | h6-bots | Needs-driven area choice, four strategies plus the cap-off reference, probe on fed hearts, trial visits, H6 flags | engineer | h6-sim merged | Blocked |
+| h6-combat-target | Guard damage by type (DESIGN.md H6 "Combat amendment"), the order and superset tests, fixture-pinned combat numbers re-derived, replay re-baselined | core-engineer (resume of h6-sim) | none; merges before h6-bots resumes and before h6-design-data | Ready |
 | h6-design-data | Probe on v10, retune to the H6 windows, data v11 | designer (resume) | h6-bots Critic-approved (stacked) | Blocked |
 
 ### h6-bug-topbar-oscillation (engineer)
@@ -652,7 +653,9 @@ Owner: "When an asteroid buffer is full the toast warning shows and hides rapidl
 
    New smoke tests pass `--repeat-each 5` on both projects.
 5. A v9 save starts fresh with the existing toast. Gates pass, with green branch CI.
-6. **Added by the Director (from the h6-bug-topbar-oscillation review):**
+6. **Added by the Director (from the h6-combat-target review):** heart and pocket sheets show the combat amendment's line "Thorns strike Flak first; Spores strike Lancers first" under the Strong/Weak tags. It fits at 375 px with the wide font. h6-client branches from `task/h6-combat-target` (which carries h6-sim), with main merged in.
+7. **Added by the Director (from the h6-bug-topbar-oscillation round 3 review):** on phones, opening an area's sheet pans the overworld so far areas (Veil, Garden, The Deep) sit above the map. On the pannable map, other areas must stay reachable while a sheet is open, either by panning or without closing the sheet.
+8. **Added by the Director (from the h6-bug-topbar-oscillation review):**
    - In phone landscape (667x375) with the full HUD, no HUD chip may overlap the control buttons. On main today, the plating, ship and fleet chips render under them by 15–123 px.
    - Fix the flaky phone test `boot.spec.ts:129` ("held area cannot be landed on"): the tap on area 3 lands on `#hint-text`. It fails 2 of 5 runs on main under parallel load. The new pannable map rewrites this test anyway; make the new version tap reliably.
 
@@ -670,6 +673,22 @@ Owner: "When an asteroid buffer is full the toast warning shows and hides rapidl
    - each flag computation, including one where two winners share a set (flag 6 fails) and one where a capturing wave is single-type (flag 4 fails).
 
    Tests use fixtures with explicit premises, pin no tuned value, run under about 5 s each and don't grow with game length. Report the numbers; don't retune.
+
+### h6-combat-target (core-engineer, resume of h6-sim; added 2026-11-08 from the h6-bots round 2 review)
+
+**Files:**
+- `packages/sim/src/step.ts` (combat) and `packages/sim/test/**`;
+- `packages/bots/src/reference-replay.ts` (re-baseline only);
+- DESIGN.md: dated notes on tables whose fixture numbers change (H3 "Calibration result", and the min-wave table in "Owner direction 2026-11-08b"), and nothing else.
+
+No `data/sim.json` and no `packages/bots/src` logic.
+
+**Acceptance:**
+1. Rule 7's guard damage exactly as the amendment says: pools by guard type, the per-pool type order, id order within a type, overflow, and thorns then spores.
+2. `combat-order.test.ts` with the permutation, superset and unit cases, as the amendment says. The permutation test is run on the pre-change code and fails (reported).
+3. Fixture-pinned combat outcomes (for example `min-waves.test.ts` on the v4 and v8 fixtures) are re-derived, never loosened, and the DESIGN.md tables that cite them get dated notes.
+4. Determinism hashes and the reference replay are re-baselined. Gates pass.
+5. `dataVersion` stays 10, because no data value changes. A v10 feedback replay recorded before the change won't reproduce; log that in DECISIONS. h6-design-data bumps to 11 anyway.
 
 ### h6-design-data (designer, resume; stacked on `task/h6-bots` after its Critic approval)
 

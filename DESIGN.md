@@ -806,9 +806,71 @@ Any new colour gets a palette key and an ART_STYLE.md row. Draw contract (h6-cli
 - **`fleetStatus`:** as H5, with `level` and `maxLevel` replaced by `commandedBands` and 2.
 - **`campaignSummary` and the area result:** `haulPaid`.
 
+#### Combat amendment: guards strike the ship type they counter (2026-11-08)
+
+*From the h6-bots round 2 review (`reviews/h6-bots.md` on `task/h6-bots`, 95490c3). This replaces the guard-damage half of H3 rule 7, for every area. Player damage is unchanged.*
+
+**The problem.** H3 rule 7 applies all guard damage to the ships present in id order, with overflow, so the oldest ship takes everything. Player damage is pooled per type and doesn't depend on order, so only this half matters. But it matters a lot. On v10, 8 of 9 probe minimum mixes win only when lancers were built before flak. In the yards' natural alternating order, 7 of 8 band 2 and Deep minimum mixes lose. With flak first, a win needs 3 to more than 12 extra lancers. So the same fleet wins or loses depending on which yard finished first, nothing on screen explains it, and building your counter first is what loses. The Critic tested 3,240 waves and found no case where adding ships to a winning wave made it lose; only the order matters.
+
+**The options, judged.**
+
+| Option | No micro | Readable on a phone | Counters matter | Deterministic, integer | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| Keep id order; make the probe and bots measure the worst or round-robin order | yes | **no**: the player still meets a hidden build-order effect | yes | yes | Rejected. It fixes the measurement, not the game. |
+| Spread each round's damage evenly across all ships (remainder by type order) | yes | yes ("damage is shared") | yes | yes | Rejected. Ships stop dying one at a time: a winning wave ends with every ship alive but damaged, and a losing one dies all together. Losses become all-or-nothing, which blurs pillar 2 ("a bad commitment wastes production"), and damaged ships carry hidden hp into the next fight. |
+| **Each guard type strikes the ship type it counters first** | yes | yes: one line on the sheet | **more**: it adds the other half of the counter | yes | **Recommended.** |
+
+**The rule (replaces "Guard damage" in H3 rule 7).**
+- **Pools.** Split the guard damage by guard type, over the guards alive at the start of the round: `thornPool = Σ guard.thorn.damage` and `sporePool = Σ guard.spore.damage`. Guards at hp ≤ 0 still count (simultaneous rounds, as before).
+- **Target order per pool:**
+  - Thorns strike **flak**, then drones, then lancers. ("Flak bounces off Thorn armour.")
+  - Spores strike **lancers**, then drones, then flak. ("Lancers are swamped by Spores.")
+
+  So each guard type hits first the ship type that is Weak against it, and the ship type that counters it last. Drones, being neutral, sit in the middle.
+- **Applying a pool.** Walk the pool's type order. Within a type, take ships `at` the node in id order. Apply damage with overflow, as H1: a ship absorbs up to its current hp and the rest goes to the next ship. If a type runs out, overflow goes to the next type.
+- **Order of pools:** thorns first, then spores. Both pools are sized from start-of-round state; the spore pool continues on the ships that are left.
+- **Integer only, fixed orders, no RNG.**
+
+**Why order no longer matters.** Within one type, every fresh ship has the same hp, so which id is hit first doesn't change the hp each type is left with. Across types the order is fixed by the rule, not by build order. The battle outcome is therefore a function of the per-type counts (and the hp of any survivors from earlier rounds), not of ids. Rule 7's player-damage half already had this property.
+
+**What the player sees and feels.**
+- Matched counters survive longer, because the guard they counter aims elsewhere first. A mismatched or neutral ship soaks the fire of the guard it's weak against. A mix protects itself: flak shield lancers from Thorns, and lancers shield flak from Spores.
+- The heart and pocket sheets gain one line under the Strong/Weak tags: "Thorns strike Flak first; Spores strike Lancers first." There's no other new UI, and the battle report is unchanged.
+- No new input or order, and no micro.
+
+**Owner question? No.** It's a mechanics fix the team owns, and I agree with the Director's read:
+- The owner never chose the id-order rule and couldn't see it.
+- The new rule makes the existing tags truer, not different, and fits VISION's counter web.
+- Calibration retunes every window anyway.
+
+The handoff's "What changed" says it in one line, so the owner can object if a fight feels different.
+
+**The sim test that proves it** (`packages/sim/test/combat-order.test.ts`, on a frozen fixture with explicit premises, not shipped data; under about 5 s):
+1. **Permutations give the same outcome.**
+   - Take each of several hearts: a Thorn-heavy, a Spore-heavy and a balanced one, all fed, with fixture caps.
+   - For each, take a set of mixes covering drones only, single counters, the minimum mix, one ship under it and two ships over it.
+   - Build the same wave in at least six orders: lancers first, flak first, drones first, round-robin, reversed ids, and a fixed deterministic shuffle.
+   - Run each to resolution. The outcome must be identical across orders: captured or repelled, the round it ended, and the surviving ships per type with their hp multiset.
+   - Run on the pre-amendment rule, this test must fail; the engineer reports that fail-before run.
+2. **A superset never loses where its subset won.**
+   - For each fixture heart, take its minimum winning mix and add every combination of 0–3 extra drones, lancers and flak (64 waves per heart), with the extras built both before and after the base ships.
+   - Every one must win.
+   - Conversely, removing one ship from a losing wave never makes it win.
+3. **Unit cases.**
+   - A thorn pool kills flak before drones before lancers, with overflow across a ship boundary and across a type boundary.
+   - A spore pool kills lancers first.
+   - The two pools apply in order on the same start-of-round state.
+   - One case where damage doesn't divide evenly into ship hp.
+
+**Bots (decided by the Director in "Bots (H6)": accepted).** Drop the pre-send battle simulation (`shipsWin` / `waveWins`):
+- With this rule, a wave that matches the probe's mix, sent together from the staging rock against guards at or below the probe's counts, wins by construction. That's the same deterministic combat from the same per-type counts, and the result is monotone in counts. So the check adds nothing true, and what it adds is foresight a player doesn't have, which hides problems like this one.
+- The composer attacks when the parked fleet has at least the probe's mix per type.
+- If a wave is repelled anyway (guards regrown past the probe's state, or a trickle), it follows H3's raise-the-threshold rule up to the limit, and `MAX_WAVES` then records the node closed.
+- The report counts repelled waves per run, so any gap between the probe and play shows.
+
 #### Bots (H6): strategies and the probe
 
-**The engine:** the H5 composer engine, with one change (Director, 2026-11-08, from reviews/h6-bots.md): it builds toward a mix that wins when one exists at the current limit. The H5 engine maximised a power estimate that is linear in ship counts, so it always built a single type. With the Root gone, and the H6 windows requiring that no single type fits a band 2 heart at L1, it could never take one. The engine now allocates from the probe's own minimum winning mix for the target (cached per node, limit, buildable types and caps) and attacks when the parked fleet matches it. Its Root step is inert.
+**The engine:** the H5 composer engine, with one change (Director, 2026-11-08, from reviews/h6-bots.md): it builds toward a mix that wins when one exists at the current limit. The H5 engine maximised a power estimate that is linear in ship counts, so it always built a single type. With the Root gone, and the H6 windows requiring that no single type fits a band 2 heart at L1, it could never take one. The engine now allocates from the probe's own minimum winning mix for the target (cached per node, limit, buildable types and caps) and attacks when the parked fleet matches it. Its Root step is inert. **Decided (Director, 2026-11-08): no pre-send battle simulation.** The composer attacks when the ships parked at its staging rock include at least the probe's mix of each type. After a repel it raises its threshold as in H3, up to the limit. After two waves at a node it records the node closed. The report counts repelled waves. See "Combat amendment" above.
 
 **Area choice, needs-driven** (replaces H4 greedy for H6 strategies):
 1. Find the first unmet goal, in this order:
@@ -853,6 +915,14 @@ Any new colour gets a palette key and an ART_STYLE.md row. Draw contract (h6-cli
 2. Retune in priority order: flag 1, then flags 2–5, then flag 6. The levers are area guards, The Deep's heart counts, hauls (keeping the haul invariant), exports, and the three H6 tunables.
 3. Bump `dataVersion` to 11 if anything changed, update the H6 tables and the pin together, and search DESIGN.md for stale statements.
 4. Name in the report any claim no bot exercises.
+5. **After the combat amendment** (`h6-combat-target` merged), recompute everything combat touches before retuning. Don't reuse any v10 probe number:
+   - the probe (single-type minima and best mix for every heart and Deep layout) and its committed report;
+   - every capability window and flags 2–5;
+   - the trial visits;
+   - the counter-tag accuracy report in `min-waves.test.ts`;
+   - the composer's cached mixes, which follow from the probe.
+
+   Then retune. Tags may need the formula or the guard mixes adjusted if accuracy drops, because Weak now also means "draws that guard's fire first".
 
 #### Success criteria (H6; the owner, one 30–40 minute phone session; 4x is fine)
 
@@ -1968,6 +2038,7 @@ The rule numbers are H1's. Anything not listed is unchanged.
     - `mult` is `counter.strongPct` for (lancer, thorn) and (flak, spore), `counter.weakPct` for (lancer, spore) and (flak, thorn), and 100 for drones.
     - Damage from earlier types is already applied when later types act. Guards at hp ≤ 0 still count for the guard damage step (simultaneous rounds).
   - **Guard damage:** `Σ guard.<type>.damage` over the guards alive at the start of the round, applied to ships present in id order with overflow (as H1).
+    *Superseded 2026-11-08 by H6 "Combat amendment: guards strike the ship type they counter": thorns strike flak, then drones, then lancers; spores strike lancers, then drones, then flak. Id order made the outcome depend on which yard finished first.*
   - Remove the dead on both sides. Then, on every round tick, each surviving guard heals its `repairPerRound` (`guard.thorn.repairPerRound` or `guard.spore.repairPerRound`; 0 for the starved heart) up to its type's hp.
 - **8. Capture** (any guardian): it is alive, has no guards and at least one ship is `at` its node. Then:
   - `alive = false`, `owned = true`, and the battle ends `captured`. Push `{node, tick}` to `stats.captures`.

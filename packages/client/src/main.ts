@@ -14,6 +14,8 @@ import {
   isWon,
   landingEffects,
   replayHashes,
+  RESOURCES,
+  SHIP_TYPES,
   rootIndex,
   shipCounts,
   shipsAtByType,
@@ -25,6 +27,7 @@ import {
   type BattleResult,
   type CampaignStart,
   type Input,
+  type World,
 } from '@factory4x/sim';
 import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { shortVersion } from './format.ts';
@@ -345,6 +348,9 @@ function transitionPending(): boolean {
   return !s.onOverworld && isCaptured(w) && !s.flags.resultShown;
 }
 
+/** Dev hook state: a copy of the world with chosen counts, shown by the in-area HUD instead of the live one (hud-stability.spec.ts). */
+let hudOverride: World | null = null;
+
 function refreshUi(): void {
   modeTransition();
   const s = app.session;
@@ -357,14 +363,14 @@ function refreshUi(): void {
     researchSheet.update();
     areaSheet.update();
   } else {
-    const thr = throughputPerMin(w);
+    const thr = throughputPerMin(hudOverride ?? w);
     setText(el.thr, String(thr));
     const before = s.history.length > 10 ? s.history[s.history.length - 11]! : thr;
     const dir = thr > before ? 'up' : thr < before ? 'down' : '';
     setText(el.arrow, dir === 'up' ? '▲' : dir === 'down' ? '▼' : '');
     toggleClass(el.arrow, 'up', dir === 'up');
     toggleClass(el.arrow, 'down', dir === 'down');
-    hud.update(w, data);
+    hud.update(hudOverride ?? w, data);
     el.pause.setAttribute('aria-label', s.paused ? 'Play' : 'Pause');
     toggleClass(el.pause, 'on', s.paused);
     for (const b of document.querySelectorAll<HTMLElement>('.speed')) toggleClass(b, 'on', Number(b.dataset.speed) === s.speed);
@@ -548,6 +554,23 @@ window.__factory4x = {
     forceBanner = on;
     if (on) toast.show('Root cut: 15 sent, 3 lost. The Heart wilts: 10 Thorns 14 Spores → 6 Thorns 7 Spores, regrows 5× slower.\n\nP4 held: 10 sent, 10 lost, 2 guards stripped\nRegrowth outpaced the wave. 10 ships strip 0.6 guards/s; P4 regrows 1/s.');
     else toast.hide();
+    refreshUi();
+  },
+  debugHudFrame: (f) => {
+    const clone = structuredClone(app.session.world) as World;
+    for (const r of RESOURCES) clone.stock[r] = f.stock[r];
+    clone.stats.firstDeliveredTick.ice = clone.stats.firstDeliveredTick.ice ?? 0;
+    clone.stats.firstDeliveredTick.crystal = clone.stats.firstDeliveredTick.crystal ?? 0;
+    clone.stats.deliveredBuckets.fill(0);
+    clone.stats.deliveredBuckets[0] = f.ore;
+    clone.stats.prizeBuckets.ice.fill(0);
+    clone.stats.prizeBuckets.crystal.fill(0);
+    clone.stats.prizeBuckets.ice[0] = f.ice;
+    clone.stats.prizeBuckets.crystal[0] = f.crystal;
+    clone.tun['fleet.cap'] = f.cap;
+    clone.ships = [];
+    for (const t of SHIP_TYPES) for (let i = 0; i < f.ships[t]; i++) clone.ships.push({ id: clone.ships.length, type: t, hp: 1, at: 0, transit: null, engagedIn: -1 });
+    hudOverride = clone;
     refreshUi();
   },
   debugShowResult: () => showAreaResult($('result'), app.session, () => send({ type: 'leaveArea' }), () => undefined),
