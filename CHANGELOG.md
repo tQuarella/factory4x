@@ -6,6 +6,12 @@ Player-facing changes per build. Three plain lines per build, written by the Dir
 
 Nothing yet.
 
+## build-20261108-5 (2026-11-08, commit 626307f) · Milestone 2, H6: Open frontier
+
+- A bigger overworld you drag to pan: 10 areas in four bands, and you need only some of them to win. Command relays replace Command limit research. Reclaim the first relay in a band and your fleet limit rises (12, then 20, then 28) and the next band opens. Locked areas are visible but can't be entered until then. A second area of the same kind pays half its haul. The Root is gone.
+- Combat change: guards now strike the ship type they counter first ("Thorns strike Flak first; Spores strike Lancers first", shown on the sheets). A fight's outcome depends only on how many of each type you send, not on which yard finished first.
+- Fixed: the top bar no longer jitters as resources change, and the "Backed up" warning no longer flickers or shifts the buttons under it. In phone landscape the chips no longer sit under the buttons.
+
 ## build-20261108-4 (2026-11-08, commit f9ddf20) · Milestone 2, H5: Fleet cap
 
 - A fleet limit: each area lets you field 12 ships at once (ships still being built count). A yard at the limit shows "idle: fleet full", and Recycle scraps parked ships for half their ore back so you can change your mix.

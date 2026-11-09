@@ -4,7 +4,42 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
-## Build build-20261108-4 is ready (2026-11-08): H5, the Fleet cap
+## Build build-20261108-5 is ready (2026-11-08): H6, the Open frontier
+
+Play: https://factory4x.pages.dev (on your phone, portrait). A run to the probe core takes the bots about 46–62 game minutes, so roughly 12–16 real minutes at 4x plus your decisions. Your old save is from an older data version, so the game starts fresh.
+
+What changed:
+- A bigger overworld you drag to pan: 10 areas in four bands, and you need only some of them to win. Command relays replace Command limit research. Reclaim the first relay in a band and your fleet limit rises (12, then 20, then 28) and the next band opens. Locked areas are visible but can't be entered until then. A second area of the same kind pays half its haul. The Root is gone.
+- Combat change: guards now strike the ship type they counter first ("Thorns strike Flak first; Spores strike Lancers first", shown on the sheets). A fight's outcome depends only on how many of each type you send, not on which yard finished first. This was a team call; say so if fights feel worse.
+- Fixed: the top bar no longer jitters as resources change, and the "Backed up" warning no longer flickers or shifts the buttons under it. In phone landscape the chips no longer sit under the buttons.
+
+Try this: take Frost Shelf or Glass Shoal, then its relay (Rime or Glint), and watch the map open band 2. Before you commit to a band 2 area, open its sheet and read the guard mix. Spore Veil and Thorn Garden sit next to the light areas: you can see them early but can't enter until you hold a relay. To compare, set "Band lock" to 0 in the tuning panel and try landing in one at a limit of 12.
+
+Fun questions (the H6 hypothesis):
+1. When you reclaimed a command relay and the next band opened, did that feel like a big step?
+2. Did you skip an area, or pick one over another for a reason? Which, and why?
+3. Did the map feel open, or still like one path? Did you miss the Root?
+
+Known from the bots (not hidden from you):
+- No bot ever takes a medium area (Spore Veil, Thorn Garden). They pay only resources for research, and the bots never need them. Whether you want them is question 2.
+- Your ships don't heal, so a fleet that is exactly what a heart needs, sent right after the pocket fights, can be pushed back once. Bring a couple of spare ships, or recycle wounded ones.
+- In phone landscape, the version tag in the corner can sit on an area name; drag the map a little.
+
+Feedback: plain answers in chat work best.
+
+Also open (none blocks anything): Q20 (pillar 3 wording now the Root is gone), Q12, Q10, Q3, Q4, Q5.
+
+Protected files changed this build: none. Every merge passed the protected-files gate.
+
+## Blocking
+
+None.
+
+## Answered
+
+### Build build-20261108-4 handoff (2026-11-08): H5, the Fleet cap. Answered in chat; see PLAYTEST_LOG.md
+
+_Originally titled:_ Build build-20261108-4 is ready (2026-11-08): H5, the Fleet cap
 
 Play: https://factory4x.pages.dev (on your phone, portrait). A full run to the probe core is about 40 game minutes, roughly 10–12 real minutes at 4x plus your decisions. Your old save is from an older data version, so the game starts fresh on the overworld.
 
@@ -27,12 +62,6 @@ Feedback: plain answers in chat work best. The speech-bubble button also opens a
 Also open (none blocks anything): Q12 (eslint ignore for agent worktrees), Q10 (list secret names), Q3 (image service), Q4 (feedback delivery), Q5 (GitHub branch protection).
 
 Protected files changed this build: none. Every merge passed the protected-files gate.
-
-## Blocking
-
-None.
-
-## Answered
 
 ### Q19. Which slice should H6 test? (2026-11-08, Designer)
 
