@@ -1,10 +1,12 @@
 import {
   GUARD_TYPES,
   PROBE,
+  RAW_RESOURCES,
   SEND_ALL,
   SHIP_TYPES,
   areaStatus,
   designResearched,
+  fnv1a,
   fleetCap,
   fleetCount,
   fleetStatus,
@@ -21,11 +23,13 @@ import {
   weightedMultPct,
   type Input,
   type ResearchId,
+  type ResourceTriple,
   type ShipType,
   type ShipTypeCounts,
   type SimData,
   type World,
 } from '@factory4x/sim';
+import { minMix, probeWorld } from './waves.ts';
 
 /**
  * Strategies are stateless: every decision is derived from the world they are
@@ -268,23 +272,102 @@ export function targetOrder(world: Readonly<World>): number[] {
   return out;
 }
 
+/** The smallest winning mix at a node and one such fleet (the probe's minMix), as the composer allocates from it. */
+export interface Mix {
+  total: number;
+  fleet: ShipTypeCounts;
+}
+
+const baseCache = new Map<string, { data: SimData; world: World }>();
+const mixCache = new Map<string, Mix | null>();
+
+const baseKey = (world: Readonly<World>, data: SimData, areaId: string): string => `${areaId}|${world.system.variant}|${fnv1a(JSON.stringify(world.tun))}|${data.dataVersion}`;
+
+/** The probe's world for the area the world is in, built with this world's tunables as the data's defaults so its battles use the same numbers. */
+function baseFor(world: Readonly<World>, data: SimData, areaId: string, key: string): { data: SimData; world: World } {
+  let b = baseCache.get(key);
+  if (b === undefined) {
+    const liveData = { ...data, tunables: Object.fromEntries(Object.entries(data.tunables).map(([k, v]) => [k, { ...v, default: world.tun[k as keyof typeof world.tun] }])) } as unknown as SimData;
+    b = { data: liveData, world: probeWorld(world.campaign.deepLayout, liveData, areaId, false) };
+    if (baseCache.size > 64) baseCache.clear();
+    baseCache.set(key, b);
+  }
+  return b;
+}
+
+/**
+ * The probe's own minimum winning mix for `node` of the area the world is in: the smallest simultaneous wave of the
+ * `types` (at most `limit` ships) that takes the node from full strength under this world's tunables, from the real
+ * sim (waves.ts minMix). It lands the same area as the probe does (probeWorld: every other area reclaimed, both
+ * designs, yards off), so it doesn't depend on this world's ships or the guards' current wounds; cached per area
+ * and layout, node, limit, types, the node's caps and the tunables. Null if no mix within the limit wins.
+ */
+export function mixAt(world: Readonly<World>, data: SimData, node: number, limit: number, types: readonly ShipType[]): Mix | null {
+  const area = world.campaign.active;
+  if (area === null || limit < 1) return null;
+  const areaId = data.map.areas[area]!.id;
+  const g = guardianStatus(world, node).guards;
+  const base = baseKey(world, data, areaId);
+  const key = `${base}|${node}|${limit}|${types.join(',')}|${g.thorn.cap},${g.spore.cap}`;
+  if (mixCache.has(key)) {
+    const hit = mixCache.get(key)!;
+    return hit === null ? null : { total: hit.total, fleet: { ...hit.fleet } };
+  }
+  const b = baseFor(world, data, areaId, base);
+  const m = minMix(b.world, node, types, limit, b.data);
+  if (mixCache.size > 4000) mixCache.clear();
+  mixCache.set(key, m === null ? null : { total: m.total, fleet: { ...m.fleet } });
+  return m === null ? null : { total: m.total, fleet: { ...m.fleet } };
+}
+
+/** Waves that may be sent at a node before the composer records it closed: a mix that wins from full strength and was repelled twice means the guards are past the probe's state. */
+export const MAX_WAVES = 2;
+
+/** `mix` scaled by (5/4)^waves per type, rounded up (H3's raise-the-threshold rule), then trimmed from the largest type until it fits `limit`. */
+export function raisedMix(mix: Mix, waves: number, limit: number): Mix {
+  const fleet = { ...mix.fleet };
+  for (const t of SHIP_TYPES) fleet[t] = Math.ceil((mix.fleet[t] * 5 ** waves) / 4 ** waves);
+  let n = fleet.drone + fleet.lancer + fleet.flak;
+  while (n > limit) {
+    let big: ShipType = 'drone';
+    for (const t of SHIP_TYPES) if (fleet[t] > fleet[big]) big = t;
+    fleet[big]--;
+    n--;
+  }
+  return { total: n, fleet };
+}
+
+/**
+ * The mix to build and attack with at `node`: mixAt (the probe's minimum winning mix, which wins by construction
+ * against guards at the probe's counts), raised by (5/4) per wave already sent there up to the limit, and null
+ * once MAX_WAVES waves have been sent (the node is then recorded closed).
+ */
+export function winningMix(world: Readonly<World>, data: SimData, node: number, limit: number, types: readonly ShipType[]): Mix | null {
+  const sent = world.guardians.find((x) => x.node === node)?.wavesSent ?? 0;
+  if (sent >= MAX_WAVES) return null;
+  const m = mixAt(world, data, node, limit, types);
+  return m === null || sent === 0 ? m : raisedMix(m, sent, limit);
+}
+
 export interface Target {
   node: number;
   fleet: ShipTypeCounts;
-  /** The allocation passes the H3 attack test at this limit. */
+  /** A winning mix exists at this limit (the node is takeable); false for the forced fallback. */
   passes: boolean;
 }
 
 /**
- * The composer's target at `limit`: the first node in the H3 order whose best allocation passes the attack test
- * (power × 3 ≥ need + 20, raised per wave already sent). Null if none passes. `fallback` returns the first node
- * in the order with its best allocation instead (passes false) when none passes, for a visit that must be played.
+ * The composer's target at `limit`: the first node in the H3 order for which a winning mix of the buildable types
+ * exists within the limit (winningMix); its fleet is that mix. A node with no guards needs one drone. Null if none
+ * has one. `fallback` returns the first node in the order with the H3 best-power allocation instead (passes false)
+ * when none does, for a visit that must be played.
  */
-export function chooseTarget(world: Readonly<World>, limit: number, buildable: readonly ShipType[], fallback = false): Target | null {
+export function chooseTarget(world: Readonly<World>, data: SimData, limit: number, buildable: readonly ShipType[], fallback = false): Target | null {
   const order = targetOrder(world);
   for (const node of order) {
-    const a = bestAllocation(world, node, limit, buildable);
-    if (readyToAttack(world, node, a.power)) return { node, fleet: a.fleet, passes: true };
+    if (guardNeed(world, node) === 0) return { node, fleet: bestAllocation(world, node, limit, buildable).fleet, passes: true };
+    const m = winningMix(world, data, node, limit, buildable);
+    if (m !== null) return { node, fleet: m.fleet, passes: true };
   }
   if (fallback && order.length > 0) return { node: order[0]!, fleet: bestAllocation(world, order[0]!, limit, buildable).fleet, passes: false };
   return null;
@@ -318,9 +401,9 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
   const inFlight = waveInFlight(world);
   const trivial = world.guardians.length > 0 && world.guardians.every((g) => guardNeed(world, g.node) === 0);
   const buildable = buildableTypes(world, opts.dronesOnly);
-  const cap = fleetCap(world);
+  const cap = fleetCap(world, data);
   const limit = cap ?? Math.max(1, fleetCount(world));
-  const target = chooseTarget(world, limit, buildable, opts.forced);
+  const target = chooseTarget(world, data, limit, buildable, opts.forced);
   const livingGuarded = world.guardians.some((g) => g.alive);
   if (target === null && !inFlight && livingGuarded && !opts.forced) return { inputs, closed: true };
 
@@ -341,25 +424,34 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
   // (the target test above is optimistic about it, as the capability windows are), so the first waves are drones.
   const unlocked = unlockStatus(world).ships;
   const planTypes = buildable.filter((t) => unlocked[t]);
-  const plan = target === null ? null : planTypes.length === buildable.length ? target.fleet : bestAllocation(world, target.node, limit, planTypes).fleet;
+  // The plan is a winning mix when one exists with the types that can be built now, else the best-power fleet of them
+  // (drones, while a component is still to come), which only the H3 threshold below can send.
+  let plan: ShipTypeCounts | null = null;
+  let viaMix = false;
+  if (target !== null) {
+    const m = planTypes.length === buildable.length ? (target.passes ? { fleet: target.fleet } : null) : winningMix(world, data, target.node, limit, planTypes);
+    viaMix = m !== null && guardNeed(world, target.node) > 0;
+    plan = m !== null ? m.fleet : bestAllocation(world, target.node, limit, planTypes).fleet;
+  }
   const have = counted(world, data);
+  const c = shipCounts(world);
+  const at = a5 >= 0 ? c.atByType[a5]! : { drone: 0, lancer: 0, flak: 0 };
+  const matches = plan !== null && SHIP_TYPES.every((t) => at[t] >= plan![t]);
   for (const t of SHIP_TYPES) {
     // A wave in flight with no passing target keeps the yards as they are.
     const want = plan === null ? world.yards[t].on : planTypes.includes(t) && have[t] < plan[t];
     if (world.yards[t].on !== want) inputs.push({ type: 'setShipyard', shipType: t, on: want });
   }
-  const owned = world.stats.captures.map((c) => c.node).filter((n) => world.nodes[n]!.kind !== 'root');
+  const owned = world.stats.captures.map((cap) => cap.node).filter((n) => world.nodes[n]!.kind !== 'root');
   const out = buildPlan(world, owned);
   if (out.order) inputs.push(out.order);
-  const c = shipCounts(world);
   // Every idle ship regroups at a5: from captured nodes, the probe, or anywhere else that isn't a living guarded node (a wave).
   for (const n of world.nodes) {
     if (n.index !== a5 && c.at[n.index]! > 0 && !isGuarded(world, n.index)) inputs.push({ type: 'sendShips', from: n.index, to: a5, counts: SEND_ALL });
   }
   if (target === null || a5 < 0) return { inputs, closed: false };
-  const at = c.atByType[a5]!;
   // Recycle: the fleet is full and a type parked at a5 is above its allocation.
-  if (isFleetFull(world)) {
+  if (isFleetFull(world, data)) {
     const surplus: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
     let n = 0;
     for (const t of SHIP_TYPES) {
@@ -369,10 +461,11 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
     if (n > 0) inputs.push({ type: 'recycleShips', node: a5, counts: surplus });
   }
   if (inFlight) return { inputs, closed: false };
-  // Attack: the ships at a5 match the allocation, or the H3 threshold is met with what is there.
-  const total = at.drone + at.lancer + at.flak;
-  const matches = SHIP_TYPES.every((t) => at[t] >= plan![t]);
-  if (total > 0 && (matches || readyToAttack(world, target.node, fleetPower(world, target.node, at)))) {
+  // Attack (no pre-send battle simulation): the ships parked at a5 include at least the plan's mix of each type, or,
+  // for a plan that is no mix (a component still to come), the H3 threshold is met with what is there. Everything
+  // parked goes.
+  const parkedTotal = at.drone + at.lancer + at.flak;
+  if (parkedTotal > 0 && (matches || (!viaMix && readyToAttack(world, target.node, fleetPower(world, target.node, at))))) {
     inputs.push({ type: 'sendShips', from: a5, to: target.node, counts: SEND_ALL });
   }
   return { inputs, closed: false };
@@ -382,18 +475,15 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
 // Research policy, area choice, strategies
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** The research policy's order, as (item, level): H4's list with Command limit inserted (DESIGN.md H5 "Research policy"). */
+/** The research policy's order, as (item, level): H4's list without Command limit, which H6 removed (relays raise the limit; DESIGN.md H6 "Bots (H6)"). */
 export const RESEARCH_POLICY: ReadonlyArray<readonly [ResearchId, number]> = [
   ['core', 1],
   ['lancer', 1],
   ['flak', 1],
-  ['fleet', 1],
   ['opening', 1],
   ['extract', 1],
-  ['fleet', 2],
   ['rigs', 1],
   ['yards', 1],
-  ['fleet', 3],
   ['extract', 2],
   ['opening', 2],
   ['rigs', 2],
@@ -402,8 +492,8 @@ export const RESEARCH_POLICY: ReadonlyArray<readonly [ResearchId, number]> = [
   ['opening', 3],
 ];
 
-/** 'full' buys the whole policy; 'no-command' all but Command limit; 'grind' only the four grind items (no core, designs or Command limit); 'none' nothing. */
-export type ResearchKit = 'full' | 'no-command' | 'grind' | 'none';
+/** 'full' buys the whole policy; 'grind' only the four grind items (no core or designs); 'none' nothing. */
+export type ResearchKit = 'full' | 'grind' | 'none';
 
 const GRIND_ITEMS: readonly ResearchId[] = ['opening', 'extract', 'rigs', 'yards'];
 
@@ -412,8 +502,6 @@ export function kitEntries(kit: ResearchKit): ReadonlyArray<readonly [ResearchId
   switch (kit) {
     case 'full':
       return RESEARCH_POLICY;
-    case 'no-command':
-      return RESEARCH_POLICY.filter(([item]) => item !== 'fleet');
     case 'grind':
       return RESEARCH_POLICY.filter(([item]) => GRIND_ITEMS.includes(item));
     case 'none':
@@ -444,7 +532,7 @@ export function areaEstimate(world: Readonly<World>, data: SimData, area: number
   return { need, powerX100 };
 }
 
-/** Open areas in data order. */
+/** Open (enterable) areas in data order. */
 export function openAreas(world: Readonly<World>, data: SimData): number[] {
   const out: number[] = [];
   for (let a = 0; a < data.map.areas.length; a++) if (isAreaOpen(world, data, a)) out.push(a);
@@ -471,12 +559,15 @@ export function cheapestOpenArea(world: Readonly<World>, data: SimData): number 
 }
 
 /** What a closed record is valid for: the fleet limit and the designs. A record clears when either changes. */
-export function closedKey(world: Readonly<World>): string {
-  return `${fleetCap(world) ?? 0}|${researchLevel(world, 'lancer')}|${researchLevel(world, 'flak')}`;
+export function closedKey(world: Readonly<World>, data: SimData): string {
+  return `${fleetCap(world, data) ?? 0}|${researchLevel(world, 'lancer')}|${researchLevel(world, 'flak')}`;
 }
 
 /** Area index -> closedKey when it was recorded closed. */
 export type ClosedRecords = ReadonlyMap<number, string>;
+
+/** Which side of the map a strategy prefers when choosing between areas that advance its goal. */
+export type SidePreference = 'ice' | 'crystal';
 
 /**
  * A campaign strategy: what to buy on the overworld and which area to land in. Both are functions of the
@@ -486,14 +577,109 @@ export interface CampaignStrategy {
   name: string;
   description: string;
   kit: ResearchKit;
-  /** Area ids in the order to take them while open (and not closed); after the list the greedy choice. */
-  route: readonly string[];
+  /** The side to prefer among areas that advance the goal (none: only the estimate and data order decide). */
+  side?: SidePreference;
   /** 'composer' (default) or 'h3' (the cap-off reference). */
   engine?: 'composer' | 'h3';
-  /** Build drones only (the drones-only strategy). */
+  /** Build drones only, and choose areas by the H4 greedy rule (the drones-only strategy: it has no designs to save for). */
   dronesOnly?: boolean;
   /** Set `fleet.cap` to this on the first step (0 = the A/B reference); undefined keeps the data's default. */
   fleetCap?: number;
+}
+
+/** The first unmet goal of the needs-driven area choice (DESIGN.md H6 "Bots (H6)"). */
+export type Goal =
+  | { kind: 'designs'; missing: ResourceTriple }
+  | { kind: 'relay'; band: number }
+  | { kind: 'area'; id: string }
+  | { kind: 'core'; missing: ResourceTriple };
+
+/** The bands (tier values) that have a command relay in the data, ascending. */
+function relayBands(data: SimData): number[] {
+  const out: number[] = [];
+  for (const a of data.map.areas) if (a.relay && !out.includes(a.tier)) out.push(a.tier);
+  return out.sort((x, y) => x - y);
+}
+
+/** The area ids the core needs reclaimed (the data's win item). */
+function coreAreas(data: SimData): string[] {
+  const core = data.research.find((r) => r.kind === 'win');
+  const out: string[] = [];
+  for (const q of core?.requires ?? []) if ('area' in q) out.push(q.area);
+  return out;
+}
+
+const isMissing = (t: ResourceTriple): boolean => RAW_RESOURCES.some((r) => t[r] > 0);
+
+/**
+ * The first unmet goal, in order: (1) the stockpile can afford the designs not yet bought, (2) a band 1 relay is
+ * reclaimed, (3) a band 2 relay, (4) The Deep (each area the core needs), (5) the core is affordable. A relay goal
+ * the data has no relay for is skipped. Null when all are met (the core is then bought, which ends the game).
+ */
+export function firstUnmetGoal(world: Readonly<World>, data: SimData): Goal | null {
+  const rows = researchStatus(world, data);
+  const stock = world.campaign.stockpile;
+  const short = (cost: ResourceTriple | null): ResourceTriple => ({
+    ore: cost === null ? 0 : Math.max(0, cost.ore - stock.ore),
+    ice: cost === null ? 0 : Math.max(0, cost.ice - stock.ice),
+    crystal: cost === null ? 0 : Math.max(0, cost.crystal - stock.crystal),
+  });
+  // 1. Both designs affordable together (or already bought).
+  const need: ResourceTriple = { ore: 0, ice: 0, crystal: 0 };
+  for (const id of ['lancer', 'flak'] as const) {
+    const row = rows.find((r) => r.id === id);
+    if (row === undefined || row.level >= row.maxLevel || row.cost === null) continue;
+    for (const r of RAW_RESOURCES) need[r] += row.cost[r];
+  }
+  const designs = short(need);
+  if (isMissing(designs)) return { kind: 'designs', missing: designs };
+  // 2-3. A relay in each band that has one.
+  for (const band of relayBands(data)) {
+    const reclaimed = data.map.areas.some((a, i) => a.relay && a.tier === band && world.campaign.areas[i]!.reclaimedTick !== null);
+    if (!reclaimed) return { kind: 'relay', band };
+  }
+  // 4. The areas the core needs.
+  for (const id of coreAreas(data)) {
+    const i = data.map.areas.findIndex((a) => a.id === id);
+    if (i >= 0 && world.campaign.areas[i]!.reclaimedTick === null) return { kind: 'area', id };
+  }
+  // 5. The core affordable.
+  const core = rows.find((r) => r.id === 'core');
+  if (core === undefined || core.level >= core.maxLevel) return null;
+  const missing = short(core.cost);
+  return isMissing(missing) ? { kind: 'core', missing } : null;
+}
+
+/** Area indices lane-joined to `a`, in lane order. */
+function neighboursOf(data: SimData, a: number): number[] {
+  const id = data.map.areas[a]!.id;
+  const out: number[] = [];
+  for (const [x, y] of data.map.lanes) {
+    const other = x === id ? y : y === id ? x : null;
+    if (other !== null) out.push(data.map.areas.findIndex((z) => z.id === other));
+  }
+  return out;
+}
+
+/**
+ * The enterable areas that advance `goal`. A resource goal: areas whose haul now (decayed for a repeat) adds a missing
+ * resource. A relay or area goal: the target itself if enterable, else the enterable areas lane-joined to a target
+ * (the step toward it). Empty if none does.
+ */
+export function advancingAreas(world: Readonly<World>, data: SimData, goal: Goal, enterable: readonly number[]): number[] {
+  if (goal.kind === 'designs' || goal.kind === 'core') {
+    return enterable.filter((a) => {
+      const h = areaStatus(world, data, a).haulNow;
+      return RAW_RESOURCES.some((r) => goal.missing[r] > 0 && h[r] > 0);
+    });
+  }
+  const targets: number[] = [];
+  data.map.areas.forEach((area, i) => {
+    if (goal.kind === 'relay' ? area.relay && area.tier === goal.band : area.id === goal.id) targets.push(i);
+  });
+  const direct = enterable.filter((a) => targets.includes(a));
+  if (direct.length > 0) return direct;
+  return enterable.filter((a) => neighboursOf(data, a).some((n) => targets.includes(n)));
 }
 
 export interface AreaChoice {
@@ -502,16 +688,27 @@ export interface AreaChoice {
   forced: boolean;
 }
 
-/** The area the strategy lands in next, or null if none is open. Closed records (valid at the current limit and designs) are skipped; if every open area is closed, the cheapest by estimate, forced. */
+/**
+ * The area the strategy lands in next, or null if none is open. The candidates are the enterable areas not recorded
+ * closed at the current limit and designs, narrowed to those that advance the first unmet goal (if any do), then to
+ * the strategy's side (if any is on it): the cheapest by estimate, ties to data order. `drones-only` has no goal and
+ * takes the cheapest. If every open area is closed, the cheapest of them, forced.
+ */
 export function chooseArea(world: Readonly<World>, data: SimData, s: CampaignStrategy, closed: ClosedRecords = new Map()): AreaChoice | null {
-  const key = closedKey(world);
+  const key = closedKey(world, data);
   const open = openAreas(world, data);
   const live = open.filter((a) => closed.get(a) !== key);
-  for (const id of s.route) {
-    const a = data.map.areas.findIndex((x) => x.id === id);
-    if (a >= 0 && live.includes(a)) return { area: a, forced: false };
+  let pool = live;
+  const goal = s.dronesOnly === true ? null : firstUnmetGoal(world, data);
+  if (goal !== null) {
+    const adv = advancingAreas(world, data, goal, live);
+    if (adv.length > 0) pool = adv;
   }
-  const pick = cheapestOf(world, data, live);
+  if (s.side !== undefined) {
+    const preferred = pool.filter((a) => data.map.areas[a]!.side === s.side);
+    if (preferred.length > 0) pool = preferred;
+  }
+  const pick = cheapestOf(world, data, pool);
   if (pick !== null) return { area: pick, forced: false };
   const any = cheapestOf(world, data, open);
   return any === null ? null : { area: any, forced: true };
@@ -534,40 +731,31 @@ export function decideOverworld(world: Readonly<World>, data: SimData, s: Campai
 export const strategies: CampaignStrategy[] = [
   {
     name: 'composer',
-    description: 'Greedy area choice, the composer engine, the research policy with Command limit.',
+    description: 'Needs-driven area choice (designs, band 1 relay, band 2 relay, The Deep, the core), no side preference, the composer engine.',
     kit: 'full',
-    route: [],
   },
   {
     name: 'ice-first',
-    description: 'Landfall, Frost Shelf, then composer.',
+    description: 'The composer, preferring ice-side areas among those that advance its goal.',
     kit: 'full',
-    route: ['landfall', 'shelf'],
+    side: 'ice',
   },
   {
     name: 'crystal-first',
-    description: 'Landfall, Glass Shoal, then composer.',
+    description: 'The composer, preferring crystal-side areas among those that advance its goal.',
     kit: 'full',
-    route: ['landfall', 'shoal'],
-  },
-  {
-    name: 'no-command',
-    description: 'Composer, but never buys Command limit.',
-    kit: 'no-command',
-    route: [],
+    side: 'crystal',
   },
   {
     name: 'drones-only',
-    description: 'The composer engine with drones as the only buildable type. Buys only grind research: no designs, no Command limit, no core.',
+    description: 'The composer engine with drones as the only buildable type, H4 greedy area choice. Buys only grind research: no designs, no core.',
     kit: 'grind',
-    route: [],
     dronesOnly: true,
   },
   {
-    name: 'greedy',
-    description: 'Cap-off reference (fleet.cap 0, H4 rules): the H3 engine, greedy area choice, the research policy.',
+    name: 'cap-off',
+    description: 'Cap-off reference (fleet.cap 0): the composer strategy, the H3 engine inside areas. Relays still open bands.',
     kit: 'full',
-    route: [],
     engine: 'h3',
     fleetCap: 0,
   },

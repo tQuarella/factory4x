@@ -6,6 +6,7 @@
 import {
   RAW_RESOURCES,
   areaStatus,
+  fleetCap,
   fleetStatus,
   landingEffects,
   researchStatus,
@@ -22,6 +23,7 @@ import { iconCanvas, paintIcon, researchIcon, resourceIcon, shipIcon } from './i
 import { drawGuardRing, drawProbeCore } from './placeholders.ts';
 import {
   COUNTER_PHRASE,
+  GUARD_TARGET_LINE,
   RES_NAME,
   TAG_TEXT,
   TIER_NAME,
@@ -52,12 +54,55 @@ const GUARD_LABEL = (c: { thorn: number; spore: number }): string => {
   return parts.length > 0 ? parts.join(' ') : 'no guards';
 };
 
-/** The state line of the area sheet: "Open", "Held: reclaim a neighbour first", "Reclaimed in 8:12". */
-export function areaStateText(st: Pick<AreaStatus, 'state' | 'record'>, tickRate: number): string {
+/** The state line of the area sheet: "Open", "Locked", "Unscouted", "Reclaimed in 8:12" (H6: a held area is locked by its band, or far). */
+export function areaStateText(st: Pick<AreaStatus, 'state' | 'record' | 'known'>, tickRate: number): string {
   if (st.state === 'reclaimed') return `Reclaimed${st.record.reclaimPlayTicks === null ? '' : ` in ${mmss(Math.floor(st.record.reclaimPlayTicks / tickRate))}`}`;
   if (st.state === 'open') return 'Open';
   if (st.state === 'active') return 'You are here';
-  return 'Held: reclaim a neighbour first';
+  return st.known ? 'Locked' : 'Unscouted';
+}
+
+/** "Locked: reclaim a band 1 relay (Rime Relay or Glint Relay)." for a locked band, from the sim's `unlockRelays`; '' when the band is open. */
+export function lockLine(st: Pick<AreaStatus, 'band' | 'locked' | 'unlockRelays'>, areaName: (area: number) => string): string {
+  if (!st.locked) return '';
+  const names = st.unlockRelays.map(areaName);
+  return `Locked: reclaim a band ${st.band - 1} relay${names.length > 0 ? ` (${names.join(' or ')})` : ''}.`;
+}
+
+/** What a far area's sheet says: its band and kind, and the way to scout it. */
+export function farLine(st: Pick<AreaStatus, 'band' | 'relay'>): string {
+  return `Band ${st.band} · ${st.relay ? 'Command relay' : 'Area'}. Unscouted: reclaim a neighbour to scout it.`;
+}
+
+/**
+ * The relay line of the sheet: what reclaiming it does ("reclaim it to raise your fleet limit 12 → 20 and open band 2"), or that
+ * its band is already commanded. `capNow` is the limit now (null when off); `opens` the band it opens (null with the band lock off).
+ */
+export function relayLine(st: Pick<AreaStatus, 'relay' | 'commanded' | 'capAfter' | 'band'>, state: AreaStatus['state'], capNow: number | null, opens: number | null): string {
+  if (!st.relay) return '';
+  if (state === 'reclaimed') return 'Command relay.';
+  if (st.commanded) return `Band ${st.band + 1} is already open: this relay pays its haul only.`;
+  const does: string[] = [];
+  if (capNow !== null && st.capAfter !== null) does.push(`raise your fleet limit ${capNow} → ${st.capAfter}`);
+  if (opens !== null) does.push(`open band ${opens}`);
+  return does.length > 0 ? `Command relay: reclaim it to ${does.join(' and ')}.` : 'Command relay.';
+}
+
+/** "half" for the default repeat haul, else the percent. */
+export function decayWord(pct: number): string {
+  return pct === 50 ? 'half' : `${pct}%`;
+}
+
+/** The haul line: "Reclaim to haul 65 ore · 40 ice (half: Frost Shelf already reclaimed)", or "Haul paid: ..." once reclaimed. */
+export function haulLine(
+  st: Pick<AreaStatus, 'haulNow' | 'haulDecayed' | 'repeatOf'>,
+  reclaimed: boolean,
+  pct: number,
+  areaName: (area: number) => string,
+): string {
+  const head = `${reclaimed ? 'Haul paid' : 'Reclaim to haul'}${reclaimed ? ': ' : ' '}${tripleText(st.haulNow)}`;
+  if (!st.haulDecayed || st.repeatOf === null) return head;
+  return `${head} (${decayWord(pct)}: ${areaName(st.repeatOf)} already reclaimed)`;
 }
 
 /** The row of a guarded node in the area sheet. */
@@ -109,7 +154,8 @@ export class AreaSheet {
 
   private signature(): string {
     const w = this.world;
-    return `${this.area}|${JSON.stringify(areaStatus(w, this.host.session.data, this.area))}|${w.tun['shipments.pct']}`;
+    const data = this.host.session.data;
+    return `${this.area}|${JSON.stringify(areaStatus(w, data, this.area))}|${w.tun['shipments.pct']}|${w.tun['areas.repeatHaulPct']}|${w.tun['overworld.bandLock']}|${fleetCap(w, data)}`;
   }
 
   update(): void {
@@ -131,6 +177,7 @@ export class AreaSheet {
     const data = this.host.session.data;
     const st = areaStatus(world, data, this.area);
     this.sig = this.signature();
+    this.limit = null;
     this.root.replaceChildren();
     this.root.hidden = false;
     this.root.classList.add('world');
@@ -146,10 +193,23 @@ export class AreaSheet {
     const stateText = h('span', `area-status ${st.state}`, areaStateText(st, data.tickRate), state);
     stateText.dataset.state = st.state;
 
+    const areaName = (i: number): string => data.map.areas[i]!.name;
+    const info = h('section', 'area-info', '', this.root);
+    if (!st.known) {
+      // Far: band and kind and the way to scout it, and the band's lock line; no ring, prize, haul or guards.
+      h('div', 'note far-line', farLine(st), info);
+      const lock = lockLine(st, areaName);
+      if (lock) h('div', 'note lock-line', lock, info);
+      this.land = null;
+      return;
+    }
+    const opens = world.tun['overworld.bandLock'] > 0 && data.map.areas.some((a) => a.tier === st.band + 1) ? st.band + 1 : null;
+    const relay = relayLine(st, st.state, fleetCap(world, data), opens);
+    if (relay) h('div', 'note relay-line', relay, info);
+
     const flow = h('section', 'area-flow', '', this.root);
     const pct = world.tun['shipments.pct'];
-    if (st.state === 'reclaimed') h('div', 'note', `Haul paid: ${tripleText(st.haul)}`, flow);
-    else h('div', 'note haul', `Reclaim to haul ${tripleText(st.haul)}`, flow);
+    h('div', st.state === 'reclaimed' ? 'note' : 'note haul', haulLine(st, st.state === 'reclaimed', world.tun['areas.repeatHaulPct'], areaName), flow);
     const exp = exportX10(st.export, pct);
     if (pct === 0) h('div', 'note', 'Shipments are off (shipments.pct 0), so this area pays its haul only.', flow);
     else h('div', 'note export', `${st.state === 'reclaimed' ? 'Ships' : 'then ships'} ${ratesX10Text(exp).replace(/^\+/, '').replace(/ \+/g, ' · ')} while you play elsewhere`, flow);
@@ -187,6 +247,7 @@ export class AreaSheet {
         const badge = h('span', `tag-badge ${t.tag}`, TAG_TEXT[t.tag], row);
         badge.title = COUNTER_PHRASE[ship];
       }
+      h('div', 'note guard-targets', GUARD_TARGET_LINE, tags);
     }
 
     // H5: the fleet limit you would land with (no ships-needed number: estimating stays the puzzle).
@@ -197,10 +258,13 @@ export class AreaSheet {
     if (st.state === 'reclaimed') {
       h('div', 'note', 'Reclaimed: nothing more to do here.', foot);
       this.land = null;
-    } else {
+    } else if (st.state === 'open') {
       const area = this.area;
-      this.land = btn(foot, '', () => this.host.land(area), 'primary land');
-      this.land.set(st.state === 'open' ? 'Land' : 'Locked', st.state === 'open');
+      this.land = btn(foot, 'Land', () => this.host.land(area), 'primary land');
+    } else {
+      // Locked by its band: no Land button, only the line that says what opens it.
+      h('div', 'note lock-line', lockLine(st, areaName) || 'Locked.', foot);
+      this.land = null;
     }
   }
 }
@@ -288,7 +352,7 @@ export class ResearchSheet {
     const w = this.world;
     const after = researchStatus(w, this.host.session.data)[item]!;
     if (after.level > before.level) {
-      this.host.notice(purchaseNotice(after, landingEffects(w).rigNodes));
+      this.host.notice(purchaseNotice(after, landingEffects(w, this.host.session.data).rigNodes));
     }
     this.update();
   }
@@ -303,14 +367,14 @@ export class ResearchSheet {
     closeBtn.el.setAttribute('aria-label', 'Close research');
     h('div', 'note', 'Bought with the stockpile. Reclaimed areas ship home while you play elsewhere.', this.root);
 
-    const order = ['core', 'lancer', 'flak', 'fleet', 'opening', 'extract', 'rigs', 'yards'];
+    const order = ['core', 'lancer', 'flak', 'opening', 'extract', 'rigs', 'yards'];
     const ordered = data.research
       .map((item, index) => ({ item, index }))
       .sort((a, b) => order.indexOf(a.item.id) - order.indexOf(b.item.id));
     this.cards = [];
     for (const { item, index } of ordered) {
       if (item.id === 'core') this.cards.push(this.coreCard(index));
-      else if (item.kind === 'design' || item.kind === 'limit') this.cards.push(this.designCard(index));
+      else if (item.kind === 'design') this.cards.push(this.designCard(index));
       else this.cards.push(this.grindRow(index));
     }
   }
@@ -405,14 +469,11 @@ export class ResearchSheet {
     const top = h('div', 'rc-top', '', row);
     researchIcon(top, 56, item.id);
     const text = h('div', 'rc-text', '', top);
-    const isLimit = item.kind === 'limit';
-    // H5: the Command limit is a large card with level pips ("1/3"), like the designs.
     const nameLine = h('div', 'rc-nameline', '', text);
     h('b', 'rc-name', item.name, nameLine);
-    const pips = isLimit ? h('span', 'rc-level', '', nameLine) : null;
-    if (isLimit) row.classList.add('limit');
+
     const phrase = item.id === 'lancer' || item.id === 'flak' ? COUNTER_PHRASE[item.id] : '';
-    if (!isLimit) h('div', 'rc-phrase', phrase, text);
+    h('div', 'rc-phrase', phrase, text);
     const eff = h('div', 'note', '', text);
     const chips = costChips(row);
     const reqs = this.requires(row);
@@ -420,7 +481,6 @@ export class ResearchSheet {
     return {
       row,
       update: (r, world) => {
-        if (pips) setText(pips, `${r.level}/${r.maxLevel}`);
         setText(eff, effectText(r, world.tun, world.tickRate));
         chips.set(r.cost, world.campaign.stockpile);
         reqs.set(r, world);

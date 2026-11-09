@@ -1,15 +1,23 @@
 import {
+  bandOpen,
   canBuyResearch,
+  commandedBands,
   designResearched,
+  haulIfReclaimedNow,
+  isBandCommanded,
   isCapOff,
   extractPct,
   isAreaOpen,
+  isKnown,
+  isLaneOpen,
   isReclaimed,
   isShipping,
   isWon,
   laneNeighbours,
+  maxCommandedBands,
   nextLevelCost,
   reclaimedExport,
+  repeatOf,
   shortfall,
   unmetRequirements,
   yardTimePct,
@@ -19,6 +27,7 @@ import { fleetCap } from './fleet.ts';
 import {
   RAW_RESOURCES,
   RIG_NODES,
+  type AreaSide,
   type AreaHeart,
   type MapLayout,
   type AreaLayout,
@@ -74,7 +83,120 @@ export function campaignStatus(world: Readonly<World>, data: SimData): CampaignS
   };
 }
 
+/** 'locked': not enterable now (see AreaStatus.lockReason: no lane to a reclaimed area, or H6's band lock). */
 export type AreaState = 'locked' | 'open' | 'reclaimed' | 'active';
+
+/**
+ * H6: why a held area can't be entered from the overworld. 'lanes': not lane-joined to a reclaimed area (H4).
+ * 'bandLocked': lane-joined, but its band is locked until a relay in the band below is reclaimed. When both hold,
+ * 'lanes' (the far area's sheet still shows the band's lock line from `bandOpen` and `unlockRelays`).
+ */
+export type LockReason = 'lanes' | 'bandLocked';
+
+/**
+ * H6 "Selectors": one area's frontier facts for the overworld map and the area sheet. Everything is derived from
+ * the reclaim records, data and live tunables.
+ */
+export interface AreaFrontier {
+  /** Reclaimed, or lane-joined to a reclaimed area, or the tier-0 start: ring, prize, haul and guards may be shown. Otherwise far. */
+  known: boolean;
+  /** enterArea is valid for it from the overworld now (held, lane-joined, band open). */
+  open: boolean;
+  /** Its band is locked (overworld.bandLock on and no relay of the band below reclaimed), whatever its lanes. */
+  locked: boolean;
+  /** Why a held area isn't open, or null (open, reclaimed or active). */
+  lockReason: LockReason | null;
+  /** A command relay. */
+  relay: boolean;
+  /** The band (the area's tier). */
+  band: number;
+  side: AreaSide;
+  /** Its band is commanded: a relay of this band is reclaimed (for a held relay: reclaiming it adds nothing to the limit). */
+  commanded: boolean;
+  /** Its band is open (bandOpen). */
+  bandOpen: boolean;
+  /** When locked: the relays (area indices, data order) of the band below; reclaiming any one opens it. Else empty. */
+  unlockRelays: number[];
+  /** The haul: what reclaiming it now pays (decayed when a group mate is reclaimed), or, once reclaimed, what it paid. */
+  haulNow: ResourceTriple;
+  /** True if haulNow is a decayed repeat (for a reclaimed area: if it was paid decayed). */
+  haulDecayed: boolean;
+  /** The reclaimed group mate that makes it a repeat ("half: Frost Shelf already reclaimed"), or null. */
+  repeatOf: number | null;
+  /** The fleet limit the next landing gets after reclaiming it (cap + relayStep for a relay of an uncommanded band), or null when the limit is off. */
+  capAfter: number | null;
+}
+
+/** True if `paid` is less than the data haul in any resource. */
+function lessThan(paid: Readonly<ResourceTriple>, haul: Readonly<ResourceTriple>): boolean {
+  return RAW_RESOURCES.some((r) => paid[r] < haul[r]);
+}
+
+/** H6: one area's frontier facts (see AreaFrontier). */
+export function areaFrontier(world: Readonly<World>, data: SimData, a: number): AreaFrontier {
+  const area = data.map.areas[a];
+  if (area === undefined) throw new Error(`no area ${a}`);
+  const camp = world.campaign;
+  const reclaimed = isReclaimed(world, a);
+  const open = isAreaOpen(world, data, a);
+  const bandIsOpen = bandOpen(world, data, area.tier);
+  const lockReason: LockReason | null = reclaimed || camp.active === a || open ? null : !isLaneOpen(world, data, a) ? 'lanes' : !bandIsOpen ? 'bandLocked' : null;
+  const unlockRelays: number[] = [];
+  if (!bandIsOpen) data.map.areas.forEach((x, i) => x.relay && x.tier === area.tier - 1 && unlockRelays.push(i));
+  const paid = camp.areas[a]!.haulPaid;
+  const haulNow = reclaimed && paid !== null ? { ...paid } : haulIfReclaimedNow(world, data, a);
+  const mate = repeatOf(world, data, a);
+  const commanded = isBandCommanded(world, data, area.tier);
+  const cap = fleetCap(world, data);
+  // On the overworld fleetCap counts every reclaimed relay; reclaiming a relay of an uncommanded band adds one step.
+  const capAfter = cap === null ? null : !reclaimed && area.relay && !commanded ? cap + world.tun['fleet.relayStep'] : cap;
+  return {
+    known: isKnown(world, data, a),
+    open,
+    locked: !bandIsOpen,
+    lockReason,
+    relay: area.relay,
+    band: area.tier,
+    side: area.side,
+    commanded,
+    bandOpen: bandIsOpen,
+    unlockRelays,
+    haulNow,
+    haulDecayed: lessThan(haulNow, area.haul),
+    repeatOf: mate,
+    capAfter,
+  };
+}
+
+export interface OverworldArea extends AreaFrontier {
+  index: number;
+  id: string;
+  name: string;
+  reclaimed: boolean;
+}
+
+export interface OverworldStatus {
+  /** Every area in data order. */
+  areas: OverworldArea[];
+  /** Bands commanded by a reclaimed relay (0–2), and the most the data allows. */
+  commandedBands: number;
+  maxCommandedBands: number;
+  /** The fleet limit (the next landing's, on the overworld), or null when fleet.cap is 0. */
+  fleetCap: number | null;
+  /** overworld.bandLock is on. */
+  bandLock: boolean;
+}
+
+/** H6: the overworld map: per area {known, open, locked, relay, band, commanded, haulNow, …}, plus commandedBands and fleetCap. */
+export function overworldStatus(world: Readonly<World>, data: SimData): OverworldStatus {
+  return {
+    areas: data.map.areas.map((area, index) => ({ index, id: area.id, name: area.name, reclaimed: isReclaimed(world, index), ...areaFrontier(world, data, index) })),
+    commandedBands: commandedBands(world, data),
+    maxCommandedBands: maxCommandedBands(data),
+    fleetCap: fleetCap(world, data),
+    bandLock: world.tun['overworld.bandLock'] > 0,
+  };
+}
 
 export interface AreaGuardedNode {
   /** Frame node id ("p1", "root", "heart"). */
@@ -94,7 +216,7 @@ export interface HeartTag extends CounterTag {
   researched: boolean;
 }
 
-export interface AreaStatus {
+export interface AreaStatus extends AreaFrontier {
   index: number;
   id: string;
   name: string;
@@ -104,8 +226,9 @@ export interface AreaStatus {
   state: AreaState;
   /** Area indices joined by a lane, in lane order. */
   lanes: number[];
+  /** The data (nominal) haul. H6: what it pays or paid is `haulNow` (decayed for a repeat). */
   haul: ResourceTriple;
-  /** Export per game minute (before shipments.pct). */
+  /** Export per game minute (before shipments.pct). Exports never decay. */
   export: ResourceTriple;
   /** Guarded nodes in node order: pockets, the Root (if present), the heart. */
   guarded: AreaGuardedNode[];
@@ -162,7 +285,8 @@ export function areaStatus(world: Readonly<World>, data: SimData, a: number): Ar
     guarded,
     hasRoot,
     heartTags: { lancer: tag('lancer'), flak: tag('flak') },
-    record: { ...camp.areas[a]! },
+    record: { ...camp.areas[a]!, haulPaid: camp.areas[a]!.haulPaid === null ? null : { ...camp.areas[a]!.haulPaid! } },
+    ...areaFrontier(world, data, a),
   };
 }
 
@@ -180,8 +304,8 @@ export interface ResearchRow {
   /**
    * What blocks a purchase: per-resource shortfalls (0 where covered), items below their level, areas not
    * reclaimed, (H5) tier requirements short of reclaimed areas ("Needs a medium area reclaimed": tier 2, count 1;
-   * "Needs both medium areas reclaimed": tier 2, count 2), and capOff: a limit item while fleet.cap is 0
-   * ("Fleet limit is off (tuning)").
+   * "Needs both medium areas reclaimed": tier 2, count 2; no shipped item has one since H6), and capOff
+   * (@deprecated: H5's Command limit while fleet.cap is 0; always false since H6 removed it).
    */
   missing: { resources: ResourceTriple; items: Array<{ id: string; level: number }>; areas: string[]; tiers: TierShortfall[]; capOff: boolean };
   /** `buyResearch` would be valid now (also false inside an area and after the win). */
@@ -190,8 +314,7 @@ export interface ResearchRow {
    * The effect as a number, now and at the next level (null at max):
    * opening: ore at each landing (economy.startStock + level × step); extract: extraction percent (100 + level × stepPct);
    * yards: ship build time percent (100 − level × stepPct, before the 15-tick floor); rigs: nodes rigged at landing;
-   * lancer, flak, core: 0 or 1; fleet (H5, kind limit): the fleet limit, fleet.cap + level × research.fleet.step,
-   * or 0 when the limit is off (fleet.cap 0).
+   * lancer, flak, core: 0 or 1. (H6 removed Command limit, `fleet`, which data can no longer contain.)
    */
   effect: number;
   nextEffect: number | null;
@@ -203,7 +326,6 @@ export function researchEffect(world: Readonly<World>, id: ResearchId, level: nu
   if (id === 'opening') return t['economy.startStock'] + level * t['research.opening.step'];
   if (id === 'extract') return 100 + level * t['research.extract.stepPct'];
   if (id === 'yards') return 100 - level * t['research.yards.stepPct'];
-  if (id === 'fleet') return t['fleet.cap'] <= 0 ? 0 : t['fleet.cap'] + level * t['research.fleet.step'];
   return level;
 }
 
@@ -243,12 +365,12 @@ export interface LandingEffects {
   yardTimePct: number;
   /** Which designs are researched (their yards start on). */
   designs: { lancer: boolean; flak: boolean };
-  /** H5: the fleet limit in an area now (fleet.cap + Command limit level × step), or null when the limit is off. */
+  /** The fleet limit at the next landing, or in the area now (H6: fleet.cap + fleet.relayStep × commandedBands), or null when the limit is off. */
   fleetCap: number | null;
 }
 
-/** What research does at the next landing (or did at this one): the landing notice and the probe sheet. */
-export function landingEffects(world: Readonly<World>): LandingEffects {
+/** What research and relays do at the next landing (or did at this one): the landing notice and the probe sheet. */
+export function landingEffects(world: Readonly<World>, data: SimData): LandingEffects {
   const t = world.tun;
   return {
     openingOre: t['economy.startStock'] + researchLevel(world, 'opening') * t['research.opening.step'],
@@ -256,7 +378,7 @@ export function landingEffects(world: Readonly<World>): LandingEffects {
     extractPct: extractPct(world),
     yardTimePct: yardTimePct(world),
     designs: { lancer: designResearched(world, 'lancer'), flak: designResearched(world, 'flak') },
-    fleetCap: fleetCap(world),
+    fleetCap: fleetCap(world, data),
   };
 }
 
@@ -271,6 +393,8 @@ export interface ReclaimEntry {
   playTicks: number;
   entries: number;
   withdrawals: number;
+  /** H6: the haul it paid (decayed for a repeat). */
+  haulPaid: ResourceTriple | null;
 }
 
 export interface CampaignSummary {
@@ -287,8 +411,11 @@ export interface CampaignSummary {
   /** H5: ships recycled and ore refunded, over the recorded visits (as shipsBuilt). */
   shipsRecycled: number;
   oreRefunded: number;
+  /** What hauls paid in (H6: decayed repeats included), and shipments. */
   hauled: ResourceTriple;
   shipped: ResourceTriple;
+  /** H6: Σ data (nominal) haul over the reclaimed areas, to set against `hauled` (areas a campaignWorld start counts as reclaimed paid nothing). */
+  haulNominal: ResourceTriple;
   wonTick: number | null;
   won: boolean;
 }
@@ -309,12 +436,14 @@ export function campaignSummary(world: Readonly<World>, data: SimData): Campaign
     refunded += r.oreRefunded;
   }
   if (camp.active !== null && !isReclaimed(world, camp.active)) total += world.tick - camp.areaStartTick;
+  const nominal: ResourceTriple = { ore: 0, ice: 0, crystal: 0 };
+  for (const a of camp.reclaimOrder) for (const res of RAW_RESOURCES) nominal[res] += data.map.areas[a]!.haul[res];
   return {
-    areas: camp.areas.map((r, a) => ({ ...r, id: data.map.areas[a]!.id, name: data.map.areas[a]!.name })),
+    areas: camp.areas.map((r, a) => ({ ...r, haulPaid: r.haulPaid === null ? null : { ...r.haulPaid }, id: data.map.areas[a]!.id, name: data.map.areas[a]!.name })),
     reclaimOrder: camp.reclaimOrder.map((a) => {
       const r = camp.areas[a]!;
       const area = data.map.areas[a]!;
-      return { area: a, id: area.id, name: area.name, tick: r.reclaimedTick!, reclaimPlayTicks: r.reclaimPlayTicks, playTicks: r.playTicks, entries: r.entries, withdrawals: r.withdrawals };
+      return { area: a, id: area.id, name: area.name, tick: r.reclaimedTick!, reclaimPlayTicks: r.reclaimPlayTicks, playTicks: r.playTicks, entries: r.entries, withdrawals: r.withdrawals, haulPaid: r.haulPaid === null ? null : { ...r.haulPaid } };
     }),
     research: camp.researchLog.map((e) => ({ ...e, name: data.research.find((it) => it.id === e.item)?.name ?? e.item })),
     totalPlayTicks: total,
@@ -324,6 +453,7 @@ export function campaignSummary(world: Readonly<World>, data: SimData): Campaign
     oreRefunded: refunded,
     hauled: { ...camp.totals.hauled },
     shipped: { ...camp.totals.shipped },
+    haulNominal: nominal,
     wonTick: camp.wonTick,
     won: isWon(world),
   };

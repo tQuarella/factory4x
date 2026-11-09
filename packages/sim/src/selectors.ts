@@ -10,7 +10,9 @@ import {
   type Prize,
   type RawResource,
   type Resource,
+  type ResourceTriple,
   type ShipType,
+  type SimData,
   type Tunables,
 } from './data.ts';
 import { designResearched, extractPct, yardBuildTicks } from './campaign.ts';
@@ -294,11 +296,11 @@ export interface YardStatus {
 }
 
 /** The probe's Yards block: one row per ship type, plus the rally point and probe mining. */
-export function yardStatus(world: Readonly<World>): YardStatus {
+export function yardStatus(world: Readonly<World>, data: SimData): YardStatus {
   const t = world.tun;
   const free = world.stock.ore - reservedOre(world);
   const unlocked = unlockStatus(world).ships;
-  const full = isFleetFull(world);
+  const full = isFleetFull(world, data);
   const yards = SHIP_TYPES.map((type): YardRow => {
     const y = world.yards[type];
     const cost = t[`ship.${type}.cost`];
@@ -737,6 +739,8 @@ export interface RunSummary {
   heartShipsLost: number;
   rootWavesSent: number;
   rootShipsLost: number;
+  /** H6: the haul this visit's reclaim paid (decayed for a repeat), or null before the reclaim (the result panel). */
+  haulPaid: ResourceTriple | null;
 }
 
 const sumShips = (c: ShipTypeCounts): number => c.drone + c.lancer + c.flak;
@@ -797,5 +801,6 @@ export function runSummary(world: Readonly<World>): RunSummary {
     heartShipsLost: heart.shipsLost,
     rootWavesSent: root === null ? 0 : root.wavesSent,
     rootShipsLost: root === null ? 0 : root.shipsLost,
+    haulPaid: st.haulPaid === null ? null : { ...st.haulPaid },
   };
 }

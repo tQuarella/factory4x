@@ -42,6 +42,8 @@ import {
   openedByReclaim,
   reclaimNotice,
   shippedNotice,
+  stepMoment,
+  stepNotice,
   unlockNotice,
   withdrawNotice,
 } from './report.ts';
@@ -146,10 +148,22 @@ canvas.addEventListener('click', (ev) => {
   const x = ev.clientX - r.left;
   const y = ev.clientY - r.top;
   if (app.session.onOverworld) {
+    // The click that ends a drag is not a tap; a tap during the step moment skips it (and does nothing else).
+    if (worldView.consumeDrag()) return;
+    if (worldView.stepActive) {
+      worldView.skipStep();
+      return;
+    }
     const a = worldView.hitTest(x, y);
     researchSheet.close();
     if (a === null) areaSheet.close();
-    else areaSheet.open(a);
+    else {
+      areaSheet.open(a);
+      // The sheet may overlay the bottom of the map: pan the least that keeps this area clear of it. The pan reaches further under it,
+      // so the other areas stay reachable by dragging while it is open.
+      worldView.cover = sheetCover();
+      worldView.reveal(a);
+    }
     return;
   }
   const node = view.hitTest(x, y);
@@ -292,6 +306,9 @@ const fleetSeen: { world: unknown; shown: boolean } = { world: null, shown: fals
 /** Which screen the last refresh showed, per world, so only a change inside one session raises a landing or return notice. */
 const modeSeen: { world: unknown; active: number | null } = { world: null, active: null };
 
+/** How many step moments have started in this page (a test hook: the step is over in 1.5 s). */
+let stepsStarted = 0;
+
 /** Raises the landing, return, withdraw or reclaim notice when the screen changed since the last look. */
 function modeTransition(): void {
   const s = app.session;
@@ -301,7 +318,12 @@ function modeTransition(): void {
     modeSeen.world = w;
     modeSeen.active = active;
     unlockSeen.world = null;
-    if (active === null) closeWorldSheets();
+    if (active === null) {
+      closeWorldSheets();
+      // A new or resumed session opens centred on the area last reclaimed, else on the start.
+      const order = w.campaign.reclaimOrder;
+      worldView.focus(order.length > 0 ? order[order.length - 1]! : Math.max(0, data.map.areas.findIndex((a) => a.tier === 0)));
+    }
     return;
   }
   if (modeSeen.active === active) return;
@@ -319,7 +341,7 @@ function modeTransition(): void {
     // Landing: name every research effect in play.
     s.flags.resultShown = false;
     s.flags.shippedAtLanding = { ...w.campaign.totals.shipped };
-    toast.show(landingNotice(data.map.areas[active]!.name, landingEffects(w)));
+    toast.show(landingNotice(data.map.areas[active]!.name, landingEffects(w, data)));
     return;
   }
   if (prev === null) return;
@@ -330,9 +352,23 @@ function modeTransition(): void {
   const shipped = base === null ? '' : shippedNotice(name, { ore: now.ore - base.ore, ice: now.ice - base.ice, crystal: now.crystal - base.crystal });
   s.flags.shippedAtLanding = null;
   const head = isReclaimed(w, prev)
-    ? reclaimNotice(name, areaStatus(w, data, prev).haul, openedByReclaim(w, data, prev))
+    ? reclaimNotice(name, areaStatus(w, data, prev).haulNow, openedByReclaim(w, data, prev))
     : withdrawNotice(name);
-  toast.show(shipped === '' ? head : `${head}\n\n${shipped}`);
+  // H6 step moment: the first relay of a band raises the limit and opens the next band, once per band.
+  const step = isReclaimed(w, prev) ? stepMoment(w, data, prev) : null;
+  const first = step !== null && !s.flags.stepsShown.includes(step.band);
+  const lead = first ? `${stepNotice(step)}\n\n${head}` : head;
+  toast.show(shipped === '' ? lead : `${lead}\n\n${shipped}`);
+  // Centre the view on the area just left, after the notice has settled the canvas height; then play the step moment.
+  resizeViews();
+  worldView.focus(prev);
+  if (first) {
+    s.flags.stepsShown.push(step.band);
+    if (step.opens !== null) {
+      stepsStarted++;
+      worldView.startStep(step.opens);
+    }
+  }
 }
 
 /**
@@ -352,11 +388,12 @@ function transitionPending(): boolean {
 let hudOverride: World | null = null;
 
 function refreshUi(): void {
+  // The mode is set first, so a re-fit inside modeTransition measures the layout of the screen it is about to show.
+  el.app.dataset.mode = app.session.onOverworld ? 'world' : 'area';
   modeTransition();
   const s = app.session;
   const w = s.world;
   const onWorld = s.onOverworld;
-  el.app.dataset.mode = onWorld ? 'world' : 'area';
   const won = isWon(w);
   if (onWorld) {
     owHud.update(w, data);
@@ -380,7 +417,7 @@ function refreshUi(): void {
   const lines = onWorld ? [] : bannerLines(w);
   const showBanner = lines.length > 0 || forceBanner;
   setHidden(el.banner, !showBanner);
-  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'ROOT · 6 Thorn 4 Spore · strip 0.8/s · 2 lost');
+  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'P4 · 6 Thorn 4 Spore · strip 0.8/s · 2 lost');
   if (showBanner && el.banner.dataset.text !== lines.join('|')) {
     el.banner.dataset.text = lines.join('|');
     el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
@@ -403,7 +440,7 @@ function refreshUi(): void {
     const fresh = (['lancer', 'flak'] as const).filter((t) => unlockStatus(w).ships[t] && !unlockSeen.ships[t]);
     if (fresh.length > 0) {
       for (const t of fresh) unlockSeen.ships[t] = true;
-      const yards = yardStatus(w).yards;
+      const yards = yardStatus(w, data).yards;
       const text = fresh
         .map((t) => {
           const row = yards.find((y) => y.type === t)!;
@@ -510,7 +547,7 @@ function startCampaign(start: CampaignStart, tunables: Record<string, number> = 
   adopt(new Session(dataWithDefaults(data, { ...s.world.tun, ...tunables }), { seed: s.seed, start }));
   // A constructed landing gets the landing notice a real one would.
   const w = app.session.world;
-  if (w.campaign.active !== null) toast.show(landingNotice(data.map.areas[w.campaign.active]!.name, landingEffects(w)));
+  if (w.campaign.active !== null) toast.show(landingNotice(data.map.areas[w.campaign.active]!.name, landingEffects(w, data)));
 }
 
 window.__factory4x = {
@@ -527,6 +564,20 @@ window.__factory4x = {
     const p = worldView.areaPos(a);
     return { x: r.left + p.x, y: r.top + p.y };
   },
+  areaRadius: () => worldView.nodeR,
+  bandRects: () => {
+    const r = canvas.getBoundingClientRect();
+    return worldView.bandRects().map((b) => ({ ...b, x: r.left + b.x, y: r.top + b.y }));
+  },
+  areaLabelRects: () => {
+    const r = canvas.getBoundingClientRect();
+    return worldView.labelRects().map((b) => (b === null ? null : { x: r.left + b.x, y: r.top + b.y, w: b.w, h: b.h }));
+  },
+  overworldScroll: () => ({ ...worldView.scroll, max: worldView.scrollLimits }),
+  centerOnArea: (a) => worldView.focus(a),
+  stepActive: () => worldView.stepActive,
+  stepsStarted: () => stepsStarted,
+  skipStep: () => worldView.skipStep(),
   selected: () => sheet.selected,
   selectedArea: () => areaSheet.selected,
   onOverworld: () => app.session.onOverworld,
@@ -552,7 +603,7 @@ window.__factory4x = {
   },
   debugShowNotices: (on) => {
     forceBanner = on;
-    if (on) toast.show('Root cut: 15 sent, 3 lost. The Heart wilts: 10 Thorns 14 Spores → 6 Thorns 7 Spores, regrows 5× slower.\n\nP4 held: 10 sent, 10 lost, 2 guards stripped\nRegrowth outpaced the wave. 10 ships strip 0.6 guards/s; P4 regrows 1/s.');
+    if (on) toast.show('Heart held: 15 sent, 3 lost, 4 guards stripped. 10 Thorns 14 Spores regrow 1 / 2.0 s and 1 / 0.7 s.\n\nP4 held: 10 sent, 10 lost, 2 guards stripped\nRegrowth outpaced the wave. 10 ships strip 0.6 guards/s; P4 regrows 1/s.');
     else toast.hide();
     refreshUi();
   },

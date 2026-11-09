@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createWorld, defaultData, replayHashes, serializeWorld, type CampaignStart } from '@factory4x/sim';
+import { tapArea } from './helpers.ts';
 import { referenceReplay } from '../../packages/bots/src/reference-replay.ts';
 
 function watchErrors(page: Page): string[] {
@@ -37,27 +38,13 @@ async function tapNode(page: Page, node: number): Promise<void> {
   await page.mouse.click(p.x, p.y);
 }
 
-/** Taps an area on the overworld by its screen position (data order: landfall 0, shelf 1, shoal 2, veil 3, garden 4, deep 5). */
-async function tapArea(page: Page, area: number): Promise<void> {
-  await settled(page);
-  // The map pans while a sheet opens or closes: wait until the area stops moving, and check it is on the visible map (a position above
-  // the canvas is under the notices strip, so the tap would land on the hint, not the area).
-  let p = { x: 0, y: 0 };
-  await expect
-    .poll(async () => {
-      const q = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), area);
-      const still = Math.abs(q.x - p.x) < 0.5 && Math.abs(q.y - p.y) < 0.5;
-      p = q;
-      return still;
-    })
-    .toBe(true);
-  const view = (await page.locator('#view').boundingBox())!;
-  expect(p.y, `area ${area} at y=${Math.round(p.y)} is above the map (top ${Math.round(view.y)})`).toBeGreaterThan(view.y);
-  await page.mouse.click(p.x, p.y);
-}
+/** Area indices by id (the data's order), and how many there are. Read from the data, so a re-tuned or re-ordered map still works. */
+const AREA = Object.fromEntries(defaultData.map.areas.map((a, i) => [a.id, i])) as Record<string, number>;
+const AREA_COUNT = defaultData.map.areas.length;
+const areaName = (id: string): string => defaultData.map.areas[AREA[id]!]!.name;
 
-const LANDFALL = 0;
-const SHELF = 1;
+const LANDFALL = AREA.landfall!;
+const SHELF = AREA.shelf!;
 
 /** Overworld to landed, by taps: tap the area, tap Land. */
 async function landByTaps(page: Page, area: number, name: string): Promise<void> {
@@ -67,15 +54,16 @@ async function landByTaps(page: Page, area: number, name: string): Promise<void>
   await expect.poll(() => page.evaluate(() => window.__factory4x!.activeArea())).toBe(area);
 }
 
-/** Every area but The Deep reclaimed, both designs bought, landed in The Deep at tick 0 (the H3 game, as a dev hook). */
-const DEEP_START: CampaignStart = { reclaimed: ['landfall', 'shelf', 'shoal', 'veil', 'garden'], research: { lancer: 1, flak: 1 }, land: 'deep' };
+/** A relay in each band reclaimed (so the limit is at its top), both designs bought, landed in The Deep at tick 0 (the H3 game, as a dev hook). */
+const DEEP_START: CampaignStart = { reclaimed: ['landfall', 'shelf', 'rime', 'mire'], research: { lancer: 1, flak: 1 }, land: 'deep' };
 
 async function startCampaign(page: Page, start: CampaignStart, tunables: Record<string, number> = {}): Promise<void> {
   await page.evaluate(([s, t]) => window.__factory4x!.startCampaign(s as never, t as never), [start, tunables] as const);
 }
 
 /** Node index of the Bloom heart on The Deep (the H3 map). */
-const HEART = 15;
+/** Node index of the Bloom heart in the area being played (frame ids are filtered per area, so the index shifts: ask the page). */
+const heartNode = (page: Page): Promise<number> => page.evaluate(() => window.__factory4x!.nodeIndex("heart"));
 
 /** Every visible control inside `root` is at least 44 px and nothing sticks out sideways. */
 async function expectControlsFit(page: Page, root: string, label: string): Promise<void> {
@@ -125,7 +113,7 @@ test('build loads on the overworld; nothing ticks there; no console errors', asy
   await expect(page.locator('#version')).not.toBeEmpty();
   await expect(page.locator('[data-hud="cw-hud-version"]')).toBeVisible();
   expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
-  await expect(page.locator('#reclaimed')).toHaveText(/^Reclaimed 0\/6$/);
+  await expect(page.locator('#reclaimed')).toHaveText(`Reclaimed 0/${AREA_COUNT}`);
   await expect(page.locator('#b-research')).toBeVisible();
   // No speed or pause buttons on the overworld: it is paused.
   for (const id of ['#b-pause', '#b-s1', '#b-s2', '#b-s4', '#b-world']) await expect(page.locator(id)).toBeHidden();
@@ -147,28 +135,17 @@ test('overworld: tap an area for its sheet; a held area cannot be landed on', as
   await expect(page.locator('#sheet')).toContainText(/Reclaim to haul \d+ ore/);
   await expect(page.locator('#sheet')).toContainText(/then ships .* while you play elsewhere/);
   await expect(page.locator('#sheet button.land')).toBeEnabled();
-  // Landfall's sheet pans the map so Landfall clears it, which can carry Spore Veil off the top of the map on a tall phone: tap empty
-  // space to close the sheet (the map pans back) before tapping Veil.
-  const veilBox = (await page.locator('#view').boundingBox())!;
-  await page.mouse.click(veilBox.x + 4, veilBox.y + veilBox.height / 2);
-  await expect(page.locator('#sheet')).toBeHidden();
-  await tapArea(page, 3);
-  await expect(page.locator('#sheet h2')).toHaveText('Spore Veil');
-  await expect(page.locator('#sheet .area-status')).toContainText('Held: reclaim a neighbour first');
-  await expect(page.locator('#sheet button.land')).toBeDisabled();
-  await expect(page.locator('#sheet .area-guard').first()).toBeVisible();
-  // Heart counters carry "(not researched)" on designs you lack; Landfall has no guards.
-  await page.locator('#sheet .area-tags').scrollIntoViewIfNeeded();
-  await expect(page.locator('#sheet .area-tag[data-ship="lancer"]')).toContainText('(not researched)');
-  await expect(page.locator('#sheet .area-tag[data-ship="lancer"] .tag-badge')).toHaveText(/Strong|Even|Weak/);
-  // On a phone the sheet overlays the bottom of the map, where Landfall is: tap empty space first.
-  const box = (await page.locator('#view').boundingBox())!;
-  await page.mouse.click(box.x + 4, box.y + box.height / 2);
-  await expect(page.locator('#sheet')).toBeHidden();
-  await tapArea(page, LANDFALL);
+  // Landfall has no guards.
   await expect(page.locator('#sheet')).toContainText('No guards: the first ship to arrive reclaims it');
-  await page.mouse.click(box.x + 4, box.y + box.height / 2);
-  await expect(page.locator('#sheet')).toBeHidden();
+  // A far area (not lane-joined to a reclaimed one) is unscouted: no Land button, no haul or guards, but its band and kind.
+  await tapArea(page, AREA.deep!);
+  await expect(page.locator('#sheet h2')).toHaveText(areaName('deep'));
+  await expect(page.locator('#sheet .area-status')).toHaveText('Unscouted');
+  await expect(page.locator('#sheet')).toContainText('Unscouted: reclaim a neighbour to scout it');
+  await expect(page.locator('#sheet')).toContainText(/Band \d · Area/);
+  await expect(page.locator('#sheet button.land')).toHaveCount(0);
+  await expect(page.locator('#sheet .area-guard')).toHaveCount(0);
+  await expect(page.locator('#sheet .haul')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -194,18 +171,15 @@ async function landfallRun(page: Page): Promise<void> {
   await expectControlsFit(page, '#result', 'area result panel');
   await page.locator('#result button', { hasText: 'Back to the overworld' }).click();
   await expect.poll(() => page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
-  await expect(page.locator('#reclaimed')).toHaveText(/^Reclaimed 1\/6$/);
-  await expect(page.locator('#toast')).toContainText(/Landfall reclaimed: \+\d+ ore\. Opened: Frost Shelf, Glass Shoal\./);
+  await expect(page.locator('#reclaimed')).toHaveText(`Reclaimed 1/${AREA_COUNT}`);
+  await expect(page.locator('#toast')).toContainText(new RegExp(`Landfall reclaimed: \\+\\d+ ore\\. Opened: ${areaName('shelf')}, ${areaName('shoal')}\\.`));
   await expect(page.locator('#sp-ore b')).not.toHaveText('0');
   // Frost Shelf is open now.
   await page.locator('#toast').click();
   await tapArea(page, SHELF);
   await expect(page.locator('#sheet .area-status')).toHaveText('Open');
   await expect(page.locator('#sheet button.land')).toBeEnabled();
-  // The sheet overlays the bottom of the map (Landfall is under it): tap empty space to close it, then Landfall.
-  const box = (await page.locator('#view').boundingBox())!;
-  await page.mouse.click(box.x + 4, box.y + box.height / 2);
-  await expect(page.locator('#sheet')).toBeHidden();
+  // With the sheet open the map still reaches Landfall (the pan reaches under the sheet), so tap it straight away.
   await tapArea(page, LANDFALL);
   await expect(page.locator('#sheet .area-status')).toContainText('Reclaimed');
   await expect(page.locator('#sheet button.land')).toHaveCount(0);
@@ -262,7 +236,7 @@ test('research: buy a level and see it in the next landing notice; a withdraw ke
   await page.locator('section.overlay:not([id]) .card button', { hasText: 'Withdraw' }).click();
   await expect.poll(() => page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
   await expect(page.locator('#toast')).toContainText('Withdrew from Frost Shelf');
-  await expect(page.locator('#reclaimed')).toHaveText(/^Reclaimed 1\/6$/);
+  await expect(page.locator('#reclaimed')).toHaveText(`Reclaimed 1/${AREA_COUNT}`);
   expect(await page.evaluate(() => JSON.parse(window.__factory4x!.campaign()).stockpile.ore as number)).toBeGreaterThanOrEqual(ore);
   expect(await page.evaluate(() => JSON.parse(window.__factory4x!.campaign()).research.opening as number)).toBe(1);
   await page.waitForTimeout(300);
@@ -281,7 +255,7 @@ test('withdraw asks first; Stay keeps the area; Withdraw resets it', async ({ pa
   await page.locator('#b-world').click();
   await page.locator('section.overlay:not([id]) .card button', { hasText: 'Withdraw' }).click();
   await expect.poll(() => page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
-  await expect(page.locator('#reclaimed')).toHaveText(/^Reclaimed 0\/6$/);
+  await expect(page.locator('#reclaimed')).toHaveText(`Reclaimed 0/${AREA_COUNT}`);
   // The area is held and open again: a second landing works.
   await landByTaps(page, LANDFALL, 'Landfall');
   expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
@@ -305,6 +279,7 @@ test('a tap on the overworld in the first frame after a running withdraw keeps i
             requestAnimationFrame(poll);
             return;
           }
+          f.centerOnArea(area);
           const p = f.areaScreenPos(area);
           document.querySelector('canvas#view')!.dispatchEvent(new MouseEvent('click', { clientX: p.x, clientY: p.y, bubbles: true }));
           resolve(true);
@@ -327,11 +302,11 @@ test('win: buy the probe core and reach the win panel; New system asks first', a
   const errors = watchErrors(page);
   await ready(page);
   await startCampaign(page, {
-    reclaimed: ['landfall', 'shelf', 'shoal', 'veil', 'garden', 'deep'],
+    reclaimed: defaultData.map.areas.map((a) => a.id),
     research: { lancer: 1, flak: 1 },
-    stockpile: { ore: 2000, ice: 600, crystal: 600 },
+    stockpile: { ore: 5000, ice: 2000, crystal: 2000 },
   });
-  await expect(page.locator('#reclaimed')).toHaveText(/^Reclaimed 6\/6$/);
+  await expect(page.locator('#reclaimed')).toHaveText(`Reclaimed ${AREA_COUNT}/${AREA_COUNT}`);
   await page.locator('#b-research').click();
   const core = page.locator('#research section[data-item="core"] button.buy');
   await expect(core).toBeEnabled();
@@ -351,7 +326,7 @@ test('win: buy the probe core and reach the win panel; New system asks first', a
   await page.locator('#win button', { hasText: 'New system' }).click();
   await page.locator('section.overlay:not([id]) .card button', { hasText: 'Yes, new system' }).click();
   await expect(page.locator('#win')).toBeHidden();
-  await expect(page.locator('#reclaimed')).toHaveText(/^Reclaimed 0\/6$/);
+  await expect(page.locator('#reclaimed')).toHaveText(`Reclaimed 0/${AREA_COUNT}`);
   expect(errors).toEqual([]);
 });
 
@@ -364,6 +339,17 @@ test('an H3 save (data v5) starts fresh with the toast', async ({ page }) => {
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
   await expect(page.locator('#toast')).toContainText(/older game data \(v5; this build is v\d+\), so it was discarded and a new run started/);
+  expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
+});
+
+test('an H5 save (data v9, before the open frontier) starts fresh with the existing toast', async ({ page }) => {
+  const world = JSON.parse(serializeWorld(createWorld(1, defaultData))) as { dataVersion: number };
+  world.dataVersion = 9;
+  const save = JSON.stringify({ format: 2, seed: 1, dataVersion: 9, world: JSON.stringify(world), log: [], pending: [], history: [], flags: {} });
+  await page.addInitScript((text) => window.localStorage.setItem('fvn.save', text), save);
+  await page.goto('/');
+  await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
+  await expect(page.locator('#toast')).toContainText(/older game data \(v9; this build is v\d+\), so it was discarded and a new run started/);
   expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
 });
 
@@ -404,18 +390,20 @@ test('the asteroid sheet shows the Extraction-boosted rate (12.5/min each at lev
   expect(errors).toEqual([]);
 });
 
-test('the Root sheet opens with the Feeds the Heart box; the heart sheet says fed; the probe names the layout', async ({ page }) => {
+// The Root smoke tests are removed with the Root (DESIGN.md H6 "Removing the Root"): "the Root sheet opens with the Feeds the Heart box"
+// needed a Root on shipped data. The behaviour stays covered by the sim tests on the frozen fixtures.
+test('The Deep has no Root: its heart sheet has no supply line and shows the combat line; the probe names the layout', async ({ page }) => {
   const errors = watchErrors(page);
   await ready(page);
   await startCampaign(page, DEEP_START);
-  const root = await page.evaluate(() => window.__factory4x!.rootNode());
-  await tapNode(page, root);
-  await expect.poll(() => page.evaluate(() => window.__factory4x!.selected())).toBe(root);
-  await expect(page.locator('#sheet h2')).toContainText('Root');
-  await expect(page.locator('#sheet')).toContainText('Feeds the Heart');
-  await expect(page.locator('#sheet')).toContainText(/Cut it: \d+ Thorns \d+ Spores, 1 \/ 10\.0 s and 1 \/ 3\.3 s, no repair/);
-  await tapNode(page, HEART);
-  await expect(page.locator('#sheet')).toContainText('Fed by the Root');
+  expect(await page.evaluate(() => window.__factory4x!.rootNode())).toBe(-1);
+  await tapNode(page, await heartNode(page));
+  await expect(page.locator('#sheet')).not.toContainText('Fed by the Root');
+  await expect(page.locator('#sheet .guard-targets')).toHaveText('Thorns strike Flak first; Spores strike Lancers first.');
+  await expectControlsFit(page, '#sheet', 'heart sheet with the combat line');
+  const pocket = await page.evaluate(() => window.__factory4x!.pocketNode('crystal'));
+  await tapNode(page, pocket);
+  await expect(page.locator('#sheet .guard-targets')).toBeVisible();
   await tapNode(page, 0);
   const name = await page.evaluate(() => window.__factory4x!.systemName());
   expect(name).toMatch(/^(Frost Gate|Glass Thicket|Twin Seams)$/);
@@ -556,10 +544,10 @@ test('autosave of a constructed campaign resumes on the overworld and replays fr
   expect(await page.evaluate(() => window.__factory4x!.saveNow())).toBe(true);
   await page.reload();
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
-  await expect(page.locator('#reclaimed')).toHaveText(/^Reclaimed 2\/6$/);
+  await expect(page.locator('#reclaimed')).toHaveText(`Reclaimed 2/${AREA_COUNT}`);
   await expect(page.locator('#sp-ore b')).toHaveText('90');
   expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
-  await landByTaps(page, 3, 'Spore Veil');
+  await landByTaps(page, AREA.rime!, areaName('rime'));
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
 });
@@ -603,15 +591,16 @@ async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
   await ready(page);
   await startCampaign(page, DEEP_START);
   if (stress) await page.addStyleTag({ content: WIDE_NOTICE_FONT });
-  await tapNode(page, HEART);
+  await tapNode(page, await heartNode(page));
   await expect(page.locator('#sheet')).toBeVisible();
   await page.evaluate(() => window.__factory4x!.debugShowNotices(true));
   await expect(page.locator('#banner')).toBeVisible();
   await expect(page.locator('#toast')).toBeVisible();
   await expect(page.locator('#banner')).toContainText('HEART ·');
-  await expect(page.locator('#banner')).toContainText('ROOT ·');
-  await expect(page.locator('#toast')).toContainText('Root cut:');
-  const rootNode = await page.evaluate(() => window.__factory4x!.rootNode());
+  await expect(page.locator('#banner')).toContainText('P4 ·');
+  await expect(page.locator('#toast')).toContainText('Heart held:');
+  const heartIdx = await heartNode(page);
+  const pocketIdx = await page.evaluate(() => window.__factory4x!.pocketNode('crystal'));
   const view = (await page.locator('#view').boundingBox())!;
   // Only the part inside the canvas is ever drawn on.
   // The notices strip is capped, so the map keeps most of its height with both notices up, whatever the font.
@@ -620,7 +609,7 @@ async function noticesClearOfBloom(page: Page, stress = false): Promise<void> {
   expect((await page.locator('#toast').boundingBox())!.height, 'toast stays tappable').toBeGreaterThanOrEqual(43.5);
   for (const sel of ['#banner', '#toast']) {
     const r = (await page.locator(sel).boundingBox())!;
-    for (const node of [HEART, rootNode]) {
+    for (const node of [heartIdx, pocketIdx]) {
       const pos = await page.evaluate((i) => window.__factory4x!.nodeScreenPos(i), node);
       // Generous box around each guarded node: thorn ring, label above it, badges.
       const box = { l: pos.x - 50, r: pos.x + 50, t: Math.max(view.y, pos.y - 62), b: pos.y + 50 };
@@ -688,7 +677,7 @@ test('paused "Attack with all" from two sources is one press, one tick, one wave
 
   await page.locator('#b-pause').click();
   await expect(page.locator('#paused')).toBeVisible();
-  await tapNode(page, HEART);
+  await tapNode(page, await heartNode(page));
   const t0 = await page.evaluate(() => window.__factory4x!.tick());
   expect(await page.evaluate(() => window.__factory4x!.wavesSent())).toBe(0);
   await page.locator('#sheet button', { hasText: /^Attack with all sources/ }).click();
@@ -711,8 +700,9 @@ test.describe('375x667 portrait', () => {
   test('every visible control is at least 44 px with each sheet open', async ({ page }) => {
     await ready(page);
     await startCampaign(page, DEEP_START);
-    // Probe, an asteroid, a pocket, the Root and the heart.
-    for (const node of [0, 1, 10, 14, HEART]) {
+    // Probe, an asteroid, both pockets and the heart.
+    const nodes = [0, 1, await page.evaluate(() => window.__factory4x!.pocketNode('crystal')), await page.evaluate(() => window.__factory4x!.pocketNode('ice')), await heartNode(page)];
+    for (const node of nodes) {
       await tapNode(page, node);
       await expect(page.locator('#sheet')).toBeVisible();
       const small = await page.evaluate(() =>
@@ -768,6 +758,23 @@ test.describe('375x667 portrait', () => {
     }
   });
 
+  test('the combat line on the heart and pocket sheets fits at 375 px with the wide font', async ({ page }) => {
+    await ready(page);
+    await startCampaign(page, DEEP_START);
+    const pocket = await page.evaluate(() => window.__factory4x!.pocketNode('crystal'));
+    for (const node of [await heartNode(page), pocket]) {
+      await tapNode(page, node);
+      const line = page.locator('#sheet .guard-targets');
+      await line.scrollIntoViewIfNeeded();
+      await expect(line).toHaveText('Thorns strike Flak first; Spores strike Lancers first.');
+      const b = (await line.boundingBox())!;
+      const s = (await page.locator('#sheet').boundingBox())!;
+      expect(b.x, `line left of node ${node}`).toBeGreaterThanOrEqual(s.x);
+      expect(b.x + b.width, `line right of node ${node}`).toBeLessThanOrEqual(s.x + s.width + 1);
+      await expectControlsFit(page, '#sheet', `sheet of node ${node} with the combat line`);
+    }
+  });
+
   test('area HUD fits and does not wrap under a wide font, with the Overworld button', async ({ page }) => {
     await ready(page);
     await startCampaign(page, DEEP_START);
@@ -775,47 +782,6 @@ test.describe('375x667 portrait', () => {
     await expect(page.locator('#b-world')).toHaveAttribute('aria-label', 'Overworld');
     await expectControlsFit(page, '#bars', 'area HUD');
     await expectHudNoWrap(page, 'area HUD');
-  });
-
-  test('overworld: area nodes are 44 px targets, labels stay off the canvas edges, the selected area clears the sheet', async ({ page }) => {
-    await ready(page);
-    await startCampaign(page, { reclaimed: ['landfall'], stockpile: { ore: 300 } });
-    // Dismiss the first-run hint's strip effects: take the map as it is, then measure.
-    const view = (await page.locator('#view').boundingBox())!;
-    for (let a = 0; a < 6; a++) {
-      const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), a);
-      expect(p.y - view.y, `area ${a} top gap`).toBeGreaterThanOrEqual(50);
-      expect(view.y + view.height - p.y, `area ${a} bottom gap`).toBeGreaterThanOrEqual(50);
-      expect(p.x - view.x, `area ${a} left gap`).toBeGreaterThanOrEqual(40);
-      expect(view.x + view.width - p.x, `area ${a} right gap`).toBeGreaterThanOrEqual(40);
-    }
-    // Neighbouring area centres are at least 44 px apart, so a tap picks one.
-    for (let a = 0; a < 6; a++) {
-      for (let b = a + 1; b < 6; b++) {
-        const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), a);
-        const q = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), b);
-        expect(Math.hypot(p.x - q.x, p.y - q.y), `areas ${a} and ${b}`).toBeGreaterThanOrEqual(44);
-      }
-    }
-    // Landfall sits at the bottom, where the sheet lands. It pans clear of it.
-    await tapArea(page, LANDFALL);
-    await expect(page.locator('#sheet')).toBeVisible();
-    await page.waitForTimeout(700);
-    const sheet = (await page.locator('#sheet').boundingBox())!;
-    const land = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), LANDFALL);
-    expect(land.y + 36, 'Landfall and its label clear the sheet').toBeLessThanOrEqual(sheet.y + 1);
-    expect(land.y, 'Landfall still on the map').toBeGreaterThan(view.y);
-    // Every sheet control is reachable and at least 44 px, and the sheet doesn't cover the whole map.
-    expect(sheet.height).toBeLessThan(view.height * 0.6);
-    await expectControlsFit(page, '#sheet', 'area sheet');
-    // An open area (Frost Shelf) shows its Land button on screen without scrolling (it is sticky), and clears the sheet too.
-    await tapArea(page, SHELF);
-    await expect(page.locator('#sheet h2')).toHaveText('Frost Shelf');
-    await page.waitForTimeout(700);
-    const shelf = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), SHELF);
-    expect(shelf.y + 36, 'Frost Shelf and its label clear the sheet').toBeLessThanOrEqual((await page.locator('#sheet').boundingBox())!.y + 1);
-    const landBtn = (await page.locator('#sheet button.land').boundingBox())!;
-    expect(landBtn.y + landBtn.height).toBeLessThanOrEqual(667);
   });
 
   test('research sheet fits at 375 px with a wide font', async ({ page }) => {
@@ -833,7 +799,13 @@ test.describe('375x667 portrait', () => {
     for (const item of ['lancer', 'flak', 'opening', 'extract', 'rigs', 'yards', 'core']) {
       await expect(page.locator(`#research section[data-item="${item}"]`)).toHaveCount(1);
     }
+    // H6: the limit rises by reclaiming command relays, so there is no Command limit card.
+    await expect(page.locator('#research section[data-item="fleet"]')).toHaveCount(0);
+    await expect(page.locator('#research')).not.toContainText('Command limit');
   });
+
+  // The H4 test "area nodes are 44 px targets, labels stay off the canvas edges" assumed the whole map fits the screen. The map pans now,
+  // so those checks live in overworld.spec.ts (every node 44 px, band labels clear of nodes, the pan, reachability with a sheet open).
 
   test('overworld: the whole first slice by touch, then the result and notices fit', async ({ page }) => {
     test.setTimeout(90_000);
@@ -1025,9 +997,9 @@ test.describe('H3 at 375x667 portrait', () => {
 // `fleet.cap` is set through the dev hook so the fleet fills in seconds. Every surface runs under WIDE_FONT.
 
 const FLEET_CAP = defaultData.tunables['fleet.cap'].default;
-const FLEET_STEP = defaultData.tunables['research.fleet.step'].default;
+const RELAY_STEP = defaultData.tunables['fleet.relayStep'].default;
 const PROBE = 0;
-const SHOAL = 2;
+const SHOAL = AREA.shoal!;
 
 /** Lands in Frost Shelf with `fleet.cap` set, at 4x, and waits until the yards have filled the fleet. */
 async function fillFleet(page: Page, cap: number): Promise<void> {
@@ -1061,7 +1033,7 @@ test('H5: the fleet fills, the chip turns amber and the yard row says why, with 
   expect(await chip.evaluate((e) => getComputedStyle(e).borderTopColor)).toBe('rgb(255, 210, 122)');
   await expect(page.locator('#toast')).toContainText('Fleet full (2/2): yards paused. Recycle ships at a node to change your mix.');
   await tapNode(page, PROBE);
-  await expect(page.locator('#sheet .fleet-line')).toHaveText('Fleet 2/2 · Command limit 0/3');
+  await expect(page.locator('#sheet .fleet-line')).toHaveText('Fleet 2/2');
   await expect(page.locator('#sheet .yard-row[data-yard="drone"] .yr-status')).toHaveText('idle: fleet full (2/2)');
   expect(errors).toEqual([]);
 });
@@ -1099,55 +1071,36 @@ test('H5: recycle frees a slot, the stock rises by the preview, and the yard res
   expect(errors).toEqual([]);
 });
 
-test('H5: Command limit is bought on the overworld and the next landing shows the new limit', async ({ page }) => {
+// The H5 Command limit tests (bought on the overworld, a disabled card says why, fleet.cap 0 says so on the card) are removed with
+// the research item (DESIGN.md H6): the limit rises with command relays, covered below.
+
+test('H6: a reclaimed command relay raises the limit: the top row, the sheet and the next landing show it', async ({ page }) => {
   const errors = watchErrors(page);
   await ready(page);
   await startCampaign(page, { reclaimed: ['landfall', 'shelf'], stockpile: { ore: 500, ice: 100, crystal: 100 } });
+  await expect(page.locator('#sp-fleet')).toHaveText(`Fleet limit ${FLEET_CAP}`);
   await tapArea(page, SHOAL);
   await expect(page.locator('#sheet .fleet-limit')).toHaveText(`Your fleet limit: ${FLEET_CAP}`);
-  await page.locator('#b-research').click();
-  const card = page.locator('#research section[data-item="fleet"]');
-  await expect(card).toBeVisible();
-  await expect(card).toContainText('Command limit');
-  await expect(card).toContainText('0/3');
-  await expect(card).toContainText(`Fleet limit ${FLEET_CAP} → ${FLEET_CAP + FLEET_STEP}`);
-  // It sits in the meaty-step group after the designs, never above the probe core.
-  const order = await page.locator('#research section.rcard').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.item));
-  expect(order.indexOf('core')).toBe(0);
-  expect(order.indexOf('fleet')).toBeGreaterThan(order.indexOf('flak'));
-  await card.locator('button.buy').click();
-  await expect(card).toContainText('1/3');
-  await expect(page.locator('#toast')).toContainText(`Command limit 1: fleet limit now ${FLEET_CAP + FLEET_STEP}.`);
-  await page.locator('#research button[aria-label="Close research"]').click();
-  await landByTaps(page, SHOAL, 'Glass Shoal');
-  await expect(page.locator('#toast')).toContainText(`fleet limit ${FLEET_CAP + FLEET_STEP}`);
-  await expect(page.locator('#chip-fleet b')).toHaveText(new RegExp(`^Fleet \\d+/${FLEET_CAP + FLEET_STEP}$`));
+  // With a band 1 relay reclaimed the limit is one step higher everywhere.
+  await startCampaign(page, { reclaimed: ['landfall', 'shelf', 'rime'], stockpile: { ore: 500, ice: 100, crystal: 100 } });
+  await expect(page.locator('#sp-fleet')).toHaveText(`Fleet limit ${FLEET_CAP + RELAY_STEP}`);
+  await expectControlsFit(page, '#bars', 'overworld HUD with the fleet limit chip');
+  await expectHudNoWrap(page, 'overworld HUD with the fleet limit chip');
+  await landByTaps(page, SHOAL, areaName('shoal'));
+  await expect(page.locator('#toast')).toContainText(`fleet limit ${FLEET_CAP + RELAY_STEP}`);
+  await expect(page.locator('#chip-fleet b')).toHaveText(new RegExp(`^Fleet \\d+/${FLEET_CAP + RELAY_STEP}$`));
   expect(errors).toEqual([]);
 });
 
-test('H5: a disabled Command limit says why: the area tier it needs', async ({ page }) => {
-  await ready(page);
-  await startCampaign(page, { reclaimed: ['landfall'], stockpile: { ore: 500, ice: 100, crystal: 100 } });
-  await page.locator('#b-research').click();
-  const buy = page.locator('#research section[data-item="fleet"] button.buy');
-  await expect(buy).toBeDisabled();
-  await expect(buy).toHaveText(/^Needs an? \w+ area reclaimed$/);
-  await expect(page.locator('#research section[data-item="fleet"] .req')).toContainText(/Needs: an? \w+ area reclaimed/);
-});
-
-test('H5: fleet.cap 0 hides the limit UI everywhere and says so on Command limit', async ({ page }) => {
+test('H6: fleet.cap 0 hides the limit UI everywhere', async ({ page }) => {
   const errors = watchErrors(page);
   await ready(page);
   await startCampaign(page, { reclaimed: ['landfall', 'shelf'], stockpile: { ore: 500, ice: 100, crystal: 100 } }, { 'fleet.cap': 0 });
+  await expect(page.locator('#sp-fleet')).toBeHidden();
   await tapArea(page, SHOAL);
-  await expect(page.locator('#sheet h2')).toHaveText('Glass Shoal');
+  await expect(page.locator('#sheet h2')).toHaveText(areaName('shoal'));
   await expect(page.locator('#sheet .fleet-limit')).toBeHidden();
-  await page.locator('#b-research').click();
-  const buy = page.locator('#research section[data-item="fleet"] button.buy');
-  await expect(buy).toBeDisabled();
-  await expect(buy).toHaveText('Fleet limit is off (tuning)');
-  await page.locator('#research button[aria-label="Close research"]').click();
-  await landByTaps(page, SHOAL, 'Glass Shoal');
+  await landByTaps(page, SHOAL, areaName('shoal'));
   await expect(page.locator('#toast')).not.toContainText('fleet limit');
   await expect(page.locator('#chip-fleet')).toBeHidden();
   await tapNode(page, PROBE);
@@ -1156,13 +1109,18 @@ test('H5: fleet.cap 0 hides the limit UI everywhere and says so on Command limit
   expect(errors).toEqual([]);
 });
 
-test('H5: the tuning panel labels the fleet limit as the A/B switch', async ({ page }) => {
+test('H6: the tuning panel labels the fleet limit and the three H6 keys, and hides the starved-heart keys', async ({ page }) => {
   await ready(page);
   await page.locator('#b-tune').click();
   await expect(page.locator('#tuning')).toContainText('Fleet limit (0 = none)');
+  await expect(page.locator('#tuning')).toContainText('Relay limit step');
+  await expect(page.locator('#tuning')).toContainText('Repeat haul %');
+  await expect(page.locator('#tuning')).toContainText('Band locks (0 = off)');
   await expect(page.getByLabel('fleet.cap', { exact: true })).toHaveValue(String(FLEET_CAP));
-  await expect(page.getByLabel('fleet.recycleRefundPct', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('research.fleet.step', { exact: true })).toBeVisible();
+  for (const key of ['fleet.recycleRefundPct', 'fleet.relayStep', 'areas.repeatHaulPct', 'overworld.bandLock']) await expect(page.getByLabel(key, { exact: true })).toBeVisible();
+  await expect(page.getByLabel('bloom.starvedRegrowMul', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('bloom.starvedRepairPerRound', { exact: true })).toHaveCount(0);
+  await expect(page.locator('#tuning')).not.toContainText('Command limit');
 });
 
 test('H5: a v7 save (before the fleet limit) starts fresh with the toast', async ({ page }) => {
@@ -1305,21 +1263,5 @@ test.describe('H5 at 375x667 portrait', () => {
     await page.screenshot({ path: 'test-results/h5-recycle.png' });
     await page.locator('#recyclepanel button', { hasText: 'Cancel' }).click();
     await expect(page.locator('#recyclepanel')).toBeHidden();
-  });
-
-  test('the research sheet with the Command limit card fits, with a wide font', async ({ page }) => {
-    await ready(page);
-    await startCampaign(page, { reclaimed: ['landfall', 'shelf', 'shoal'], research: { fleet: 1 }, stockpile: { ore: 300, ice: 50, crystal: 50 } });
-    await page.locator('#b-research').click();
-    await expect(page.locator('#research section[data-item="fleet"]')).toHaveCount(1);
-    await page.locator('#research section[data-item="fleet"]').scrollIntoViewIfNeeded();
-    await expectControlsFit(page, '#research', 'research sheet with the Command limit card');
-    await page.screenshot({ path: 'test-results/h5-research.png' });
-    // A disabled reason fits in its button too.
-    await startCampaign(page, { reclaimed: ['landfall'] }, { 'fleet.cap': 0 });
-    await page.locator('#b-research').click();
-    await page.locator('#research section[data-item="fleet"]').scrollIntoViewIfNeeded();
-    await expect(page.locator('#research section[data-item="fleet"] button.buy')).toHaveText('Fleet limit is off (tuning)');
-    await expectControlsFit(page, '#research', 'disabled Command limit button');
   });
 });

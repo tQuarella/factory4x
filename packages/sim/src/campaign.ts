@@ -1,11 +1,26 @@
-import { RAW_RESOURCES, RESEARCH_IDS, appliesAtLevel, isTierRequirement, type ResearchId, type ResearchItem, type ResourceTriple, type ShipType, type SimData } from './data.ts';
+import {
+  RAW_RESOURCES,
+  RESEARCH_IDS,
+  RELAY_TIERS,
+  appliesAtLevel,
+  decayedHaul,
+  isTierRequirement,
+  sameHaulGroup,
+  type ResearchId,
+  type ResearchItem,
+  type ResourceTriple,
+  type ShipType,
+  type SimData,
+} from './data.ts';
 import { clearArea, createWorld, landArea, researchLevel, ticksPerMin, type World } from './world.ts';
 
 /**
  * The campaign rules (DESIGN.md H4 "Reclaim ladder"): which areas are open,
  * landing and leaving, the reclaim, research and its effects, and rule 10
- * (shipments). Integer only; areas, lanes and research are always walked in
- * data order and resources in the order ore, ice, crystal.
+ * (shipments). H6 ("Open frontier"): command relays, band locks and repeat
+ * hauls, all derived from the reclaim records and data, never stored.
+ * Integer only; areas, lanes and research are always walked in data order
+ * and resources in the order ore, ice, crystal.
  */
 
 /** Index of an area id in data `map.areas`, or -1. */
@@ -35,12 +50,81 @@ export function laneNeighbours(data: SimData, a: number): number[] {
   return out;
 }
 
-/** Open: still held, and either the start area (tier 0) or lane-joined to a reclaimed area. */
-export function isAreaOpen(world: Readonly<World>, data: SimData, a: number): boolean {
+/** H6 "Scouting": known (ring, prize and haul shown) once reclaimed, or lane-joined to a reclaimed area; the tier-0 start always. */
+export function isKnown(world: Readonly<World>, data: SimData, a: number): boolean {
+  const area = data.map.areas[a];
+  if (area === undefined) return false;
+  return area.tier === 0 || isReclaimed(world, a) || laneNeighbours(data, a).some((n) => isReclaimed(world, n));
+}
+
+/** H4's lane rule alone: still held, and either the start area (tier 0) or lane-joined to a reclaimed area. */
+export function isLaneOpen(world: Readonly<World>, data: SimData, a: number): boolean {
   const area = data.map.areas[a];
   if (area === undefined || isReclaimed(world, a)) return false;
-  if (area.tier === 0) return true;
-  return laneNeighbours(data, a).some((n) => isReclaimed(world, n));
+  return area.tier === 0 || laneNeighbours(data, a).some((n) => isReclaimed(world, n));
+}
+
+/**
+ * H6: band b is commanded once a relay of band b is reclaimed and the visit that reclaimed it is over (a relay
+ * reclaimed in the active area counts from the next landing: the limit never rises mid-area). Relays stand in tiers
+ * 1–2 only, so this is false for any other band.
+ */
+export function isBandCommanded(world: Readonly<World>, data: SimData, b: number): boolean {
+  const active = world.campaign.active;
+  return data.map.areas.some((area, a) => area.relay && area.tier === b && a !== active && isReclaimed(world, a));
+}
+
+/** H6: how many bands (of 1, 2) are commanded (0–2 at the shipped data). Derived, never stored. */
+export function commandedBands(world: Readonly<World>, data: SimData): number {
+  let n = 0;
+  for (const b of RELAY_TIERS) if (isBandCommanded(world, data, b)) n++;
+  return n;
+}
+
+/** H6: the bands that have a relay in this data (the most bands that can be commanded: 2 at the shipped data). */
+export function maxCommandedBands(data: SimData): number {
+  let n = 0;
+  for (const b of RELAY_TIERS) if (data.map.areas.some((area) => area.relay && area.tier === b)) n++;
+  return n;
+}
+
+/** H6 "Band locks": bands 0 and 1 are always open; band b ≥ 2 once overworld.bandLock is 0 or band b − 1 is commanded. */
+export function bandOpen(world: Readonly<World>, data: SimData, b: number): boolean {
+  if (b <= 1) return true;
+  return world.tun['overworld.bandLock'] <= 0 || isBandCommanded(world, data, b - 1);
+}
+
+/**
+ * Open (enterArea is valid for it from the overworld): H4's lane rule (still held, and the tier-0 start or
+ * lane-joined to a reclaimed area) and, H6, its band open (bandOpen).
+ */
+export function isAreaOpen(world: Readonly<World>, data: SimData, a: number): boolean {
+  const area = data.map.areas[a];
+  if (area === undefined) return false;
+  return isLaneOpen(world, data, a) && bandOpen(world, data, area.tier);
+}
+
+/**
+ * H6 "Repeat hauls": the area of `a`'s (tier, side) group reclaimed before it, which makes `a` a repeat; or null.
+ * For a held area that is any reclaimed group mate; for a reclaimed one, a mate earlier in the reclaim order (so
+ * the first of a pair is never a repeat). The earliest in reclaim order if several.
+ */
+export function repeatOf(world: Readonly<World>, data: SimData, a: number): number | null {
+  const area = data.map.areas[a]!;
+  for (const b of world.campaign.reclaimOrder) {
+    if (b === a) return null;
+    if (sameHaulGroup(area, data.map.areas[b]!)) return b;
+  }
+  return null;
+}
+
+/**
+ * H6: the haul area `a` pays if reclaimed now: its data haul, or floor(haul × areas.repeatHaulPct / 100) per
+ * resource when another area of its group is already reclaimed. Exports never decay.
+ */
+export function haulIfReclaimedNow(world: Readonly<World>, data: SimData, a: number): ResourceTriple {
+  const haul = data.map.areas[a]!.haul;
+  return repeatOf(world, data, a) === null ? { ...haul } : decayedHaul(haul, world.tun['areas.repeatHaulPct']);
 }
 
 /** True after the probe core is bought: every input but setTunable is refused. */
@@ -152,7 +236,11 @@ function shipTotals(world: Readonly<World>): { built: number; lost: number; recy
   return { built: b.drone + b.lancer + b.flak, lost: l.drone + l.lancer + l.flak, recycled: r.drone + r.lancer + r.flak, refunded: world.stats.oreRefunded };
 }
 
-/** Rule 8, heart: the active area is reclaimed. Records the visit and pays its haul into the stockpile, once. */
+/**
+ * Rule 8, heart: the active area is reclaimed. Records the visit and pays its haul into the stockpile, once.
+ * H6: a repeat in its group pays the decayed haul (haulIfReclaimedNow); what was paid is recorded as `haulPaid`
+ * on the area record and in the visit's stats.
+ */
 export function reclaimActive(world: World, data: SimData): void {
   const camp = world.campaign;
   const a = camp.active;
@@ -168,8 +256,11 @@ export function reclaimActive(world: World, data: SimData): void {
   rec.shipsLost += ships.lost;
   rec.shipsRecycled += ships.recycled;
   rec.oreRefunded += ships.refunded;
+  // repeatOf skips `a` itself, so marking it reclaimed above doesn't make it its own repeat.
+  const haul = haulIfReclaimedNow(world, data, a);
   camp.reclaimOrder.push(a);
-  const haul = data.map.areas[a]!.haul;
+  rec.haulPaid = { ...haul };
+  world.stats.haulPaid = { ...haul };
   for (const res of RAW_RESOURCES) {
     camp.stockpile[res] += haul[res];
     camp.totals.hauled[res] += haul[res];
@@ -256,13 +347,17 @@ export function designResearched(world: Readonly<World>, type: ShipType): boolea
 
 /** A start for tests, tools, bots and dev hooks: see campaignWorld. */
 export interface CampaignStart {
-  /** Area ids treated as already reclaimed (at tick 0, in this order; no haul is paid). */
+  /** Area ids treated as already reclaimed (at tick 0, in this order; no haul is paid, so each records haulPaid 0 / 0 / 0). */
   reclaimed?: string[];
   /** Research levels, by item id. */
   research?: Partial<Record<ResearchId, number>>;
   /** The stockpile to start with. */
   stockpile?: Partial<ResourceTriple>;
-  /** Land at once in this area (it must be open), at tick 0, as `enterArea` would. */
+  /**
+   * Land at once in this area, at tick 0, as `enterArea` would. It must be lane-open (held, and the start or
+   * lane-joined to a reclaimed area). H6: a band lock doesn't stop it, so tools can land behind one (the bots'
+   * trial visits: band 2 at the base limit); `enterArea` itself always honours the lock.
+   */
   land?: string;
 }
 
@@ -270,7 +365,8 @@ export interface CampaignStart {
  * Test and tool helper (DESIGN.md H4): a campaign at tick 0 as if `reclaimed`
  * were reclaimed and `research` bought, with `stockpile`, without playing;
  * optionally landed in `land`. Not reachable from the game's inputs. Throws on
- * an unknown area or item, a level past the max, or a landing that isn't open.
+ * an unknown area or item, a level past the max, or a landing that isn't
+ * lane-open (band locks are not checked: see CampaignStart.land).
  */
 export function campaignWorld(seed: number, data: SimData, start: Readonly<CampaignStart> = {}): World {
   const world = createWorld(seed, data);
@@ -281,6 +377,7 @@ export function campaignWorld(seed: number, data: SimData, start: Readonly<Campa
     if (camp.areas[a]!.reclaimedTick !== null) throw new Error(`campaignWorld: area ${id} listed twice`);
     camp.areas[a]!.reclaimedTick = 0;
     camp.areas[a]!.reclaimPlayTicks = 0;
+    camp.areas[a]!.haulPaid = { ore: 0, ice: 0, crystal: 0 };
     camp.reclaimOrder.push(a);
   }
   for (const id of RESEARCH_IDS) {
@@ -295,7 +392,7 @@ export function campaignWorld(seed: number, data: SimData, start: Readonly<Campa
   for (const res of RAW_RESOURCES) camp.stockpile[res] = start.stockpile?.[res] ?? 0;
   if (start.land !== undefined) {
     const a = areaIndex(data, start.land);
-    if (!isAreaOpen(world, data, a)) throw new Error(`campaignWorld: area ${start.land} is not open`);
+    if (!isLaneOpen(world, data, a)) throw new Error(`campaignWorld: area ${start.land} is not open`);
     landArea(world, data, a);
   }
   return world;

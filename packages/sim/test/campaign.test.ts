@@ -218,7 +218,7 @@ describe('landing (enterArea)', () => {
       // Ore at the landing (the drone yard may pay for a drone on the landing tick; probe mining adds under a unit a tick).
       tick(w, { type: 'enterArea', area: A.landfall });
       expect(w.stock.ore + w.stats.oreSpentShips, `level ${level}`).toBe(ore);
-      expect(landingEffects(w).openingOre).toBe(ore);
+      expect(landingEffects(w, data).openingOre).toBe(ore);
     }
   });
 
@@ -235,7 +235,7 @@ describe('landing (enterArea)', () => {
       expect(w.routes.length).toBe(level);
       expect(w.stock.ore + w.stats.oreSpentShips + w.stats.oreSpentEconomy).toBe(30);
       expect(w.queue).toEqual([]);
-      expect(landingEffects(w).rigNodes).toEqual(rigged);
+      expect(landingEffects(w, data).rigNodes).toEqual(rigged);
     }
   });
 
@@ -249,7 +249,7 @@ describe('landing (enterArea)', () => {
       const w = campaignWorld(1, data, { research: { lancer, flak } });
       land(w, A.landfall);
       expect([w.yards.drone.on, w.yards.lancer.on, w.yards.flak.on]).toEqual([true, lancer === 1, flak === 1]);
-      expect(landingEffects(w).designs).toEqual({ lancer: lancer === 1, flak: flak === 1 });
+      expect(landingEffects(w, data).designs).toEqual({ lancer: lancer === 1, flak: flak === 1 });
     }
   });
 
@@ -382,7 +382,7 @@ describe('research effects in an area', () => {
     tick(w);
     // Drone yard on with 30 ore: the first build starts on the first tick, at 90 × 60% = 54 ticks.
     expect(w.yards.drone.ticksLeft).toBe(54);
-    expect(yardStatus(w).yards[0]!.totalTicks).toBe(54);
+    expect(yardStatus(w, data).yards[0]!.totalTicks).toBe(54);
     run(w, 53);
     expect(w.stats.shipsBuilt.drone).toBe(0);
     run(w, 1);
@@ -396,7 +396,7 @@ describe('research effects in an area', () => {
     w.yards.flak.on = true;
     w.stock = { ore: 100, ice: 0, crystal: 0, lens: 2, plating: 2 };
     w.tun['economy.probeOrePerMin'] = 0;
-    expect(yardStatus(w).yards.map((y) => [y.type, y.researched, y.state])).toEqual([
+    expect(yardStatus(w, data).yards.map((y) => [y.type, y.researched, y.state])).toEqual([
       ['drone', true, 'off'],
       ['lancer', false, 'needsDesign'],
       ['flak', false, 'needsDesign'],
@@ -412,11 +412,11 @@ describe('research effects in an area', () => {
     w.stock = { ore: 100, ice: 0, crystal: 0, lens: 0, plating: 0 };
     w.yards.lancer.ticksLeft = 0;
     w.yards.flak.ticksLeft = 0;
-    expect(yardStatus(w).yards.map((y) => y.state)).toEqual(['off', 'noSource', 'needsComponent']);
+    expect(yardStatus(w, data).yards.map((y) => y.state)).toEqual(['off', 'noSource', 'needsComponent']);
     // noSource and needsDesign come before off.
     w.yards.lancer.on = false;
     w.campaign.research.flak = 0;
-    expect(yardStatus(w).yards.map((y) => y.state)).toEqual(['off', 'noSource', 'needsDesign']);
+    expect(yardStatus(w, data).yards.map((y) => y.state)).toEqual(['off', 'noSource', 'needsDesign']);
   });
 });
 
@@ -665,7 +665,7 @@ describe('campaign selectors', () => {
       ['rigs', 0, 1],
       ['yards', 20, null],
     ]);
-    expect(landingEffects(w)).toEqual({ openingOre: 0, rigNodes: [], extractPct: 150, yardTimePct: 20, designs: { lancer: false, flak: false }, fleetCap: null });
+    expect(landingEffects(w, data)).toEqual({ openingOre: 0, rigNodes: [], extractPct: 150, yardTimePct: 20, designs: { lancer: false, flak: false }, fleetCap: null });
     const noExtract = researchStatus(campaignWorld(1, data, { stockpile: { ore: 500 } }), data)[R.rigs]!;
     expect(noExtract).toMatchObject({ affordable: true, canBuy: false, missing: { items: [{ id: 'extract', level: 1 }] } });
   });

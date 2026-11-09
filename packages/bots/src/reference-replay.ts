@@ -3,31 +3,40 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
 /**
  * Fixed replay used by the determinism gate (Node, 9000 ticks) and the smoke
  * test (browser, 3000 ticks). Grow it as mechanics land so it exercises every
- * system. H4 (DESIGN.md "Save, data version and replay"): a campaign from
- * createWorld. It uses every Input type, and live tuning (setTunable,
- * including guard.capPct 50, research.costPct 25 and shipments.pct 300)
- * speeds it up so that, before tick 6000 (H5: fleet.cap is 0, no limit, until Thorn Garden):
+ * system. It uses every Input type, and live tuning (setTunable, including
+ * guard.capPct 50, research.costPct 25 and shipments.pct 300) speeds it up.
+ *
+ * H6 (DESIGN.md "Save, data version and replay"): it starts from a
+ * campaignWorld start (`start`) with both designs bought and Thorn Garden held
+ * as if reclaimed. On the shipped lanes band 2 is lane-joined only to relays
+ * and band 2 areas, so a band-lock refusal can only come from a constructed
+ * start. fleet.cap is 4 from tick 0, so the limits are 4, 12 and 20.
  *
  *   - Landfall (area 0): land, one drone takes the empty heart (reclaim, haul), leave.
- *   - Overworld: buy Opening ore 1 and Extraction 1. Land in Frost Shelf (area 1), queue
- *     extractors, then withdraw (the area resets); land again (the opening includes the research),
- *     drones take the ice pocket and then the heart, leave. Shipments run while each held area is played.
- *   - Buy the Flak design; Spore Veil (area 3): the lancer yard is switched on but has no design
- *     (the design gate), a lone drone is repelled at the heart, drones take p1 (ice) and p2 (crystal),
- *     plating and flak are made, a mixed wave cuts the Root (the heart wilts and starves) and takes the heart.
- *   - H5: set fleet.cap 4 and buy Command limit 1 (Frost Shelf, tier 1, is reclaimed): the limit is 4 + 6 = 10.
- *     Buy the Lancer design; Thorn Garden (area 4) lands with the limit 10. Drones take p2 and p1, and the
- *     yards pause at the limit (fleetFull). Six drones are recycled at p1 (ore refunded); in the freed slots
- *     both component yards take turns (rule 5b round-robin), and lancers, flak and drones cut the Root and
- *     take the heart. Every Garden battle records capAtSend 10.
- *   - Buy Seed rigs 1 and Fast yards 1; land in The Deep (area 5): A1 lands rigged, ships build faster,
- *     and the yards fill the limit again.
+ *   - Overworld: buy Opening ore 1 and Extraction 1. enterArea Spore Veil (area 5) is refused by the band lock
+ *     (lane-joined through Thorn Garden, but no band 1 relay is reclaimed). Land in Glass Shoal (area 2), queue
+ *     extractors, withdraw (the area resets); land again, drones take the crystal pocket and the heart, leave.
+ *   - Glint Relay (area 4): a repeat of Glass Shoal (band 1, crystal), so it pays half its haul. Drones take p2
+ *     (crystal) and the heart; the relay commands band 1. The yards hold at the limit 4 (fleetFull).
+ *   - Buy Seed rigs 1 and Fast yards 1; Spore Veil now opens and lands with the limit 4 + 8 = 12. A1 lands
+ *     rigged. Drones take p1 (ice); with the fleet full (12/12) the drone yard is switched off and the drones
+ *     take p2 (crystal). Once lenses and plating are in stock, three drones are recycled at p2 (ore refunded) and
+ *     lancers and flak fill the freed slots (rule 5b round-robin). The mixed wave takes the heart: full haul
+ *     (band 2 ice is new).
+ *   - Spire Relay (area 8): a repeat of Thorn Garden (band 2, crystal), half its haul; the relay commands
+ *     band 2. Every capture there is sent with the limit 12.
+ *   - The Deep (area 9): lands with the limit 4 + 2 × 8 = 20, and no Root (H6: fed for good). Drones take p2
+ *     (crystal) and p1 (ice); the drone yard goes off and the drones are recycled, so lancers and flak fill the limit.
+ *     Then, with their damage set to 1, they attack the heart's Thorns and Spores together: a fight from tick 5340
+ *     to 5550, across the 5400 checkpoint, where each guard pool strikes the ship type it counters first (H6
+ *     "Combat amendment"), so the hashes depend on that rule.
  *
- * One input is invalid on purpose (buyResearch inside an area) and must be ignored. Node indices are per
- * area (the area's nodes in frame order): Landfall 0 probe, 1-5 a1-a5, 6 heart; Frost Shelf 0 probe,
- * 1 a1, 2 a2, 3 a3, 4 a5, 5 p1, 6 heart; Spore Veil and Thorn Garden 0 probe, 1-7 a1-a7, 8 p1, 9 p2,
- * 10 root, 11 heart; The Deep the H3 indices (seed 20261106 gives Frost Gate). Research items:
- * 0 lancer, 1 flak, 2 opening, 3 extract, 4 rigs, 5 yards, 6 core, 7 fleet (Command limit).
+ * One input is invalid on purpose (buyResearch inside an area) and one is refused by the band lock; both must
+ * be ignored. Node indices are per area (its nodes in frame order): Landfall 0 probe, 1-5 a1-a5, 6 heart;
+ * Glass Shoal 0 probe, 1 a1, 2 a2, 3 a4, 4 a5, 5 p1, 6 heart; Glint Relay 0 probe, 1 a1, 2 a2, 3 a4, 4 a5,
+ * 5 a7, 6 p2, 7 heart; Spore Veil 0 probe, 1-7 a1-a7, 8 p1, 9 p2, 10 heart; Spire Relay 0 probe, 1 a1, 2 a2,
+ * 3 a4, 4 a5, 5 a7, 6 a9, 7 p2, 8 p4, 9 heart; The Deep 0 probe, 1-9 a1-a9, 10-13 p1-p4, 14 heart (seed 20261106
+ * gives Frost Gate). Research items: 0 lancer, 1 flak, 2 opening, 3 extract, 4 rigs, 5 yards, 6 core.
  *
  * It runs on the shipped data, so a calibration that changes areas, research costs or guards can break
  * the script (packages/sim/test/reference-replay.test.ts says so). The tunables it depends on are set at
@@ -39,6 +48,7 @@ const counts = (drone: number, lancer: number, flak: number) => ({ drone, lancer
 export const referenceReplay: Replay = {
   seed: 20261106,
   dataVersion: defaultData.dataVersion,
+  start: { reclaimed: ['garden'], research: { lancer: 1, flak: 1 } },
   inputs: [
     ...at(
       0,
@@ -70,8 +80,8 @@ export const referenceReplay: Replay = {
       // Cheap research, generous shipments.
       { type: 'setTunable', key: 'research.costPct', value: 25 },
       { type: 'setTunable', key: 'shipments.pct', value: 300 },
-      // H5: no fleet limit until Thorn Garden (H4's rules, the A/B), so the H4 part plays as recorded.
-      { type: 'setTunable', key: 'fleet.cap', value: 0 },
+      // A small fleet limit, so every area meets it: 4, then 12 and 20 as the relays command bands 1 and 2.
+      { type: 'setTunable', key: 'fleet.cap', value: 4 },
       // Landfall, and in the same tick its first extractor and route.
       { type: 'enterArea', area: 0 },
       { type: 'buildExtractor', node: 1 },
@@ -82,59 +92,67 @@ export const referenceReplay: Replay = {
     // The first drone takes Landfall's empty heart.
     ...at(31, { type: 'sendShips', from: 0, to: 6, counts: SEND_ALL }),
     ...at(271, { type: 'leaveArea' }),
-    // Overworld: Opening ore 1, Extraction 1, then Frost Shelf.
-    ...at(272, { type: 'buyResearch', item: 2 }, { type: 'buyResearch', item: 3 }, { type: 'enterArea', area: 1 }),
+    // Overworld: Opening ore 1, Extraction 1. Spore Veil is refused (band 2 is locked); then Glass Shoal.
+    ...at(272, { type: 'buyResearch', item: 2 }, { type: 'buyResearch', item: 3 }, { type: 'enterArea', area: 5 }, { type: 'enterArea', area: 2 }),
     ...at(273, { type: 'buildExtractor', node: 1 }, { type: 'buildExtractor', node: 2 }, { type: 'setRally', node: 4 }),
     // Withdraw: everything built here is lost; then land again.
-    ...at(513, { type: 'leaveArea' }),
-    ...at(514, { type: 'enterArea', area: 1 }),
-    ...at(515, { type: 'buildExtractor', node: 1 }, { type: 'buildRoute', from: 1, to: 0 }, { type: 'buildExtractor', node: 2 }, { type: 'setRally', node: 4 }),
+    ...at(512, { type: 'leaveArea' }),
+    ...at(513, { type: 'enterArea', area: 2 }),
+    ...at(514, { type: 'buildExtractor', node: 1 }, { type: 'buildRoute', from: 1, to: 0 }, { type: 'buildExtractor', node: 2 }, { type: 'setRally', node: 4 }),
     // Cancels the a2 extractor (queue: route a1, extractor a2).
-    ...at(516, { type: 'cancelBuild', index: 1 }),
-    // Drones take the ice pocket p1; route it and upgrade the a1 route.
-    ...at(767, { type: 'sendShips', from: 4, to: 5, counts: SEND_ALL }),
-    ...at(841, { type: 'buildRoute', from: 5, to: 0 }, { type: 'upgradeRoute', from: 1 }),
-    // Everything at a5 and p1 takes the heart (no Root here: it is fed for good).
-    ...at(947, { type: 'sendShips', from: 4, to: 6, counts: SEND_ALL }, { type: 'sendShips', from: 5, to: 6, counts: SEND_ALL }),
-    ...at(1081, { type: 'leaveArea' }),
-    // Flak design (paid with the Shelf's ice), then Spore Veil.
-    ...at(1082, { type: 'buyResearch', item: 1 }, { type: 'enterArea', area: 3 }),
-    // The lancer yard goes on, but the Lancer design isn't researched: it never starts a build here.
-    ...at(1083, { type: 'buildExtractor', node: 1 }, { type: 'buildRoute', from: 1, to: 0 }, { type: 'setRally', node: 5 }, { type: 'setShipyard', shipType: 'lancer', on: true }),
-    // One drone meets the heart and is repelled.
-    ...at(1245, { type: 'sendShips', from: 5, to: 11, counts: counts(1, 0, 0) }),
-    // Drones take p1 (ice), then p2 (crystal); both are routed.
-    ...at(1425, { type: 'sendShips', from: 5, to: 8, counts: SEND_ALL }),
-    ...at(1501, { type: 'buildRoute', from: 8, to: 0 }),
-    ...at(1605, { type: 'sendShips', from: 5, to: 9, counts: SEND_ALL }, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
-    ...at(1681, { type: 'buildRoute', from: 9, to: 0 }),
-    // Drones and flak cut the Root: the heart wilts and starves. Then they take the heart.
-    ...at(2444, { type: 'sendShips', from: 5, to: 10, counts: SEND_ALL }, { type: 'sendShips', from: 9, to: 10, counts: SEND_ALL }),
-    ...at(2939, { type: 'sendShips', from: 5, to: 11, counts: SEND_ALL }, { type: 'sendShips', from: 10, to: 11, counts: SEND_ALL }),
-    ...at(3001, { type: 'leaveArea' }),
-    // H5: a small fleet limit (4), Command limit 1 (+6: the limit is 10), the Lancer design (paid with the Veil's
-    // crystal), then Thorn Garden: both component yards run, up to the limit.
+    ...at(515, { type: 'cancelBuild', index: 1 }),
+    // Drones take the crystal pocket p1; then route it, upgrade the a1 route, and everything takes the heart.
+    ...at(736, { type: 'sendShips', from: 4, to: 5, counts: SEND_ALL }),
     ...at(
-      3002,
-      { type: 'setTunable', key: 'fleet.cap', value: 4 },
-      { type: 'buyResearch', item: 7 },
-      { type: 'buyResearch', item: 0 },
-      { type: 'enterArea', area: 4 },
+      811,
+      { type: 'buildRoute', from: 5, to: 0 },
+      { type: 'upgradeRoute', from: 1 },
+      { type: 'sendShips', from: 4, to: 6, counts: SEND_ALL },
+      { type: 'sendShips', from: 5, to: 6, counts: SEND_ALL },
     ),
-    ...at(3003, { type: 'buildExtractor', node: 1 }, { type: 'buildRoute', from: 1, to: 0 }, { type: 'setRally', node: 5 }),
-    ...at(3375, { type: 'sendShips', from: 5, to: 9, counts: SEND_ALL }),
-    ...at(3451, { type: 'buildRoute', from: 9, to: 0 }),
-    ...at(3944, { type: 'sendShips', from: 5, to: 8, counts: SEND_ALL }, { type: 'sendShips', from: 9, to: 8, counts: SEND_ALL }),
-    ...at(4021, { type: 'buildRoute', from: 8, to: 0 }),
-    // H5: the fleet has been full (10/10) since the p2 fight, so the yards are paused. Recycle six drones at p1
-    // (refunded in ore); the freed slots go to lancers and flak as their components come in.
-    ...at(4500, { type: 'recycleShips', node: 8, counts: counts(6, 0, 0) }),
-    ...at(4949, { type: 'sendShips', from: 5, to: 10, counts: SEND_ALL }, { type: 'sendShips', from: 8, to: 10, counts: SEND_ALL }),
-    // Everything is at the Root now (the yards are paused at the limit, so nothing waits at a5): it takes the heart.
-    ...at(5759, { type: 'sendShips', from: 10, to: 11, counts: SEND_ALL }),
-    ...at(5821, { type: 'leaveArea' }),
-    // Seed rigs 1 and Fast yards 1, then The Deep: A1 lands mined and routed, so its route can be upgraded at once.
-    ...at(5822, { type: 'buyResearch', item: 4 }, { type: 'buyResearch', item: 5 }, { type: 'enterArea', area: 5 }),
-    ...at(5823, { type: 'upgradeRoute', from: 1 }, { type: 'buildExtractor', node: 2 }, { type: 'setRally', node: 5 }),
+    ...at(931, { type: 'leaveArea' }),
+    // Glint Relay (lane-joined to Glass Shoal): a relay, and a repeat of Glass Shoal.
+    ...at(932, { type: 'enterArea', area: 4 }),
+    ...at(933, { type: 'buildExtractor', node: 1 }, { type: 'buildRoute', from: 1, to: 0 }, { type: 'setRally', node: 4 }),
+    ...at(1185, { type: 'sendShips', from: 4, to: 6, counts: SEND_ALL }),
+    ...at(1261, { type: 'buildRoute', from: 6, to: 0 }),
+    ...at(1320, { type: 'sendShips', from: 6, to: 7, counts: SEND_ALL }),
+    ...at(1501, { type: 'leaveArea' }),
+    // Band 1 is commanded: Seed rigs 1, Fast yards 1, then Spore Veil with the limit 12.
+    ...at(1502, { type: 'buyResearch', item: 4 }, { type: 'buyResearch', item: 5 }, { type: 'enterArea', area: 5 }),
+    ...at(1503, { type: 'upgradeRoute', from: 1 }, { type: 'buildExtractor', node: 2 }, { type: 'setRally', node: 5 }),
+    ...at(1779, { type: 'sendShips', from: 5, to: 8, counts: SEND_ALL }),
+    ...at(1861, { type: 'buildRoute', from: 8, to: 0 }),
+    // The fleet is full (12/12): the drone yard goes off, and everything takes p2 (crystal).
+    ...at(2072, { type: 'setShipyard', shipType: 'drone', on: false }, { type: 'sendShips', from: 5, to: 9, counts: SEND_ALL }, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
+    ...at(2161, { type: 'buildRoute', from: 9, to: 0 }),
+    // Lenses and plating in stock and the fleet still full of drones: recycle three; lancers and flak fill the slots.
+    ...at(2522, { type: 'recycleShips', node: 9, counts: counts(3, 0, 0) }),
+    ...at(2703, { type: 'sendShips', from: 5, to: 10, counts: SEND_ALL }, { type: 'sendShips', from: 9, to: 10, counts: SEND_ALL }),
+    ...at(2821, { type: 'leaveArea' }),
+    // Spire Relay: band 2's relay, and a repeat of Thorn Garden.
+    ...at(2822, { type: 'enterArea', area: 8 }),
+    ...at(2823, { type: 'upgradeRoute', from: 1 }, { type: 'setRally', node: 4 }),
+    ...at(3147, { type: 'sendShips', from: 4, to: 7, counts: SEND_ALL }),
+    ...at(3211, { type: 'buildRoute', from: 7, to: 0 }),
+    ...at(3243, { type: 'sendShips', from: 4, to: 9, counts: SEND_ALL }, { type: 'sendShips', from: 7, to: 9, counts: SEND_ALL }),
+    ...at(3421, { type: 'leaveArea' }),
+    // Both bands commanded: The Deep, with the limit 20 and no Root.
+    ...at(3422, { type: 'enterArea', area: 9 }),
+    ...at(3423, { type: 'upgradeRoute', from: 1 }, { type: 'buildExtractor', node: 2 }, { type: 'setRally', node: 5 }),
+    // h6-combat-target: a mixed fight that spans a checkpoint. Drones take p2 (crystal) and p1 (ice); both are routed,
+    // the drone yard goes off and the drones are recycled, so lancers and flak fill the limit of 20.
+    ...at(3699, { type: 'sendShips', from: 5, to: 11, counts: SEND_ALL }),
+    ...at(3781, { type: 'buildRoute', from: 11, to: 0 }, { type: 'sendShips', from: 11, to: 10, counts: SEND_ALL }),
+    ...at(3871, { type: 'buildRoute', from: 10, to: 0 }, { type: 'setShipyard', shipType: 'drone', on: false }),
+    ...at(3872, { type: 'recycleShips', node: 10, counts: SEND_ALL }),
+    // Weak lancers and flak (damage 1) against the heart's Thorns and Spores: the battle runs from tick 5340 to 5550,
+    // across the 5400 checkpoint, and each guard pool strikes its own counter-weak type first.
+    ...at(
+      5220,
+      { type: 'setTunable', key: 'ship.lancer.damage', value: 1 },
+      { type: 'setTunable', key: 'ship.flak.damage', value: 1 },
+      { type: 'sendShips', from: 5, to: 14, counts: counts(0, 1_000_000, 1_000_000) },
+    ),
   ],
 };

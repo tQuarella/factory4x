@@ -2,7 +2,9 @@
  * Data schema for data/sim.json: tunables (keyed by their dotted name, each
  * with default/min/max), the fixed 16-node map and the hand-made layouts
  * (DESIGN.md H3 "Counter web"), and the H4 overworld: areas (node subsets of
- * the map with their own guards, haul and export), lanes and research.
+ * the map with their own guards, haul and export), lanes and research. H6
+ * ("Open frontier"): areas gain `side` and `relay`, the frame grows to
+ * 1000 × 2100, and the haul invariant counts repeat hauls at their worst.
  * `parseSimData` validates a raw JSON value against the schema, so bad data
  * fails loudly at load time rather than as a desync later.
  */
@@ -46,7 +48,7 @@ export const COMPONENT_INPUT: Readonly<Record<Component, Prize>> = { lens: 'crys
 /** The component each ship type consumes (null: ore only). */
 export const SHIP_COMPONENT: Readonly<Record<ShipType, Component | null>> = { drone: null, lancer: 'lens', flak: 'plating' };
 
-/** Every tunable in DESIGN.md (H1 economy keys, H3, H4 and H5 "Tunables"), in display order. The order is fixed and is the only order the sim iterates in. */
+/** Every tunable in DESIGN.md (H1 economy keys, H3, H4, H5 and H6 "Tunables"), in display order. H6 removed `research.fleet.step`. The order is fixed and is the only order the sim iterates in. */
 export const TUNABLE_KEYS = [
   'economy.startStock',
   'economy.probeOrePerMin',
@@ -102,12 +104,14 @@ export const TUNABLE_KEYS = [
   'component.stockCap',
   'fleet.cap',
   'fleet.recycleRefundPct',
+  'fleet.relayStep',
   'research.opening.step',
   'research.extract.stepPct',
   'research.yards.stepPct',
-  'research.fleet.step',
   'research.costPct',
   'shipments.pct',
+  'areas.repeatHaulPct',
+  'overworld.bandLock',
   'system.variant',
   'stats.throughputWindowSec',
   'client.autosaveSec',
@@ -193,13 +197,31 @@ export interface AreaLayout {
   heart: AreaHeart;
 }
 
-/** One overworld area (DESIGN.md H4 "Areas"). */
+/**
+ * H6: an area's side. With its tier (its band) it makes the area's repeat-haul
+ * group: the second area reclaimed in a (tier, side) group pays
+ * areas.repeatHaulPct of its haul. `none` never decays.
+ */
+export const AREA_SIDES = ['ice', 'crystal', 'none'] as const;
+export type AreaSide = (typeof AREA_SIDES)[number];
+
+/** H6: the overworld frame (DESIGN.md H6 "The overworld"). Every area's x and y lie inside it. */
+export const OVERWORLD_FRAME: Readonly<{ width: number; height: number }> = Object.freeze({ width: 1000, height: 2100 });
+
+/** H6: command relays stand in these bands (tiers) only; the first one reclaimed in a band commands it. */
+export const RELAY_TIERS: readonly number[] = [1, 2];
+
+/** One overworld area (DESIGN.md H4 "Areas", H6 "Areas"). */
 export interface MapArea {
   id: string;
   name: string;
-  /** 0 Landfall (the start, open from the beginning), 1 light, 2 medium, 3 The Deep. */
+  /** 0 Landfall (the start, open from the beginning), 1 light, 2 medium, 3 The Deep. H6: the area's band. */
   tier: number;
-  /** Overworld position (frame x 0–1000, y 0–1300). */
+  /** H6: the repeat-haul side (with `tier`, the group). */
+  side: AreaSide;
+  /** H6: a command relay (tiers 1–2 only). The first relay reclaimed in a band raises the fleet limit by fleet.relayStep and opens the next band. */
+  relay: boolean;
+  /** Overworld position (inside OVERWORLD_FRAME: x 0–1000, y 0–2100). */
   x: number;
   y: number;
   /** Frame node ids present in this area (map.nodes ids), any order; the area uses them in frame order. */
@@ -215,11 +237,21 @@ export interface MapArea {
 /** An undirected lane between two areas, by area id. */
 export type MapLane = [string, string];
 
-/** The research item ids the sim gives effects to (DESIGN.md H4 "Research"). */
+/**
+ * The research item ids the sim gives effects to (DESIGN.md H4 "Research").
+ * @deprecated member `fleet`: H5's Command limit, removed at H6 (data v10). parseSimData rejects it; the id stays
+ * in the type only so H5 client code still compiles until h6-client drops it.
+ */
 export const RESEARCH_IDS = ['lancer', 'flak', 'opening', 'extract', 'rigs', 'yards', 'core', 'fleet'] as const;
 export type ResearchId = (typeof RESEARCH_IDS)[number];
 
-/** H5 adds 'limit' (Command limit): a meaty step, drawn as a large card like the designs. */
+/** Research ids that data may no longer use (H6 removed Command limit: relays are the only way to raise the limit). */
+export const REMOVED_RESEARCH_IDS: readonly ResearchId[] = ['fleet'];
+
+/**
+ * H5 added 'limit' (Command limit). @deprecated member `limit`: removed at H6 with the `fleet` item; parseSimData
+ * rejects it. Kept in the type only so H5 client code still compiles.
+ */
 export type ResearchKind = 'design' | 'grind' | 'win' | 'limit';
 
 /**
@@ -377,17 +409,54 @@ export function parseSimData(raw: unknown): SimData {
   const areaIds = parseAreas(map.areas, nodes as MapNode[]);
   parseLanes(map.lanes, areaIds);
   const research = parseResearch(r.research, map.areas as MapArea[]);
-  // No softlock (DESIGN.md H4 "Areas"): taking every area always pays for every research level, at the costPct maximum.
-  const costMax = (tunRec['research.costPct'] as unknown as TunableSpec).max;
   const areas = map.areas as MapArea[];
+  // No softlock (DESIGN.md H6 "The haul invariant", replacing H4's): taking every area, each at its worst
+  // position (every area in a repeat group of two or more paid at the default areas.repeatHaulPct), always pays for
+  // every research level, at the research.costPct maximum.
+  const costMax = (tunRec['research.costPct'] as unknown as TunableSpec).max;
+  const repeatPct = (tunRec['areas.repeatHaulPct'] as unknown as TunableSpec).default;
+  const worst = worstHauls(areas, repeatPct);
   for (const res of RAW_RESOURCES) {
-    let haul = 0;
-    for (const a of areas) haul += a.haul[res];
     let cost = 0;
     for (const item of research) for (const lv of item.levels) cost += Math.floor((lv[res] * costMax) / 100);
-    if (haul < cost) fail(`total ${res} haul ${haul} is below the total research cost ${cost} (at research.costPct ${costMax})`);
+    if (worst[res] < cost) {
+      fail(`total ${res} haul ${worst[res]} (every area at its worst position, areas.repeatHaulPct ${repeatPct}) is below the total research cost ${cost} (at research.costPct ${costMax})`);
+    }
+  }
+  // H6 band locks: with the lock on by default, every band b ≥ 2 that has areas needs a relay in band b − 1, or it
+  // could never open. Checked at the default, like the haul invariant (the tuning panel's live value is a dev experiment).
+  if ((tunRec['overworld.bandLock'] as unknown as TunableSpec).default >= 1) {
+    for (const a of areas) {
+      if (a.tier >= 2 && !areas.some((x) => x.relay && x.tier === a.tier - 1)) {
+        fail(`${a.id} is in band ${a.tier}, which overworld.bandLock keeps locked, but band ${a.tier - 1} has no relay to open it`);
+      }
+    }
   }
   return raw as unknown as SimData;
+}
+
+/** True if two areas share a repeat-haul group: the same tier (band) and the same side, which isn't `none`. */
+export function sameHaulGroup(a: Readonly<MapArea>, b: Readonly<MapArea>): boolean {
+  return a.side !== 'none' && a.tier === b.tier && a.side === b.side;
+}
+
+/** A haul decayed as a repeat: floor(haul × pct / 100) per resource. */
+export function decayedHaul(haul: Readonly<ResourceTriple>, pct: number): ResourceTriple {
+  return { ore: Math.floor((haul.ore * pct) / 100), ice: Math.floor((haul.ice * pct) / 100), crystal: Math.floor((haul.crystal * pct) / 100) };
+}
+
+/**
+ * The H6 haul invariant's left side: Σ over areas of the haul, with every area that has a group mate counted at
+ * floor(haul × pct / 100) (each area at its worst position).
+ */
+export function worstHauls(areas: readonly MapArea[], pct: number): ResourceTriple {
+  const sum: ResourceTriple = { ore: 0, ice: 0, crystal: 0 };
+  for (const a of areas) {
+    const repeat = areas.some((b) => b !== a && sameHaulGroup(a, b));
+    const h = repeat ? decayedHaul(a.haul, pct) : a.haul;
+    for (const res of RAW_RESOURCES) sum[res] += h[res];
+  }
+  return sum;
 }
 
 function checkTriple(v: unknown, where: string): void {
@@ -412,7 +481,13 @@ function parseAreas(raw: unknown, frame: readonly MapNode[]): string[] {
     if (typeof a.name !== 'string' || a.name === '') fail(`${at} needs a name`);
     if (!isInt(a.tier) || a.tier < 0 || a.tier > 3) fail(`${at}.tier must be an integer 0..3`);
     if (a.tier === 0) starts++;
+    if (typeof a.side !== 'string' || !(AREA_SIDES as readonly string[]).includes(a.side)) fail(`${at}.side must be one of ${AREA_SIDES.join(', ')}`);
+    if (typeof a.relay !== 'boolean') fail(`${at}.relay must be true or false`);
+    if (a.relay && !RELAY_TIERS.includes(a.tier as number)) fail(`${at} is a relay in tier ${String(a.tier)}: relays stand in tiers ${RELAY_TIERS.join('–')} only`);
     for (const f of ['x', 'y'] as const) if (!isInt(a[f]) || a[f] < 0) fail(`${at}.${f} must be a non-negative integer`);
+    if ((a.x as number) > OVERWORLD_FRAME.width || (a.y as number) > OVERWORLD_FRAME.height) {
+      fail(`${at} at (${String(a.x)}, ${String(a.y)}) is outside the overworld frame ${OVERWORLD_FRAME.width} × ${OVERWORLD_FRAME.height}`);
+    }
     if (!Array.isArray(a.nodes) || a.nodes.length < 1) fail(`${at}.nodes missing`);
     const present: string[] = [];
     for (const id of a.nodes as unknown[]) {
@@ -430,7 +505,10 @@ function parseAreas(raw: unknown, frame: readonly MapNode[]): string[] {
     const rootHere = present.some((id) => kindOf.get(id) === 'root');
     if (a.layout === 'seed') {
       seeds++;
-      if (present.length !== frame.length) fail(`${at} has layout "seed" (The Deep), so it must have every frame node`);
+      // The run's H3 layout covers every frame node; H6 lets The Deep leave out the Root (it is then fed for good, and
+      // the layout's Root and starved counts are never read).
+      const missing = frameIds.filter((id) => !present.includes(id) && kindOf.get(id) !== 'root');
+      if (missing.length > 0) fail(`${at} has layout "seed" (The Deep), so it must have every frame node but the Root (missing ${missing.join(', ')})`);
       return;
     }
     const l = a.layout;
@@ -479,8 +557,6 @@ function parseLanes(raw: unknown, areaIds: readonly string[]): void {
   });
 }
 
-/** Research ids a data file may leave out (H5: data without the Command limit item simply has no limit research; the frozen v4 fixture). */
-const OPTIONAL_RESEARCH: readonly string[] = ['fleet'];
 
 function parseResearch(raw: unknown, areas: readonly MapArea[]): ResearchItem[] {
   const areaIds = areas.map((a) => a.id);
@@ -491,11 +567,11 @@ function parseResearch(raw: unknown, areas: readonly MapArea[]): ResearchItem[] 
     const at = `research[${i}]`;
     if (!isObj(it)) fail(`${at} not an object`);
     if (typeof it.id !== 'string' || !(RESEARCH_IDS as readonly string[]).includes(it.id)) fail(`${at}.id must be one of ${RESEARCH_IDS.join(', ')}`);
+    if ((REMOVED_RESEARCH_IDS as readonly string[]).includes(it.id)) fail(`${at}: ${it.id} (Command limit) was removed at H6: command relays raise the fleet limit`);
     if (ids.includes(it.id)) fail(`${at}.id ${it.id} is repeated`);
     ids.push(it.id);
     if (typeof it.name !== 'string' || it.name === '') fail(`${at} needs a name`);
-    if (it.kind !== 'design' && it.kind !== 'grind' && it.kind !== 'win' && it.kind !== 'limit') fail(`${at}.kind must be design, grind, win or limit`);
-    if ((it.id === 'fleet') !== (it.kind === 'limit')) fail(`${at}: kind limit is the fleet item's, and only its`);
+    if (it.kind !== 'design' && it.kind !== 'grind' && it.kind !== 'win') fail(`${at}.kind must be design, grind or win`);
     if (it.kind === 'win') wins++;
     if (!Array.isArray(it.levels) || it.levels.length < 1) fail(`${at}.levels missing`);
     (it.levels as unknown[]).forEach((lv, k) => checkTriple(lv, `${at}.levels[${k}]`));
@@ -503,7 +579,7 @@ function parseResearch(raw: unknown, areas: readonly MapArea[]): ResearchItem[] 
     if (it.id === 'rigs' && it.levels.length > RIG_NODES.length) fail(`${at} (rigs) has at most ${RIG_NODES.length} levels`);
     if (!Array.isArray(it.requires)) fail(`${at}.requires missing`);
   });
-  for (const id of RESEARCH_IDS) if (!ids.includes(id) && !OPTIONAL_RESEARCH.includes(id)) fail(`research item ${id} missing`);
+  for (const id of RESEARCH_IDS) if (!ids.includes(id) && !REMOVED_RESEARCH_IDS.includes(id)) fail(`research item ${id} missing`);
   if (wins !== 1) fail('research needs exactly one win item');
   const items = raw as ResearchItem[];
   const tiers = areas.map((a) => a.tier);

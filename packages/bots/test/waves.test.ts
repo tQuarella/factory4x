@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ShipType, ShipTypeCounts } from '@factory4x/sim';
+import { campaignWorld, commandedBands, defaultData, isAreaOpen, isLaneOpen, type ShipType, type ShipTypeCounts } from '@factory4x/sim';
 // The frozen v8 fixture: the probe's numbers on it never move with calibration.
 import { fixtureV8 as fx } from '../../sim/test/fixture.ts';
 import {
@@ -14,9 +14,12 @@ import {
   probeWorld,
   singleClosedAt,
   singleFitsAt,
+  trialSpecs,
+  trialStart,
   waveWins,
   windowChecks,
   type HeartProbe,
+  type TrialKind,
 } from '../src/waves.ts';
 
 const L = { l0: 12, l1: 18, l2: 24 };
@@ -24,8 +27,11 @@ const heartOf = (w: { nodes: { kind: string }[] }): number => w.nodes.findIndex(
 const ALL: ShipType[] = ['drone', 'lancer', 'flak'];
 
 describe('probe world and limits', () => {
-  it('limits are fleet.cap, plus one and two Command limit steps', () => {
-    expect(probeLimits(fx)).toEqual(L);
+  it('limits are fleet.cap, plus one and two relay steps (h6-sim: fleet.relayStep replaced the removed Command limit step)', () => {
+    const l0 = fx.tunables['fleet.cap'].default;
+    const stepSize = fx.tunables['fleet.relayStep'].default;
+    expect(probeLimits(fx)).toEqual({ l0, l1: l0 + stepSize, l2: l0 + 2 * stepSize });
+    expect(probeLimits(fx)).toEqual({ l0: 12, l1: 20, l2: 28 });
   });
 
   it('lands the area with both designs, every other area reclaimed and every yard off', () => {
@@ -134,6 +140,7 @@ describe('windows', () => {
   const r = (tier: number, state: 'fed' | 'starved', d: number | null, l: number | null, f: number | null, mix: number | null): HeartProbe => ({
     area: 'x',
     tier,
+    relay: false,
     state,
     layout: null,
     seed: 1,
@@ -157,18 +164,72 @@ describe('windows', () => {
     expect(singleClosedAt(12, 12)).toBe(false);
   });
 
-  it('marks each tier window met or missed', () => {
-    expect(windowChecks(r(1, 'fed', 10, 20, 20, 9), L).map((c) => c.met)).toEqual([true]);
-    expect(windowChecks(r(1, 'fed', 11, 20, 20, 9), L).map((c) => c.met)).toEqual([false]);
-    // Tier 2 fed: closed at L0, fits at L1, no single type fits at L1.
-    expect(windowChecks(r(2, 'fed', 40, 30, 20, 16), L).map((c) => c.met)).toEqual([true, true, true]);
-    expect(windowChecks(r(2, 'fed', 40, 30, 16, 16), L).map((c) => c.met)).toEqual([true, true, false]);
-    // Tier 2 starved: fits at L0, drones closed at L1.
-    expect(windowChecks(r(2, 'starved', 19, 9, 9, 10), L).map((c) => c.met)).toEqual([true, true]);
-    expect(windowChecks(r(2, 'starved', 18, 9, 9, 11), L).map((c) => c.met)).toEqual([false, false]);
-    // Tier 3 starved: fits at L1, closed at L0, drones closed at L2. Fed: closed at L1, fits at L2.
-    expect(windowChecks(r(3, 'starved', 25, 9, 9, 14), L).map((c) => c.met)).toEqual([true, true, true]);
-    expect(windowChecks(r(3, 'fed', 60, 30, 40, 22), L).map((c) => c.met)).toEqual([true, true]);
-    expect(windowChecks(r(3, 'fed', 60, 30, 40, 18), L).map((c) => c.met)).toEqual([false, true]);
+  const h6 = (tier: number, relay: boolean, d: number | null, l: number | null, f: number | null, mix: number | null, pocketDrones?: number | null): HeartProbe => ({
+    ...r(tier, 'fed', d, l, f, mix),
+    relay,
+    ...(pocketDrones === undefined ? {} : { pocketDrones }),
+  });
+  const met = (row: HeartProbe): boolean[] => windowChecks(row, L).map((c) => c.met);
+
+  it('marks each H6 window met or missed (premise: limits 12 / 18 / 24)', () => {
+    // A plain light area: drones alone fit at L0.
+    expect(met(h6(1, false, 10, 20, 20, 9))).toEqual([true]);
+    expect(met(h6(1, false, 11, 20, 20, 9))).toEqual([false]);
+    // A band 1 relay: closed to drones alone at L0, fits at L0 with the counter.
+    expect(met(h6(1, true, 13, 20, 8, 9))).toEqual([true, true]);
+    expect(met(h6(1, true, 12, 20, 8, 9))).toEqual([false, true]);
+    expect(met(h6(1, true, 13, 20, 8, 11))).toEqual([true, false]);
+    // Band 2 plain: closed at L0, fits at L1, no single type fits at L1, first pocket within L1.
+    expect(met(h6(2, false, 40, 30, 20, 16, 8))).toEqual([true, true, true, true]);
+    expect(met(h6(2, false, 40, 30, 16, 16, 8))).toEqual([true, true, false, true]);
+    expect(met(h6(2, false, 40, 30, 20, 12, 19))).toEqual([false, true, true, false]);
+    expect(met(h6(2, false, 40, 30, 20, 16))).toEqual([true, true, true, false]);
+    // Band 2 relay: also binds at L1 (best mix >= L1 - 6 = 12).
+    expect(met(h6(2, true, 40, 30, 20, 16, 8))).toEqual([true, true, true, true, true]);
+    expect(met(h6(2, true, 40, 30, 20, 11, 8))[3]).toBe(false);
+    expect(windowChecks(h6(2, true, 40, 30, 20, 16, 8), L).map((c) => c.name)).toContain('binds at L1 (mix >= 12)');
+    // The Deep: closed at L1, fits at L2, no single type fits at L2, binds at L2 (>= 18).
+    expect(met(h6(3, false, 60, 30, 40, 22))).toEqual([true, true, true, true]);
+    expect(met(h6(3, false, 60, 30, 40, 18))).toEqual([false, true, true, true]);
+    expect(met(h6(3, false, 60, 20, 40, 22))).toEqual([true, true, false, true]);
+    expect(met(h6(3, false, 60, 30, 40, 17))).toEqual([false, true, true, false]);
+  });
+});
+
+describe('trial starts (the shipped map; structure only, no tuned value)', () => {
+  const data = defaultData;
+  const world = (kind: TrialKind, area: string) => campaignWorld(1, data, trialStart(data, kind, area));
+
+  it('each lands in its own area, behind the lock, with both designs', () => {
+    for (const [kind, area] of [['band2-l0', 'veil'], ['band2-l0', 'mire'], ['deep-l1', 'deep'], ['relay-drones', 'rime']] as const) {
+      const w = world(kind, area);
+      expect(data.map.areas[w.campaign.active!]!.id).toBe(area);
+      expect(w.campaign.research.lancer).toBe(1);
+      expect(w.campaign.research.flak).toBe(1);
+    }
+  });
+
+  it('the limit premise: band 2 and the relays land at L0 (no relay reclaimed), The Deep at L1 (one)', () => {
+    for (const a of data.map.areas.filter((x) => x.tier === 2)) expect(commandedBands(world('band2-l0', a.id), data), a.id).toBe(0);
+    for (const a of data.map.areas.filter((x) => x.tier === 1 && x.relay)) expect(commandedBands(world('relay-drones', a.id), data), a.id).toBe(0);
+    expect(commandedBands(world('deep-l1', 'deep'), data)).toBe(1);
+  });
+
+  it('a band 2 trial lands behind a real lock: from the same start enterArea refuses the area (The Deep is behind the limit, not the lock)', () => {
+    for (const area of ['veil', 'garden', 'mire', 'spire']) {
+      const start = trialStart(data, 'band2-l0', area);
+      const w = campaignWorld(1, data, { reclaimed: start.reclaimed ?? [], research: start.research ?? {} });
+      const a = data.map.areas.findIndex((x) => x.id === area);
+      expect(isLaneOpen(w, data, a), `${area} lane`).toBe(true);
+      expect(isAreaOpen(w, data, a), `${area} open`).toBe(false);
+    }
+  });
+
+  it('lists every trial: band 2 areas, The Deep once per seed, band 1 relays with drones only', () => {
+    const specs = trialSpecs(data, 2);
+    expect(specs.filter((t) => t.kind === 'band2-l0').map((t) => t.area)).toEqual(['veil', 'garden', 'mire', 'spire']);
+    expect(specs.filter((t) => t.kind === 'deep-l1').map((t) => `${t.area}/${t.seed}`)).toEqual(['deep/1', 'deep/2']);
+    expect(specs.filter((t) => t.kind === 'relay-drones').map((t) => [t.area, t.dronesOnly])).toEqual([['rime', true], ['glint', true]]);
+    expect(specs.filter((t) => t.kind !== 'relay-drones').every((t) => !t.dronesOnly)).toBe(true);
   });
 });

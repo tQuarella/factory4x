@@ -1,21 +1,27 @@
 /**
  * @factory4x/sim — the deterministic game simulation (DESIGN.md H1, H2's Root and supply, H3 "Counter web",
- * H4 "Reclaim ladder": the campaign of areas around them, and H5 "Fleet cap").
+ * H4 "Reclaim ladder": the campaign of areas around them, H5 "Fleet cap", and H6 "Open frontier": command relays,
+ * band locks, scouting and repeat hauls on a ten-area map).
  *
  * PUBLIC API. The client, bots and tests depend only on what this file
  * exports. Treat it as stable: add, don't rename or remove, without a
- * DECISIONS.md entry (the H3 changes are logged under "h3-sim", the H4 ones under "h4-sim", the H5 ones under "h5-sim").
+ * DECISIONS.md entry (the H3 changes are logged under "h3-sim", the H4 ones under "h4-sim", the H5 ones under "h5-sim",
+ * the H6 ones under "h6-sim").
  *
  * Lifecycle
  *   defaultData                     validated data/sim.json (tunables, map.nodes, map.layouts, map.areas, map.lanes, research).
  *   parseSimData(raw)               validate other data (e.g. a feedback replay's) → SimData; throws on bad data
- *                                   (including Σ haul < Σ research cost per resource at the research.costPct max).
+ *                                   (H6: including the haul invariant: Σ haul with every area of a repeat group at its
+ *                                   decayed haul (areas.repeatHaulPct default) < Σ research cost per resource at the
+ *                                   research.costPct max; a relay outside tiers 1–2; an area outside OVERWORLD_FRAME;
+ *                                   a band locked by default with no relay in the band below; the removed `fleet` item).
  *   createWorld(seed, data)         fresh campaign at tick 0, ON THE OVERWORLD (no area active: world.nodes is empty).
  *                                   The Deep's layout is system.variant − 1 if that tunable's default is > 0, else
  *                                   ((seed mod 3) + 3) mod 3 (chooseVariant); world.system and campaign.deepLayout name it.
  *   campaignWorld(seed, data, start)   TEST/TOOL/DEV-HOOK ONLY: a campaign as if `start.reclaimed` (area ids) were
  *                                   reclaimed and `start.research` ({id: level}) bought, with `start.stockpile`;
- *                                   `start.land` (an open area id) lands there at tick 0. Not reachable by inputs.
+ *                                   `start.land` (a lane-open area id; H6: band locks are not checked, so tools can land
+ *                                   behind one) lands there at tick 0. Start areas record haulPaid 0. Not reachable by inputs.
  *   step(world, data, inputs)       advance one tick (mutates world); inputs apply first, invalid ones are ignored.
  *                                   No area active: inputs only, then tick + 1 (the overworld is paused).
  *   worldHash(world)                8-hex fingerprint of all state (the campaign included).
@@ -29,7 +35,8 @@
  *   campaign.active                 index into data.map.areas of the area being played, or null on the overworld.
  *   campaign.areaStartTick          tick of the current landing; area times are tick − areaStartTick.
  *   campaign.areas[i]               {reclaimedTick, entries, withdrawals, playTicks, reclaimPlayTicks, shipsBuilt, shipsLost,
- *                                   shipsRecycled, oreRefunded} (H5: the recycle totals, recorded with shipsBuilt).
+ *                                   shipsRecycled, oreRefunded, haulPaid} (H5: the recycle totals, recorded with shipsBuilt;
+ *                                   H6: haulPaid, what the reclaim paid, or null while held).
  *   campaign.reclaimOrder, research {id: level}, researchLog [{item, level, tick}], stockpile, shipAccum,
  *   totals {hauled, shipped}, wonTick (non-null after the probe core: only setTunable is valid then).
  *   The area fields (stock, nodes, routes, ships, guardians, yards, stats, capturedTick, ...) hold the active
@@ -37,9 +44,22 @@
  *   Capturing the heart reclaims the area (pays its haul once). Rule 10 ships Σ export × shipments.pct of the
  *   reclaimed areas into the stockpile while a held area is played (integer accumulators).
  *
+ * Open frontier (H6; all derived from reclaim records, data and live tunables, never stored)
+ *   data.map.areas[i].side ('ice' | 'crystal' | 'none') and .relay (a command relay; tiers 1–2 only). Band = tier.
+ *   commandedBands(world, data)     bands (of 1, 2) with a reclaimed relay; a relay reclaimed in the active area counts
+ *                                   from the next landing (the limit never rises mid-area). A second relay in a band adds
+ *                                   nothing. maxCommandedBands(data): bands that have a relay (2 shipped).
+ *   bandOpen(world, data, b)        b ≤ 1, or overworld.bandLock 0, or a relay of band b − 1 commanded.
+ *   isLaneOpen(world, data, a)      H4's lane rule alone (held, and tier 0 or lane-joined to a reclaimed area).
+ *   isAreaOpen(world, data, a)      enterable: isLaneOpen and bandOpen(its tier). enterArea checks it (the band lock).
+ *   isKnown(world, data, a)         scouted: tier 0, reclaimed, or lane-joined to a reclaimed area (else "far").
+ *   repeatOf(world, data, a)        the group mate (same tier and side, side ≠ none) reclaimed before it, or null.
+ *   haulIfReclaimedNow(world, data, a)   its haul, or floor(haul × areas.repeatHaulPct / 100) per resource for a repeat.
+ *                                   The reclaim pays exactly this and records it as haulPaid. Exports never decay.
+ *
  * Inputs (the `Input` union; node params are node indices, see world.nodes)
  *   enterArea{area}                 H4: land in an open area (held, and the tier-0 start or lane-joined to a reclaimed
- *                                   area). Valid on the overworld, before the win.
+ *                                   area; H6: and its band open). Valid on the overworld, before the win.
  *   leaveArea{}                     H4: back to the overworld; a withdraw (the area resets) if its heart isn't captured.
  *   buyResearch{item}               H4: next level of data.research[item], paid from the stockpile. Overworld only,
  *                                   before the win, below max, requirements met, affordable.
@@ -56,9 +76,9 @@
  *                                   total is ≥ 1 (also while fleet.cap is 0). Each ship adds
  *                                   floor(ship.<type>.cost × fleet.recycleRefundPct / 100) ore to stock; its
  *                                   component is lost. stats.shipsRecycled (per type) and stats.oreRefunded count it.
- *   buyResearch{item}               H5: also invalid for the Command limit (`fleet`, kind 'limit') while fleet.cap is 0,
- *                                   and checks {tier, count} requirements (≥ count reclaimed areas of tier ≥ tier).
- *                                   A requirement's `atLevel` limits it to that level.
+ *   buyResearch{item}               H5: checks {tier, count} requirements (≥ count reclaimed areas of tier ≥ tier); a
+ *                                   requirement's `atLevel` limits it to that level. H6 removed Command limit (`fleet`):
+ *                                   parseSimData rejects it, so its capOff rule never applies.
  *   isValidInput(world, data, input)   would `step` accept it now? (grey out buttons with this)
  *   inputCost(world, input)            ore the build order would lock if queued now (0 for non-builds).
  *   clampSendCounts(world, from, counts)   what a sendShips order would really send.
@@ -72,9 +92,10 @@
  *   Yards (rule 5b): lancer and flak start before drones and take turns (world.yardTurn indexes YARD_ROTATION:
  *   the component yard tried first; each start passes the turn on), so neither starves the other when ore is short.
  *
- * Fleet limit (H5; derived, never stored)
- *   fleetCap(world)                 fleet.cap + Command limit level × research.fleet.step, or null when fleet.cap is 0
- *                                   (no limit: exactly H4's rules).
+ * Fleet limit (H5, H6; derived, never stored)
+ *   fleetCap(world, data)           fleet.cap + fleet.relayStep × commandedBands, or null when fleet.cap is 0
+ *                                   (no limit: exactly H4's rules; relays still open bands). On the overworld: the next
+ *                                   landing's limit. isFleetFull(world, data): a limit is set and fleetCount reached it.
  *   fleetCount(world)               world.ships (parked, in transit, fighting) + yards with a ship in progress.
  *   A yard starts only while fleetCount < fleetCap (recomputed after each start in the tick); a yard held by the
  *   limit keeps its round-robin turn. Ships are never removed to meet the limit (lowering fleet.cap live only
@@ -92,11 +113,11 @@
  *   nodeStatus(world, node)         prize, extractors, extraction/min, buffer, backedUp, noRoute, route level/capacity.
  *   routeCapacityPerMin(world, lvl) units/min a route of that level carries.
  *   queueStatus(world)              unpaid orders, reserved ore, active build progress.
- *   yardStatus(world)               Yards block: per type on/off, unlocked (resource delivered here), researched (design),
+ *   yardStatus(world, data)         Yards block: per type on/off, unlocked (resource delivered here), researched (design),
  *                                   progress, cost, component, state ('building' | 'needsDesign' | 'noSource' | 'off' |
  *                                   'fleetFull' | 'needsComponent' | 'needsOre' | 'ready'); rally; probe mining.
- *   fleetStatus(world, data)        H5: {cap (null = off), count, building, byType, buildingByType, full, level, maxLevel}
- *                                   for the fleet chip and "Fleet 9/12 · Command limit 1/3".
+ *   fleetStatus(world, data)        H5: {cap (null = off), count, building, byType, buildingByType, full}; H6:
+ *                                   commandedBands and maxCommandedBands (level and maxLevel are deprecated, always 0).
  *   recycleRefund(world, counts)    H5: ore those counts would refund, as given (pass clampSendCounts(world, node, c)).
  *   assemblerStatus(world)          Assembly block: per component stock/cap, recipe, progress, state
  *                                   ('making' | 'full' | 'needsInput' | 'needsOre' | 'ready').
@@ -114,20 +135,27 @@
  *                                   by type, guards killed by type; a Root capture carries `wilt` {from, to}.
  *                                   world.lastBattle is the latest at any node.
  *   runSummary(world)               heart capture time, capture order, ships built/lost/recycled by type, ore refunded,
- *                                   waves, ore spent,
+ *                                   waves, ore spent, haulPaid (H6: the area result's haul, decayed for a repeat),
  *                                   layout, Root cut, withered, delivered and first-delivered per resource, per target.
  *                                   Every `…Sec` is area-relative (since the landing); `…Tick` fields are world ticks.
  *   campaignStatus(world, data)     overworld HUD: active area, stockpile, shipPerMinX10, shipping, reclaimed count,
  *                                   wonTick, research levels.
  *   areaStatus(world, data, area)   area sheet: id, name, tier, x/y, state ('locked' | 'open' | 'reclaimed' | 'active'),
- *                                   lanes, haul, export, guarded nodes (caps, starved caps), hasRoot, heartTags
- *                                   {lancer, flak} with `researched`, and the visit record.
+ *                                   lanes, haul (nominal), export, guarded nodes (caps, starved caps), hasRoot, heartTags
+ *                                   {lancer, flak} with `researched`, and the visit record; H6: plus areaFrontier's fields.
+ *   areaFrontier(world, data, area) H6: {known, open, locked (its band), lockReason (null | 'lanes' | 'bandLocked'), relay,
+ *                                   band, side, commanded (a relay of its band is reclaimed), bandOpen, unlockRelays (the
+ *                                   band-below relays when locked), haulNow (would pay now / paid), haulDecayed, repeatOf,
+ *                                   capAfter (the limit after reclaiming it)}.
+ *   overworldStatus(world, data)    H6: {areas: per area {index, id, name, reclaimed, ...areaFrontier}, commandedBands,
+ *                                   maxCommandedBands, fleetCap, bandLock}.
  *   researchStatus(world, data)     research sheet rows: level/max, next cost (after research.costPct), affordable,
  *                                   missing {resources, items, areas, tiers [{tier, count, have}], capOff}, canBuy,
- *                                   effect and nextEffect (numbers; the fleet row's are fleet limits, 0 while off).
- *   landingEffects(world)           openingOre, rigNodes, extractPct, yardTimePct, designs, fleetCap (the landing notice).
- *   campaignSummary(world, data)    win panel / bots: per area records, reclaim order, research order, total play
- *                                   ticks, ships built/lost/recycled, ore refunded, hauled and shipped.
+ *                                   effect and nextEffect (numbers).
+ *   landingEffects(world, data)     openingOre, rigNodes, extractPct, yardTimePct, designs, fleetCap (the landing notice).
+ *   campaignSummary(world, data)    win panel / bots: per area records, reclaim order (with haulPaid), research order,
+ *                                   total play ticks, ships built/lost/recycled, ore refunded, hauled (paid) and
+ *                                   shipped, haulNominal (H6: Σ data haul of the reclaimed areas).
  *   isAreaOpen(world, data, area), isWon(world), yardBuildTicks(world, type), extractPct(world), yardTimePct(world).
  *   nodeDistance(world, a, b)       integer distance used for routes and travel.
  *   heartIndex(world), rootIndex(world), PROBE   node index of the heart / the Root / the probe (always 0).
@@ -136,7 +164,9 @@
  *   counterPct(tun, ship, guard)    the raw damage multiplier (strongPct, weakPct, or 100 for drones).
  *
  * Constants: SHIP_TYPES, GUARD_TYPES, RESOURCES, RAW_RESOURCES, COMPONENTS, COMPONENT_INPUT, SHIP_COMPONENT,
- *   YARD_ORDER, YARD_ROTATION, COMBAT_ORDER, TAG_STRONG_PCT, TAG_WEAK_PCT, GUARD_CAP_MAX, SEND_ALL.
+ *   YARD_ORDER, YARD_ROTATION, COMBAT_ORDER, TAG_STRONG_PCT, TAG_WEAK_PCT, GUARD_CAP_MAX, SEND_ALL,
+ *   AREA_SIDES, RELAY_TIERS, OVERWORLD_FRAME (H6: x 0–1000, y 0–2100), REMOVED_RESEARCH_IDS.
+ *   Data helpers (H6): sameHaulGroup(a, b), decayedHaul(haul, pct), worstHauls(areas, pct).
  *
  * Tuning
  *   TUNABLE_KEYS, tunableMeta(data) every tunable: key, section, default, min, max, live, scope, newRunOnly.
@@ -153,12 +183,16 @@ import { parseSimData, type SimData } from './data.ts';
 import type { ShipTypeCounts } from './world.ts';
 
 export {
+  AREA_SIDES,
   COMBAT_ORDER,
   COMPONENTS,
   COMPONENT_INPUT,
   GUARD_CAP_MAX,
   GUARD_TYPES,
+  OVERWORLD_FRAME,
   RAW_RESOURCES,
+  RELAY_TIERS,
+  REMOVED_RESEARCH_IDS,
   RESEARCH_IDS,
   RESOURCES,
   RIG_NODES,
@@ -168,12 +202,16 @@ export {
   YARD_ORDER,
   YARD_ROTATION,
   appliesAtLevel,
+  decayedHaul,
   isTierRequirement,
   parseSimData,
+  sameHaulGroup,
   tunableMeta,
+  worstHauls,
 } from './data.ts';
 export type {
   AreaHeart,
+  AreaSide,
   AreaLayout,
   Component,
   GuardMix,
@@ -204,11 +242,19 @@ export type {
 export {
   MIN_BUILD_TICKS,
   areaIndex,
+  bandOpen,
   campaignWorld,
+  commandedBands,
   designResearched,
   extractPct,
+  haulIfReclaimedNow,
   isAreaOpen,
+  isBandCommanded,
+  isKnown,
+  isLaneOpen,
   isReclaimed,
+  maxCommandedBands,
+  repeatOf,
   isWon,
   laneNeighbours,
   researchIndex,
@@ -217,8 +263,9 @@ export {
   yardTimePct,
 } from './campaign.ts';
 export type { CampaignStart, TierShortfall } from './campaign.ts';
-export { areaStatus, campaignStatus, campaignSummary, landingEffects, researchEffect, researchStatus } from './overworld.ts';
+export { areaFrontier, areaStatus, campaignStatus, campaignSummary, landingEffects, overworldStatus, researchEffect, researchStatus } from './overworld.ts';
 export type {
+  AreaFrontier,
   AreaGuardedNode,
   AreaState,
   AreaStatus,
@@ -226,6 +273,9 @@ export type {
   CampaignSummary,
   HeartTag,
   LandingEffects,
+  LockReason,
+  OverworldArea,
+  OverworldStatus,
   ReclaimEntry,
   ResearchRow,
 } from './overworld.ts';
@@ -273,7 +323,7 @@ export type {
 } from './world.ts';
 export { clampSendCounts, inputCost, isValidInput } from './inputs.ts';
 export type { Input } from './inputs.ts';
-export { counterPct, step } from './step.ts';
+export { GUARD_TARGET_ORDER, counterPct, step } from './step.ts';
 export { fleetCap, fleetCount, fleetStatus, isFleetFull, recycleRefund } from './fleet.ts';
 export type { FleetStatus } from './fleet.ts';
 export { replayHashes, worldHash } from './replay.ts';

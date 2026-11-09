@@ -16,7 +16,7 @@ import { N, addShips, data, guardian, idle, run, runUntil } from './helpers.ts';
 /** DESIGN.md H3 rules 5a (assemblers), 5b (yards), 3-4 for pockets, and the unlocks. */
 
 const state = (w: World, c: 'lens' | 'plating') => assemblerStatus(w).find((a) => a.component === c)!.state;
-const yard = (w: World, t: 'drone' | 'lancer' | 'flak') => yardStatus(w).yards.find((y) => y.type === t)!;
+const yard = (w: World, t: 'drone' | 'lancer' | 'flak') => yardStatus(w, data).yards.find((y) => y.type === t)!;
 
 describe('rule 5a: assemblers', () => {
   it('make a lens from 5 ore + 4 crystal in component.buildTicks, then start the next while inputs last', () => {
@@ -347,7 +347,7 @@ describe('pockets: capture, then the prize flows once routed', () => {
     w.stats.firstDeliveredTick.crystal = 10;
     expect(unlockStatus(w).ships).toEqual({ drone: true, lancer: true, flak: false });
     expect(unlockStatus(w).resources).toMatchObject({ crystal: true, lens: true, ice: false, plating: false });
-    expect(yardStatus(w).yards.map((y) => [y.type, y.unlocked])).toEqual([
+    expect(yardStatus(w, data).yards.map((y) => [y.type, y.unlocked])).toEqual([
       ['drone', true],
       ['lancer', true],
       ['flak', false],

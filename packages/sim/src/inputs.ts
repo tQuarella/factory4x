@@ -232,7 +232,7 @@ export function applyInput(world: World, data: SimData, input: Input): void {
         target.wavesSent++;
         world.stats.wavesSent++;
         // H5: a running battle takes the limit this wave was sent at.
-        if (target.battle !== null) target.battle.capAtSend = fleetCap(world);
+        if (target.battle !== null) target.battle.capAtSend = fleetCap(world, data);
       }
       return;
     }

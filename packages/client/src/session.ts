@@ -71,6 +71,8 @@ export interface RunFlags {
   resultShown: boolean;
   /** H4: `campaign.totals.shipped` at the current landing, for the "Shipped while you were in X" notice; null on the overworld. */
   shippedAtLanding: ResourceTriple | null;
+  /** H6: bands whose step moment (the pan, reveal and notice for a band's first relay) has been shown, so it never replays. */
+  stepsShown: number[];
 }
 
 export interface SessionInit {
@@ -108,7 +110,7 @@ export class Session {
     this.log = init.log ?? [];
     this.pending = init.pending ?? [];
     this.history = init.history ?? [];
-    this.flags = init.flags ?? { seenBattleEnd: -1, resultShown: false, shippedAtLanding: null };
+    this.flags = init.flags ?? { seenBattleEnd: -1, resultShown: false, shippedAtLanding: null, stepsShown: [] };
   }
 
   get tickMs(): number {

@@ -235,6 +235,8 @@ export interface Stats {
   rootCutTick: number | null;
   /** Every capture, in order. The heart's also sets `world.capturedTick`. */
   captures: Capture[];
+  /** H6: the haul this visit's reclaim paid into the stockpile (decayed for a repeat), or null before the reclaim. */
+  haulPaid: ResourceTriple | null;
 }
 
 export interface Yard {
@@ -265,6 +267,8 @@ export interface AreaRecord {
   /** H5: ships recycled here while it was held, and the ore they refunded, over every visit (recorded as shipsBuilt is). */
   shipsRecycled: number;
   oreRefunded: number;
+  /** H6: the haul the reclaim paid (decayed for a repeat in its group), or null while held. */
+  haulPaid: ResourceTriple | null;
 }
 
 /** One research purchase, in order. `item` is the research item id. */
@@ -502,6 +506,7 @@ function freshStats(data: SimData): Stats {
     oreRefunded: 0,
     rootCutTick: null,
     captures: [],
+    haulPaid: null,
   };
 }
 
@@ -660,6 +665,7 @@ export function createWorld(seed: number, data: SimData): World {
         shipsLost: 0,
         shipsRecycled: 0,
         oreRefunded: 0,
+        haulPaid: null,
       })),
       reclaimOrder: [],
       research,

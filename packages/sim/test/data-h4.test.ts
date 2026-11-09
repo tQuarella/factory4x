@@ -1,18 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import design from '../../../DESIGN.md?raw';
-import shippedRaw from '../../../data/sim.json' with { type: 'json' };
 import {
   RAW_RESOURCES,
   appliesAtLevel,
-  areaStatus,
-  counterTag,
-  createWorld,
   defaultData,
   isTierRequirement,
   parseSimData,
-  tagFor,
   tunableMeta,
-  type GuardCounts,
   type ResearchItem,
   type SimData,
 } from '../src/index.ts';
@@ -29,6 +23,13 @@ import rawData from './fixtures/sim-v4.json' with { type: 'json' };
  * h5-sim: the dataVersion pin moved to data-h5.test.ts. The "Research" table
  * gained the Command limit rows (one requirement per level, `atLevel`), and
  * the "Areas" table the v8 hauls; the frozen v4 fixture has no Command limit.
+ *
+ * h6-sim: the H4 "Areas", "Area guards" and "Research" tables describe data
+ * v9 and were superseded at data v10 by the H6 tables (DESIGN.md says so under
+ * each). The shipped data is checked against the H6 tables in
+ * data-h6.test.ts, so those checks are retired here. The "Tunables (H4 …)"
+ * table is not superseded (H6 changes none of its keys) and still checks the
+ * shipped data. The fixture and validation tests below stay.
  */
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -138,97 +139,8 @@ describe('the frozen fixture carries the H4 spec values (as of h4-sim)', () => {
   });
 });
 
-describe('data/sim.json (shipped) against the DESIGN.md H4 tables', () => {
-  it('matches the "Areas" table', () => {
-    const rows = h4Table('#### Areas (data `map.areas`)', '**Area guards**').map((r) => r.map(strip));
-    expect(areaRows(defaultData)).toEqual(rows);
-  });
-
-  it('has the spec lanes, all undirected pairs of known areas', () => {
-    const line = design.slice(h4At).match(/Lanes \(data `map\.lanes`, undirected\): (.+)\./)![1]!;
-    const spec = line.split(', ').map((l) => strip(l));
-    expect(defaultData.map.lanes.map((l) => l.join('–'))).toEqual(spec);
-  });
-
-  it('matches the "Area guards" table: prize, slots and guard counts per guarded node', () => {
-    const rows = h4Table('**Area guards**', 'How an H3 field is cut down').filter((r) => r[0] !== 'deep');
-    const ours: string[][] = [];
-    for (const a of defaultData.map.areas) {
-      if (a.layout === 'seed') continue;
-      const l = a.layout;
-      for (const id of a.nodes) {
-        const kind = defaultData.map.nodes.find((n) => n.id === id)!.kind;
-        if (kind === 'pocket') {
-          const p = l.pockets[id]!;
-          ours.push([a.id, id, p.prize, String(p.slots), `${p.thorns} / ${p.spores}`]);
-        } else if (kind === 'root') {
-          ours.push([a.id, id, 'none', '0', `${l.root!.thorns} / ${l.root!.spores}`]);
-        } else if (kind === 'heart') {
-          const h = l.heart;
-          const starved = h.starvedThorns === undefined ? '' : `, starved ${h.starvedThorns} / ${h.starvedSpores}`;
-          ours.push([a.id, id, 'ore', String(defaultData.map.nodes.find((n) => n.id === 'heart')!.slots), `${h.thorns} / ${h.spores}${starved}`]);
-        }
-      }
-    }
-    expect(ours).toEqual(rows.map((r) => r.slice(0, 5)));
-    // The Deep's row says "as H3": it uses the run's H3 layout.
-    expect(defaultData.map.areas.find((a) => a.id === 'deep')!.layout).toBe('seed');
-  });
-
-  it('counterTag on each area guard caps (areaStatus) reproduces the "Area guards" tag column, starved hearts included', () => {
-    const rows = h4Table('**Area guards**', 'How an H3 field is cut down').filter((r) => r[0] !== 'deep');
-    const w = createWorld(1, defaultData);
-    const t = w.tun;
-    /** "Weak (25)" → ['weak', 25]; "Even" → ['even', null]. */
-    const parse = (cell: string): [string, number | null] => {
-      const m = /^(Strong|Even|Weak)(?: \((\d+)\))?$/.exec(cell.trim());
-      if (!m) throw new Error(`bad tag cell "${cell}"`);
-      return [m[1]!.toLowerCase(), m[2] === undefined ? null : Number(m[2])];
-    };
-    const check = (caps: GuardCounts, cell: string, where: string): void => {
-      const [l, f] = cell.split(' / ');
-      for (const [ship, c] of [['lancer', l!], ['flak', f!]] as const) {
-        const [tag, pct] = parse(c);
-        const got = counterTag(t, ship, caps);
-        expect(got.tag, `${where} ${ship}`).toBe(tag);
-        if (pct !== null) expect(got.multPct, `${where} ${ship}`).toBe(pct);
-        expect(tagFor(ship, got.multPct)).toBe(got.tag);
-      }
-    };
-    let checked = 0;
-    for (const [areaId = '', node = '', , , , tags = ''] of rows) {
-      const a = defaultData.map.areas.findIndex((x) => x.id === areaId);
-      const g = areaStatus(w, defaultData, a).guarded.find((x) => x.id === node)!;
-      if (tags.startsWith('none')) {
-        expect(g.caps, `${areaId} ${node} has no guards`).toEqual({ thorn: 0, spore: 0 });
-        continue;
-      }
-      const [fed = '', starved] = tags.split('; starved ');
-      check(g.caps, fed, `${areaId} ${node}`);
-      checked++;
-      if (starved !== undefined) {
-        expect(g.starvedCaps, `${areaId} ${node} starved`).not.toBeNull();
-        check(g.starvedCaps!, starved, `${areaId} ${node} starved`);
-        checked++;
-      }
-      if (node === 'heart') {
-        const st = areaStatus(w, defaultData, a).heartTags;
-        expect([st.lancer.tag, st.flak.tag]).toEqual([counterTag(t, 'lancer', g.caps).tag, counterTag(t, 'flak', g.caps).tag]);
-      }
-    }
-    // 12 guarded nodes with guards (Landfall's heart has none) plus the two starved hearts.
-    expect(checked).toBe(14);
-  });
-
-  it('matches the "Research" table, and its totals line', () => {
-    const rows = h4Table('#### Research (data `research`)', 'Totals over every level').map((r) => r.slice(0, 8).map(strip));
-    expect(researchRows(defaultData)).toEqual(rows);
-    const totals = design.slice(h4At).match(/Totals over every level: (\d+) ore, (\d+) ice, (\d+) crystal/)!;
-    const sum = (res: 'ore' | 'ice' | 'crystal'): number => defaultData.research.reduce((s, it) => s + it.levels.reduce((x, lv) => x + lv[res], 0), 0);
-    expect([sum('ore'), sum('ice'), sum('crystal')]).toEqual([Number(totals[1]), Number(totals[2]), Number(totals[3])]);
-  });
-
-  it('matches the "Tunables (H4, data/sim.json, all integers)" table, and the haul totals cover every research level', () => {
+describe('data/sim.json (shipped) against the DESIGN.md H4 Tunables table (not superseded at v10)', () => {
+  it('matches the "Tunables (H4, data/sim.json, all integers)" table; all of them are live sim tunables', () => {
     const rows = h4Table('#### Tunables (H4, data/sim.json, all integers)', '`system.variant` keeps');
     expect(rows.map((r) => strip(r[0]!)).sort()).toEqual([...Object.keys(H4_TUNABLES), 'economy.startStock'].sort());
     for (const [key = '', def = '', range = ''] of rows) {
@@ -236,12 +148,8 @@ describe('data/sim.json (shipped) against the DESIGN.md H4 tables', () => {
       const [min, max] = range.split('–').map(Number);
       expect(defaultData.tunables[k], k).toEqual({ default: Number(def), min, max });
     }
-    // The "Totals" line under the Areas table: haul per resource, and the validation rule it states.
-    const hauls = design.slice(h4At).match(/Totals: haul (\d+) \/ (\d+) \/ (\d+)/)!;
-    const haul = (res: 'ore' | 'ice' | 'crystal'): number => defaultData.map.areas.reduce((s, a) => s + a.haul[res], 0);
-    expect([haul('ore'), haul('ice'), haul('crystal')]).toEqual([Number(hauls[1]), Number(hauls[2]), Number(hauls[3])]);
-    // research.fleet.step is H5's (data-h5.test.ts).
-    const meta = tunableMeta(defaultData).filter((m) => (m.key.startsWith('research.') && m.key !== 'research.fleet.step') || m.key.startsWith('shipments.'));
+    // The H4 "Totals" line under the superseded Areas table is H6's haul invariant now (data-h6.test.ts).
+    const meta = tunableMeta(defaultData).filter((m) => m.key.startsWith('research.') || m.key.startsWith('shipments.'));
     expect(meta.map((m) => [m.key, m.live, m.newRunOnly, m.scope])).toEqual(Object.keys(H4_TUNABLES).map((k) => [k, true, false, 'sim']));
   });
 });
@@ -293,20 +201,12 @@ describe('parseSimData rejects bad H4 data', () => {
     bad((d) => (d.research[2]!.kind = 'win'), /exactly one win item/);
   });
 
-  it('the hauls must cover every research level per resource at the research.costPct maximum', () => {
-    bad((d) => (area(d, 'deep').haul = { ore: 650, ice: 49, crystal: 60 }), /total ice haul 219 is below the total research cost 220/);
-    bad((d) => (d.research[0]!.levels[0]!.ore = 101), /total ore haul 1700 is below the total research cost 1701/);
+  it('the hauls must cover every research level per resource at the research.costPct maximum (no repeat groups on this map, so H6\'s worst position is the plain sum)', () => {
+    bad((d) => (area(d, 'deep').haul = { ore: 650, ice: 49, crystal: 60 }), /total ice haul 219 \(.*\) is below the total research cost 220/);
+    bad((d) => (d.research[0]!.levels[0]!.ore = 101), /total ore haul 1700 \(.*\) is below the total research cost 1701/);
     // Exactly equal is fine.
     const d = clone(rawData);
     area(d, 'deep').haul = { ore: 650, ice: 50, crystal: 50 };
     expect(() => parseSimData(d)).not.toThrow();
   });
-});
-
-it('the shipped data parses and agrees with the fixture on structure (areas, lanes, research ids; H5 adds only Command limit)', () => {
-  const d = parseSimData(clone(shippedRaw));
-  expect(d.map.areas.map((a) => [a.id, a.nodes])).toEqual(fixtureData.map.areas.map((a) => [a.id, a.nodes]));
-  expect(d.map.lanes).toEqual(fixtureData.map.lanes);
-  expect(d.research.filter((r) => r.id !== 'fleet').map((r) => [r.id, r.levels.length])).toEqual(fixtureData.research.map((r) => [r.id, r.levels.length]));
-  expect(d.research.filter((r) => r.id === 'fleet').map((r) => r.kind)).toEqual(['limit']);
 });

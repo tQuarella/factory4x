@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   SEND_ALL,
-  campaignStatus,
   campaignSummary,
   campaignWorld,
   clampSendCounts,
@@ -10,6 +9,7 @@ import {
   fleetCount,
   fleetStatus,
   isValidInput,
+  parseSimData,
   landingEffects,
   recycleRefund,
   researchIndex,
@@ -25,18 +25,19 @@ import {
   type World,
 } from '../src/index.ts';
 import { fixtureData, fixtureV8 } from './fixture.ts';
+import rawV8 from './fixtures/sim-v8.json' with { type: 'json' };
 import { DEEP_START, h3World } from './h3-world.ts';
 import { N, addShips, guardian, setGuards } from './helpers.ts';
 
 /**
  * h5-sim acceptance 1, 4 and 5 (DESIGN.md H5 "The fleet limit", "Recycle",
- * "Command limit", "Selectors"). Every rule test runs on the frozen v8
- * fixture with its premise set explicitly (a small limit, a constructed
- * fleet), so a retune of data/sim.json changes none of them.
+ * "Selectors"). Every rule test runs on the frozen v8 fixture with its premise
+ * set explicitly (a small limit, a constructed fleet), so a retune of
+ * data/sim.json changes none of them. h6-sim removed Command limit (its tests
+ * are retired; the H6 relay limit is tested in h6.test.ts).
  */
 
 const D = fixtureV8;
-const FLEET = researchIndex(D, 'fleet');
 const counts = (drone: number, lancer: number, flak: number): ShipTypeCounts => ({ drone, lancer, flak });
 
 function tick(w: World, ...inputs: Input[]): void {
@@ -64,31 +65,21 @@ function deep(yards: Partial<Record<'drone' | 'lancer' | 'flak', boolean>> = { d
 function runCapped(w: World, n: number): void {
   for (let i = 0; i < n; i++) {
     step(w, D, []);
-    const cap = fleetCap(w);
+    const cap = fleetCap(w, D);
     if (cap !== null) expect(fleetCount(w)).toBeLessThanOrEqual(cap);
   }
 }
 
 describe('the fleet limit (rule 5b)', () => {
-  it('fleetCap is fleet.cap + Command limit level × research.fleet.step, or null when fleet.cap is 0', () => {
+  it('fleetCap is fleet.cap with no relay reclaimed (the v8 fixture has none; H6 removed Command limit), or null when fleet.cap is 0', () => {
+    // The H6 relay term (fleet.relayStep × commandedBands) is tested on the v10 fixture in h6.test.ts.
     const w = deep();
-    for (const [cap, stepSize] of [
-      [12, 6],
-      [6, 2],
-      [60, 12],
-      [1, 2],
-    ] as const) {
-      tick(w, tune('fleet.cap', cap), tune('research.fleet.step', stepSize));
-      for (let level = 0; level <= 3; level++) {
-        w.campaign.research.fleet = level;
-        expect(fleetCap(w), `cap ${cap} step ${stepSize} level ${level}`).toBe(cap + level * stepSize);
-      }
+    for (const cap of [12, 6, 60, 1]) {
+      tick(w, tune('fleet.cap', cap), tune('fleet.relayStep', 12));
+      expect(fleetCap(w, D), `cap ${cap}`).toBe(cap);
     }
     tick(w, tune('fleet.cap', 0));
-    for (let level = 0; level <= 3; level++) {
-      w.campaign.research.fleet = level;
-      expect(fleetCap(w)).toBeNull();
-    }
+    expect(fleetCap(w, D)).toBeNull();
   });
 
   it('the yards stop at the limit: the count never passes it, and the yard shows fleetFull', () => {
@@ -98,7 +89,7 @@ describe('the fleet limit (rule 5b)', () => {
     expect(w.ships.length).toBe(5);
     expect(fleetStatus(w, D)).toMatchObject({ cap: 5, count: 5, building: 0, full: true });
     expect(w.yards.drone).toEqual({ on: true, ticksLeft: 0 });
-    expect(yardStatus(w).yards.find((y) => y.type === 'drone')!.state).toBe('fleetFull');
+    expect(yardStatus(w, D).yards.find((y) => y.type === 'drone')!.state).toBe('fleetFull');
     expect(w.stock.ore).toBe(100_000 - 5 * w.tun['ship.drone.cost']);
   });
 
@@ -117,7 +108,7 @@ describe('the fleet limit (rule 5b)', () => {
     runCapped(w, w.yards.drone.ticksLeft + 30);
     expect(w.ships.map((s) => s.type)).toEqual(['drone', 'drone', 'drone']);
     expect([w.yards.lancer.ticksLeft, w.yards.flak.ticksLeft, w.yards.drone.ticksLeft]).toEqual([0, 0, 0]);
-    expect(yardStatus(w).yards.map((y) => y.state)).toEqual(['fleetFull', 'fleetFull', 'fleetFull']);
+    expect(yardStatus(w, D).yards.map((y) => y.state)).toEqual(['fleetFull', 'fleetFull', 'fleetFull']);
   });
 
   it('two idle yards and one slot: only the first in rotation starts; the capped yard keeps its turn', () => {
@@ -188,7 +179,7 @@ describe('the fleet limit (rule 5b)', () => {
     run(w, 1500);
     expect(w.ships.length).toBe(ships);
     expect(fleetStatus(w, D)).toMatchObject({ cap: 5, count: ships, full: true });
-    expect(yardStatus(w).yards.filter((y) => y.on).map((y) => y.state)).toEqual(['fleetFull', 'fleetFull']);
+    expect(yardStatus(w, D).yards.filter((y) => y.on).map((y) => y.state)).toEqual(['fleetFull', 'fleetFull']);
     tick(w, tune('fleet.cap', 30));
     expect(w.yards.lancer.ticksLeft).toBeGreaterThan(0);
     expect(w.yards.drone.ticksLeft).toBeGreaterThan(0);
@@ -202,7 +193,7 @@ describe('the fleet limit (rule 5b)', () => {
     expect(fleetStatus(w, D)).toMatchObject({ cap: null, count: 71, building: 1, full: false });
     run(w, 300);
     expect(w.ships.length).toBeGreaterThan(71);
-    expect(yardStatus(w).yards.some((y) => y.state === 'fleetFull')).toBe(false);
+    expect(yardStatus(w, D).yards.some((y) => y.state === 'fleetFull')).toBe(false);
   });
 });
 
@@ -215,45 +206,45 @@ describe('yardStatus fleetFull and fleetStatus', () => {
     w.yards.drone.on = false;
     addShips(w, N.probe, 12);
     // Full at 12: drone off → off; lancer on, no lens and no ore → fleetFull (not needsComponent); flak, no design → needsDesign.
-    expect(yardStatus(w).yards.map((y) => [y.type, y.state])).toEqual([
+    expect(yardStatus(w, D).yards.map((y) => [y.type, y.state])).toEqual([
       ['drone', 'off'],
       ['lancer', 'fleetFull'],
       ['flak', 'needsDesign'],
     ]);
     // One slot free: the real reasons show.
     w.ships.pop();
-    expect(yardStatus(w).yards.map((y) => y.state)).toEqual(['off', 'needsComponent', 'needsDesign']);
+    expect(yardStatus(w, D).yards.map((y) => y.state)).toEqual(['off', 'needsComponent', 'needsDesign']);
     w.stock.lens = 1;
-    expect(yardStatus(w).yards.map((y) => y.state)).toEqual(['off', 'needsOre', 'needsDesign']);
+    expect(yardStatus(w, D).yards.map((y) => y.state)).toEqual(['off', 'needsOre', 'needsDesign']);
     // A yard building at the limit says building.
     w.stock.ore = 1000;
     tick(w);
     expect(w.yards.lancer.ticksLeft).toBeGreaterThan(0);
     expect(fleetStatus(w, D).full).toBe(true);
-    expect(yardStatus(w).yards.map((y) => y.state)).toEqual(['off', 'building', 'needsDesign']);
+    expect(yardStatus(w, D).yards.map((y) => y.state)).toEqual(['off', 'building', 'needsDesign']);
   });
 
-  it('fleetStatus: limit, counts by type, building, level and max level; on the overworld and with no Command limit in the data', () => {
+  it('fleetStatus: limit, counts by type, building; no relays in the v8 fixture (H6: commandedBands 0 of 0, the deprecated level and max level 0)', () => {
     const w = deep({ drone: true });
     addShips(w, N.a5, 2, 'flak');
     addShips(w, N.probe, 1, 'lancer');
-    w.campaign.research.fleet = 2;
     tick(w);
-    const step6 = D.tunables['research.fleet.step'].default;
     expect(fleetStatus(w, D)).toEqual({
-      cap: D.tunables['fleet.cap'].default + 2 * step6,
+      cap: D.tunables['fleet.cap'].default,
       count: 4,
       building: 1,
       byType: counts(0, 1, 2),
       buildingByType: counts(1, 0, 0),
       full: false,
-      level: 2,
-      maxLevel: 3,
+      commandedBands: 0,
+      maxCommandedBands: 0,
+      level: 0,
+      maxLevel: 0,
     });
     const overworld = campaignWorld(1, D);
-    expect(fleetStatus(overworld, D)).toMatchObject({ cap: D.tunables['fleet.cap'].default, count: 0, full: false, level: 0, maxLevel: 3 });
-    // The frozen v4 fixture: no Command limit item and fleet.cap 0.
-    expect(fleetStatus(campaignWorld(1, fixtureData), fixtureData)).toMatchObject({ cap: null, level: 0, maxLevel: 0 });
+    expect(fleetStatus(overworld, D)).toMatchObject({ cap: D.tunables['fleet.cap'].default, count: 0, full: false, commandedBands: 0, level: 0, maxLevel: 0 });
+    // The frozen v4 fixture: fleet.cap 0.
+    expect(fleetStatus(campaignWorld(1, fixtureData), fixtureData)).toMatchObject({ cap: null, commandedBands: 0, level: 0, maxLevel: 0 });
   });
 });
 
@@ -412,100 +403,58 @@ describe('capAtSend', () => {
   });
 });
 
-describe('Command limit (research fleet)', () => {
-  const ALL_BUT_DEEP = ['landfall', 'shelf', 'shoal', 'veil', 'garden'];
+/**
+ * H6 removed Command limit (the `fleet` item, kind 'limit', research.fleet.step): parseSimData rejects it
+ * (data-h6.test.ts), and relays raise the limit (h6.test.ts). The H5 {tier, count} requirement it used stays a
+ * generic research requirement; no shipped item has one, so it is tested here on a v8 fixture item given one.
+ */
+describe('tier requirements (H5; generic since H6)', () => {
   const rich = { ore: 10_000, ice: 10_000, crystal: 10_000 };
-  const buy: Input = { type: 'buyResearch', item: FLEET };
+  const raw = JSON.parse(JSON.stringify(rawV8)) as { research: Array<{ id: string; requires: unknown[] }> };
+  raw.research.find((r) => r.id === 'yards')!.requires = [
+    { tier: 1, count: 1, atLevel: 1 },
+    { tier: 2, count: 2, atLevel: 2 },
+  ];
+  const T = parseSimData(raw);
+  const YARDS = researchIndex(T, 'yards');
+  const buy: Input = { type: 'buyResearch', item: YARDS };
 
-  it('is the limit kind, three levels, and the probe core does not require it', () => {
-    const item = D.research[FLEET]!;
-    expect([item.kind, item.levels.length]).toEqual(['limit', 3]);
-    const core = D.research.find((r) => r.id === 'core')!;
-    expect(core.requires.some((q) => 'item' in q && q.item === 'fleet')).toBe(false);
-  });
-
-  it('each level raises the limit by research.fleet.step, at default and tuned values, and the next landing uses it', () => {
-    for (const [cap, stepSize] of [
-      [12, 6],
-      [6, 2],
-      [20, 12],
-    ] as const) {
-      const w = campaignWorld(1, D, { reclaimed: ALL_BUT_DEEP, stockpile: rich });
-      tick(w, tune('fleet.cap', cap), tune('research.fleet.step', stepSize));
-      for (let level = 0; level < 3; level++) {
-        expect(landingEffects(w).fleetCap).toBe(cap + level * stepSize);
-        const row = researchStatus(w, D)[FLEET]!;
-        expect([row.level, row.effect, row.nextEffect, row.canBuy]).toEqual([level, cap + level * stepSize, cap + (level + 1) * stepSize, true]);
-        tick(w, buy);
-        expect(w.campaign.research.fleet).toBe(level + 1);
-      }
-      const row = researchStatus(w, D)[FLEET]!;
-      expect([row.level, row.maxLevel, row.effect, row.nextEffect, row.cost, row.canBuy]).toEqual([3, 3, cap + 3 * stepSize, null, null, false]);
-      expect(isValidInput(w, D, buy)).toBe(false);
-      tick(w, { type: 'enterArea', area: D.map.areas.findIndex((a) => a.id === 'deep') });
-      expect(fleetStatus(w, D)).toMatchObject({ cap: cap + 3 * stepSize, level: 3, maxLevel: 3 });
-    }
-  });
-
-  it('is paid from the stockpile at research.costPct, one level at a time, only on the overworld', () => {
-    const w = campaignWorld(1, D, { reclaimed: ALL_BUT_DEEP, stockpile: rich });
-    const levels = D.research[FLEET]!.levels;
-    tick(w, buy);
-    expect(campaignStatus(w, D).stockpile).toEqual({ ore: 10_000 - levels[0]!.ore, ice: 10_000 - levels[0]!.ice, crystal: 10_000 - levels[0]!.crystal });
-    tick(w, tune('research.costPct', 50), buy);
-    expect(campaignStatus(w, D).stockpile.ore).toBe(10_000 - levels[0]!.ore - Math.floor(levels[1]!.ore / 2));
-    tick(w, { type: 'enterArea', area: D.map.areas.findIndex((a) => a.id === 'deep') });
-    expect(isValidInput(w, D, buy)).toBe(false);
-  });
-
-  it('with fleet.cap 0 it cannot be bought, and its row says capOff; any limit makes it buyable again', () => {
-    const w = campaignWorld(1, D, { reclaimed: ALL_BUT_DEEP, stockpile: rich });
-    expect(isValidInput(w, D, buy)).toBe(true);
-    tick(w, tune('fleet.cap', 0));
-    expect(isValidInput(w, D, buy)).toBe(false);
-    tick(w, buy);
-    expect(w.campaign.research.fleet).toBe(0);
-    const rows = researchStatus(w, D);
-    expect(rows[FLEET]).toMatchObject({ canBuy: false, affordable: true, effect: 0, missing: { capOff: true, tiers: [], items: [], areas: [] } });
-    expect(rows.filter((r) => r.id !== 'fleet').every((r) => !r.missing.capOff)).toBe(true);
-    tick(w, tune('fleet.cap', 1), buy);
-    expect(w.campaign.research.fleet).toBe(1);
-  });
-
-  it('tier requirements: level 1 needs an area of tier ≥ 1, level 2 one of tier ≥ 2, level 3 two of tier ≥ 2', () => {
+  it('level 1 needs an area of tier ≥ 1, level 2 two of tier ≥ 2; at max level none is reported', () => {
     const state = (reclaimed: string[], level: number) => {
-      const w = campaignWorld(1, D, { reclaimed, stockpile: rich, research: { fleet: level } });
-      const row = researchStatus(w, D)[FLEET]!;
-      return { canBuy: row.canBuy, tiers: row.missing.tiers, valid: isValidInput(w, D, buy) };
+      const w = campaignWorld(1, T, { reclaimed, stockpile: rich, research: { yards: level } });
+      const row = researchStatus(w, T)[YARDS]!;
+      return { canBuy: row.canBuy, tiers: row.missing.tiers, capOff: row.missing.capOff, valid: isValidInput(w, T, buy) };
     };
-    // Level 1.
-    expect(state([], 0)).toEqual({ canBuy: false, tiers: [{ tier: 1, count: 1, have: 0 }], valid: false });
-    expect(state(['landfall'], 0)).toEqual({ canBuy: false, tiers: [{ tier: 1, count: 1, have: 0 }], valid: false });
-    expect(state(['landfall', 'shoal'], 0)).toEqual({ canBuy: true, tiers: [], valid: true });
+    expect(state([], 0)).toEqual({ canBuy: false, tiers: [{ tier: 1, count: 1, have: 0 }], capOff: false, valid: false });
+    expect(state(['landfall'], 0)).toEqual({ canBuy: false, tiers: [{ tier: 1, count: 1, have: 0 }], capOff: false, valid: false });
+    expect(state(['landfall', 'shoal'], 0)).toEqual({ canBuy: true, tiers: [], capOff: false, valid: true });
     // A heavier area also counts ("tier ≥ T").
-    expect(state(['landfall', 'veil'], 0)).toEqual({ canBuy: true, tiers: [], valid: true });
-    // Level 2: both light areas are not enough; one medium, or The Deep, is.
-    expect(state(['landfall', 'shelf', 'shoal'], 1)).toEqual({ canBuy: false, tiers: [{ tier: 2, count: 1, have: 0 }], valid: false });
-    expect(state(['landfall', 'shelf', 'garden'], 1)).toEqual({ canBuy: true, tiers: [], valid: true });
-    expect(state(['landfall', 'shelf', 'deep'], 1)).toEqual({ canBuy: true, tiers: [], valid: true });
-    // Level 3: two areas of tier ≥ 2.
-    expect(state(['landfall', 'shelf', 'veil'], 2)).toEqual({ canBuy: false, tiers: [{ tier: 2, count: 2, have: 1 }], valid: false });
-    expect(state(['landfall', 'shelf', 'veil', 'garden'], 2)).toEqual({ canBuy: true, tiers: [], valid: true });
-    expect(state(['landfall', 'shelf', 'veil', 'deep'], 2)).toEqual({ canBuy: true, tiers: [], valid: true });
-    // At max level no per-level requirement is reported.
-    expect(state([], 3)).toEqual({ canBuy: false, tiers: [], valid: false });
+    expect(state(['landfall', 'veil'], 0)).toEqual({ canBuy: true, tiers: [], capOff: false, valid: true });
+    expect(state(['landfall', 'shelf', 'veil'], 1)).toEqual({ canBuy: false, tiers: [{ tier: 2, count: 2, have: 1 }], capOff: false, valid: false });
+    expect(state(['landfall', 'shelf', 'veil', 'deep'], 1)).toEqual({ canBuy: true, tiers: [], capOff: false, valid: true });
+    expect(state([], 2)).toEqual({ canBuy: false, tiers: [], capOff: false, valid: false });
+  });
+
+  it('research no longer changes the fleet limit, and no row is capOff with the limit off', () => {
+    const w = campaignWorld(1, T, { reclaimed: ['landfall', 'shelf', 'veil', 'garden'], stockpile: rich });
+    const before = landingEffects(w, T).fleetCap;
+    tick(w, buy);
+    tick(w, buy);
+    expect(w.campaign.research.yards).toBe(2);
+    expect(landingEffects(w, T).fleetCap).toBe(before);
+    tick(w, tune('fleet.cap', 0));
+    expect(researchStatus(w, T).every((r) => !r.missing.capOff)).toBe(true);
   });
 });
 
 describe('save', () => {
-  it('round-trips a world with a Command limit level, recycles and a battle with capAtSend; refuses a v7 save', () => {
+  it('round-trips a world with recycles and a battle with capAtSend; refuses a v7 save', () => {
     const w = deep({ drone: true });
-    w.campaign.research.fleet = 1;
     addShips(w, N.a5, 4);
     tick(w, { type: 'recycleShips', node: N.a5, counts: counts(1, 0, 0) }, { type: 'sendShips', from: N.a5, to: N.p1, counts: SEND_ALL });
     let t = 0;
     while (guardian(w, N.p1).battle === null && t++ < 300) tick(w);
-    expect(guardian(w, N.p1).battle!.capAtSend).toBe(fleetCap(w));
+    expect(guardian(w, N.p1).battle!.capAtSend).toBe(fleetCap(w, D));
     const text = serializeWorld(w);
     const back = deserializeWorld(text, D);
     expect(back.ok).toBe(true);
