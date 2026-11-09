@@ -42,3 +42,35 @@ Scope: `git diff main...task/h6-art` (c99543f), one commit on top of f8fabe3. It
 This is round 1.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+Scope: `git diff 525d810 cf6da1b` (one commit on top of round 1). It touches `placeholders.ts`, which adds `drawRelayMark`, plus `gallery.ts`, `ART_STYLE.md` and `h6-art.test.ts`. All are inside the task's file list, and no protected file is touched.
+
+**Gates (run by me on cf6da1b):** `npm run gates -- --base main` passes: typecheck, lint, test, determinism, bots and protected-files.
+
+**Gallery:** the engineer didn't re-screenshot after the layout change, so I did. I loaded `gallery.html` in Chromium on cf6da1b and inspected the H6 strips (colour and greyscale), the four relay-node entries, the plain-node entry and the lane modes. There were no console errors.
+
+**Round 1 required changes:**
+1. **Met in code and gallery: a relay node keeps its haul.** `drawRelayMark` puts the relay icon on a dark disc at the node's upper left, and the prize icon stays in the centre. At 48 and 96 px the reclaimed relay reads "ice, amber rim, beacon top-left", and the open one reads "crystal, dashed ring, beacon". On a locked relay the mark and the lock sit on opposite corners. A new test checks they don't overlap at node r = 12, 22 and 50.
+2. **Met in code and gallery: the far node centre.** The far examples show no prize. The far relay shows only the mark at 0.5 alpha, and ART_STYLE now states the rule.
+3. **Met: the strip layout.** The three lane modes have their own row, and all three are fully on the canvas, in colour and in greyscale.
+
+**New problems (all small, but they're in the contract h6-client builds from):**
+- **ART_STYLE.md contradicts itself in three places.** Round 1 rejected the caller guidance specifically, so this has to be consistent.
+  - Line 177 (Lock badge row) still says the badge is "drawn about 0.42 of the node's r". The new Callers rule (line 188) says `drawLockBadge(ctx, 0.5 * r)`.
+  - Line 185 ("Relay is told apart") still says "A reclaimed node with the relay icon in the centre reads as 'amber rim, blue beacon'". The new rule puts the mark at the upper left and never in the centre.
+  - Line 190 says both marks "reach about 1.3 of the node's r diagonally". At the new size, the relay mark's disc (centre (−0.7r, −0.7r), radius 0.5r) reaches about 1.49r from the node centre. The caller needs the right figure to keep labels and the selection ring clear.
+- **`drawRelayMark` is over its bound by the gallery's own pixel check.** The gallery reports "relay mark: 1.024 r" against its stated limit of 1.002 r (antialiasing included). Every other entity is at or under the limit. The backing disc is filled at exactly r, so the antialiased edge spills past it. The recording test passes only because it measures exact geometry. ART_STYLE says it "stays within its own r", and acceptance 3 is "each stays within r".
+
+**Required changes:**
+1. In ART_STYLE.md line 177, change "about 0.42 of the node's r" to match the Callers rule (0.5).
+2. In ART_STYLE.md line 185, replace the "relay icon in the centre" sentence with the corner-mark reading. For example: "a reclaimed relay reads as amber rim, haul icon in the centre, blue beacon at the upper left."
+3. In ART_STYLE.md line 190, correct the reach to the real figure (about 1.5 of the node's r for the relay mark), or shrink or move the marks so the stated figure is true.
+4. Bring `drawRelayMark` within the gallery's 1.002 r pixel limit, for example by filling the backing disc at about 0.96r. Show the gallery's "relay mark:" bounds line at or under 1.002 r.
+
+**Unchanged from round 1:** determinism, data and tests are fine. The new non-overlap test is meaningful. At the overworld size (node r ≥ 22) the mark is about 22 px across, which is readable. At the 24 px node size it's only a tiny glyph, but no real node is drawn that small.
+
+The next round on this task would be the third. If these four items aren't all met then, the Director parks it per `PROCESS.md`.
+
+VERDICT: REJECT
