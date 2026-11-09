@@ -22,7 +22,11 @@ Launches: 6 / 12.
 | 4 | engineer | h6-bug-topbar-oscillation | launch | Build (owner bug): green, 36f414e; smoke test fails before fix |
 | 5 | critic | h6-art | launch | Review round 1 (art green, c99543f) |
 | 6 | critic | h6-bug-topbar-oscillation | launch | Review round 1 |
-| r2 | engineer | h6-bug-buffer-toast-flicker | resume | Build, branched from task/h6-bug-topbar-oscillation (merges after it) |
+| r3a | critic | h6-art | resume | (round 1 was launch 5): REJECT (relay icon hid the haul; far centre; clipped lane) |
+| r2 | engineer | h6-bug-buffer-toast-flicker | resume | Build, branched from task/h6-bug-topbar-oscillation (merges after it): green, d869e14; smoke test fails before fix |
+| r3 | art-direction | h6-art | resume | Fix round 1 (cf6da1b) |
+| r4 | critic | h6-art | resume | Review round 2: REJECT (ART_STYLE contradictions, relay mark 1.024 r) |
+| r5 | core-engineer | h6-art | resume | Fix round 3, reassigned per deadlock rule (resumed the h5-sim core-engineer) |
 
 ## Iteration 5 ledger
 
