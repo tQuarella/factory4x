@@ -100,6 +100,12 @@ export class MapView {
   private trackedWorld: World | null = null;
   private seenCut: number | null = null;
   private wilt: WiltAnim | null = null;
+  /** What the last frame drew for each node: the "!" badge and the dashed backed-up route (tests read it through a dev hook). */
+  private readonly drawn = { badge: new Set<number>(), dashed: new Set<number>() };
+
+  drawnBackedUp(node: number): { badge: boolean; route: boolean } {
+    return { badge: this.drawn.badge.has(node), route: this.drawn.dashed.has(node) };
+  }
 
   constructor(canvas: HTMLCanvasElement, app: { session: Session }) {
     this.canvas = canvas;
@@ -175,6 +181,8 @@ export class MapView {
     const world = session.world;
     const alpha = session.alpha;
     const t = nowMs / 1000;
+    this.drawn.badge.clear();
+    this.drawn.dashed.clear();
     ctx.fillStyle = palette.space;
     ctx.fillRect(0, 0, w, h);
     for (const st of this.stars) {
@@ -205,7 +213,9 @@ export class MapView {
     for (const route of world.routes) {
       const a = this.nodePos(route.from);
       const b = this.nodePos(route.to);
-      drawRoute(ctx, a.x, a.y, b.x, b.y, route.level, isBackedUp(world, route.from, nodeStatus(world, route.from)));
+      const backedUp = isBackedUp(world, route.from, nodeStatus(world, route.from));
+      if (backedUp) this.drawn.dashed.add(route.from);
+      drawRoute(ctx, a.x, a.y, b.x, b.y, route.level, backedUp);
     }
     const podTotal = (length: number): number => podTotalTicks(length, world.tun['route.podSpeedSu']);
     for (const route of world.routes) {
@@ -319,7 +329,10 @@ export class MapView {
       const parked = counts.at[n.index]!;
       if (parked > 0) this.badge(String(parked), x + rr * 0.85, y - rr * 0.75, palette.ship, '#0b1626');
       const ns = nodeStatus(world, n.index);
-      if (n.kind !== 'probe' && (isBackedUp(world, n.index, ns) || ns.noRoute)) this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
+      if (n.kind !== 'probe' && (isBackedUp(world, n.index, ns) || ns.noRoute)) {
+        this.drawn.badge.add(n.index);
+        this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
+      }
     }
 
     // Labels last, each on a dark pill, so no guard ring hides the name of the node it rings or a neighbour.
