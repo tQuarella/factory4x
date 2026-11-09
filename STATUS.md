@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 6, hypothesis H6: Open frontier, Root removed)
-**State:** Awaiting owner feedback on build-20261108-5 (M2 H6: Open frontier). Only Can wait work until feedback arrives. Next: retro, then stop until the owner answers the three H6 fun questions in QUESTIONS.md. Can wait candidates: cw-worktree-prune, cw-sim-fleet-leftovers, cw-veil-starved-tag, cw-root-code-removal.
+**State:** Awaiting owner feedback on build-20261108-5 (M2 H6: Open frontier). Retro done; team stopped until the owner answers the three H6 fun questions in QUESTIONS.md. Only Can wait work until then. Candidates: cw-smoke-isolation (retro's pick), cw-worktree-prune, cw-sim-fleet-leftovers, cw-veil-starved-tag, cw-root-code-removal.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-5 (H6 Open frontier), commit 626307f, live (CI gates and deploy green; site shows 626307f · data v11). Release gates passed locally (192/192 smoke).
@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 6 ledger
 
-Launches: 8 / 12.
+Launches: 9 / 12. Iteration 6 closed.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -49,6 +49,7 @@ Launches: 8 / 12.
 | 8 | engineer | h6-client | launch | Build (97d5390): gates green, smoke 178/178, design-data merged in |
 | r25 | critic | h6-client | resume | Review round 1: REJECT (flaky reachability test, tapArea retry, loosened/removed tests, combat line hard-coded) |
 | r26 | engineer | h6-client | resume | Fix round 1 (1cab655) |
+| 9 | retrospective | iteration 6 retro | launch | Retro after build-20261108-5: engineer test-strength, settle-before-act, parallel repeats, self-check; designer inherited-assumption check; art one-rule-once; PROCESS stack-top rule, deadlock departures logged, autocrlf |
 | r27 | critic | h6-client | resume | Review round 2: APPROVE (652b143); branch CI gates green; whole H6 slice merged 626307f |
 | r13 | engineer | h6-bug-topbar-oscillation | resume | Branch CI red on 91dab72: boot.spec:129 phone tap fails reliably on Linux (green on main). Fix cause, merge into buffer branch |
 
