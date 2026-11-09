@@ -41,6 +41,7 @@ import { guardIcon, recycleIcon, resourceIcon, shipIcon } from './icons.ts';
 import {
   COMPONENT_SOURCE,
   COUNTER_PHRASE,
+  GUARD_TARGET_LINE,
   GUARD_NAME,
   RES_NAME,
   SHIP_NAME,
@@ -351,7 +352,7 @@ export class Sheet {
       const ys = yardStatus(w, this.host.session.data);
       const fleet = fleetStatus(w, this.host.session.data);
       setHidden(fleetHead, fleet.cap === null);
-      if (fleet.cap !== null) setText(fleetHead, fleetLine({ count: fleet.count, cap: fleet.cap, level: fleet.level, maxLevel: fleet.maxLevel }));
+      if (fleet.cap !== null) setText(fleetHead, fleetLine({ count: fleet.count, cap: fleet.cap }));
       ys.yards.forEach((y, i) => yardRows[i]!.update(y, w.tickRate, { count: fleet.count, cap: fleet.cap }));
       setText(mining.val, `+${ys.probeOrePerMin}/min`);
       const asms = assemblerStatus(w);
@@ -500,6 +501,8 @@ export class Sheet {
       h('div', 'tr-phrase', COUNTER_PHRASE[type], wrap);
       return { type, wrap, badge };
     });
+    // H6 combat amendment: which ship type each guard strikes first (every heart and pocket here has guards).
+    h('div', 'note guard-targets', GUARD_TARGET_LINE, tagSec);
 
     const here = h('section', '', '', this.root);
     const ships = this.row(here, 'Ships here');

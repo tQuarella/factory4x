@@ -3,7 +3,9 @@ import {
   activeBattles,
   combatRates,
   counterTag,
+  fleetCap,
   fleetStatus,
+  isReclaimed,
   guardianStatus,
   supplyStatus,
   unlockStatus,
@@ -182,11 +184,18 @@ export function fleetChipText(count: number, cap: number): string {
   return `Fleet ${count}/${cap}`;
 }
 
-/** The probe sheet's Yards header, "Fleet 9/12 · Command limit 1/3" (no Command limit part when the data has none). */
-export function fleetLine(f: { count: number; cap: number; level: number; maxLevel: number }): string {
-  const head = fleetChipText(f.count, f.cap);
-  return f.maxLevel > 0 ? `${head} · Command limit ${f.level}/${f.maxLevel}` : head;
+/** The probe sheet's Yards header and the chip's tooltip, "Fleet 9/12". (H6: the limit rises by reclaiming command relays, so no level part.) */
+export function fleetLine(f: { count: number; cap: number }): string {
+  return fleetChipText(f.count, f.cap);
 }
+
+/** The overworld top row's chip, "Fleet limit 20". */
+export function fleetLimitText(cap: number): string {
+  return `Fleet limit ${cap}`;
+}
+
+/** H6 combat amendment: the line under the Strong/Weak tags of a heart or pocket (the guard-damage target order). */
+export const GUARD_TARGET_LINE = 'Thorns strike Flak first; Spores strike Lancers first.';
 
 /** The first-time notice when the fleet reaches its limit in a visit. */
 export function fleetFullNotice(count: number, cap: number): string {
@@ -206,9 +215,10 @@ export function recycleNotice(counts: Readonly<ShipTypeCounts>, ore: number): st
 }
 
 /**
- * The repelled hint for a wave sent at the limit (at least capAtSend - 1 ships): " You sent a full fleet. Change the mix, cut the
- * Root, or raise the limit (Command limit)." A fed Heart leads with the Root cut. With no Root to cut (or the Heart not the target)
- * that part is left out, and so is "raise the limit" at the last Command limit level. Empty when the limit was off or the wave smaller.
+ * The repelled hint for a wave sent at the limit (at least capAtSend - 1 ships): " You sent a full fleet. Change the mix, or
+ * reclaim a command relay to raise the limit." A fed Heart (the dormant Root path) leads with the Root cut. With no Root to cut (or
+ * the Heart not the target) that part is left out, and so is the relay part once every band's relay is reclaimed. Empty when the
+ * limit was off or the wave smaller.
  */
 export function fullFleetHint(world: Readonly<World>, r: BattleResult, data?: SimData): string {
   const cap = r.capAtSend;
@@ -218,12 +228,12 @@ export function fullFleetHint(world: Readonly<World>, r: BattleResult, data?: Si
   let canRaise = true;
   if (data !== undefined) {
     const f = fleetStatus(world, data);
-    canRaise = f.maxLevel > 0 && f.level < f.maxLevel;
+    canRaise = f.commandedBands < f.maxCommandedBands;
   }
   const options = fed ? ['Cut the Root', 'change the mix'] : ['Change the mix'];
-  if (canRaise) options.push('raise the limit (Command limit)');
+  if (canRaise) options.push('reclaim a command relay to raise the limit');
   const last = options[options.length - 1]!;
-  const list = options.length === 1 ? last : `${options.slice(0, -1).join(', ')}${options.length > 2 ? ',' : ''} or ${last}`;
+  const list = options.length === 1 ? last : `${options.slice(0, -1).join(', ')}, or ${last}`;
   return ` You sent a full fleet. ${list}.`;
 }
 
@@ -296,6 +306,42 @@ export function shippedNotice(areaName: string, shipped: Readonly<Record<RawReso
 export function reclaimNotice(areaName: string, haul: Readonly<Record<RawResource, number>>, opened: readonly string[]): string {
   const head = `${areaName} reclaimed: ${plusText(haul)}.`;
   return opened.length > 0 ? `${head} Opened: ${opened.join(', ')}.` : head;
+}
+
+/** What the first relay of a band did, for the step moment: the band it opened (or null with the band lock off) and the limit before and after. */
+export interface StepMoment {
+  /** The relay's band (1 or 2). */
+  band: number;
+  /** The band the relay opens (band + 1), or null when `overworld.bandLock` is 0 or the data has no such band. */
+  opens: number | null;
+  capBefore: number | null;
+  capAfter: number | null;
+}
+
+/**
+ * The step moment of returning to the overworld after leaving `area`: set when it is a relay reclaimed first in its band (no
+ * relay of the band was reclaimed before it), and it either raised the limit or opened a band; else null. Numbers come from
+ * the sim (`fleetCap`, which counts every reclaimed relay on the overworld) and the live relay step.
+ */
+export function stepMoment(world: Readonly<World>, data: SimData, area: number): StepMoment | null {
+  const def = data.map.areas[area];
+  if (def === undefined || !def.relay || !isReclaimed(world, area)) return null;
+  for (const b of world.campaign.reclaimOrder) {
+    if (b === area) break;
+    const other = data.map.areas[b]!;
+    if (other.relay && other.tier === def.tier) return null;
+  }
+  const capAfter = fleetCap(world, data);
+  const capBefore = capAfter === null ? null : capAfter - world.tun['fleet.relayStep'];
+  const opens = world.tun['overworld.bandLock'] > 0 && data.map.areas.some((a) => a.tier === def.tier + 1) ? def.tier + 1 : null;
+  if (capAfter === null && opens === null) return null;
+  return { band: def.tier, opens, capBefore, capAfter };
+}
+
+/** "Command relay reclaimed: fleet limit 12 → 20. Band 2 is open." (each part only when it applies) */
+export function stepNotice(s: StepMoment): string {
+  const head = s.capAfter === null ? 'Command relay reclaimed' : `Command relay reclaimed: fleet limit ${s.capBefore} → ${s.capAfter}`;
+  return s.opens === null ? `${head}.` : `${head}. Band ${s.opens} is open.`;
 }
 
 /** Notice after a withdraw. */

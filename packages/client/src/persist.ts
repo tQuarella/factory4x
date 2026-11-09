@@ -94,6 +94,7 @@ export function decodeSave(text: string, data: SimData): LoadOutcome {
     seenBattleEnd: isInt(f.seenBattleEnd) ? f.seenBattleEnd : -1,
     resultShown: f.resultShown === true,
     shippedAtLanding: readTriple(f.shippedAtLanding),
+    stepsShown: Array.isArray(f.stepsShown) ? f.stepsShown.filter(isInt) : [],
   };
   const start = isObj(parsed.start) ? (parsed.start as CampaignStart) : undefined;
   const tunables = isObj(parsed.startTunables) ? (parsed.startTunables as Record<string, number>) : {};

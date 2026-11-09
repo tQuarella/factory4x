@@ -42,6 +42,8 @@ import {
   openedByReclaim,
   reclaimNotice,
   shippedNotice,
+  stepMoment,
+  stepNotice,
   unlockNotice,
   withdrawNotice,
 } from './report.ts';
@@ -146,10 +148,22 @@ canvas.addEventListener('click', (ev) => {
   const x = ev.clientX - r.left;
   const y = ev.clientY - r.top;
   if (app.session.onOverworld) {
+    // The click that ends a drag is not a tap; a tap during the step moment skips it (and does nothing else).
+    if (worldView.consumeDrag()) return;
+    if (worldView.stepActive) {
+      worldView.skipStep();
+      return;
+    }
     const a = worldView.hitTest(x, y);
     researchSheet.close();
     if (a === null) areaSheet.close();
-    else areaSheet.open(a);
+    else {
+      areaSheet.open(a);
+      // The sheet may overlay the bottom of the map: pan the least that keeps this area clear of it. The pan reaches further under it,
+      // so the other areas stay reachable by dragging while it is open.
+      worldView.cover = sheetCover();
+      worldView.reveal(a);
+    }
     return;
   }
   const node = view.hitTest(x, y);
@@ -301,7 +315,12 @@ function modeTransition(): void {
     modeSeen.world = w;
     modeSeen.active = active;
     unlockSeen.world = null;
-    if (active === null) closeWorldSheets();
+    if (active === null) {
+      closeWorldSheets();
+      // A new or resumed session opens centred on the area last reclaimed, else on the start.
+      const order = w.campaign.reclaimOrder;
+      worldView.focus(order.length > 0 ? order[order.length - 1]! : Math.max(0, data.map.areas.findIndex((a) => a.tier === 0)));
+    }
     return;
   }
   if (modeSeen.active === active) return;
@@ -330,9 +349,20 @@ function modeTransition(): void {
   const shipped = base === null ? '' : shippedNotice(name, { ore: now.ore - base.ore, ice: now.ice - base.ice, crystal: now.crystal - base.crystal });
   s.flags.shippedAtLanding = null;
   const head = isReclaimed(w, prev)
-    ? reclaimNotice(name, areaStatus(w, data, prev).haul, openedByReclaim(w, data, prev))
+    ? reclaimNotice(name, areaStatus(w, data, prev).haulNow, openedByReclaim(w, data, prev))
     : withdrawNotice(name);
-  toast.show(shipped === '' ? head : `${head}\n\n${shipped}`);
+  // H6 step moment: the first relay of a band raises the limit and opens the next band, once per band.
+  const step = isReclaimed(w, prev) ? stepMoment(w, data, prev) : null;
+  const first = step !== null && !s.flags.stepsShown.includes(step.band);
+  const lead = first ? `${stepNotice(step)}\n\n${head}` : head;
+  toast.show(shipped === '' ? lead : `${lead}\n\n${shipped}`);
+  // Centre the view on the area just left, after the notice has settled the canvas height; then play the step moment.
+  resizeViews();
+  worldView.focus(prev);
+  if (first) {
+    s.flags.stepsShown.push(step.band);
+    if (step.opens !== null) worldView.startStep(step.opens);
+  }
 }
 
 /**
@@ -352,11 +382,12 @@ function transitionPending(): boolean {
 let hudOverride: World | null = null;
 
 function refreshUi(): void {
+  // The mode is set first, so a re-fit inside modeTransition measures the layout of the screen it is about to show.
+  el.app.dataset.mode = app.session.onOverworld ? 'world' : 'area';
   modeTransition();
   const s = app.session;
   const w = s.world;
   const onWorld = s.onOverworld;
-  el.app.dataset.mode = onWorld ? 'world' : 'area';
   const won = isWon(w);
   if (onWorld) {
     owHud.update(w, data);
@@ -527,6 +558,15 @@ window.__factory4x = {
     const p = worldView.areaPos(a);
     return { x: r.left + p.x, y: r.top + p.y };
   },
+  areaRadius: () => worldView.nodeR,
+  bandRects: () => {
+    const r = canvas.getBoundingClientRect();
+    return worldView.bandRects().map((b) => ({ ...b, x: r.left + b.x, y: r.top + b.y }));
+  },
+  overworldScroll: () => ({ ...worldView.scroll, max: worldView.scrollLimits }),
+  centerOnArea: (a) => worldView.focus(a),
+  stepActive: () => worldView.stepActive,
+  skipStep: () => worldView.skipStep(),
   selected: () => sheet.selected,
   selectedArea: () => areaSheet.selected,
   onOverworld: () => app.session.onOverworld,

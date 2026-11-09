@@ -11,6 +11,17 @@ interface Window {
     nodeScreenPos(node: number): { x: number; y: number };
     /** Area centre on the overworld, in client (viewport) pixels. */
     areaScreenPos(area: number): { x: number; y: number };
+    /** Area node radius on the overworld, px. */
+    areaRadius(): number;
+    /** The band labels' boxes in viewport pixels. */
+    bandRects(): Array<{ band: number; x: number; y: number; w: number; h: number }>;
+    /** The overworld pan now and the furthest it reaches now (it reaches further under an open sheet), px. */
+    overworldScroll(): { x: number; y: number; max: { x: number; y: number } };
+    /** Centres the overworld on an area at once (tests; a drag does the same for a player). */
+    centerOnArea(area: number): void;
+    /** The step moment is playing. */
+    stepActive(): boolean;
+    skipStep(): void;
     /** Selected node index, or null. */
     selected(): number | null;
     /** The area whose overworld sheet is open, or null. */

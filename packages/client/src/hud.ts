@@ -2,13 +2,13 @@
  * The HUD chips: icon + count per resource and per ship type, hidden until owned (DESIGN.md H3 "HUD").
  * Built once; `update` touches text and visibility only. All values come from the sim's selectors.
  */
-import { RAW_RESOURCES, RESOURCES, SHIP_TYPES, campaignStatus, fleetStatus, prizePerMin, shipCounts, unlockStatus, type RawResource, type Resource, type ShipType, type SimData, type World } from '@factory4x/sim';
+import { RAW_RESOURCES, RESOURCES, SHIP_TYPES, campaignStatus, fleetCap, fleetStatus, prizePerMin, shipCounts, unlockStatus, type RawResource, type Resource, type ShipType, type SimData, type World } from '@factory4x/sim';
 import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { fmt10 } from './format.ts';
 import { fleetIcon, paintIcon, resourceIcon, shipIcon, stockpileIcon } from './icons.ts';
 import { drawFleetIcon } from './placeholders.ts';
 import { palette } from './palette.ts';
-import { RES_NAME, SHIP_NAME, fleetChipText, fleetLine } from './report.ts';
+import { RES_NAME, SHIP_NAME, fleetChipText, fleetLimitText, fleetLine } from './report.ts';
 
 interface Chip {
   el: HTMLElement;
@@ -60,7 +60,7 @@ export class Hud {
     setHidden(this.fleet.el, f.cap === null);
     if (f.cap !== null) {
       setText(this.fleet.numbers, fleetChipText(f.count, f.cap).replace(/^Fleet /, ''));
-      this.fleet.el.title = fleetLine({ count: f.count, cap: f.cap, level: f.level, maxLevel: f.maxLevel });
+      this.fleet.el.title = fleetLine({ count: f.count, cap: f.cap });
       toggleClass(this.fleet.el, 'full', f.full);
       // The chip's edge is the probe amber at the limit (palette.probe), and the icon's bracket closes.
       this.fleet.el.style.borderColor = f.full ? palette.probe : '';
@@ -98,6 +98,8 @@ export class Hud {
 export class OverworldHud {
   private readonly chips = new Map<RawResource, Chip>();
   private readonly reclaimed: HTMLElement;
+  /** H6: "Fleet limit 20" with the fleet icon, hidden while `fleet.cap` is 0. Its count has room for three digits, so a relay never reflows the row. */
+  private readonly fleet: Chip;
 
   constructor(root: HTMLElement) {
     const stock = h('span', 'sp-icon', '', root);
@@ -106,11 +108,20 @@ export class OverworldHud {
     stockpileIcon(stock, 26);
     const chips = h('div', 'sp-chips', '', root);
     for (const r of RAW_RESOURCES) this.chips.set(r, makeChip(chips, `sp-${r}`, `${RES_NAME[r]} in the stockpile`, (p) => resourceIcon(p, 18, r), true));
+    this.fleet = makeChip(chips, 'sp-fleet', 'Fleet limit', (p) => fleetIcon(p, 22, false), false);
+    this.fleet.el.classList.add('fleet-limit');
+    this.fleet.el.hidden = true;
     this.reclaimed = h('span', 'reclaimed', '', root);
     this.reclaimed.id = 'reclaimed';
   }
 
   update(world: Readonly<World>, data: SimData): void {
+    const cap = fleetCap(world, data);
+    setHidden(this.fleet.el, cap === null);
+    if (cap !== null) {
+      setText(this.fleet.count, fleetLimitText(cap));
+      this.fleet.el.title = `${fleetLimitText(cap)}: reclaim command relays to raise it`;
+    }
     const st = campaignStatus(world, data);
     const totals = world.campaign.totals;
     for (const r of RAW_RESOURCES) {

@@ -1,4 +1,4 @@
-/** Fits the whole fixed map into the map area: no pan, no zoom (DESIGN.md H1 scope). */
+/** Fits the whole fixed map into the map area: no pan, no zoom (DESIGN.md H1 scope). The overworld fit (H6) pans: see fitOverworld. */
 
 export interface Fit {
   scale: number;
@@ -38,10 +38,29 @@ const OW_PAD_X = 30;
 const OW_PAD_Y = 40;
 /** Largest overworld scale, so desktop nodes don't balloon. */
 const OW_MAX_SCALE = 0.7;
+/** Smallest on-screen node radius, px (the spec: area radius at least 22 px, so a node is a 44 px target). */
+export const OW_MIN_NODE_PX = 22.5;
 
-/** Fits area nodes of radius `r` su into w x h px with room for their labels. */
-export function fitOverworld(points: readonly { x: number; y: number }[], r: number, w: number, h: number): Fit {
-  if (points.length === 0) return { scale: 1, ox: 0, oy: 0 };
+/**
+ * The overworld's layout (DESIGN.md H6 "Overworld map"): the frame's width fills the map width, and the map pans when the
+ * frame is taller than the view. A screen position is `o + su * scale - scroll`. `contentW` x `contentH` is the frame plus its
+ * label padding in px, the extent a scroll can reach.
+ */
+export interface OwFit {
+  scale: number;
+  /** Screen offset of the frame origin (0, 0) at scroll 0. */
+  ox: number;
+  oy: number;
+  contentW: number;
+  contentH: number;
+}
+
+/**
+ * Fits area nodes of radius `r` su into a w x h px map. The scale fills the width, so a phone pans vertically. If the whole
+ * frame fits at a scale that still gives nodes at least OW_MIN_NODE_PX, that scale is used and nothing pans (a wide screen).
+ */
+export function fitOverworld(points: readonly { x: number; y: number }[], r: number, w: number, h: number): OwFit {
+  if (points.length === 0) return { scale: 1, ox: 0, oy: 0, contentW: w, contentH: h };
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -54,6 +73,26 @@ export function fitOverworld(points: readonly { x: number; y: number }[], r: num
   }
   const bw = Math.max(1, maxX - minX);
   const bh = Math.max(1, maxY - minY);
-  const scale = Math.max(0.05, Math.min(OW_MAX_SCALE, (w - 2 * OW_PAD_X) / bw, (h - 2 * OW_PAD_Y) / bh));
-  return { scale, ox: (w - bw * scale) / 2 - minX * scale, oy: (h - bh * scale) / 2 - minY * scale };
+  const minScale = OW_MIN_NODE_PX / r;
+  const wFill = (w - 2 * OW_PAD_X) / bw;
+  const hFill = (h - 2 * OW_PAD_Y) / bh;
+  // The scale the height allows when the whole frame fits with nodes still big enough (no pan); otherwise the width fills the view.
+  let scale = hFill >= minScale ? Math.min(wFill, hFill) : wFill;
+  scale = Math.max(minScale, Math.min(OW_MAX_SCALE, scale));
+  const contentW = bw * scale + 2 * OW_PAD_X;
+  const contentH = bh * scale + 2 * OW_PAD_Y;
+  // Centred across when it fits; flush to the padding on an axis that scrolls (and always at the top, so a sheet can extend the scroll).
+  const ox = (contentW <= w ? (w - contentW) / 2 : 0) + OW_PAD_X - minX * scale;
+  const oy = OW_PAD_Y - minY * scale;
+  return { scale, ox, oy, contentW, contentH };
+}
+
+/** The most an axis scrolls: the content less the part of the view that no sheet covers (the last `cover` px). */
+export function scrollMax(content: number, view: number, cover = 0): number {
+  return Math.max(0, content - Math.max(1, view - cover));
+}
+
+/** `v` held to 0..max. */
+export function clampScroll(v: number, max: number): number {
+  return Math.max(0, Math.min(max, v));
 }

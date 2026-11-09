@@ -48,10 +48,15 @@ function header(root: HTMLElement, title: string, onClose: () => void): void {
 // ---------------------------------------------------------------------------
 
 /** H5: friendlier names for the fleet-cap tunables (the owner's A/B: `fleet.cap` 0 turns the limit off). The input's aria-label stays the key. */
+/** H6: the Root is removed from play, so its starved-heart tunables are hidden (they stay in the data). */
+export const HIDDEN_TUNABLES: readonly string[] = ['bloom.starved'];
+
 export const TUNE_LABEL: Readonly<Record<string, string>> = {
   'fleet.cap': 'Fleet limit (0 = none)',
   'fleet.recycleRefundPct': 'Recycle refund %',
-  'research.fleet.step': 'Command limit step',
+  'fleet.relayStep': 'Relay limit step',
+  'areas.repeatHaulPct': 'Repeat haul %',
+  'overworld.bandLock': 'Band locks (0 = off)',
 };
 
 interface TuneRow {
@@ -135,7 +140,7 @@ export class TuningPanel {
 
     let section = '';
     for (const meta of tunableMeta(host.data)) {
-      if (!meta.live) continue;
+      if (!meta.live || HIDDEN_TUNABLES.some((p) => meta.key.startsWith(p))) continue;
       if (meta.section !== section) {
         section = meta.section;
         h('div', 't-section', section, this.root);

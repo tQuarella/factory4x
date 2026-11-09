@@ -341,4 +341,21 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 .btn.recycle-btn { display: flex; align-items: center; justify-content: center; gap: 8px; border-color: #2f6c73; }
 .recycle-card h2 { display: flex; align-items: center; gap: 8px; }
 .recycle-preview { padding: 8px 0; font-size: 18px; font-weight: 700; color: var(--teal); text-align: center; border-top: 1px solid var(--line); }
-.rcard.limit { border-color: #3a5c8a; }
+
+/* ---- H6: the pannable overworld, the fleet limit chip, relay and lock lines, low landscape ---- */
+/* A drag pans the overworld, so the canvas takes the touches itself there (the area map keeps the default). */
+#app[data-mode='world'] #view { touch-action: none; }
+.chip.fleet-limit { white-space: nowrap; }
+#ow-stats .chip.fleet-limit b { font-size: 13px; }
+.relay-line { color: var(--ship); }
+.lock-line, .far-line { color: var(--dim); overflow-wrap: anywhere; }
+.guard-targets { overflow-wrap: anywhere; }
+/* Phone landscape (short and wide): the bar was one column taller than the screen, so its chips ran under the buttons. Two columns instead:
+   the chips on the left, the buttons in a column on the right, each taking only its own height. */
+@media (min-aspect-ratio: 1/1) and (max-height: 520px) {
+  #bars { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; width: 196px; overflow-y: auto; }
+  #stats { grid-column: 1; min-width: 0; }
+  #controls { grid-column: 2; grid-template-columns: 44px; gap: 4px; padding: 4px 0 0 2px; justify-content: end; }
+  #controls .ctl { width: 44px; }
+  #b-research { grid-column: auto; width: 44px; font-size: 10px; margin: 0; white-space: normal; }
+}
