@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 6, hypothesis H6: Open frontier, Root removed)
-**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Build/Review. Topbar merged (b96f211). Buffer approved, CI pending on 0e6a8f8. h6-sim + h6-combat-target approved (stacked); h6-bots approved; h6-design-data calibrating; h6-client next (after buffer merges). h6-art merged (e598eed). Topbar approved but branch CI red (boot.spec:129 phone); engineer fixing. Local note: the main checkout had core.autocrlf=true, which rewrote DESIGN.md with CRLF on a merge abort and broke a DESIGN-table test locally only; set core.autocrlf=false in local git config. In flight: h6-sim (core-engineer), h6-art (art-direction), h6-bug-topbar-oscillation (engineer; then resumed for h6-bug-buffer-toast-flicker). Note for h6-client: boot.spec.ts:129 (overworld tap area 3, phone) fails locally on Windows on unmodified main; Linux CI on main is green (b7679bc). Next: h6-client branches from task/h6-sim after both bugs merge, and merges together with h6-sim (a948a53); h6-design-data stacked on h6-bots. Q20 (pillar 3 wording) is Can wait.
+**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Build/Review. Both bug fixes merged (b96f211, 9a37ee2). h6-sim + h6-combat-target approved (stacked); h6-bots approved; h6-design-data approved (9ceae09, v11); h6-client building; it merges task/h6-design-data in and the whole slice lands via merge-task h6-client (fc044d8). h6-art merged (e598eed). Topbar approved but branch CI red (boot.spec:129 phone); engineer fixing. Local note: the main checkout had core.autocrlf=true, which rewrote DESIGN.md with CRLF on a merge abort and broke a DESIGN-table test locally only; set core.autocrlf=false in local git config. In flight: h6-sim (core-engineer), h6-art (art-direction), h6-bug-topbar-oscillation (engineer; then resumed for h6-bug-buffer-toast-flicker). Note for h6-client: boot.spec.ts:129 (overworld tap area 3, phone) fails locally on Windows on unmodified main; Linux CI on main is green (b7679bc). Next: h6-client branches from task/h6-sim after both bugs merge, and merges together with h6-sim (a948a53); h6-design-data stacked on h6-bots. Q20 (pillar 3 wording) is Can wait.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-4 (H5 Fleet cap), commit f9ddf20, live (CI gates and deploy green; site shows f9ddf20 · data v9).
@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 6 ledger
 
-Launches: 7 / 12.
+Launches: 8 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -44,6 +44,11 @@ Launches: 7 / 12.
 | r20 | engineer | h6-bots | resume | Fix round 2 (6f9d01a): no pre-send sim; gate green on v10 |
 | r21 | critic | h6-bots | resume | Review round 3: APPROVE (4ec2c71); flags 2-3 data only |
 | r22 | designer | h6-design-data | resume | Calibrate v11, stacked on task/h6-bots |
+| r23 | critic | h6-bug-topbar-oscillation r3 + buffer r2 | resume | APPROVE both; topbar merged b96f211, buffer merged 9a37ee2 |
+| r24 | critic | h6-design-data | resume | Review round 1: APPROVE (9ceae09); v11, all 7 flags met |
+| 8 | engineer | h6-client | launch | Build (97d5390): gates green, smoke 178/178, design-data merged in |
+| r25 | critic | h6-client | resume | Review round 1: REJECT (flaky reachability test, tapArea retry, loosened/removed tests, combat line hard-coded) |
+| r26 | engineer | h6-client | resume | Fix round 1 |
 | r13 | engineer | h6-bug-topbar-oscillation | resume | Branch CI red on 91dab72: boot.spec:129 phone tap fails reliably on Linux (green on main). Fix cause, merge into buffer branch |
 
 ## Iteration 5 ledger
