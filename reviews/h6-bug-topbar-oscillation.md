@@ -59,3 +59,43 @@ Notes for the Director (not blocking this task):
 This is round 1.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+I reviewed commit 27825f7 against 36f414e and main (f8fabe3), in clean detached worktrees, each build served on its own port. 27825f7 touches only `style.css`, `hud-stability.spec.ts` and `DECISIONS.md`.
+
+**The rework.**
+- All of the H6 chip rules are now scoped to `#chips`, so the overworld stockpile chips are back to main's layout. I checked this in a screenshot: the ore "0" hugs its icon again.
+- Counts are left-aligned inside their reserved room.
+- The icon column is `max-content`, so the spanning rate line can't widen it.
+- In the column layouts (landscape and desktop), the rate sits beside the count, so each chip is one 24 px row.
+
+**Gates:** `npm run gates -- --base main` on 27825f7 passed all six (typecheck, lint, test, determinism, bots, protected-files). `npm run build` passed.
+
+**Smoke:**
+- Full suite on 27825f7: 150/150. The round-1 flake didn't recur this run, and it is filed in BACKLOG in any case.
+- `hud-stability.spec.ts --repeat-each 5`, both projects: 30/30.
+
+**Required changes from round 1:**
+1. **Counts beside their icons: done.** At 375 portrait, landscape 667x375 and desktop, every count sits next to its own icon. The 375 bar now reads "[ice] 56 +5 · [crystal] 7 · [lens] 12 · [plating] 3", with no ambiguity about which count belongs to which icon. The ship row reads the same way.
+2. **Icon-gap assertion: done.** The test measures a `Range` over each `<b>`'s text and requires it to start within 8 px of the icon, in every frame and layout. I ran the round-2 spec against a 36f414e build myself. It fails with "chip-ore: its count starts 32.3 px from its icon" and "chip-crystal … 12.8 px", and passes on 27825f7.
+3. **Landscape no lower than main: done.** The test pins each chip's bottom (relative to `#controls`' top) to main's values in main's shortest state, with no rates showing, which is the stricter baseline. The chips are no lower than on main. The pre-existing overlap with the buttons is filed in BACKLOG (line 656, h6-client).
+4. **DECISIONS entry: done.** It covers the cause, the sizer technique, the per-chip caps and their data sources, the phone trims, the one-row column chips and the untouched overworld.
+
+All acceptance criteria from round 1 still hold:
+- AC1–5: the same walks, frames and layouts, with the two new assertions added.
+- AC6: the test fails on main (round 1), passes `--repeat-each 5` on both projects, and gates pass.
+- I did not check branch CI.
+
+**Code quality.** The CSS is tighter than in round 1: scoped, commented, and with no dead rules left (the overworld `--rate-pad` and the fleet `text-align` override are gone). One smaller issue, not blocking: the main baseline in the test (`MAIN_LANDSCAPE_BOTTOMS`) is a snapshot. When h6-client fixes the landscape overlap, it should replace that snapshot with a no-overlap assertion, not just edit the numbers.
+
+Pillar fit: a client-only layout fix with no sim, data or determinism impact. The top bar holds still and reads as well as on main. I'm comfortable with the owner playing this.
+
+Gates: all six passed locally on 27825f7. Smoke: 150/150.
+
+Required changes:
+- none
+
+This is round 2.
+
+VERDICT: APPROVE
