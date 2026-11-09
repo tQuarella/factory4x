@@ -46,6 +46,15 @@ interface Window {
     saveNow(): boolean;
     /** Does the session's replay (seed + input log) reproduce the live world hash at the current tick? */
     replayMatchesLive(): boolean;
+    /** Shows the in-area HUD from a copy of the world with these counts (tests only; stays until the page reloads). */
+    debugHudFrame(f: {
+      stock: Record<'ore' | 'ice' | 'crystal' | 'lens' | 'plating', number>;
+      ore: number;
+      ice: number;
+      crystal: number;
+      ships: Record<'drone' | 'lancer' | 'flak', number>;
+      cap: number;
+    }): void;
     /** Shows the battle banner and a sample toast (or hides them), to check layout. */
     debugShowNotices(on: boolean): void;
     debugShowResult(): void;
