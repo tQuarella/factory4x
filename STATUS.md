@@ -29,8 +29,9 @@ Launches: 7 / 12.
 | r5 | core-engineer | h6-art | resume | Fix round 3, reassigned per deadlock rule (resumed the h5-sim core-engineer) |
 | r6 | engineer | h6-bug-topbar-oscillation | resume | Fix round 1 after Critic REJECT (counts drift from icons; landscape chips 8 px lower); then merge into the buffer branch |
 | r7 | critic | h6-art | resume | Review round 3: APPROVE (bce9bb7); main merged (728a058), waiting for branch CI |
-| r8 | critic | h6-sim | resume | Review round 1 (h6-sim pushed 1a4c0fe; client tests fail as expected, stacked path a948a53) |
+| r8 | critic | h6-sim | resume | Review round 1: APPROVE (7768a52), merges only together with h6-client. Gate gap: campaign timeouts of winners don't fail the bots gate; added to h6-bots. Don't hand off from a main without h6-bots |
 | 7 | engineer | h6-bots | launch | Build, branched from task/h6-sim |
+| r9 | critic | h6-bug-topbar-oscillation + h6-bug-buffer-toast-flicker | resume | Review rounds 2 and 1 |
 
 ## Iteration 5 ledger
 
