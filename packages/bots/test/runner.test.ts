@@ -3,7 +3,8 @@ import { defaultData } from '@factory4x/sim';
 // The frozen v8 fixture: outcome assertions that depend on tuned numbers run here, so a retune of data/sim.json
 // (h5-design-data) never breaks them. Tests on defaultData below keep only what any calibration must keep.
 import { fixtureV8 as fx } from '../../sim/test/fixture.ts';
-import { CAMPAIGN_CAP_MIN, defaultRunOptions, reclaimVisit, runCampaign, runSeeds } from '../src/runner.ts';
+import { CAMPAIGN_CAP_MIN, defaultRunOptions, reclaimVisit, runCampaign, runSeeds, runTrial } from '../src/runner.ts';
+import { trialSpecs } from '../src/waves.ts';
 import { strategies, type CampaignStrategy } from '../src/strategies.ts';
 
 const VISIT_CAP = 54000;
@@ -42,15 +43,43 @@ describe('campaign runner (shipped data: only what any calibration must keep)', 
   });
 });
 
+describe('trial visits', () => {
+  // A short visit cap keeps these fast; what they check is the premise (the limit the visit gets) and the result shape.
+  const specs = trialSpecs(defaultData, 3);
+
+  it('every trial lands in its area under the limit it expects, and a visit that runs out of time is a timeout, not a reclaim', () => {
+    for (const t of specs.filter((x) => ['veil', 'mire', 'deep', 'rime'].includes(x.area)).filter((x) => x.seed === 1)) {
+      const r = runTrial(t, defaultData, 300);
+      expect(r.area).toBe(t.area);
+      expect(r.limit, `${t.kind} ${t.area}`).toBe(t.limit);
+      expect(r.reclaimed).toBe(false);
+      expect(r.result).toBe('timeout');
+      expect(r.playTicks).toBe(300);
+    }
+  });
+
+  it('plays a forced visit: nothing is withdrawn as closed even where nothing passes the attack test', () => {
+    const veil = specs.find((t) => t.area === 'veil')!;
+    expect(runTrial(veil, defaultData, 300).result).not.toBe('closed');
+  });
+
+  it('reports a reclaim when the heart falls (Landfall, undefended, as a trial)', () => {
+    const easy = { kind: 'relay-drones', area: 'landfall', seed: 1, limit: 12, dronesOnly: true, start: { land: 'landfall' } } as const;
+    const r = runTrial(easy, defaultData, 3000);
+    expect(r.reclaimed).toBe(true);
+    expect(r.result).toBe('reclaimed');
+  });
+});
+
 describe('campaign runner (frozen v8 fixture)', () => {
   it('runs every seed as its own game', () => {
-    const rs = runSeeds(by('greedy'), 2, fx, 3000);
+    const rs = runSeeds(by('cap-off'), 2, fx, 3000);
     expect(rs.map((r) => r.seed)).toEqual([1, 2]);
     expect(rs[0]!.finalHash).not.toBe(rs[1]!.finalHash);
   });
 
-  it('the cap-off reference (greedy, fleet.cap 0) plays the H3 engine to the core and recycles nothing', () => {
-    const r = runCampaign(by('greedy'), 1, fx, fxOpts);
+  it('the cap-off reference (cap-off, fleet.cap 0) plays the H3 engine to the core and recycles nothing', () => {
+    const r = runCampaign(by('cap-off'), 1, fx, fxOpts);
     expect(r.outcome).toBe('won');
     expect(r.shipsRecycled).toBe(0);
     expect(r.research.some((b) => b.item === 'fleet')).toBe(false);
@@ -78,15 +107,17 @@ describe('campaign runner (frozen v8 fixture)', () => {
   });
 
   it('records the capturing wave per heart, and the Root only where the area has one', () => {
-    const start = { reclaimed: ['landfall'], research: { lancer: 1, flak: 1 } };
+    // Premise: no design bought, plenty of ore, no ice or crystal: the goal is the designs and only the light areas pay the missing ice and crystal.
+    const start = { reclaimed: ['landfall'], stockpile: { ore: 5000 } };
     const r = runCampaign(by('composer'), 1, fx, { ...RAISED, start, stopAfterReclaims: 2 });
     expect(r.visits).toHaveLength(2);
     for (const v of r.visits) {
       expect(v.result).toBe('reclaimed');
       expect(v.wave).not.toBeNull();
-      expect(v.rootCutBeforeHeart).toBeNull(); // the two light areas have no Root
+      // The v8 fixture's two light areas have no Root; its medium areas do (a boolean: cut before the heart or not).
+      expect(v.rootCutBeforeHeart === null).toBe(v.area === 'shelf' || v.area === 'shoal');
     }
-    expect(r.visits.map((v) => v.area).sort()).toEqual(['shelf', 'shoal']);
+    expect(r.visits[0]!.area).toBe('shelf');
   });
 
   it('records a closed area and withdraws at once, then plays the cheapest forced when every open area is closed', () => {
@@ -123,9 +154,37 @@ describe('campaign runner (frozen v8 fixture)', () => {
     expect(r.visits.every((v) => v.wave === null || v.wave.lancer + v.wave.flak === 0)).toBe(true);
   });
 
-  it('no-command never buys Command limit', () => {
-    const r = runCampaign(by('no-command'), 1, fx, { ...RAISED, campaignCapTicks: 15 * 60 * fx.tickRate });
+  it('no strategy buys Command limit (H6 removed it)', () => {
+    const r = runCampaign(by('composer'), 1, fx, { ...RAISED, campaignCapTicks: 15 * 60 * fx.tickRate });
     expect(r.research.some((b) => b.item === 'fleet')).toBe(false);
+  });
+
+  it('records the limit each visit played under and the haul a reclaim paid (Landfall: the haul in the data, nominal)', () => {
+    const r = runCampaign(by('composer'), 1, fx, { ...RAISED, stopAfterReclaims: 1 });
+    const v = r.visits[0]!;
+    expect(v.area).toBe('landfall');
+    expect(v.limit).toBe(60);
+    expect(v.haulPaid).toEqual(fx.map.areas.find((a) => a.id === 'landfall')!.haul);
+    const off = runCampaign(by('cap-off'), 1, fx, { ...fxOpts, stopAfterReclaims: 1 });
+    expect(off.visits[0]!.limit).toBeNull();
+  });
+
+  it('stopAfterVisits ends the run after that many visits, reclaimed or withdrawn', () => {
+    const r = runCampaign(by('composer'), 1, fx, { ...fxOpts, visitCapTicks: 1, stopAfterVisits: 1 });
+    expect(r.visits).toHaveLength(1);
+    expect(r.visits[0]!.result).toBe('withdrawn');
+    expect(r.outcome).toBe('timeout');
+  });
+
+  it('forceFirstVisit plays a visit the engine would withdraw as closed, up to the visit cap', () => {
+    // Premise: a limit of 2 closes Frost Shelf (nothing passes the attack test), and Landfall is already reclaimed.
+    const start = { reclaimed: ['landfall'], land: 'shelf' };
+    const closed = runCampaign(by('composer'), 1, fx, { ...fxOpts, fleetCap: 2, start, visitCapTicks: 900, stopAfterVisits: 1 });
+    expect(closed.visits[0]!.closed).toBe(true);
+    const forced = runCampaign(by('composer'), 1, fx, { ...fxOpts, fleetCap: 2, start, visitCapTicks: 900, stopAfterVisits: 1, forceFirstVisit: true });
+    expect(forced.visits[0]!.closed).toBe(false);
+    expect(forced.visits[0]!.forced).toBe(true);
+    expect(forced.visits[0]!.playTicks).toBe(900);
   });
 
   it('withdraws a visit past the cap, then reports a softlock on a second timeout in the same area', () => {
@@ -150,13 +209,13 @@ describe('campaign runner (frozen v8 fixture)', () => {
   });
 
   it('reports a softlock when the overworld has nothing to buy and nothing open', () => {
-    const dead: CampaignStrategy = { name: 'dead', description: '', kit: 'none', route: [] };
+    const dead: CampaignStrategy = { name: 'dead', description: '', kit: 'none' };
     const r = runCampaign(dead, 1, fx, { ...fxOpts, start: { reclaimed: ['landfall', 'shelf', 'shoal', 'veil', 'garden', 'deep'] } });
     expect(r.outcome).toBe('softlock');
   });
 
   it('turns a crash into outcome crash', () => {
-    const boom = { name: 'boom', description: '', kit: 'none', get route(): string[] { throw new Error('kaboom'); } } as CampaignStrategy;
+    const boom = { name: 'boom', description: '', kit: 'none', get side(): never { throw new Error('kaboom'); } } as CampaignStrategy;
     const r = runCampaign(boom, 1, fx, fxOpts);
     expect(r.outcome).toBe('crash');
     expect(r.error).toContain('kaboom');

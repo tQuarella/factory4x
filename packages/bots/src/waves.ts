@@ -178,7 +178,7 @@ export function probeHeart(seed: number, data: SimData, areaId: string, starved:
   const row: HeartProbe = {
     area: areaId,
     tier: def.tier,
-    relay: def.relay,
+    relay: def.relay === true,
     state: starved ? 'starved' : 'fed',
     layout: areaId === 'deep' ? w.system.name : null,
     seed,

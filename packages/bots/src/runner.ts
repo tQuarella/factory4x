@@ -5,6 +5,7 @@ import {
   campaignWorld,
   createWorld,
   isWon,
+  fleetCap,
   heartIndex,
   rootIndex,
   runSummary,
@@ -19,7 +20,7 @@ import {
   type World,
 } from '@factory4x/sim';
 import { decideArea, decideComposer, decideOverworld, closedKey, WINNING_STRATEGIES, type CampaignStrategy } from './strategies.ts';
-import { closedAt, fitsAt, singleClosedAt, singleFitsAt, type HeartProbe, type ProbeLimits } from './waves.ts';
+import { closedAt, fitsAt, type HeartProbe, type ProbeLimits, type Trial, type TrialKind } from './waves.ts';
 
 /** won = the probe core was bought; timeout = the campaign cap ran out; softlock = nothing left to do or a second visit timeout. */
 export type Outcome = 'won' | 'timeout' | 'softlock' | 'crash';
@@ -48,6 +49,9 @@ export interface Visit {
   shipsRecycled: number;
   /** The Root was cut before the heart fell (reclaimed visits): null when the area has no Root. */
   rootCutBeforeHeart: boolean | null;
+  /** The fleet limit the visit played under (null: off), and, for a reclaimed visit, the haul the reclaim paid (decayed for a repeat). */
+  limit: number | null;
+  haulPaid: ResourceTriple | null;
   /** The ships that fought the capturing battle at the heart, by type (reclaimed visits), else null. */
   wave: ShipTypeCounts | null;
 }
@@ -100,6 +104,10 @@ export interface RunOptions {
   campaignCapTicks: number;
   /** Stop (outcome 'won' is not set; the caller reads the visits) after this many reclaims in this run. */
   stopAfterReclaims?: number;
+  /** Stop after this many visits have ended, reclaimed or not (the trial visits). */
+  stopAfterVisits?: number;
+  /** Play the first visit even when nothing passes the attack test (the trial visits are never withdrawn as closed). */
+  forceFirstVisit?: boolean;
   /** Set `fleet.cap` to this with a setTunable on the first step, overriding the strategy's own (undefined: the strategy's, else the data's default). */
   fleetCap?: number;
 }
@@ -138,8 +146,8 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
   const research: ResearchBuy[] = [];
   const timeouts = new Map<number, number>();
   const closedRecords = new Map<number, string>();
-  let visit: { area: number; startTick: number; openingTicks: number | null; forced: boolean } | null = null;
-  let nextForced = false;
+  let visit: { area: number; startTick: number; openingTicks: number | null; forced: boolean; limit: number | null } | null = null;
+  let nextForced = opts.forceFirstVisit === true;
   let loggedResearch = camp.researchLog.length;
   let reclaims = 0;
   let outcome: Outcome = 'timeout';
@@ -162,6 +170,8 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
       shipsBuilt: s.shipsBuilt,
       shipsLost: s.shipsLost,
       shipsRecycled: s.shipsRecycled,
+      limit: visit.limit,
+      haulPaid: result === 'reclaimed' && rec.haulPaid !== null ? { ...rec.haulPaid } : null,
       rootCutBeforeHeart: result === 'reclaimed' && rootIndex(world) >= 0 ? s.rootCutTick !== null : null,
       wave: result === 'reclaimed' && world.lastBattle !== null && world.lastBattle.node === heartIndex(world) ? { ...world.lastBattle.engagedByType } : null,
     });
@@ -176,11 +186,12 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
         break;
       }
       if (opts.stopAfterReclaims !== undefined && reclaims >= opts.stopAfterReclaims) break;
+      if (opts.stopAfterVisits !== undefined && visits.length >= opts.stopAfterVisits) break;
       if (playTicksNow(world) >= opts.campaignCapTicks) break;
       let inputs: Input[];
       const inArea = camp.active !== null;
       if (inArea) {
-        if (visit === null) visit = { area: camp.active!, startTick: camp.areaStartTick, openingTicks: null, forced: nextForced };
+        if (visit === null) visit = { area: camp.active!, startTick: camp.areaStartTick, openingTicks: null, forced: nextForced, limit: fleetCap(world, data) };
         if (world.capturedTick !== null) {
           finishVisit('reclaimed');
           inputs = [{ type: 'leaveArea' }];
@@ -292,23 +303,21 @@ export function reclaimVisit(r: Pick<CampaignResult, 'visits'>, area: string): V
 }
 
 /** One flag line: `pass` is a report marker, never a gate. */
-export interface H5Flag {
+export interface H6Flag {
   name: string;
   pass: boolean;
   detail: string;
 }
 
-/** What the flags need besides the runs and the probe: tick rate, the tier of each area id, the probe's limits. */
+/** What the flags need besides the runs, the probe and the trials: tick rate, the tier and relay marks of each area id, the probe's limits. */
 export interface FlagContext {
   tickRate: number;
   tiers: Readonly<Record<string, number>>;
+  /** Area ids of the command relays. */
+  relays: readonly string[];
   limits: ProbeLimits;
   seeds: number;
 }
-
-/** The strategies flag 1 covers (the ones meant to win). */
-const WINNERS = WINNING_STRATEGIES;
-const GAP_PP = 30;
 
 /** Lancer share of a probe row's best mix, in whole percent (integer), or null without a mix. */
 export function lancerSharePct(row: Pick<HeartProbe, 'mix' | 'mixFleet'>): number | null {
@@ -316,29 +325,111 @@ export function lancerSharePct(row: Pick<HeartProbe, 'mix' | 'mixFleet'>): numbe
   return Math.floor((row.mixFleet.lancer * 100) / row.mix);
 }
 
+/** The strategies flag 1 covers (the ones meant to win). */
+const WINNERS = WINNING_STRATEGIES;
+/** A counter type counts toward the mix when it is at least this share of the capturing wave (flag 4). */
+export const MIX_SHARE_PCT = 30;
+/** The capturing wave must be at least L minus this many ships (flag 5). */
+export const WAVE_SLACK = 6;
+
+const total = (w: Readonly<ShipTypeCounts>): number => w.drone + w.lancer + w.flak;
+
+/** Both counter types make up at least MIX_SHARE_PCT of the wave (integer test: n × 100 ≥ share × total). */
+export function isMixedWave(w: Readonly<ShipTypeCounts>): boolean {
+  const t = total(w);
+  return t > 0 && w.lancer * 100 >= MIX_SHARE_PCT * t && w.flak * 100 >= MIX_SHARE_PCT * t;
+}
+
+/** One trial visit and what it did. */
+export interface TrialResult {
+  kind: TrialKind;
+  area: string;
+  seed: number;
+  /** The limit the visit played under (from the world), and the limit the trial expects. */
+  limit: number | null;
+  expectedLimit: number;
+  reclaimed: boolean;
+  /** 'reclaimed', 'timeout' (the visit cap) or 'closed' (nothing passed the attack test: not reached as trials are forced). */
+  result: 'reclaimed' | 'timeout' | 'closed' | 'none';
+  playTicks: number;
+}
+
+/** Play one trial: the composer engine for a forced visit up to `visitCapTicks`, landed from campaignWorld. */
+export function runTrial(trial: Trial, data: SimData, visitCapTicks: number): TrialResult {
+  const strategy: CampaignStrategy = { name: `trial-${trial.kind}`, description: '', kit: 'none', dronesOnly: trial.dronesOnly };
+  const r = runCampaign(strategy, trial.seed, data, {
+    start: trial.start,
+    visitCapTicks,
+    campaignCapTicks: visitCapTicks * 2,
+    stopAfterVisits: 1,
+    forceFirstVisit: true,
+  });
+  if (r.error !== undefined) throw new Error(`trial ${trial.kind} ${trial.area}: ${r.error}`);
+  const v = r.visits[0];
+  return {
+    kind: trial.kind,
+    area: trial.area,
+    seed: trial.seed,
+    limit: v?.limit ?? null,
+    expectedLimit: trial.limit,
+    reclaimed: v?.result === 'reclaimed',
+    result: v === undefined ? 'none' : v.result === 'reclaimed' ? 'reclaimed' : v.closed ? 'closed' : 'timeout',
+    playTicks: v?.playTicks ?? 0,
+  };
+}
+
 /**
- * The seven H5 flags (DESIGN.md H5 "Bots: strategies and the probe") as report lines. Each measures what can or
- * can't be done at a limit, never a time gap. `probe` is the minimum-wave probe (null if not run).
+ * The bot gate's failures from the runs (DESIGN.md H6, plus the Director's h6-sim review addition): a crash of any
+ * strategy, a tick p95 over budget, and, for a strategy expected to win, a softlock or a campaign timeout (the 120
+ * minute cap ran out without the core). Missing a flag is never a failure.
  */
-export function computeH5Flags(
+export function gateFailures(results: readonly CampaignResult[], names: readonly string[], tickBudgetMsP95: number, tickRate: number): string[] {
+  const out: string[] = [];
+  const mins = (ticks: number): string => `${(ticks / tickRate / 60).toFixed(1)} min`;
+  for (const name of names) {
+    const rs = results.filter((r) => r.strategy === name);
+    for (const r of rs) {
+      if (r.outcome === 'crash') out.push(`${name} seed ${r.seed}: crash (${(r.error ?? '').split('\n')[0]})`);
+      if (WINNERS.includes(name) && r.outcome === 'softlock') out.push(`${name} seed ${r.seed}: softlock (a second visit timeout or nothing to do, at ${mins(r.playTicks)} of play)`);
+      if (WINNERS.includes(name) && r.outcome === 'timeout') out.push(`${name} seed ${r.seed}: campaign timeout (no core after ${mins(r.playTicks)} of play, the ${CAMPAIGN_CAP_MIN} minute cap)`);
+    }
+    const p95 = rs.length === 0 ? 0 : Math.max(...rs.map((r) => r.tickMsP95));
+    if (p95 > tickBudgetMsP95) out.push(`${name}: tick p95 ${p95.toFixed(3)}ms exceeds budget ${tickBudgetMsP95}ms`);
+  }
+  return out;
+}
+
+/**
+ * The seven H6 flags (DESIGN.md H6 "Bots (H6)") as report lines. Each measures what can or can't be done, never a
+ * time gap. `probe` is the minimum-wave probe and `trials` the trial visits (null if not run).
+ */
+export function computeH6Flags(
   results: readonly CampaignResult[],
   probe: readonly HeartProbe[] | null,
+  trials: readonly TrialResult[] | null,
   ctx: FlagContext,
   determinismOk: boolean,
   determinismDetail = '',
-): H5Flag[] {
-  const { limits: L, tiers, tickRate: tr } = ctx;
-  const seedList = Array.from({ length: ctx.seeds }, (_, i) => i + 1);
-  const flags: H5Flag[] = [];
+): H6Flag[] {
+  const { limits: L, tickRate: tr } = ctx;
+  const flags: H6Flag[] = [];
   const NO_PROBE = 'probe not run';
-  const rowsOf = (tier: number, state: 'fed' | 'starved'): HeartProbe[] => (probe ?? []).filter((r) => r.tier === tier && r.state === state);
-  const label = (r: HeartProbe): string => `${r.area}${r.layout !== null ? `/${r.layout}` : ''} ${r.state}`;
+  const rowsOf = (tier: number): HeartProbe[] => (probe ?? []).filter((r) => r.tier === tier && r.state === 'fed');
+  const label = (r: HeartProbe): string => `${r.area}${r.layout !== null ? `/${r.layout}` : ''}`;
   const n = (v: number | null): string => (v === null ? '>80' : String(v));
-  /** Pass if `rows` is non-empty and every row satisfies `ok`; the detail lists each. */
   const every = (rows: HeartProbe[], ok: (r: HeartProbe) => boolean, show: (r: HeartProbe) => string): { pass: boolean; detail: string } => ({
     pass: rows.length > 0 && rows.every(ok),
     detail: rows.length === 0 ? 'no rows' : rows.map((r) => `${label(r)} ${show(r)} ${ok(r) ? 'ok' : 'MISS'}`).join('; '),
   });
+  const winners = results.filter((r) => WINNERS.includes(r.strategy) && r.outcome === 'won');
+  const NO_WINNERS = 'no winning runs';
+  /** Pass if there are winners and every one satisfies `ok`; the detail lists each. */
+  const perWinner = (ok: (r: CampaignResult) => boolean, show: (r: CampaignResult) => string): { pass: boolean; detail: string } => ({
+    pass: winners.length > 0 && winners.every(ok),
+    detail: winners.length === 0 ? NO_WINNERS : winners.map((r) => `${r.strategy}/${r.seed} ${show(r)} ${ok(r) ? 'ok' : 'MISS'}`).join('; '),
+  });
+  const waveText = (v: Visit): string => (v.wave === null ? 'no wave' : `${v.wave.drone}d/${v.wave.lancer}l/${v.wave.flak}f`);
+  const reclaimed = (r: CampaignResult): Visit[] => r.visits.filter((v) => v.result === 'reclaimed');
 
   // 1. No softlock.
   {
@@ -351,74 +442,69 @@ export function computeH5Flags(
     });
   }
 
-  // 2. Drones don't fit.
+  // 2. A relay opens a band.
   {
-    const name = "Drones don't fit: every tier 2 and tier 3 heart is closed to drones alone at the tier's limit (starved: tier 2 at L1, tier 3 at L2), and drones-only reclaims no tier 2 or tier 3 area on any seed";
-    const t2 = every(rowsOf(2, 'starved'), (r) => singleClosedAt(r.drones, L.l1), (r) => `drones ${n(r.drones)} vs L1 ${L.l1}`);
-    const t3 = every(rowsOf(3, 'starved'), (r) => singleClosedAt(r.drones, L.l2), (r) => `drones ${n(r.drones)} vs L2 ${L.l2}`);
-    const dr = results.filter((r) => r.strategy === 'drones-only');
-    const heavy = dr.flatMap((r) => r.reclaimOrder.filter((id) => (tiers[id] ?? 0) >= 2).map((id) => `${r.seed}:${id}`));
-    const probeOk = probe !== null && t2.pass && t3.pass;
+    const band2 = every(rowsOf(2), (r) => closedAt(r.mix, L.l0) && fitsAt(r.mix, L.l1), (r) => `mix ${n(r.mix)} vs L0 ${L.l0} / L1-2 ${L.l1 - 2}`);
+    const deep = every(rowsOf(3), (r) => closedAt(r.mix, L.l1) && fitsAt(r.mix, L.l2), (r) => `mix ${n(r.mix)} vs L1 ${L.l1} / L2-2 ${L.l2 - 2}`);
     flags.push({
-      name,
-      pass: probeOk && dr.length === ctx.seeds && heavy.length === 0,
-      detail: `${probe === null ? NO_PROBE : `${t2.detail}; ${t3.detail}`}; drones-only: ${dr.length === 0 ? 'no runs' : heavy.length === 0 ? `no tier 2/3 area reclaimed (reclaimed: ${dr.map((r) => `seed ${r.seed} ${r.reclaimOrder.join('>') || '-'}`).join(', ')})` : `reclaimed ${heavy.join(', ')}`}`,
+      name: 'A relay opens a band: every band 2 heart is closed at L0 and every Deep layout is closed at L1 with any local mix, and each fits at the next limit',
+      pass: probe !== null && band2.pass && deep.pass,
+      detail: probe === null ? NO_PROBE : `${band2.detail}; ${deep.detail}`,
     });
   }
 
-  // 3. The best local mix fits.
+  // 3. The lock is real.
   {
-    const name = 'The best local mix fits: tier 1 at L0 with drones, tier 2 starved at L0 and fed at L1, tier 3 starved at L1 and fed at L2';
-    const parts = [
-      every(rowsOf(1, 'fed'), (r) => singleFitsAt(r.drones, L.l0), (r) => `drones ${n(r.drones)} vs L0-2 ${L.l0 - 2}`),
-      every(rowsOf(2, 'starved'), (r) => fitsAt(r.mix, L.l0), (r) => `mix ${n(r.mix)} vs L0-2 ${L.l0 - 2}`),
-      every(rowsOf(2, 'fed'), (r) => fitsAt(r.mix, L.l1), (r) => `mix ${n(r.mix)} vs L1-2 ${L.l1 - 2}`),
-      every(rowsOf(3, 'starved'), (r) => fitsAt(r.mix, L.l1), (r) => `mix ${n(r.mix)} vs L1-2 ${L.l1 - 2}`),
-      every(rowsOf(3, 'fed'), (r) => fitsAt(r.mix, L.l2), (r) => `mix ${n(r.mix)} vs L2-2 ${L.l2 - 2}`),
-    ];
-    flags.push({ name, pass: probe !== null && parts.every((p) => p.pass), detail: probe === null ? NO_PROBE : parts.map((p) => p.detail).join('; ') });
+    const kinds: TrialKind[] = ['band2-l0', 'deep-l1', 'relay-drones'];
+    const done = trials ?? [];
+    const held = done.filter((t) => !t.reclaimed);
+    const missingKinds = kinds.filter((k) => !done.some((t) => t.kind === k));
+    flags.push({
+      name: 'The lock is real: no trial visit reclaims its area (band 2 at L0, The Deep at L1, band 1 relays with drones only, a full composer visit each)',
+      pass: trials !== null && missingKinds.length === 0 && held.length === done.length,
+      detail:
+        trials === null
+          ? 'trials not run'
+          : `${done.map((t) => `${t.kind} ${t.area}${t.kind === 'deep-l1' ? `/seed ${t.seed}` : ''} ${t.reclaimed ? `RECLAIMED at ${tickMmss(t.playTicks, tr)}` : t.result} (limit ${t.limit ?? 'off'})`).join('; ')}${missingKinds.length > 0 ? `; no trials of kind ${missingKinds.join(', ')}` : ''}`,
+    });
   }
 
-  // 4. Both counters needed.
+  // 4. The mix is used.
   {
-    const name = "Both counters needed: no single type fits either medium's fed heart at L1, and the best mix does";
-    const p = every(
-      rowsOf(2, 'fed'),
-      (r) => ![r.drones, r.lancers, r.flak].some((v) => singleFitsAt(v, L.l1)) && fitsAt(r.mix, L.l1),
-      (r) => `d/l/f ${n(r.drones)}/${n(r.lancers)}/${n(r.flak)}, mix ${n(r.mix)}, fit means <= ${L.l1 - 2}`,
+    const p = perWinner(
+      (r) => reclaimed(r).some((v) => (ctx.tiers[v.area] ?? 0) >= 2 && v.wave !== null && isMixedWave(v.wave)),
+      (r) => `band 2+ waves ${reclaimed(r).filter((v) => (ctx.tiers[v.area] ?? 0) >= 2).map((v) => `${v.area} ${waveText(v)}`).join(', ') || 'none'}`,
     );
-    flags.push({ name, pass: probe !== null && p.pass, detail: probe === null ? NO_PROBE : p.detail });
+    flags.push({ name: `The mix is used: every winning run captures a band 2 or higher heart with a wave in which lancers and flak are each at least ${MIX_SHARE_PCT}% of the ships`, pass: p.pass, detail: p.detail });
   }
 
-  // 5. A raise opens an area.
+  // 5. The new limit is used.
   {
-    const name = "A raise opens an area: every medium's fed heart is closed at L0, every Deep layout's fed heart is closed at L1 and fits at L2, and no-command does not buy the core on any seed";
-    const med = every(rowsOf(2, 'fed'), (r) => closedAt(r.mix, L.l0), (r) => `mix ${n(r.mix)} vs L0 ${L.l0}`);
-    const deep = every(rowsOf(3, 'fed'), (r) => closedAt(r.mix, L.l1) && fitsAt(r.mix, L.l2), (r) => `mix ${n(r.mix)} vs L1 ${L.l1} / L2-2 ${L.l2 - 2}`);
-    const nc = results.filter((r) => r.strategy === 'no-command');
-    const bought = nc.filter((r) => r.research.some((b) => b.item === 'core'));
-    flags.push({
-      name,
-      pass: probe !== null && med.pass && deep.pass && nc.length === ctx.seeds && bought.length === 0,
-      detail: `${probe === null ? NO_PROBE : `${med.detail}; ${deep.detail}`}; no-command: ${nc.length === 0 ? 'no runs' : nc.map((r) => `seed ${r.seed} ${r.outcome}, reclaimed ${r.reclaimOrder.join('>') || '-'}${r.research.some((b) => b.item === 'core') ? ' (bought the core)' : ''}`).join(', ')}`,
-    });
+    const isRelay2 = (id: string): boolean => ctx.relays.includes(id) && ctx.tiers[id] === 2;
+    const checked = (r: CampaignResult): Visit[] => reclaimed(r).filter((v) => isRelay2(v.area) || ctx.tiers[v.area] === 3);
+    const full = (v: Visit): boolean => v.wave !== null && v.limit !== null && total(v.wave) >= v.limit - WAVE_SLACK;
+    const p = perWinner(
+      (r) => checked(r).length > 0 && checked(r).every(full),
+      (r) => checked(r).map((v) => `${v.area} ${v.wave === null ? 0 : total(v.wave)} ships vs limit ${v.limit ?? 'off'}`).join(', ') || 'no band 2 relay or Deep capture',
+    );
+    flags.push({ name: `The new limit is used: in every winning run the capturing wave at the band 2 relay it took and at The Deep has at least L - ${WAVE_SLACK} ships`, pass: p.pass, detail: p.detail });
   }
 
-  // 6. Composition varies.
+  // 6. The set is a choice.
   {
-    const name = `Composition varies: on every seed, the lancer share of the best mix differs by at least ${GAP_PP} percentage points between at least two tier 2 or 3 hearts (fed or starved)`;
+    const left = perWinner((r) => r.skipped.length > 0, (r) => `untaken ${r.skipped.length}: ${r.skipped.join(', ')}`);
     const parts: string[] = [];
-    let all = probe !== null && ctx.seeds > 0;
-    for (const s of seedList) {
-      const rows = (probe ?? []).filter((r) => r.tier >= 2 && (r.tier === 2 || r.seed === s));
-      const shares = rows.map((r) => ({ r, pct: lancerSharePct(r) })).filter((x): x is { r: HeartProbe; pct: number } => x.pct !== null);
-      const lo = shares.reduce<(typeof shares)[number] | null>((b, x) => (b === null || x.pct < b.pct ? x : b), null);
-      const hi = shares.reduce<(typeof shares)[number] | null>((b, x) => (b === null || x.pct > b.pct ? x : b), null);
-      const gap = lo && hi ? hi.pct - lo.pct : null;
-      if (gap === null || gap < GAP_PP) all = false;
-      parts.push(`seed ${s}: ${gap === null ? 'no mixes' : `${lo!.pct}% ${label(lo!.r)} to ${hi!.pct}% ${label(hi!.r)}, gap ${gap} pp`}`);
+    let differ = ctx.seeds > 0;
+    for (let seed = 1; seed <= ctx.seeds; seed++) {
+      const sets = new Set(winners.filter((r) => r.seed === seed).map((r) => [...r.reclaimOrder].sort().join(',')));
+      if (sets.size < 2) differ = false;
+      parts.push(`seed ${seed}: ${winners.filter((r) => r.seed === seed).length} winners, ${sets.size} distinct sets`);
     }
-    flags.push({ name, pass: all, detail: probe === null ? NO_PROBE : parts.join('; ') });
+    flags.push({
+      name: 'The set is a choice: every winning run leaves at least one area untaken, and on each seed at least two winners end with different sets of reclaimed areas',
+      pass: left.pass && differ,
+      detail: `${left.detail}; ${parts.join('; ')}`,
+    });
   }
 
   flags.push({ name: 'Determinism and the reference replay pass', pass: determinismOk, detail: determinismDetail });

@@ -33,7 +33,6 @@ import {
   decideOverworld,
   fleetPower,
   guardNeed,
-  kitEntries,
   nextEconomyOrder,
   nextPurchase,
   nextTarget,
@@ -381,10 +380,11 @@ describe('research policy', () => {
   };
   const NO_DEEP = ['landfall', 'shelf', 'shoal', 'veil', 'garden'];
 
-  it('lists the spec order: core, designs, Command limit 1, opening 1, extract 1, Command limit 2, rigs 1, yards 1, Command limit 3, then the rest', () => {
+  it('lists the H4 order without Command limit: core, designs, opening 1, extract 1, rigs 1, yards 1, then the rest', () => {
     expect(RESEARCH_POLICY.map(([i, l]) => `${i}${l}`)).toEqual([
-      'core1', 'lancer1', 'flak1', 'fleet1', 'opening1', 'extract1', 'fleet2', 'rigs1', 'yards1', 'fleet3', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3',
+      'core1', 'lancer1', 'flak1', 'opening1', 'extract1', 'rigs1', 'yards1', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3',
     ]);
+    expect(RESEARCH_POLICY.some(([i]) => i === 'fleet')).toBe(false);
   });
 
   it('never buys Command limit: H6 removed it from the sim and the data (h6-sim), so its policy entries find no row', () => {
@@ -413,10 +413,7 @@ describe('research policy', () => {
     expect(nextPurchase(w, data, 'full')).toBeNull();
   });
 
-  it('no-command is the policy without Command limit; grind buys only the four grind items, never a design, the core or Command limit', () => {
-    expect(kitEntries('no-command').some(([i]) => i === 'fleet')).toBe(false);
-    expect(kitEntries('no-command')).toHaveLength(RESEARCH_POLICY.length - 3);
-    expect(buy(rich({}, NO_DEEP), 'no-command')).toEqual(['lancer1', 'flak1', 'opening1', 'extract1', 'rigs1', 'yards1', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3']);
+  it('grind buys only the four grind items, never a design or the core', () => {
     const all = [...NO_DEEP, 'deep'];
     expect(buy(rich({}, all), 'grind')).toEqual(['opening1', 'extract1', 'rigs1', 'yards1', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3']);
     expect(nextPurchase(rich(DESIGNS, all), data, 'grind')).toBe('opening');
@@ -442,15 +439,11 @@ describe('area choice', () => {
     expect(openAreas(reclaimed('landfall'), data)).toEqual([area('shelf'), area('shoal')]);
   });
 
-  it('ice-first goes Landfall, Frost Shelf, then the greedy choice; crystal-first goes Landfall, Glass Shoal', () => {
-    const ice = by('ice-first');
-    expect(chosen(createWorld(1, data), ice)).toEqual({ area: area('landfall'), forced: false });
-    expect(chosen(reclaimed('landfall'), ice)!.area).toBe(area('shelf'));
-    const after = reclaimed('landfall', 'shelf');
-    expect(chosen(after, ice)!.area).toBe(cheapestOpenArea(after, data));
-    const crystal = by('crystal-first');
-    expect(chosen(reclaimed('landfall'), crystal)!.area).toBe(area('shoal'));
-    expect(chosen(reclaimed('landfall', 'shoal'), crystal)!.area).toBe(cheapestOpenArea(reclaimed('landfall', 'shoal'), data));
+  it('ice-first prefers the ice side among the areas that advance the goal, crystal-first the crystal side', () => {
+    // Premise: nothing in stock and no design bought, so the goal is the designs and both light areas add what is missing.
+    expect(chosen(createWorld(1, data), by('ice-first'))).toEqual({ area: area('landfall'), forced: false });
+    expect(chosen(reclaimed('landfall'), by('ice-first'))!.area).toBe(area('shelf'));
+    expect(chosen(reclaimed('landfall'), by('crystal-first'))!.area).toBe(area('shoal'));
   });
 
   it('greedy takes the lowest estimate: need / best power, lowest index on ties', () => {
@@ -480,7 +473,7 @@ describe('area choice', () => {
     const second = first === area('shelf') ? area('shoal') : area('shelf');
     const closed = new Map([[first, closedKey(w, data)]]);
     expect(chosen(w, by('composer'), closed)).toEqual({ area: second, forced: false });
-    // A route entry that is closed is skipped too.
+    // A preferred side that is closed is skipped too.
     const ice = new Map([[area('shelf'), closedKey(w, data)]]);
     expect(chosen(w, by('ice-first'), ice)).toEqual({ area: area('shoal'), forced: false });
   });
@@ -524,14 +517,13 @@ describe('area choice', () => {
 });
 
 describe('strategies', () => {
-  it('are the five H5 strategies and the cap-off reference', () => {
-    expect(strategies.map((s) => [s.name, s.kit, s.engine ?? 'composer', s.dronesOnly ?? false, s.fleetCap ?? null])).toEqual([
-      ['composer', 'full', 'composer', false, null],
-      ['ice-first', 'full', 'composer', false, null],
-      ['crystal-first', 'full', 'composer', false, null],
-      ['no-command', 'no-command', 'composer', false, null],
-      ['drones-only', 'grind', 'composer', true, null],
-      ['greedy', 'full', 'h3', false, 0],
+  it('are the four H6 strategies and the cap-off reference', () => {
+    expect(strategies.map((s) => [s.name, s.kit, s.side ?? null, s.engine ?? 'composer', s.dronesOnly ?? false, s.fleetCap ?? null])).toEqual([
+      ['composer', 'full', null, 'composer', false, null],
+      ['ice-first', 'full', 'ice', 'composer', false, null],
+      ['crystal-first', 'full', 'crystal', 'composer', false, null],
+      ['drones-only', 'grind', null, 'composer', true, null],
+      ['cap-off', 'full', null, 'h3', false, 0],
     ]);
     expect(WINNING_STRATEGIES).toEqual(['composer', 'ice-first', 'crystal-first']);
   });
