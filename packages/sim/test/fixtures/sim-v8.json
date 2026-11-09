@@ -56,12 +56,14 @@
     "component.stockCap": { "default": 5, "min": 1, "max": 50 },
     "fleet.cap": { "default": 12, "min": 0, "max": 60 },
     "fleet.recycleRefundPct": { "default": 50, "min": 0, "max": 100 },
+    "fleet.relayStep": { "default": 8, "min": 4, "max": 12 },
     "research.opening.step": { "default": 40, "min": 10, "max": 150 },
     "research.extract.stepPct": { "default": 25, "min": 10, "max": 50 },
     "research.yards.stepPct": { "default": 20, "min": 10, "max": 40 },
-    "research.fleet.step": { "default": 6, "min": 2, "max": 12 },
     "research.costPct": { "default": 100, "min": 25, "max": 100 },
     "shipments.pct": { "default": 100, "min": 0, "max": 300 },
+    "areas.repeatHaulPct": { "default": 50, "min": 0, "max": 100 },
+    "overworld.bandLock": { "default": 0, "min": 0, "max": 1 },
     "system.variant": { "default": 0, "min": 0, "max": 3 },
     "stats.throughputWindowSec": { "default": 60, "min": 60, "max": 60 },
     "client.autosaveSec": { "default": 5, "min": 2, "max": 60 }
@@ -124,12 +126,12 @@
       }
     ],
     "areas": [
-      { "id": "landfall", "name": "Landfall", "tier": 0, "x": 500, "y": 1150, "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "heart"], "haul": { "ore": 100, "ice": 0, "crystal": 0 }, "export": { "ore": 4, "ice": 0, "crystal": 0 }, "layout": { "pockets": {}, "heart": { "thorns": 0, "spores": 0 } } },
-      { "id": "shelf", "name": "Frost Shelf", "tier": 1, "x": 220, "y": 870, "nodes": ["probe", "a1", "a2", "a3", "a5", "p1", "heart"], "haul": { "ore": 130, "ice": 80, "crystal": 0 }, "export": { "ore": 3, "ice": 2, "crystal": 0 }, "layout": { "pockets": { "p1": { "prize": "ice", "slots": 2, "thorns": 0, "spores": 4 } }, "heart": { "thorns": 2, "spores": 12 } } },
-      { "id": "shoal", "name": "Glass Shoal", "tier": 1, "x": 780, "y": 870, "nodes": ["probe", "a1", "a2", "a4", "a5", "p1", "heart"], "haul": { "ore": 130, "ice": 0, "crystal": 80 }, "export": { "ore": 3, "ice": 0, "crystal": 2 }, "layout": { "pockets": { "p1": { "prize": "crystal", "slots": 2, "thorns": 0, "spores": 4 } }, "heart": { "thorns": 6, "spores": 4 } } },
-      { "id": "veil", "name": "Spore Veil", "tier": 2, "x": 220, "y": 520, "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "p1", "p2", "root", "heart"], "haul": { "ore": 420, "ice": 90, "crystal": 70 }, "export": { "ore": 5, "ice": 3, "crystal": 0 }, "layout": { "pockets": { "p1": { "prize": "ice", "slots": 2, "thorns": 2, "spores": 6 }, "p2": { "prize": "crystal", "slots": 2, "thorns": 2, "spores": 6 } }, "root": { "thorns": 0, "spores": 16 }, "heart": { "thorns": 1, "spores": 50, "starvedThorns": 0, "starvedSpores": 25 } } },
-      { "id": "garden", "name": "Thorn Garden", "tier": 2, "x": 780, "y": 520, "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "p1", "p2", "root", "heart"], "haul": { "ore": 420, "ice": 70, "crystal": 90 }, "export": { "ore": 5, "ice": 0, "crystal": 3 }, "layout": { "pockets": { "p1": { "prize": "crystal", "slots": 2, "thorns": 1, "spores": 12 }, "p2": { "prize": "ice", "slots": 2, "thorns": 4, "spores": 3 } }, "root": { "thorns": 9, "spores": 0 }, "heart": { "thorns": 24, "spores": 13, "starvedThorns": 11, "starvedSpores": 5 } } },
-      { "id": "deep", "name": "The Deep", "tier": 3, "x": 500, "y": 200, "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "p1", "p2", "p3", "p4", "root", "heart"], "haul": { "ore": 920, "ice": 100, "crystal": 100 }, "export": { "ore": 8, "ice": 3, "crystal": 3 }, "layout": "seed" }
+      { "id": "landfall", "name": "Landfall", "tier": 0, "side": "none", "relay": false, "x": 500, "y": 1150, "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "heart"], "haul": { "ore": 100, "ice": 0, "crystal": 0 }, "export": { "ore": 4, "ice": 0, "crystal": 0 }, "layout": { "pockets": {}, "heart": { "thorns": 0, "spores": 0 } } },
+      { "id": "shelf", "name": "Frost Shelf", "tier": 1, "side": "ice", "relay": false, "x": 220, "y": 870, "nodes": ["probe", "a1", "a2", "a3", "a5", "p1", "heart"], "haul": { "ore": 130, "ice": 80, "crystal": 0 }, "export": { "ore": 3, "ice": 2, "crystal": 0 }, "layout": { "pockets": { "p1": { "prize": "ice", "slots": 2, "thorns": 0, "spores": 4 } }, "heart": { "thorns": 2, "spores": 12 } } },
+      { "id": "shoal", "name": "Glass Shoal", "tier": 1, "side": "crystal", "relay": false, "x": 780, "y": 870, "nodes": ["probe", "a1", "a2", "a4", "a5", "p1", "heart"], "haul": { "ore": 130, "ice": 0, "crystal": 80 }, "export": { "ore": 3, "ice": 0, "crystal": 2 }, "layout": { "pockets": { "p1": { "prize": "crystal", "slots": 2, "thorns": 0, "spores": 4 } }, "heart": { "thorns": 6, "spores": 4 } } },
+      { "id": "veil", "name": "Spore Veil", "tier": 2, "side": "ice", "relay": false, "x": 220, "y": 520, "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "p1", "p2", "root", "heart"], "haul": { "ore": 420, "ice": 90, "crystal": 70 }, "export": { "ore": 5, "ice": 3, "crystal": 0 }, "layout": { "pockets": { "p1": { "prize": "ice", "slots": 2, "thorns": 2, "spores": 6 }, "p2": { "prize": "crystal", "slots": 2, "thorns": 2, "spores": 6 } }, "root": { "thorns": 0, "spores": 16 }, "heart": { "thorns": 1, "spores": 50, "starvedThorns": 0, "starvedSpores": 25 } } },
+      { "id": "garden", "name": "Thorn Garden", "tier": 2, "side": "crystal", "relay": false, "x": 780, "y": 520, "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "p1", "p2", "root", "heart"], "haul": { "ore": 420, "ice": 70, "crystal": 90 }, "export": { "ore": 5, "ice": 0, "crystal": 3 }, "layout": { "pockets": { "p1": { "prize": "crystal", "slots": 2, "thorns": 1, "spores": 12 }, "p2": { "prize": "ice", "slots": 2, "thorns": 4, "spores": 3 } }, "root": { "thorns": 9, "spores": 0 }, "heart": { "thorns": 24, "spores": 13, "starvedThorns": 11, "starvedSpores": 5 } } },
+      { "id": "deep", "name": "The Deep", "tier": 3, "side": "none", "relay": false, "x": 500, "y": 200, "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "p1", "p2", "p3", "p4", "root", "heart"], "haul": { "ore": 920, "ice": 100, "crystal": 100 }, "export": { "ore": 8, "ice": 3, "crystal": 3 }, "layout": "seed" }
     ],
     "lanes": [["landfall", "shelf"], ["landfall", "shoal"], ["shelf", "veil"], ["shoal", "garden"], ["veil", "garden"], ["veil", "deep"], ["garden", "deep"]]
   },
@@ -140,7 +142,6 @@
     { "id": "extract", "name": "Extraction", "kind": "grind", "levels": [{ "ore": 60, "ice": 0, "crystal": 0 }, { "ore": 120, "ice": 0, "crystal": 0 }, { "ore": 180, "ice": 0, "crystal": 0 }], "requires": [] },
     { "id": "rigs", "name": "Seed rigs", "kind": "grind", "levels": [{ "ore": 100, "ice": 0, "crystal": 0 }, { "ore": 200, "ice": 0, "crystal": 0 }], "requires": [{ "item": "extract", "level": 1 }] },
     { "id": "yards", "name": "Fast yards", "kind": "grind", "levels": [{ "ore": 60, "ice": 20, "crystal": 20 }, { "ore": 120, "ice": 40, "crystal": 40 }], "requires": [] },
-    { "id": "core", "name": "Probe core", "kind": "win", "levels": [{ "ore": 400, "ice": 120, "crystal": 120 }], "requires": [{ "item": "lancer", "level": 1 }, { "item": "flak", "level": 1 }, { "area": "deep" }] },
-    { "id": "fleet", "name": "Command limit", "kind": "limit", "levels": [{ "ore": 60, "ice": 20, "crystal": 20 }, { "ore": 140, "ice": 40, "crystal": 40 }, { "ore": 240, "ice": 60, "crystal": 60 }], "requires": [{ "tier": 1, "count": 1, "atLevel": 1 }, { "tier": 2, "count": 1, "atLevel": 2 }, { "tier": 2, "count": 2, "atLevel": 3 }] }
+    { "id": "core", "name": "Probe core", "kind": "win", "levels": [{ "ore": 400, "ice": 120, "crystal": 120 }], "requires": [{ "item": "lancer", "level": 1 }, { "item": "flak", "level": 1 }, { "area": "deep" }] }
   ]
 }

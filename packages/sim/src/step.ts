@@ -209,11 +209,11 @@ function newShip(world: World, type: ShipType): Ship {
  * this tick), and ore (net of reservations) and its component allow. The
  * build takes yardBuildTicks (H4 Fast yards). Returns true if it started.
  */
-function startShip(world: World, type: ShipType): boolean {
+function startShip(world: World, data: SimData, type: ShipType): boolean {
   const t = world.tun;
   const yard = world.yards[type];
   if (!yard.on || yard.ticksLeft !== 0 || !designResearched(world, type)) return false;
-  if (isFleetFull(world)) return false;
+  if (isFleetFull(world, data)) return false;
   const cost = t[`ship.${type}.cost`];
   const comp = SHIP_COMPONENT[type];
   // Recomputed per yard: reservedOre doesn't change here, but stock does.
@@ -233,7 +233,7 @@ function startShip(world: World, type: ShipType): boolean {
  * it), then the drone yard. H5: a yard that can't start because the fleet
  * is full keeps its turn, like one waiting for a component.
  */
-function yards(world: World): void {
+function yards(world: World, data: SimData): void {
   for (const type of YARD_ORDER) {
     const yard = world.yards[type];
     if (yard.ticksLeft > 0) {
@@ -245,9 +245,9 @@ function yards(world: World): void {
   const first = world.yardTurn;
   for (let i = 0; i < n; i++) {
     const k = (first + i) % n;
-    if (startShip(world, YARD_ROTATION[k]!)) world.yardTurn = (k + 1) % n;
+    if (startShip(world, data, YARD_ROTATION[k]!)) world.yardTurn = (k + 1) % n;
   }
-  startShip(world, 'drone');
+  startShip(world, data, 'drone');
 }
 
 /** Rule 6. */
@@ -329,7 +329,7 @@ export function playerDamage(t: Readonly<Tunables>, guards: Guard[], present: Re
   }
 }
 
-function newBattle(world: World, g: Guardian): Battle {
+function newBattle(world: World, data: SimData, g: Guardian): Battle {
   return {
     id: world.nextId++,
     node: g.node,
@@ -341,18 +341,18 @@ function newBattle(world: World, g: Guardian): Battle {
     lostByType: { drone: 0, lancer: 0, flak: 0 },
     guardsKilled: 0,
     killedByType: { thorn: 0, spore: 0 },
-    capAtSend: fleetCap(world),
+    capAtSend: fleetCap(world, data),
   };
 }
 
 /** Rule 7, for one living guardian: a round against the ships at its node, then repair. */
-function combat(world: World, g: Guardian): void {
+function combat(world: World, data: SimData, g: Guardian): void {
   const t = world.tun;
   let lastShipsDied = false;
   if (world.tick % t['combat.roundTicks'] === 0) {
     const present = shipsAt(world, g.node);
     if (present.length > 0 && g.guards.length > 0) {
-      if (g.battle === null) g.battle = newBattle(world, g);
+      if (g.battle === null) g.battle = newBattle(world, data, g);
       const battle = g.battle;
       const byType = { drone: 0, lancer: 0, flak: 0 };
       for (const s of present) {
@@ -458,7 +458,7 @@ function capture(world: World, data: SimData, g: Guardian): void {
   world.stats.captures.push({ node: g.node, tick: world.tick });
   // Capture without a fought round (guards and ships traded out to zero, or a zero-cap node, then a ship arrived).
   if (g.battle === null) {
-    const b = newBattle(world, g);
+    const b = newBattle(world, data, g);
     for (const s of present) {
       b.shipsEngaged += 1;
       b.engagedByType[s.type] += 1;
@@ -561,9 +561,9 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
   extraction(world);
   routes(world);
   assemblers(world);
-  yards(world);
+  yards(world, data);
   movement(world);
-  for (const g of gs) if (g.alive) combat(world, g);
+  for (const g of gs) if (g.alive) combat(world, data, g);
   for (const g of gs) if (g.alive) capture(world, data, g);
   for (const g of gs) if (g.alive) regrowth(world, g);
   stats(world);

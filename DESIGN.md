@@ -973,6 +973,8 @@ New rows for the H4 "Research" table, in the same format. h5-sim adds them to th
 
   Exports, the other hauls, and every area guard are unchanged at v8. h5-design-data retunes them.
 
+*Superseded at data v10 by H6 (h6-sim, 2026-11-08):* H6 removed Command limit, its three rows and `research.fleet.step` (H6 "Research"). Relays raise the limit instead (H6 "Fleet limit, relays and band locks"). The `{tier, count}` requirement stays in the sim, but no shipped item uses it.
+
 #### Root cuts, regrowth and trickling under the limit
 
 - **Root cuts are unchanged** (H3 rule 8). Under the limit they become a gate. A medium's fed heart is calibrated not to fit the base limit while its starved heart does, so at Command limit 0 you take a medium by cutting its Root, and at level 1 you may skip the cut.
@@ -1041,6 +1043,8 @@ What these windows mean in play:
 | `fleet.recycleRefundPct` | 50 | 0–100 | 0: a wrong build is wasted until it dies / 100: free refits, so composition is never a commitment |
 
 All three are live and sim-scoped.
+
+*Superseded at data v10 by H6 (h6-sim, 2026-11-08):* `research.fleet.step` is removed. `fleet.cap` and `fleet.recycleRefundPct` are unchanged. The H6 keys are in "Tunables (H6 …)".
 
 #### Save, data version and replay
 
@@ -1374,6 +1378,8 @@ Totals: haul 2120 / 340 / 340 (data v8), which covers every research level (2100
 
 *Updated 2026-11-08 by h5-sim (data v8):* the `veil`, `garden` and `deep` hauls rose from 300 / 60 / 40, 300 / 40 / 60 and 720 / 60 / 60 (v7, calibrated by h4-design-data; totals then 1680 / 240 / 240 against 1660 / 220 / 220) to cover the H5 Command limit levels (H5 spec, "Command limit"). The prose below is the record of what H4 tested at v7.
 
+*Superseded at data v10 by H6 (h6-sim, 2026-11-08):* this table, its totals line and the lanes above describe data v9. Data v10 has ten areas with `side` and `relay`, 14 lanes, the frame y 0–2100 and no Root (H6 "The overworld" and "Areas"). The no-softlock check is now H6's haul invariant, with repeat hauls at their worst position.
+
 **Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). First derived from the H3 layouts at about 20% (light) and 60% (medium) and pushed toward each side's theme, then calibrated by h4-design-data (see "Calibration result (h4-design-data, data v7)"), and recalibrated for the fleet limit by h5-design-data (data v9; see H5 "Calibration result (h5-design-data, data v9)"). The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
 
 | Area | Node | Prize | Slots | Guards (T/S) | Tags l / f |
@@ -1392,6 +1398,8 @@ Totals: haul 2120 / 340 / 340 (data v8), which covers every research level (2100
 | garden | root | none | 0 | 9 / 0 | Strong / Weak |
 | garden | heart | ore | 4 | 14 / 9, starved 9 / 5 | Strong (171) / Weak (53); starved Strong (175) / Weak (50) |
 | deep | all | as H3 | as H3 | the H3 layout tables | as H3 |
+
+*Superseded at data v10 by H6 (h6-sim, 2026-11-08):* the shipped guards are H6 "Area guards". Landfall, Frost Shelf and Glass Shoal keep these rows. Spore Veil and Thorn Garden lose their Root rows and starved counts, and The Deep plays its H3 layout without the Root (fed counts only).
 
 How an H3 field is cut down:
 - **Landfall** is the H3 frame's lower asteroids and an empty heart: a landing beat of under a minute (build one drone, send it). It gets the player to the overworld and the first research choice at once.
@@ -1469,6 +1477,8 @@ Bought on the overworld only (not inside an area), one level at a time. Cost per
 Totals over every level: 2100 ore, 340 ice, 340 crystal.
 
 *Updated 2026-11-08 by h5-sim (data v8):* the three Command limit rows are H5's (see the H5 spec, "Command limit"); a "tier T" requirement holds when enough reclaimed areas have tier ≥ T, and each of these applies only to its own level. Before them the totals were 1660 ore, 220 ice, 220 crystal. The H4 items are unchanged.
+
+*Superseded at data v10 by H6 (h6-sim, 2026-11-08):* the shipped research is H6 "Research": these rows without the three Command limit rows, so the totals are 1660 ore, 220 ice, 220 crystal again.
 
 Effects in the sim, all integer:
 - **Extraction** (rule 3): a node's accumulator adds `extractors × perExtractorPerMin × (100 + level × research.extract.stepPct)` per tick, and yields a unit each time it reaches `ticksPerMin × 100`. Asteroids, pockets and the captured heart; not probe mining.

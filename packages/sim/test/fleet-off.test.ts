@@ -13,7 +13,11 @@ import { h3World } from './h3-world.ts';
  * guards, stock, yards, research, the campaign records) shows up here.
  */
 
-/** The world without the state H5 added: the three H5 tunables, recycle stats, the Command limit level and `capAtSend`. */
+/**
+ * The world without the state H5 and H6 added: the H5 tunables, recycle stats, the Command limit level and
+ * `capAtSend`; h6-sim: the three H6 tunables and `haulPaid` (stats and area records). The v4 fixture has no relays,
+ * no repeat groups and `overworld.bandLock` 0, so H6's rules must leave every H4 field exactly as H4 did.
+ */
 function h4View(w: Readonly<World>): unknown {
   const v = JSON.parse(JSON.stringify(w)) as {
     tun: Record<string, unknown>;
@@ -22,13 +26,15 @@ function h4View(w: Readonly<World>): unknown {
     lastBattle: Record<string, unknown> | null;
     guardians: Array<{ battle: Record<string, unknown> | null; lastBattle: Record<string, unknown> | null }>;
   };
-  for (const k of ['fleet.cap', 'fleet.recycleRefundPct', 'research.fleet.step']) delete v.tun[k];
+  for (const k of ['fleet.cap', 'fleet.recycleRefundPct', 'research.fleet.step', 'fleet.relayStep', 'areas.repeatHaulPct', 'overworld.bandLock']) delete v.tun[k];
   delete v.stats.shipsRecycled;
   delete v.stats.oreRefunded;
+  delete v.stats.haulPaid;
   delete v.campaign.research.fleet;
   for (const a of v.campaign.areas) {
     delete a.shipsRecycled;
     delete a.oreRefunded;
+    delete a.haulPaid;
   }
   for (const b of [v.lastBattle, ...v.guardians.flatMap((g) => [g.battle, g.lastBattle])]) if (b !== null) delete b.capAtSend;
   return v;

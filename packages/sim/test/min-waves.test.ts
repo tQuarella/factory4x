@@ -138,6 +138,11 @@ for (const { name, layout, cases } of LAYOUTS) {
  * are printed, not pinned, so calibration never breaks this test. It asserts
  * only what must hold for any calibration: every guarded node, the starved
  * heart included, falls to some single-type wave within the search cap.
+ *
+ * h6-sim: since data v10 The Deep has no Root (DESIGN.md H6 "Removing the
+ * Root"), so the shipped report has no Root or starved-heart rows and finds
+ * nodes by id (the heart is no longer index 15). The Root rows above run on
+ * the frozen v4 fixture.
  */
 describe('shipped data: minimum single-type waves and tag accuracy (report)', () => {
   it('every guarded node can be taken; prints the numbers and the tags that disagree with them', () => {
@@ -146,11 +151,13 @@ describe('shipped data: minimum single-type waves and tag accuracy (report)', ()
     let total = 0;
     for (const { name, layout } of LAYOUTS) {
       const fed = baseWorld(layout, false, defaultData);
-      const starved = baseWorld(layout, true, defaultData);
+      const hasRoot = fed.nodes.some((n) => n.kind === 'root');
+      const starved = hasRoot ? baseWorld(layout, true, defaultData) : null;
       lines.push(`${name}:`);
       for (const id of Object.keys(NODE) as Array<keyof typeof NODE>) {
-        const base = id === 'starved heart' ? starved : fed;
-        const node = NODE[id];
+        if (!hasRoot && (id === 'root' || id === 'starved heart')) continue;
+        const base = id === 'starved heart' ? starved! : fed;
+        const node = fed.nodes.findIndex((n) => n.id === (id === 'starved heart' ? 'heart' : id));
         const [d = null, l = null, f = null] = (['drone', 'lancer', 'flak'] as const).map((t) => minSingle(base, node, t, defaultData));
         expect([d, l, f].some((v) => v !== null), `${name} ${id}`).toBe(true);
         const tags = guardianStatus(base, node).tags;

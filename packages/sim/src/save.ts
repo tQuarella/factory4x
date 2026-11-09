@@ -50,6 +50,7 @@ function campaignOk(c: unknown, data: SimData): c is Record<string, unknown> {
         isObj(a) &&
         isIntOrNull(a.reclaimedTick) &&
         isIntOrNull(a.reclaimPlayTicks) &&
+        (a.haulPaid === null || isTriple(a.haulPaid)) &&
         ['entries', 'withdrawals', 'playTicks', 'shipsBuilt', 'shipsLost', 'shipsRecycled', 'oreRefunded'].every((k) => isInt(a[k])),
     ) &&
     Array.isArray(c.reclaimOrder) &&
@@ -116,6 +117,8 @@ export function deserializeWorld(text: string, data: SimData): LoadResult {
     typeof w.system === 'object' &&
     w.stats !== null &&
     typeof w.stats === 'object' &&
+    (w.stats as Record<string, unknown>).haulPaid !== undefined &&
+    ((w.stats as Record<string, unknown>).haulPaid === null || isTriple((w.stats as Record<string, unknown>).haulPaid)) &&
     tun !== null &&
     typeof tun === 'object' &&
     SIM_TUNABLE_KEYS.every((k) => isInt(tun[k]));
