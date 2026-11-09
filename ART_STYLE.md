@@ -166,3 +166,23 @@ Rules:
 - **Full is told apart by shape as well as colour**: an open bracket vs a closed box, so it reads in greyscale and for colour-blind players. Callers should also change the chip text, not only the icon.
 - **Told apart at 24 px** (greyscale strip): fleet = brackets round a trio; full = a closed box round a trio; recycle = a ring of arrows; research fleet = a dashed square round a trio (lancer and flak hold one ship, opening is a chip with a plus). The recycle icon is ore teal, since it turns ships into ore.
 - **Callers.** The fleet chip draws `drawFleetIcon` at about r = 12 beside its text, with `full = true` when `fleetStatus.full`. The Command limit card uses `drawResearchIcon(ctx, r, 'fleet')` like the other research cards, or `drawFleetIcon` for the sheet header. The Recycle button uses `drawRecycleIcon`.
+
+## H6 entities
+
+Open frontier: the command relay, band locks, unscouted areas, lane reveal. Draw functions are in `packages/client/src/placeholders.ts`; bounds are checked in `packages/client/test/h6-art.test.ts` (recording context, at r = 50 and r = 12) and the gallery (`packages/client/gallery.html`: a 24 px strip in colour and greyscale with each new draw beside the area node, fleet icon and "!" badge, plus each at 24, 48 and 96 px). No new palette entries: everything reuses existing colours.
+
+| Entity | Draw | Look | 24 px read |
+| --- | --- | --- | --- |
+| Relay icon | `drawRelayIcon(ctx, r)` | a mast on a small foot, a pale `starBright` lamp at its head, three concentric `ship` blue arcs fanning up from the lamp (a command beacon) | a blue broadcast mast, arcs over a stick |
+| Lock badge | `drawLockBadge(ctx, r)` | a padlock: steel-grey (`plating`) chamfered body with a dark keyhole, an amber (`probe`) shackle, a dark outline; `r` is the badge's own half-size, drawn about 0.42 of the node's r at the node's upper right | grey block under an amber hoop |
+| Area `far` | `drawAreaNode(..., 'far')` | hollow `areaLocked` rock outlines at 0.5 alpha, no fill, no spikes, no ring; the centre icon is the caller's | a ghost cluster of outlines |
+| Lane modes | `drawLane(ctx, x1, y1, x2, y2, t, state, mode = 'normal', reveal = 100)` | `dim` the state at 0.32 alpha with no pulses; `normal` as H4; `reveal` the state (pulses too) growing from (x1, y1) to `reveal` percent (0..100, clamped) with a white spark at the front, the rest of the lane dim | faint line; bright line; bright line with a bead running along it |
+| Band pill | `drawBandPill(ctx, w, h)` | a dark `space` pill at 0.78 alpha with a faint `starDim` edge, centred at the origin; text `starBright`, or `areaLocked` for a locked band | label on a dark capsule |
+| Band divider | `drawBandDivider(ctx, x1, y, x2)` | a dotted `starBright` hairline at 10% alpha | barely there |
+
+Rules:
+- **Bounds.** Relay and lock stay within r; every area state stays within r; every lane mode stays within 4 px of its segment (the spark is a 3.2 px disc). The recording-context test checks these at several `t`, tiers and reveal values (including out-of-range).
+- **Relay is told apart** from the area node (rocks, no arcs), the fleet icon (chevrons in brackets, no mast) and the "!" badge (a pill): by its vertical mast and the arcs, in blue only, with no amber and no pink (checked by test). A reclaimed node with the relay icon in the centre reads as "amber rim, blue beacon".
+- **Lock is told apart** from the "!" badge (an amber pill with a dark glyph, upper left): the lock has a grey body with an amber hoop on top, a different outline, and sits on the upper right. Amber appears only on the shackle, so a locked node stays free of amber rocks and rim, and the amber-marks-reclaimed rule for areas holds (checked: `locked`, `open` and `far` node draws use no amber).
+- **Far is told apart from locked** by shape (hollow outlines vs filled rocks and faint spikes), not only by tone, so it reads in greyscale. Far has no ring, so it never invites a tap.
+- **Callers.** Draw the lock badge after the node and the prize icon, at the node's upper right, at about 0.42 of the node's r (at least 10 px across on a phone); the relay icon replaces the prize icon at about 0.5 of the node's r, and draws on the sheet and notice at its own size. The band pill sits under or beside the node row, and the caller measures the text.

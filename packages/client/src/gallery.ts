@@ -11,6 +11,11 @@ import {
   drawGuardRing,
   drawHitFlash,
   drawLane,
+  drawLockBadge,
+  drawRelayIcon,
+  drawBandPill,
+  drawBandDivider,
+  type LaneMode,
   drawPocket,
   drawPod,
   drawProbe,
@@ -112,7 +117,7 @@ function iconRow(c: Ctx, r: number): void {
 
 const researchIds: ResearchIconId[] = ['lancer', 'flak', 'opening', 'extract', 'rigs', 'yards', 'core'];
 const researchIds5: ResearchIconId[] = [...researchIds, 'fleet'];
-const areaStates: AreaNodeState[] = ['locked', 'open', 'reclaimed'];
+const areaStates: AreaNodeState[] = ['locked', 'open', 'reclaimed', 'far'];
 
 /** H4 actual-size strip: 3 rows of 7 at r = 12 (area tiers and states, research icons, core, crate, lanes). */
 function strip4(c: Ctx, grey: boolean): void {
@@ -164,6 +169,95 @@ function strip5(c: Ctx, grey: boolean): void {
   c.restore();
 }
 
+/** The H1 "!" badge as view.ts draws it (amber pill, dark glyph), for side-by-side checks. */
+function bangBadge(c: Ctx, r: number): void {
+  const h = r * 1.3;
+  const w = r * 1.3;
+  c.save();
+  c.fillStyle = palette.routeBackedUp;
+  c.beginPath();
+  c.roundRect(-w / 2, -h / 2, w, h, h / 2);
+  c.fill();
+  c.fillStyle = '#2a1e00';
+  c.font = `700 ${Math.max(8, r * 1.1)}px ui-monospace, Menlo, Consolas, monospace`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('!', 0, r * 0.05);
+  c.restore();
+}
+
+/** An area node with the relay icon or an ore icon in its centre and, optionally, the lock badge on its upper right. */
+function nodeWith(c: Ctx, r: number, state: AreaNodeState, centre: 'relay' | 'ore', lock: boolean): void {
+  drawAreaNode(c, r, T, 2, state);
+  if (centre === 'relay') drawRelayIcon(c, r * 0.5);
+  else drawResourceIcon(c, r * 0.4, 'ore');
+  if (lock) {
+    c.save();
+    c.translate(r * 0.7, -r * 0.7);
+    drawLockBadge(c, r * 0.42);
+    c.restore();
+  }
+}
+
+/** H6 actual-size strip: the new draws beside the area node, fleet icon and "!" badge they must not be mistaken for. */
+function strip6(c: Ctx, grey: boolean): void {
+  const r = 12;
+  const items: ((c2: Ctx) => void)[] = [
+    (c2) => drawRelayIcon(c2, r),
+    (c2) => drawLockBadge(c2, r),
+    (c2) => nodeWith(c2, r, 'reclaimed', 'relay', false),
+    (c2) => nodeWith(c2, r, 'locked', 'ore', true),
+    (c2) => nodeWith(c2, r, 'far', 'ore', false),
+    (c2) => nodeWith(c2, r, 'open', 'ore', false),
+    (c2) => drawAreaNode(c2, r, T, 2, 'reclaimed'),
+    (c2) => drawFleetIcon(c2, r, false),
+    (c2) => drawFleetIcon(c2, r, true),
+    (c2) => bangBadge(c2, r),
+    (c2) => drawResearchIcon(c2, r, 'fleet'),
+    (c2) => drawStockpileIcon(c2, r),
+    ...(['dim', 'normal', 'reveal'] as LaneMode[]).map((m) => (c2: Ctx) => drawLane(c2, -20, 6, 20, -6, T, 'owned', m, 55)),
+  ];
+  c.save();
+  if (grey) c.filter = 'grayscale(1)';
+  items.forEach((f, i) => {
+    c.save();
+    c.translate(r + 2 + (i % 7) * 46, 40 + Math.floor(i / 7) * 48);
+    f(c);
+    c.restore();
+  });
+  c.restore();
+}
+
+function laneModes(c: Ctx, r: number): void {
+  const rows: [LaneState, LaneMode, number][] = [
+    ['owned', 'dim', 0],
+    ['owned', 'normal', 0],
+    ['owned', 'reveal', 20],
+    ['owned', 'reveal', 60],
+    ['owned', 'reveal', 90],
+    ['open', 'dim', 0],
+    ['open', 'reveal', 50],
+  ];
+  rows.forEach(([s, m, p], i) => drawLane(c, -r, (i - 3) * r * 0.28, r, (i - 3) * r * 0.28, T, s, m, p));
+}
+
+function bandRow(c: Ctx, r: number): void {
+  c.save();
+  drawBandDivider(c, -r * 1.1, -r * 0.55, r * 1.1);
+  c.translate(0, -r * 0.35);
+  c.font = `600 ${Math.max(7, r * 0.22)}px ui-monospace, Menlo, Consolas, monospace`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  drawBandPill(c, r * 1.5, r * 0.4);
+  c.fillStyle = palette.starBright;
+  c.fillText('BAND 2', 0, 0);
+  c.translate(0, r * 0.7);
+  drawBandPill(c, r * 1.5, r * 0.4);
+  c.fillStyle = palette.areaLocked;
+  c.fillText('BAND 3', 0, 0);
+  c.restore();
+}
+
 function areaRow(c: Ctx, r: number, state: AreaNodeState): void {
   [0, 1, 2, 3].forEach((tier, i) => {
     c.save();
@@ -204,6 +298,8 @@ const entries: Entry[] = [
   { label: 'H4 24 px strip, greyscale', draw: (c) => strip4(c, true), strip: true, h: 170 },
   { label: 'H5 24 px strip, colour (fleet, fleet full, recycle, research fleet; then H4 research icons, drone, ore, crate)', draw: (c) => strip5(c, false), strip: true, h: 120 },
   { label: 'H5 24 px strip, greyscale (shape-only)', draw: (c) => strip5(c, true), strip: true, h: 120 },
+  { label: 'H6 24 px strip, colour (relay, lock, reclaimed+relay, locked+lock, far, open, reclaimed; fleet, full, !, research fleet, crate; lane dim, normal, reveal)', draw: (c) => strip6(c, false), strip: true, h: 150 },
+  { label: 'H6 24 px strip, greyscale (shape-only)', draw: (c) => strip6(c, true), strip: true, h: 150 },
   { label: 'drone', draw: (c, r) => drawShip(c, r, 0, 'drone') },
   { label: 'lancer', draw: (c, r) => drawShip(c, r, 0, 'lancer') },
   { label: 'flak', draw: (c, r) => drawShip(c, r, 0, 'flak') },
@@ -252,6 +348,17 @@ const entries: Entry[] = [
   { label: 'lanes closed / open / owned', draw: (c, r) => laneSet(c, r) },
   ...researchIds.map((id) => ({ label: `research ${id}`, draw: (c: Ctx, r: number) => drawResearchIcon(c, r, id) })),
   { label: 'research icons, all eight', draw: (c, r) => researchRow(c, r * 4) },
+  { label: 'relay icon', draw: (c, r) => drawRelayIcon(c, r) },
+  { label: 'lock badge', draw: (c, r) => drawLockBadge(c, r) },
+  { label: '"!" badge (H1, for comparison)', draw: (c, r) => bangBadge(c, r * 0.6) },
+  { label: 'relay (left) vs fleet (right)', draw: (c, r) => { c.save(); c.translate(-r * 0.55, 0); drawRelayIcon(c, r * 0.5); c.restore(); c.save(); c.translate(r * 0.55, 0); drawFleetIcon(c, r * 0.5, false); c.restore(); } },
+  { label: 'lock (left) vs "!" (right)', draw: (c, r) => { c.save(); c.translate(-r * 0.5, 0); drawLockBadge(c, r * 0.45); c.restore(); c.save(); c.translate(r * 0.5, 0); bangBadge(c, r * 0.3); c.restore(); } },
+  { label: 'area node far (hollow rocks, no ring)', draw: (c, r) => drawAreaNode(c, r, T, 2, 'far') },
+  { label: 'area node reclaimed + relay icon', draw: (c, r) => nodeWith(c, r, 'reclaimed', 'relay', false) },
+  { label: 'area node locked + lock badge', draw: (c, r) => nodeWith(c, r, 'locked', 'ore', true) },
+  { label: 'area node open / locked+lock / far', draw: (c, r) => { (['open', 'locked', 'far'] as AreaNodeState[]).forEach((st, i) => { c.save(); c.translate((i - 1) * r * 0.66, 0); nodeWith(c, r * 0.3, st, 'ore', st === 'locked'); c.restore(); }); } },
+  { label: 'lane modes: dim, normal, reveal 20/60/90, open dim, open reveal 50', draw: (c, r) => laneModes(c, r) },
+  { label: 'band label pills and divider', draw: (c, r) => bandRow(c, r) },
   { label: 'fleet icon', draw: (c, r) => drawFleetIcon(c, r, false) },
   { label: 'fleet icon, full', draw: (c, r) => drawFleetIcon(c, r, true) },
   { label: 'recycle icon', draw: (c, r) => drawRecycleIcon(c, r) },
@@ -344,6 +451,8 @@ boundLines.push(`fleet icon full: ${(measure((c, r) => drawFleetIcon(c, r, true)
 boundLines.push(`recycle icon: ${(measure((c, r) => drawRecycleIcon(c, r)) / 50).toFixed(3)} r`);
 boundLines.push(`probe core: ${(measure((c, r) => drawProbeCore(c, r, 0.5, 1)) / 50).toFixed(3)} r`);
 boundLines.push(`stockpile icon: ${(measure((c, r) => drawStockpileIcon(c, r)) / 50).toFixed(3)} r`);
+boundLines.push(`relay icon: ${(measure((c, r) => drawRelayIcon(c, r)) / 50).toFixed(3)} r`);
+boundLines.push(`lock badge: ${(measure((c, r) => drawLockBadge(c, r)) / 50).toFixed(3)} r`);
 for (const s of ['closed', 'open', 'owned'] as LaneState[]) {
   // Segment along x from -150 to 150, so the distance to it is |y| inside the span and the end distance beyond.
   const dist = (x: number, y: number): number => (Math.abs(x) <= 150 ? Math.abs(y) : Math.hypot(Math.abs(x) - 150, y));

@@ -709,8 +709,10 @@ export function drawWiltingThorn(ctx: Ctx, r: number, frac: number): void {
 // H4 (Reclaim ladder): overworld art. See ART_STYLE.md "H4 entities".
 // ---------------------------------------------------------------------------
 
-export type AreaNodeState = 'locked' | 'open' | 'reclaimed';
+export type AreaNodeState = 'locked' | 'open' | 'reclaimed' | 'far';
 export type LaneState = 'closed' | 'open' | 'owned';
+/** H6 lane brightness: dim (faint, no pulses), normal (the state as is), reveal (the state growing in from (x1, y1)). */
+export type LaneMode = 'dim' | 'normal' | 'reveal';
 export type ResearchIconId = 'lancer' | 'flak' | 'opening' | 'extract' | 'rigs' | 'yards' | 'core' | 'fleet';
 
 /** Four rocks around an open centre (the caller draws the prize icon there). All within 0.7r. */
@@ -739,21 +741,29 @@ export function drawAreaNode(ctx: Ctx, r: number, t: number, tier: number, state
   ctx.globalAlpha = 0.7;
   disc(ctx, 0, 0, r * 0.74);
   ctx.fill();
-  ctx.globalAlpha = state === 'locked' ? 0.6 : 1;
-  const rockFill = state === 'locked' ? palette.areaLocked : state === 'reclaimed' ? palette.probe : palette.asteroid;
+  const far = state === 'far';
+  ctx.globalAlpha = state === 'locked' ? 0.6 : far ? 0.5 : 1;
+  const rockFill = state === 'locked' || far ? palette.areaLocked : state === 'reclaimed' ? palette.probe : palette.asteroid;
   AREA_ROCKS.forEach(([x, y, k], i) => {
     ctx.save();
     ctx.translate(x * r, y * r);
     rockPath(ctx, k * r, 3 + i * 2, 8, 0.78);
-    ctx.fillStyle = rockFill;
-    ctx.fill();
-    ctx.strokeStyle = palette.space;
-    ctx.lineWidth = Math.max(1, r * 0.035);
-    ctx.stroke();
+    if (far) {
+      // Far (not yet scouted): hollow rock outlines only, no fill, no spikes, no ring.
+      ctx.strokeStyle = rockFill;
+      ctx.lineWidth = Math.max(1.2, r * 0.06);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = rockFill;
+      ctx.fill();
+      ctx.strokeStyle = palette.space;
+      ctx.lineWidth = Math.max(1, r * 0.035);
+      ctx.stroke();
+    }
     ctx.restore();
   });
   // Spikes from the rim of the cluster out to r.
-  if (spikes > 0) {
+  if (spikes > 0 && !far) {
     ctx.fillStyle = palette.bloom;
     ctx.globalAlpha = state === 'locked' ? 0.35 : 1;
     for (let i = 0; i < spikes; i++) {
@@ -792,8 +802,47 @@ export function drawAreaNode(ctx: Ctx, r: number, t: number, tier: number, state
  * to the node rims). Stays within 4 px of the segment. closed = dim dotted,
  * open = dashed, owned = solid amber with comet pulses running from (x1, y1)
  * to (x2, y2).
+ *
+ * H6 brightness `mode` (default 'normal', so old callers are unchanged):
+ * 'dim' draws the state faint with no pulses; 'reveal' draws the state growing
+ * in from (x1, y1) to `reveal` percent (0..100) of the way, with a white spark
+ * at the front, the rest of the lane staying dim.
  */
-export function drawLane(ctx: Ctx, x1: number, y1: number, x2: number, y2: number, t: number, state: LaneState): void {
+export function drawLane(
+  ctx: Ctx,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  t: number,
+  state: LaneState,
+  mode: LaneMode = 'normal',
+  reveal = 100,
+): void {
+  if (mode === 'normal') {
+    laneStroke(ctx, x1, y1, x2, y2, t, state, 1, true);
+    return;
+  }
+  if (mode === 'dim') {
+    laneStroke(ctx, x1, y1, x2, y2, t, state, 0.32, false);
+    return;
+  }
+  const f = Math.max(0, Math.min(100, reveal)) / 100;
+  const ex = x1 + (x2 - x1) * f;
+  const ey = y1 + (y2 - y1) * f;
+  if (f < 1) laneStroke(ctx, ex, ey, x2, y2, t, state, 0.32, false);
+  if (f > 0) laneStroke(ctx, x1, y1, ex, ey, t, state, 1, true);
+  if (f > 0 && f < 1) {
+    ctx.save();
+    ctx.fillStyle = palette.flash;
+    ctx.globalAlpha = 0.9;
+    disc(ctx, ex, ey, 3.2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function laneStroke(ctx: Ctx, x1: number, y1: number, x2: number, y2: number, t: number, state: LaneState, alpha: number, pulses: boolean): void {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.beginPath();
@@ -801,23 +850,25 @@ export function drawLane(ctx: Ctx, x1: number, y1: number, x2: number, y2: numbe
   ctx.lineTo(x2, y2);
   if (state === 'closed') {
     ctx.strokeStyle = palette.laneClosed;
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = 0.55 * alpha;
     ctx.lineWidth = 2.5;
     ctx.setLineDash([0.1, 7]);
     ctx.stroke();
   } else if (state === 'open') {
     ctx.strokeStyle = palette.laneOpen;
+    ctx.globalAlpha = alpha;
     ctx.lineWidth = 2.5;
     ctx.setLineDash([9, 6]);
     ctx.stroke();
   } else {
     ctx.strokeStyle = palette.laneOwned;
+    ctx.globalAlpha = alpha;
     ctx.lineWidth = 3;
     ctx.stroke();
     const dx = x2 - x1;
     const dy = y2 - y1;
     const len = Math.hypot(dx, dy);
-    if (len > 1) {
+    if (pulses && len > 1) {
       const n = Math.max(1, Math.round(len / 80));
       ctx.fillStyle = palette.flash;
       for (let i = 0; i < n; i++) {
@@ -832,6 +883,137 @@ export function drawLane(ctx: Ctx, x1: number, y1: number, x2: number, y2: numbe
       }
     }
   }
+  ctx.restore();
+}
+
+/**
+ * Relay icon (H6): a command beacon. A mast on a small foot, a pale lamp at its
+ * head, and three concentric player-blue arcs fanning up from the lamp. No
+ * amber and no pink, so it is never the area node (rocks), the fleet icon
+ * (chevrons in brackets) or a badge. Within r.
+ */
+export function drawRelayIcon(ctx: Ctx, r: number): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const lw = Math.max(1.5, r * 0.12);
+  const cy = r * 0.12;
+  ctx.strokeStyle = palette.ship;
+  ctx.lineWidth = lw;
+  // Mast and foot.
+  ctx.beginPath();
+  ctx.moveTo(0, cy);
+  ctx.lineTo(0, r * 0.76);
+  ctx.moveTo(-r * 0.3, r * 0.76);
+  ctx.lineTo(r * 0.3, r * 0.76);
+  ctx.stroke();
+  // Three concentric arcs, a 100 degree fan opening upward.
+  const up = -Math.PI / 2;
+  const span = (50 * Math.PI) / 180;
+  for (const k of [0.3, 0.52, 0.74]) {
+    ctx.beginPath();
+    ctx.arc(0, cy, r * k, up - span, up + span);
+    ctx.stroke();
+  }
+  // Lamp.
+  ctx.fillStyle = palette.starBright;
+  disc(ctx, 0, cy, Math.max(1.3, r * 0.11));
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Lock badge (H6): a small padlock for the upper right of an area node. A
+ * steel-grey body (neutral, not the locked-rock blue-grey) with a dark
+ * keyhole and an amber shackle; a dark outline lifts it off the rocks. The "!"
+ * badge is a round-ended amber pill with a glyph, so the two differ by shape
+ * and by the grey body. Within r (r is the badge's own half-size).
+ */
+export function drawLockBadge(ctx: Ctx, r: number): void {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.translate(0, -r * 0.18);
+  const lw = Math.max(1.6, r * 0.17);
+  const bw = r * 0.52;
+  const top = 0;
+  const bot = r * 0.74;
+  const c = r * 0.14;
+  // Dark halo under the shackle.
+  ctx.strokeStyle = palette.space;
+  ctx.lineWidth = lw + Math.max(1.2, r * 0.12);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.34, Math.PI, Math.PI * 2);
+  ctx.stroke();
+  // Shackle.
+  ctx.strokeStyle = palette.probe;
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.34, r * 0.1);
+  ctx.lineTo(-r * 0.34, 0);
+  ctx.arc(0, 0, r * 0.34, Math.PI, Math.PI * 2);
+  ctx.lineTo(r * 0.34, r * 0.1);
+  ctx.stroke();
+  // Body: a chamfered block.
+  ctx.beginPath();
+  ctx.moveTo(-bw + c, top);
+  ctx.lineTo(bw - c, top);
+  ctx.lineTo(bw, top + c);
+  ctx.lineTo(bw, bot - c);
+  ctx.lineTo(bw - c, bot);
+  ctx.lineTo(-bw + c, bot);
+  ctx.lineTo(-bw, bot - c);
+  ctx.lineTo(-bw, top + c);
+  ctx.closePath();
+  ctx.fillStyle = palette.plating;
+  ctx.fill();
+  ctx.strokeStyle = palette.space;
+  ctx.lineWidth = Math.max(1, r * 0.09);
+  ctx.stroke();
+  // Keyhole.
+  ctx.fillStyle = palette.space;
+  disc(ctx, 0, bot * 0.4, Math.max(1, r * 0.12));
+  ctx.fill();
+  ctx.fillRect(-Math.max(0.5, r * 0.04), bot * 0.4, Math.max(1, r * 0.08), r * 0.22);
+  ctx.restore();
+}
+
+/**
+ * Band label pill (H6): a dark rounded pill under the label text. Centred at
+ * the origin; the caller sets the text colour to `starBright`, or `areaLocked`
+ * for a locked band.
+ */
+export function drawBandPill(ctx: Ctx, w: number, h: number): void {
+  ctx.save();
+  const rad = h / 2;
+  ctx.beginPath();
+  ctx.moveTo(-w / 2 + rad, -h / 2);
+  ctx.lineTo(w / 2 - rad, -h / 2);
+  ctx.arc(w / 2 - rad, 0, rad, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(-w / 2 + rad, h / 2);
+  ctx.arc(-w / 2 + rad, 0, rad, Math.PI / 2, (Math.PI * 3) / 2);
+  ctx.closePath();
+  ctx.fillStyle = palette.space;
+  ctx.globalAlpha = 0.78;
+  ctx.fill();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = palette.starDim;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Faint dotted band divider: a pale hairline at 10% alpha. */
+export function drawBandDivider(ctx: Ctx, x1: number, y: number, x2: number): void {
+  ctx.save();
+  ctx.strokeStyle = palette.starBright;
+  ctx.globalAlpha = 0.1;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 6]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y);
+  ctx.lineTo(x2, y);
+  ctx.stroke();
   ctx.restore();
 }
 
