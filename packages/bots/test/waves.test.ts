@@ -24,8 +24,11 @@ const heartOf = (w: { nodes: { kind: string }[] }): number => w.nodes.findIndex(
 const ALL: ShipType[] = ['drone', 'lancer', 'flak'];
 
 describe('probe world and limits', () => {
-  it('limits are fleet.cap, plus one and two Command limit steps', () => {
-    expect(probeLimits(fx)).toEqual(L);
+  it('limits are fleet.cap, plus one and two relay steps (h6-sim: fleet.relayStep replaced the removed Command limit step)', () => {
+    const l0 = fx.tunables['fleet.cap'].default;
+    const stepSize = fx.tunables['fleet.relayStep'].default;
+    expect(probeLimits(fx)).toEqual({ l0, l1: l0 + stepSize, l2: l0 + 2 * stepSize });
+    expect(probeLimits(fx)).toEqual({ l0: 12, l1: 20, l2: 28 });
   });
 
   it('lands the area with both designs, every other area reclaimed and every yard off', () => {

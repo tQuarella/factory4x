@@ -342,7 +342,7 @@ export class Sheet {
 
     this.ups.push(() => {
       const w = this.world;
-      const ys = yardStatus(w);
+      const ys = yardStatus(w, this.host.session.data);
       const fleet = fleetStatus(w, this.host.session.data);
       setHidden(fleetHead, fleet.cap === null);
       if (fleet.cap !== null) setText(fleetHead, fleetLine({ count: fleet.count, cap: fleet.cap, level: fleet.level, maxLevel: fleet.maxLevel }));

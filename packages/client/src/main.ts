@@ -316,7 +316,7 @@ function modeTransition(): void {
     // Landing: name every research effect in play.
     s.flags.resultShown = false;
     s.flags.shippedAtLanding = { ...w.campaign.totals.shipped };
-    toast.show(landingNotice(data.map.areas[active]!.name, landingEffects(w)));
+    toast.show(landingNotice(data.map.areas[active]!.name, landingEffects(w, data)));
     return;
   }
   if (prev === null) return;
@@ -397,7 +397,7 @@ function refreshUi(): void {
     const fresh = (['lancer', 'flak'] as const).filter((t) => unlockStatus(w).ships[t] && !unlockSeen.ships[t]);
     if (fresh.length > 0) {
       for (const t of fresh) unlockSeen.ships[t] = true;
-      const yards = yardStatus(w).yards;
+      const yards = yardStatus(w, data).yards;
       const text = fresh
         .map((t) => {
           const row = yards.find((y) => y.type === t)!;
@@ -504,7 +504,7 @@ function startCampaign(start: CampaignStart, tunables: Record<string, number> = 
   adopt(new Session(dataWithDefaults(data, { ...s.world.tun, ...tunables }), { seed: s.seed, start }));
   // A constructed landing gets the landing notice a real one would.
   const w = app.session.world;
-  if (w.campaign.active !== null) toast.show(landingNotice(data.map.areas[w.campaign.active]!.name, landingEffects(w)));
+  if (w.campaign.active !== null) toast.show(landingNotice(data.map.areas[w.campaign.active]!.name, landingEffects(w, data)));
 }
 
 window.__factory4x = {

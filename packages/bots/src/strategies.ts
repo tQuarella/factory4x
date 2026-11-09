@@ -318,7 +318,7 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
   const inFlight = waveInFlight(world);
   const trivial = world.guardians.length > 0 && world.guardians.every((g) => guardNeed(world, g.node) === 0);
   const buildable = buildableTypes(world, opts.dronesOnly);
-  const cap = fleetCap(world);
+  const cap = fleetCap(world, data);
   const limit = cap ?? Math.max(1, fleetCount(world));
   const target = chooseTarget(world, limit, buildable, opts.forced);
   const livingGuarded = world.guardians.some((g) => g.alive);
@@ -359,7 +359,7 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
   if (target === null || a5 < 0) return { inputs, closed: false };
   const at = c.atByType[a5]!;
   // Recycle: the fleet is full and a type parked at a5 is above its allocation.
-  if (isFleetFull(world)) {
+  if (isFleetFull(world, data)) {
     const surplus: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
     let n = 0;
     for (const t of SHIP_TYPES) {
@@ -471,8 +471,8 @@ export function cheapestOpenArea(world: Readonly<World>, data: SimData): number 
 }
 
 /** What a closed record is valid for: the fleet limit and the designs. A record clears when either changes. */
-export function closedKey(world: Readonly<World>): string {
-  return `${fleetCap(world) ?? 0}|${researchLevel(world, 'lancer')}|${researchLevel(world, 'flak')}`;
+export function closedKey(world: Readonly<World>, data: SimData): string {
+  return `${fleetCap(world, data) ?? 0}|${researchLevel(world, 'lancer')}|${researchLevel(world, 'flak')}`;
 }
 
 /** Area index -> closedKey when it was recorded closed. */
@@ -504,7 +504,7 @@ export interface AreaChoice {
 
 /** The area the strategy lands in next, or null if none is open. Closed records (valid at the current limit and designs) are skipped; if every open area is closed, the cheapest by estimate, forced. */
 export function chooseArea(world: Readonly<World>, data: SimData, s: CampaignStrategy, closed: ClosedRecords = new Map()): AreaChoice | null {
-  const key = closedKey(world);
+  const key = closedKey(world, data);
   const open = openAreas(world, data);
   const live = open.filter((a) => closed.get(a) !== key);
   for (const id of s.route) {

@@ -200,7 +200,7 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
             if (d.closed) {
               const a = camp.active!;
               finishVisit('withdrawn', true);
-              closedRecords.set(a, closedKey(world));
+              closedRecords.set(a, closedKey(world, data));
               inputs = [{ type: 'leaveArea' }];
             } else inputs = d.inputs;
           }

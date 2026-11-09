@@ -142,18 +142,18 @@ describe('overworld text comes from selectors and live tunables', () => {
   });
 
   it('the landing notice names every research effect in play, and only those', () => {
-    const none = landingEffects(campaignWorld(1, data, {}));
+    const none = landingEffects(campaignWorld(1, data, {}), data);
     expect(landingNotice('Glass Shoal', { ...none, fleetCap: null })).toBe(`Landed in Glass Shoal · ${none.openingOre} ore`);
     expect(landingNotice('Glass Shoal', none)).toBe(`Landed in Glass Shoal · ${none.openingOre} ore · fleet limit ${none.fleetCap}`);
     const w = campaignWorld(1, data, { reclaimed: ['landfall'], research: { opening: 2, extract: 1, rigs: 2, yards: 1, lancer: 1, flak: 1 } });
-    const fx = landingEffects(w);
+    const fx = landingEffects(w, data);
     const text = landingNotice('Glass Shoal', fx);
     expect(text).toContain(`${fx.openingOre} ore`);
     expect(text).toContain('A1 and A2 rigs running');
     expect(text).toContain(`extraction +${fx.extractPct - 100}%`);
     expect(text).toContain(`ships build ${100 - fx.yardTimePct}% faster`);
     expect(text).toContain('Lancer and Flak yards on');
-    const one = landingNotice('X', landingEffects(campaignWorld(1, data, { research: { extract: 1, rigs: 1 } })));
+    const one = landingNotice('X', landingEffects(campaignWorld(1, data, { research: { extract: 1, rigs: 1 } }), data));
     expect(one).toContain('A1 rig running');
     expect(one).not.toContain('A2');
     expect(one).not.toContain('yard');
@@ -211,7 +211,7 @@ describe('overworld text comes from selectors and live tunables', () => {
   it('a purchase notice says what changed', () => {
     const w = campaignWorld(1, data, { research: { extract: 2, opening: 1, rigs: 1, yards: 1 } });
     const rows = researchStatus(w, data);
-    const rig = landingEffects(w).rigNodes;
+    const rig = landingEffects(w, data).rigNodes;
     const get = (id: string): ReturnType<typeof researchStatus>[number] => rows.find((r) => r.id === id)!;
     expect(purchaseNotice(get('extract'), rig)).toBe(`Extraction 2: extractors now yield +${get('extract').effect - 100}%`);
     expect(purchaseNotice(get('opening'), rig)).toContain(`${get('opening').effect} ore`);

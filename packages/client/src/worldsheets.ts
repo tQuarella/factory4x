@@ -288,7 +288,7 @@ export class ResearchSheet {
     const w = this.world;
     const after = researchStatus(w, this.host.session.data)[item]!;
     if (after.level > before.level) {
-      this.host.notice(purchaseNotice(after, landingEffects(w).rigNodes));
+      this.host.notice(purchaseNotice(after, landingEffects(w, this.host.session.data).rigNodes));
     }
     this.update();
   }

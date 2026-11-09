@@ -58,7 +58,7 @@ describe('fleet text', () => {
 
   it('the landing notice names the limit from landingEffects, and nothing when it is off', () => {
     const w = campaignWorld(1, data, { reclaimed: ['landfall'], research: { fleet: 1 } });
-    const fx = landingEffects(w);
+    const fx = landingEffects(w, data);
     expect(fx.fleetCap).not.toBeNull();
     expect(landingNotice('Frost Shelf', fx)).toContain(`fleet limit ${fx.fleetCap}`);
     expect(landingNotice('Frost Shelf', { ...fx, fleetCap: null })).not.toContain('fleet limit');
@@ -108,7 +108,7 @@ describe('Command limit research', () => {
     const after = row(s.world, 'fleet');
     expect(after.level).toBe(1);
     expect(purchaseNotice(after, [])).toBe(`Command limit 1: fleet limit now ${after.effect}.`);
-    expect(landingEffects(s.world).fleetCap).toBe(after.effect);
+    expect(landingEffects(s.world, data).fleetCap).toBe(after.effect);
   });
 });
 

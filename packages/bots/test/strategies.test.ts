@@ -387,15 +387,10 @@ describe('research policy', () => {
     ]);
   });
 
-  it('buys Command limit where the sim allows it: not before an area is reclaimed, each level after its area', () => {
-    // Nothing reclaimed: no level is buyable yet.
-    expect(buy(rich(), 'full')).toEqual(['lancer1', 'flak1', 'opening1', 'extract1', 'rigs1', 'yards1', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3']);
-    // Both mediums reclaimed: all three levels in their slots.
-    expect(buy(rich({}, NO_DEEP), 'full')).toEqual([
-      'lancer1', 'flak1', 'fleet1', 'opening1', 'extract1', 'fleet2', 'rigs1', 'yards1', 'fleet3', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3',
-    ]);
-    // A light area only: level 1 and nothing more of the Command limit.
-    expect(buy(rich({}, ['landfall', 'shelf']), 'full').filter((o) => o.startsWith('fleet'))).toEqual(['fleet1']);
+  it('never buys Command limit: H6 removed it from the sim and the data (h6-sim), so its policy entries find no row', () => {
+    const rest = ['lancer1', 'flak1', 'opening1', 'extract1', 'rigs1', 'yards1', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3'];
+    expect(buy(rich(), 'full')).toEqual(rest);
+    expect(buy(rich({}, NO_DEEP), 'full')).toEqual(rest);
   });
 
   it('buys the core first once The Deep is reclaimed and it is affordable', () => {
@@ -483,33 +478,35 @@ describe('area choice', () => {
     const w = reclaimed('landfall');
     const first = chosen(w, by('composer'))!.area;
     const second = first === area('shelf') ? area('shoal') : area('shelf');
-    const closed = new Map([[first, closedKey(w)]]);
+    const closed = new Map([[first, closedKey(w, data)]]);
     expect(chosen(w, by('composer'), closed)).toEqual({ area: second, forced: false });
     // A route entry that is closed is skipped too.
-    const ice = new Map([[area('shelf'), closedKey(w)]]);
+    const ice = new Map([[area('shelf'), closedKey(w, data)]]);
     expect(chosen(w, by('ice-first'), ice)).toEqual({ area: area('shoal'), forced: false });
   });
 
   it('when every open area is closed, lands in the cheapest anyway, forced', () => {
     const w = reclaimed('landfall');
     const cheapest = cheapestOpenArea(w, data)!;
-    const closed = new Map([[area('shelf'), closedKey(w)], [area('shoal'), closedKey(w)]]);
+    const closed = new Map([[area('shelf'), closedKey(w, data)], [area('shoal'), closedKey(w, data)]]);
     expect(chosen(w, by('composer'), closed)).toEqual({ area: cheapest, forced: true });
   });
 
   it('a closed record clears when the limit or a design changes', () => {
     const w = reclaimed('landfall');
-    const key = closedKey(w);
+    const key = closedKey(w, data);
     const closed = new Map([[area('shelf'), key], [area('shoal'), key]]);
     const lancer = campaignWorld(1, data, { reclaimed: ['landfall'], research: { lancer: 1 } });
     const flak = campaignWorld(1, data, { reclaimed: ['landfall'], research: { flak: 1 } });
-    const limit = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf'], research: { fleet: 1 } });
-    expect(new Set([key, closedKey(lancer), closedKey(flak), closedKey(limit)]).size).toBe(4);
+    // h6-sim: the limit changes with fleet.cap here (the v8 fixture has no relays, and Command limit is gone).
+    const limit = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf'] });
+    limit.tun['fleet.cap'] += 1;
+    expect(new Set([key, closedKey(lancer, data), closedKey(flak, data), closedKey(limit, data)]).size).toBe(4);
     expect(chosen(lancer, by('composer'), closed)!.forced).toBe(false);
     expect(chosen(flak, by('composer'), closed)!.forced).toBe(false);
     // Other research (a grind item) leaves the record valid.
     const grind = campaignWorld(1, data, { reclaimed: ['landfall'], research: { opening: 1 } });
-    expect(closedKey(grind)).toBe(key);
+    expect(closedKey(grind, data)).toBe(key);
     expect(chosen(grind, by('composer'), closed)!.forced).toBe(true);
   });
 

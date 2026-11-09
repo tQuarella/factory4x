@@ -120,7 +120,7 @@ export function minMix(
   throw new Error('minMix: the minimum total was not found again');
 }
 
-/** The probe's limits (DESIGN.md "Capability windows"): L0 = fleet.cap, L1 = L0 + step, L2 = L0 + 2 × step. */
+/** The probe's limits (DESIGN.md "Capability windows"; H6: one fleet.relayStep per commanded band): L0 = fleet.cap, L1 = L0 + step, L2 = L0 + 2 × step. */
 export interface ProbeLimits {
   l0: number;
   l1: number;
@@ -129,7 +129,7 @@ export interface ProbeLimits {
 
 export function probeLimits(data: SimData): ProbeLimits {
   const l0 = data.tunables['fleet.cap'].default;
-  const stepSize = data.tunables['research.fleet.step'].default;
+  const stepSize = data.tunables['fleet.relayStep'].default;
   return { l0, l1: l0 + stepSize, l2: l0 + 2 * stepSize };
 }
 
@@ -188,7 +188,8 @@ export function probeAll(data: SimData, seeds: number, progress: (row: HeartProb
   const rows: HeartProbe[] = [];
   for (const area of data.map.areas) {
     if (area.tier < 1) continue;
-    const hasRoot = area.layout === 'seed' || area.layout.root !== undefined;
+    // h6-sim: read it from the area's nodes; since data v10 no area, The Deep included, has the Root.
+    const hasRoot = area.nodes.some((id) => data.map.nodes.find((n) => n.id === id)?.kind === 'root');
     const seedList = area.layout === 'seed' ? Array.from({ length: seeds }, (_, i) => i + 1) : [1];
     for (const seed of seedList) {
       for (const starved of hasRoot ? [false, true] : [false]) {

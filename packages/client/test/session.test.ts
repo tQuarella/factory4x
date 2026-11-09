@@ -13,11 +13,11 @@ import { podTotalTicks, progressFrac } from '../src/interp.ts';
 // The frozen v4 test fixture: tests that pin rule outcomes (guard counts, wilt text) run on it, so calibration doesn't break them.
 import { fixtureData } from '../../sim/test/fixture.ts';
 // H4: createWorld starts on the overworld; an H3 game is The Deep from a constructed campaign.
-import { DEEP_START, h3World } from '../../sim/test/h3-world.ts';
+import { deepStart, h3World } from '../../sim/test/h3-world.ts';
 
 /** The H3 game as a session: The Deep from a constructed campaign (the start is part of the replay). */
 function deep(seed: number, data = defaultData): Session {
-  return new Session(data, { seed, start: DEEP_START });
+  return new Session(data, { seed, start: deepStart(data) });
 }
 
 function mem(): StorageLike & { map: Map<string, string> } {
@@ -58,7 +58,7 @@ describe('session replay log', () => {
 
   it('drops invalid inputs without logging them', () => {
     const s = deep(7);
-    expect(s.send({ type: 'buildExtractor', node: 15 })).toBe(false);
+    expect(s.send({ type: 'buildExtractor', node: DEEP_HEART })).toBe(false);
     expect(s.log.length).toBe(0);
   });
 
@@ -98,10 +98,13 @@ function stagedAtProbeAndA5(): Session {
   throw new Error('ships never staged at Probe and A5');
 }
 
-/** Node 15 is the heart. */
+/** The Deep's heart on the shipped data (h6-sim: index 14, since The Deep has no Root from data v10). */
+const DEEP_HEART = campaignWorld(1, defaultData, deepStart(defaultData)).nodes.findIndex((n) => n.kind === 'heart');
+
+/** An attack on the heart from the probe and a5. */
 const attackAll: Input[] = [
-  { type: 'sendShips', from: 0, to: 15, counts: SEND_ALL },
-  { type: 'sendShips', from: 5, to: 15, counts: SEND_ALL },
+  { type: 'sendShips', from: 0, to: DEEP_HEART, counts: SEND_ALL },
+  { type: 'sendShips', from: 5, to: DEEP_HEART, counts: SEND_ALL },
 ];
 
 function replayMatches(s: Session): boolean {
@@ -136,12 +139,12 @@ describe('one press, one tick (sendAll)', () => {
   it('paused: drops invalid inputs, and steps nothing when none is valid', () => {
     const s = deep(3);
     s.paused = true;
-    expect(s.sendAll([{ type: 'buildExtractor', node: 15 }])).toBe(0);
+    expect(s.sendAll([{ type: 'buildExtractor', node: DEEP_HEART }])).toBe(0);
     expect(s.world.tick).toBe(0);
     expect(
       s.sendAll([
         { type: 'setTunable', key: 'ship.drone.cost', value: 20 },
-        { type: 'buildExtractor', node: 15 },
+        { type: 'buildExtractor', node: DEEP_HEART },
         { type: 'setTunable', key: 'ship.drone.hp', value: 12 },
       ]),
     ).toBe(2);
@@ -210,7 +213,7 @@ describe('New system keeps tuning', () => {
     old.send({ type: 'setTunable', key: 'guard.capPct', value: 50 });
     old.stepOnce();
     // A real New system starts on the overworld; the tuned start stock applies at the landing, so land in The Deep from a constructed start.
-    const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2, start: DEEP_START });
+    const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2, start: deepStart(defaultData) });
     expect(s.world.stock.ore).toBe(150);
     // Seed 2 is Twin Seams. Its p1 (the first guardian) starts at floor(count × 50 / 100) per type.
     // This test runs on the shipped data (replayData rebuilds from it), so the count is read from the layout.
@@ -282,14 +285,14 @@ describe('helpers', () => {
 
   it('battle report names the reason for a failed wave, with the counter hint', () => {
     const s = deep(1);
-    const text = battleReport(s.world, result({ node: 15, outcome: 'repelled', shipsEngaged: 6, shipsLost: 6, guardsKilled: 2 }));
+    const text = battleReport(s.world, result({ node: DEEP_HEART, outcome: 'repelled', shipsEngaged: 6, shipsLost: 6, guardsKilled: 2 }));
     expect(text).toContain('Heart held: 6 sent, 6 lost.');
     expect(text).toMatch(/Regrowth outpaced|Too few ships/);
-    expect(battleReport(s.world, result({ node: 15, outcome: 'captured', shipsEngaged: 30, shipsLost: 12, guardsKilled: 12 }))).toBe('Heart taken: 30 sent, 12 lost');
+    expect(battleReport(s.world, result({ node: DEEP_HEART, outcome: 'captured', shipsEngaged: 30, shipsLost: 12, guardsKilled: 12 }))).toBe('Heart taken: 30 sent, 12 lost');
   });
 
   it('a pocket capture names its prize, and the unlock only until that prize has been delivered', () => {
-    const w = campaignWorld(3, defaultData, DEEP_START);
+    const w = campaignWorld(3, defaultData, deepStart(defaultData));
     const pockets = w.nodes.filter((n) => n.kind === 'pocket');
     const ice = pockets.find((n) => n.prize === 'ice')!;
     const text = battleReport(w, result({ node: ice.index, outcome: 'captured', shipsEngaged: 12, shipsLost: 3, guardsKilled: 9 }));
