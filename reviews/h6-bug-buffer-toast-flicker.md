@@ -62,3 +62,37 @@ Required changes:
 This is round 1.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+I reviewed head 65bb543. The rework is d5ec75a. After it come two merges, which bring in main (e6b7f61) and the top-bar branch's area-tap test fix (a4e791f; I approved that separately in its round 3). The fix code from round 1 (`isBackedUp`, the sheet's reserved warning room) is unchanged. d5ec75a adds:
+- a `drawn` record in `MapView`, cleared at the start of each frame and filled when the "!" badge or the dashed backed-up route is actually drawn, exposed as the `mapBackedUp` dev hook;
+- a rewritten `buffer-warning.spec.ts`;
+- a DECISIONS entry.
+
+**Required changes from round 1:**
+1. **A 1x run: done.** "375 px portrait, wide font, 1x" uses a pod every 150 ticks at 40/min, so the buffer sits at its cap with pods leaving. The test samples every frame for 15 game seconds (three pod departures) with the same checks.
+2. **The map badge and route: done.** Every sample reads `mapBackedUp(a1)`, which reports what the renderer drew in its last frame rather than a recomputation. Every frame must show both the badge and the dashed route.
+3. **Stays cleared, and nothing moves: done.** After the upgrade, the test samples 10 more game seconds and checks that the warning, badge and route stay off. Every sheet box is compared with its place before any warning, measured from the sheet's own top minus `scrollTop`, so the upgrade click's scroll can't hide a shift.
+4. **No-route warnings: done.** A new test builds an extractor with no route. It checks that "No route: this ore goes nowhere. Build a route." holds for 5 game seconds with the badge on and no dashed route, then that "Backed up: no route. Build one." holds for 5 game seconds, with nothing moving in either state.
+5. **DECISIONS: done.** The entry covers the cause, the latch thresholds and why half is safe, why the fix lives in the client and in `report.ts` (and that the Director accepted that deviation), the reserved room and its cost, and the tests.
+6. **Fails without the fix, passes repeated: done, and I checked it myself.**
+   - Round 1 already showed the sheet test failing on main (the warning hidden at frame 16, the buttons jumping 63 px).
+   - The new map assertions need the new hook, which doesn't exist on main. So I built 65bb543 with a one-line change making `isBackedUp` return the sim's `st.backedUp` (no latch). All three backed-up tests fail, including the 1x one: "frame 7: warning is hidden", "map "!" badge not drawn", "dashed route not drawn".
+   - The no-route test passes on that build too, as it should, because the sim's flag is already steady without a route. That test guards the reserved room and the text.
+   - With the fix: `buffer-warning.spec.ts --repeat-each 5`, both projects: 40/40.
+
+**Gates (clean detached worktree, private port):** `npm run gates -- --base main` on 65bb543 passed all six (typecheck, lint, test, determinism, bots, protected-files). Build passed. Full smoke: 158/158. Branch CI on 65bb543 was still running when I wrote this, so it is not checked here.
+
+**Code quality.** The `drawn` record is two sets cleared once per frame, with negligible cost, and it reads exactly what was drawn, which is what the test needs. The test is well organised: one `record` and one `check` serve all four scenarios, the tunables are chosen and explained per speed, and failures name the frame and the element. My round-1 observation about the sizer hardcoding "crystal" is now recorded in DECISIONS.
+
+Pillar fit: a client-only fix with no sim, data or determinism change. The warning, badge and route now tell the player one steady thing, and the sheet's buttons don't move under their thumb. I'm comfortable with the owner playing this.
+
+Gates: all six passed locally on 65bb543. Smoke: 158/158, and the new spec passes 40/40 with `--repeat-each 5`. Branch CI was in progress when I wrote this.
+
+Required changes:
+- none
+
+This is round 2.
+
+VERDICT: APPROVE
