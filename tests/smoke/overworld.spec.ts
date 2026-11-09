@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { defaultData, type CampaignStart } from '@factory4x/sim';
+import { expectControlsFit, settled, tapArea } from './helpers.ts';
 
 /**
  * H6 client: the pannable overworld on the real 10-area map, in the fullest state a game reaches (every chip, the notices strip up,
@@ -27,38 +28,11 @@ async function ready(page: Page, size: { width: number; height: number }): Promi
   await page.addStyleTag({ content: WIDE_FONT });
 }
 
-async function settled(page: Page): Promise<void> {
-  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-}
-
 async function startCampaign(page: Page, start: CampaignStart, tunables: Record<string, number> = {}): Promise<void> {
   await page.evaluate(([s, t]) => window.__factory4x!.startCampaign(s as never, t as never), [start, tunables] as const);
   await settled(page);
 }
 
-/** Taps an area: centres it clear of any sheet, waits until it stops moving and the canvas is what is under it, taps until its sheet opens. */
-async function tapArea(page: Page, area: number): Promise<void> {
-  let last = { x: -1, y: -1 };
-  await expect
-    .poll(
-      async () => {
-        await page.evaluate((i) => window.__factory4x!.centerOnArea(i), area);
-        await settled(page);
-        const q = await page.evaluate((i) => {
-          const p = window.__factory4x!.areaScreenPos(i);
-          const hit = document.elementFromPoint(p.x, p.y);
-          return { ...p, onCanvas: hit !== null && hit.id === 'view' };
-        }, area);
-        const still = Math.abs(q.x - last.x) < 0.5 && Math.abs(q.y - last.y) < 0.5;
-        last = { x: q.x, y: q.y };
-        if (!still || !q.onCanvas) return false;
-        await page.mouse.click(q.x, q.y);
-        return (await page.evaluate(() => window.__factory4x!.selectedArea())) === area;
-      },
-      { message: `tapping area ${area}`, timeout: 15_000 },
-    )
-    .toBe(true);
-}
 
 /** The fullest overworld: five areas reclaimed, all three stockpile chips with rates, a long notice up, a wide font. */
 const FULL: CampaignStart = { reclaimed: ['landfall', 'shelf', 'shoal', 'rime', 'glint'], research: { lancer: 1 }, stockpile: { ore: 1234, ice: 456, crystal: 789 } };
@@ -201,37 +175,119 @@ test('portrait: pan by dragging to The Deep and tap it; a drag is not a tap and 
   expect(await page.evaluate(() => window.__factory4x!.selectedArea())).toBe(deep);
 });
 
+/** Waits until the pan has stopped easing (the same scroll on three frames in a row) and the sheet's box has stopped changing. */
+async function panSettled(page: Page): Promise<void> {
+  let same = 0;
+  let last = '';
+  await expect
+    .poll(async () => {
+      await settled(page);
+      const now = JSON.stringify(
+        await page.evaluate(() => {
+          const s = window.__factory4x!.overworldScroll();
+          const sh = document.getElementById('sheet')!.getBoundingClientRect();
+          return [s.y, s.max.y, sh.top, sh.height];
+        }),
+      );
+      same = now === last ? same + 1 : 0;
+      last = now;
+      return same >= 3;
+    })
+    .toBe(true);
+}
+
 test('portrait: with a sheet open the other areas stay reachable by dragging, and a tap on one switches the sheet', async ({ page }) => {
   await ready(page, PORTRAIT);
   await startCampaign(page, FULL);
   await tapArea(page, AREA.landfall!);
+  await panSettled(page);
   const sheet = (await page.locator('#sheet').boundingBox())!;
   const canvas = (await page.locator('#view').boundingBox())!;
-  // Every area can be brought into the part of the map the sheet doesn't cover, by dragging alone (no closing the sheet).
-  const far = AREAS.map((_, i) => i).sort((a, b) => AREAS[b]!.y - AREAS[a]!.y).slice(-3);
-  for (const a of far) {
-    for (let n = 0; n < 16; n++) {
+  // The part of the map the sheet doesn't cover: every area is dragged into it, one drag at a time, in the direction it needs.
+  const topEdge = canvas.y + 30;
+  const bottomEdge = sheet.y - 40;
+  const mid = (canvas.y + sheet.y) / 2;
+  const reach = (sheet.y - canvas.y) / 2 - 12;
+  const x = canvas.x + canvas.width - 14;
+  const byHeight = AREAS.map((_, i) => i).sort((a, b) => AREAS[a]!.y - AREAS[b]!.y);
+  // The three highest areas on the map and the lowest: the extremes of the pan.
+  const targets = [...byHeight.slice(0, 3).reverse(), byHeight[byHeight.length - 1]!].reverse();
+  for (const a of targets) {
+    for (let n = 0; n < 8; n++) {
       const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), a);
-      if (p.y > canvas.y + 30 && p.y < sheet.y - 40) break;
-      const x = canvas.x + canvas.width - 14;
-      await page.mouse.move(x, canvas.y + 80);
+      if (p.y > topEdge && p.y < bottomEdge) break;
+      // Dragging down moves the map down; the distance that puts the area in the middle of the free part, at most what the free part allows.
+      const d = Math.max(-reach * 2, Math.min(reach * 2, mid - p.y));
+      await page.mouse.move(x, mid - d / 2);
       await page.mouse.down();
-      await page.mouse.move(x, canvas.y + 160, { steps: 6 });
-      await page.mouse.move(x, canvas.y + 300, { steps: 6 });
+      await page.mouse.move(x, mid - d / 2 + d / 2, { steps: 5 });
+      await page.mouse.move(x, mid + d / 2, { steps: 5 });
       await page.mouse.up();
-      await settled(page);
+      await panSettled(page);
     }
     const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), a);
-    expect(p.y, `${AREAS[a]!.name} reachable above the sheet`).toBeGreaterThan(canvas.y);
-    expect(p.y, `${AREAS[a]!.name} reachable above the sheet`).toBeLessThan(sheet.y - 30);
+    expect(p.y, `${AREAS[a]!.name} is on the map above the sheet`).toBeGreaterThan(topEdge);
+    expect(p.y, `${AREAS[a]!.name} is on the map above the sheet`).toBeLessThan(bottomEdge);
   }
   expect(await page.locator('#sheet').isVisible(), 'the sheet stayed open while panning').toBe(true);
-  // And a tap on a visible one switches the sheet without closing it first.
-  const top = far[far.length - 1]!;
-  const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), top);
+  // A tap on a visible one switches the sheet without closing it first.
+  const last = targets[targets.length - 1]!;
+  const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), last);
   await page.mouse.click(p.x, p.y);
-  await expect(page.locator('#sheet h2')).toHaveText(AREAS[top]!.name);
+  await expect(page.locator('#sheet h2')).toHaveText(AREAS[last]!.name);
 });
+
+
+test('portrait: a guarded area sheet shows its guard rows, the counter tags and the combat line, and they fit at 375 px with the wide font', async ({ page }) => {
+  await ready(page, PORTRAIT);
+  const start = { reclaimed: ['landfall', 'shelf', 'shoal'] };
+  await startCampaign(page, start);
+  const id = lockedKnown(start.reclaimed)[0]!;
+  await tapArea(page, AREA[id]!);
+  await panSettled(page);
+  await expect(page.locator('#sheet .area-guard').first()).toBeVisible();
+  // Heart counters: "(not researched)" on a design you lack, and a Strong, Even or Weak badge.
+  await page.locator('#sheet .area-tags').scrollIntoViewIfNeeded();
+  await expect(page.locator('#sheet .area-tag[data-ship="lancer"]')).toContainText('(not researched)');
+  await expect(page.locator('#sheet .area-tag[data-ship="lancer"] .tag-badge')).toHaveText(/Strong|Even|Weak/);
+  // The combat line, from the sim's rule, under the tags; it fits the sheet's width.
+  await expect(page.locator('#sheet .guard-targets')).toHaveText('Thorns strike Flak first; Spores strike Lancers first.');
+  const line = (await page.locator('#sheet .guard-targets').boundingBox())!;
+  const sheet = (await page.locator('#sheet').boundingBox())!;
+  expect(line.x).toBeGreaterThanOrEqual(sheet.x);
+  expect(line.x + line.width).toBeLessThanOrEqual(sheet.x + sheet.width + 1);
+  await expectControlsFit(page, '#sheet', 'guarded area sheet with the combat line');
+});
+
+for (const c of [
+  { what: 'an open area', id: 'shelf', start: ['landfall'] },
+  { what: 'a locked area', id: 'veil', start: ['landfall', 'shelf', 'shoal'] },
+  { what: 'a relay with a decayed haul', id: 'rime', start: ['landfall', 'shelf', 'shoal'] },
+  { what: 'a far area', id: 'deep', start: ['landfall', 'shelf', 'shoal'] },
+]) {
+  test(`portrait: the sheet of ${c.what} fits at 375x667 with the wide font, clears the selected area, and Land is on screen`, async ({ page }) => {
+    await ready(page, PORTRAIT);
+    await startCampaign(page, { reclaimed: c.start });
+    await tapArea(page, AREA[c.id]!);
+    await panSettled(page);
+    const sheet = (await page.locator('#sheet').boundingBox())!;
+    const canvas = (await page.locator('#view').boundingBox())!;
+    const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), AREA[c.id]!);
+    const r = await page.evaluate(() => window.__factory4x!.areaRadius());
+    expect(p.y + r + 30, `${c.id} and its label clear the sheet`).toBeLessThanOrEqual(sheet.y + 1);
+    expect(p.y - r, `${c.id} is on the map`).toBeGreaterThanOrEqual(canvas.y);
+    expect(sheet.height, 'the sheet leaves most of the map').toBeLessThan(canvas.height * 0.6);
+    await expectControlsFit(page, '#sheet', `sheet of ${c.what}`);
+    const land = page.locator('#sheet button.land');
+    if ((await land.count()) > 0) {
+      const b = (await land.boundingBox())!;
+      expect(b.y, 'Land starts on screen').toBeGreaterThanOrEqual(0);
+      expect(b.y + b.height, 'Land ends inside the viewport without scrolling').toBeLessThanOrEqual(667);
+    } else {
+      expect(['veil', 'deep'], 'only a locked or far area has no Land button').toContain(c.id);
+    }
+  });
+}
 
 /** An area known (lane-joined to a reclaimed one) and behind a band lock with these reclaimed: the data's lanes decide. */
 function lockedKnown(reclaimed: string[]): string[] {
@@ -388,6 +444,41 @@ test('portrait: reclaiming a relay plays the step moment once, with its notice, 
   await expect(page.locator('#sheet .fleet-limit')).toHaveText(`Your fleet limit: ${FLEET_CAP + RELAY_STEP}`);
   await page.locator('#sheet button.land').click();
   await expect(page.locator('#toast')).toContainText(`fleet limit ${FLEET_CAP + RELAY_STEP}`);
+});
+
+test('portrait: a tap on the canvas during the step moment skips it, in its final state, and opens no sheet', async ({ page }) => {
+  test.setTimeout(120_000);
+  await ready(page, PORTRAIT);
+  await reclaimRime(page);
+  await page.locator('#result button', { hasText: 'Back to the overworld' }).click();
+  await expect.poll(() => page.evaluate(() => window.__factory4x!.stepActive()), { timeout: 5000 }).toBe(true);
+  // A real tap, on a node of the band being revealed, so a tap that wasn't swallowed would open that node's sheet.
+  const mire = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), AREA.mire!);
+  const canvas = (await page.locator('#view').boundingBox())!;
+  const x = Math.min(canvas.x + canvas.width - 20, Math.max(canvas.x + 20, mire.x));
+  const y = Math.min(canvas.y + canvas.height - 20, Math.max(canvas.y + 20, mire.y));
+  await page.mouse.click(x, y);
+  expect(await page.evaluate(() => window.__factory4x!.stepActive()), 'the tap stopped the step moment').toBe(false);
+  expect(await page.evaluate(() => window.__factory4x!.selectedArea()), 'the skipping tap opened no area').toBe(null);
+  await expect(page.locator('#sheet')).toBeHidden();
+  // Final state: the pan has stopped on the band that opened, and the padlocks are gone from it.
+  await settled(page);
+  const s1 = await page.evaluate(() => window.__factory4x!.overworldScroll().y);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__factory4x!.overworldScroll().y), 'the pan is at rest').toBe(s1);
+  const view = (await page.locator('#view').boundingBox())!;
+  const band2 = AREAS.filter((a) => a.tier === 2);
+  let inView = 0;
+  for (const a of band2) {
+    const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), AREA[a.id]!);
+    if (p.y > view.y && p.y < view.y + view.height) inView++;
+  }
+  expect(inView, 'the opened band is in view').toBeGreaterThan(0);
+  for (const id of lockedKnown(['landfall', 'shelf', 'rime'])) {
+    await page.evaluate((i) => window.__factory4x!.centerOnArea(i), AREA[id]!);
+    await settled(page);
+    expect(await padlockPixels(page, AREA[id]!), `padlock on ${name(id)}`).toBeLessThan(10);
+  }
 });
 
 test('the step moment leaves the band in view and the padlocks gone once it has played', async ({ page }) => {

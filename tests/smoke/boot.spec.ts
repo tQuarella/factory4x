@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createWorld, defaultData, replayHashes, serializeWorld, type CampaignStart } from '@factory4x/sim';
+import { tapArea } from './helpers.ts';
 import { referenceReplay } from '../../packages/bots/src/reference-replay.ts';
 
 function watchErrors(page: Page): string[] {
@@ -41,35 +42,6 @@ async function tapNode(page: Page, node: number): Promise<void> {
 const AREA = Object.fromEntries(defaultData.map.areas.map((a, i) => [a.id, i])) as Record<string, number>;
 const AREA_COUNT = defaultData.map.areas.length;
 const areaName = (id: string): string => defaultData.map.areas[AREA[id]!]!.name;
-
-/**
- * Taps an area on the overworld. The map is a pan, so the area is first centred in the part of the map no sheet covers (what a drag
- * does, in one step), then the tap waits until the area has stopped moving and the point under it is the canvas itself, not a notice
- * or the hint that a layout shift has put there (boot.spec "held area cannot be landed on" tapped #hint-text 2 runs in 5). It retries
- * until the sheet for that area is open, so a tap that lands during a re-layout is simply made again.
- */
-async function tapArea(page: Page, area: number): Promise<void> {
-  let last = { x: -1, y: -1 };
-  await expect
-    .poll(
-      async () => {
-        await page.evaluate((i) => window.__factory4x!.centerOnArea(i), area);
-        await settled(page);
-        const q = await page.evaluate((i) => {
-          const p = window.__factory4x!.areaScreenPos(i);
-          const hit = document.elementFromPoint(p.x, p.y);
-          return { ...p, onCanvas: hit !== null && hit.id === 'view' };
-        }, area);
-        const still = Math.abs(q.x - last.x) < 0.5 && Math.abs(q.y - last.y) < 0.5;
-        last = { x: q.x, y: q.y };
-        if (!still || !q.onCanvas) return false;
-        await page.mouse.click(q.x, q.y);
-        return (await page.evaluate(() => window.__factory4x!.selectedArea())) === area;
-      },
-      { message: `tapping area ${area}`, timeout: 15_000 },
-    )
-    .toBe(true);
-}
 
 const LANDFALL = AREA.landfall!;
 const SHELF = AREA.shelf!;
@@ -783,6 +755,23 @@ test.describe('375x667 portrait', () => {
       await expect.poll(shown).toBe('play');
       await page.locator('#b-pause').click();
       await expect.poll(shown).toBe('pause');
+    }
+  });
+
+  test('the combat line on the heart and pocket sheets fits at 375 px with the wide font', async ({ page }) => {
+    await ready(page);
+    await startCampaign(page, DEEP_START);
+    const pocket = await page.evaluate(() => window.__factory4x!.pocketNode('crystal'));
+    for (const node of [await heartNode(page), pocket]) {
+      await tapNode(page, node);
+      const line = page.locator('#sheet .guard-targets');
+      await line.scrollIntoViewIfNeeded();
+      await expect(line).toHaveText('Thorns strike Flak first; Spores strike Lancers first.');
+      const b = (await line.boundingBox())!;
+      const s = (await page.locator('#sheet').boundingBox())!;
+      expect(b.x, `line left of node ${node}`).toBeGreaterThanOrEqual(s.x);
+      expect(b.x + b.width, `line right of node ${node}`).toBeLessThanOrEqual(s.x + s.width + 1);
+      await expectControlsFit(page, '#sheet', `sheet of node ${node} with the combat line`);
     }
   });
 

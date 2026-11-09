@@ -166,7 +166,7 @@ function unionRect(a: Rect, b: Rect): Rect {
   return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
 }
 
-const easeOut =(t: number): number => 1 - (1 - t) * (1 - t) * (1 - t);
+const easeOut = (t: number): number => 1 - (1 - t) * (1 - t) * (1 - t);
 const ramp = (t: number, a: number, b: number): number => Math.max(0, Math.min(1, (t - a) / (b - a)));
 
 export class WorldView {
@@ -187,7 +187,6 @@ export class WorldView {
   private goalY = 0;
   /** Px of the canvas's bottom covered by a sheet right now (portrait overlay), set by the host each frame. The pan reaches that much further. */
   cover = 0;
-  /** An area to centre on at the next resize (the area just left, or the start), set before the first layout. */
   /** The area the view is centred on until the player pans (re-applied when the layout changes). */
   private focusTarget: number | null = null;
   private userMoved = false;

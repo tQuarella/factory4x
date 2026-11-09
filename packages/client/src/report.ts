@@ -3,6 +3,7 @@ import {
   activeBattles,
   combatRates,
   counterTag,
+  GUARD_TARGET_ORDER,
   fleetCap,
   fleetStatus,
   isReclaimed,
@@ -195,7 +196,7 @@ export function fleetLimitText(cap: number): string {
 }
 
 /** H6 combat amendment: the line under the Strong/Weak tags of a heart or pocket (the guard-damage target order). */
-export const GUARD_TARGET_LINE = 'Thorns strike Flak first; Spores strike Lancers first.';
+export const GUARD_TARGET_LINE = `Thorns strike ${SHIP_PLURAL[GUARD_TARGET_ORDER.thorn[0]!]} first; Spores strike ${SHIP_PLURAL[GUARD_TARGET_ORDER.spore[0]!]} first.`;
 
 /** The first-time notice when the fleet reaches its limit in a visit. */
 export function fleetFullNotice(count: number, cap: number): string {

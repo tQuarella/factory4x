@@ -323,7 +323,7 @@ export type {
 } from './world.ts';
 export { clampSendCounts, inputCost, isValidInput } from './inputs.ts';
 export type { Input } from './inputs.ts';
-export { counterPct, step } from './step.ts';
+export { GUARD_TARGET_ORDER, counterPct, step } from './step.ts';
 export { fleetCap, fleetCount, fleetStatus, isFleetFull, recycleRefund } from './fleet.ts';
 export type { FleetStatus } from './fleet.ts';
 export { replayHashes, worldHash } from './replay.ts';

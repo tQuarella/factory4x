@@ -573,7 +573,7 @@ window.__factory4x = {
     const r = canvas.getBoundingClientRect();
     return worldView.labelRects().map((b) => (b === null ? null : { x: r.left + b.x, y: r.top + b.y, w: b.w, h: b.h }));
   },
-  overworldScroll:() => ({ ...worldView.scroll, max: worldView.scrollLimits }),
+  overworldScroll: () => ({ ...worldView.scroll, max: worldView.scrollLimits }),
   centerOnArea: (a) => worldView.focus(a),
   stepActive: () => worldView.stepActive,
   stepsStarted: () => stepsStarted,

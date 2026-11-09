@@ -177,10 +177,10 @@ describe('overworld text comes from selectors and live tunables', () => {
     expect(openedByReclaim(afterShelf, data, idx('shelf'))).toEqual(['Rime Relay']);
     // The first band 1 relay opens band 2: its new neighbours, not ones another reclaimed area already joined.
     const afterRime = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf', 'rime'] });
-    const opened = openedByReclaim(afterRime, data, idx('rime'));
-    expect(opened).toContain('Mire Relay');
-    expect(opened).toContain('Glint Relay');
-    expect(opened).not.toContain('Frost Shelf');
+    expect(openedByReclaim(afterRime, data, idx('rime'))).toEqual(['Glint Relay', 'Mire Relay']);
+    // Already joined: Thorn Garden is joined by Glass Shoal, so Glint's reclaim opens only Spire Relay.
+    const afterGlint = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf', 'shoal', 'rime', 'glint'] });
+    expect(openedByReclaim(afterGlint, data, idx('glint'))).toEqual(['Spire Relay']);
   });
 
   it('a disabled research button says why: items, then areas, then the shortest missing resource', () => {
@@ -279,9 +279,16 @@ describe('overworld layout helpers', () => {
     const hops = hopsFromStart(data);
     expect(hops[idx('landfall')]).toBe(0);
     expect(hops[idx('shelf')]).toBe(1);
-    // The map is taller than H4's: The Deep is further than any band 1 area and than the medium areas.
-    expect(hops[idx('deep')]).toBeGreaterThan(hops[idx('veil')]!);
-    expect(hops[idx('deep')]).toBeGreaterThan(hops[idx('rime')]!);
+    // Every area's hop count, against an independent relaxation over the data's lanes (Bellman-Ford style, not the BFS under test).
+    const want = ids.map((id) => (id === 'landfall' ? 0 : Infinity));
+    for (let pass = 0; pass < ids.length; pass++) {
+      for (const [a, b] of data.map.lanes) {
+        want[idx(a)] = Math.min(want[idx(a)]!, want[idx(b)]! + 1);
+        want[idx(b)] = Math.min(want[idx(b)]!, want[idx(a)]! + 1);
+      }
+    }
+    expect(hops).toEqual(want);
+    expect(hops[idx('deep')]).toBe(Math.min(hops[idx('mire')]!, hops[idx('spire')]!) + 1);
     const w = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf'] });
     const lanes = laneDraws(w, data);
     expect(lanes).toHaveLength(data.map.lanes.length);

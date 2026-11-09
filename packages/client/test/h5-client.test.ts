@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { campaignWorld, defaultData, fleetStatus, landingEffects, recycleRefund, type BattleResult, type ShipTypeCounts } from '@factory4x/sim';
 import { Session } from '../src/session.ts';
-import { fleetChipText, fleetFullNotice, fleetLine, fullFleetHint, landingNotice, recycleNotice, recycledText } from '../src/report.ts';
+import { fleetChipText, fleetFullNotice, fleetLine, fullFleetHint, landingNotice, recycleNotice, recycledText, tierRequirementText } from '../src/report.ts';
 import { YARD_STATE_TEXT } from '../src/sheet.ts';
 import { TUNE_LABEL } from '../src/panels.ts';
 
@@ -38,6 +38,15 @@ describe('fleet text', () => {
     expect(fx.fleetCap).not.toBeNull();
     expect(landingNotice('Frost Shelf', fx)).toContain(`fleet limit ${fx.fleetCap}`);
     expect(landingNotice('Frost Shelf', { ...fx, fleetCap: null })).not.toContain('fleet limit');
+  });
+});
+
+describe('tier requirement wording (still rendered by researchBlock and the research sheet)', () => {
+  it('words the tier requirement', () => {
+    expect(tierRequirementText(1, 1)).toBe('a light area reclaimed');
+    expect(tierRequirementText(2, 1)).toBe('a medium area reclaimed');
+    expect(tierRequirementText(2, 2)).toBe('both medium areas reclaimed');
+    expect(tierRequirementText(2, 3)).toBe('3 medium areas reclaimed');
   });
 });
 

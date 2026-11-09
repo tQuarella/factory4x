@@ -3,7 +3,7 @@
  * the tuning panel and the save flags. Every number comes from the sim or a live tunable; none is pinned.
  */
 import { describe, expect, it } from 'vitest';
-import { areaStatus, campaignWorld, defaultData, fleetCap, overworldStatus, tunableMeta } from '@factory4x/sim';
+import { GUARD_TARGET_ORDER, areaStatus, campaignWorld, defaultData, fleetCap, overworldStatus, tunableMeta } from '@factory4x/sim';
 import { Session } from '../src/session.ts';
 import { decodeSave, encodeSave } from '../src/persist.ts';
 import { GUARD_TARGET_LINE, fleetLimitText, stepMoment, stepNotice } from '../src/report.ts';
@@ -143,7 +143,10 @@ describe('the step moment', () => {
 
 describe('text and tuning', () => {
   it('the combat line, the fleet limit chip and the hidden starved tunables', () => {
+    // The line is built from the sim's rule, and says what the spec says today.
     expect(GUARD_TARGET_LINE).toBe('Thorns strike Flak first; Spores strike Lancers first.');
+    expect(GUARD_TARGET_LINE.toLowerCase()).toContain(`thorns strike ${GUARD_TARGET_ORDER.thorn[0]}`);
+    expect(GUARD_TARGET_LINE.toLowerCase()).toContain(`spores strike ${GUARD_TARGET_ORDER.spore[0] === 'lancer' ? 'lancers' : 'flak'}`);
     expect(fleetLimitText(20)).toBe('Fleet limit 20');
     const keys = tunableMeta(data).map((m) => m.key);
     expect(keys.some((k) => k.startsWith('bloom.starved'))).toBe(true);
