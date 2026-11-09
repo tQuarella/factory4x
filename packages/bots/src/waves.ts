@@ -65,6 +65,23 @@ export function waveWins(base: Readonly<World>, node: number, fleet: Readonly<Sh
   throw new Error('battle did not end');
 }
 
+/**
+ * True if these ships, in this order (the order sets their ids, and a battle's damage falls on ships in id order, so a
+ * wave that wins with its lancers first can lose with its flak first), each at its hp, arriving together at `node` of
+ * `base`, capture it. The live check the composer makes before it sends a wave.
+ */
+export function shipsWin(base: Readonly<World>, node: number, ships: ReadonlyArray<Readonly<{ type: ShipType; hp: number }>>, data: SimData): boolean {
+  const w = JSON.parse(JSON.stringify(base)) as World;
+  for (const s of ships) w.ships.push({ id: w.nextId++, type: s.type, hp: s.hp, at: node, transit: null, engagedIn: -1 });
+  const g = guardianAt(w, node)!;
+  for (let i = 0; i < 100_000; i++) {
+    step(w, data, []);
+    if (!g.alive) return true;
+    if (!w.ships.some((s) => s.at === node)) return false;
+  }
+  throw new Error('battle did not end');
+}
+
 const only = (type: ShipType, n: number): ShipTypeCounts => ({ drone: 0, lancer: 0, flak: 0, [type]: n });
 
 /** The smallest single-type wave that wins, or null within `max`. */

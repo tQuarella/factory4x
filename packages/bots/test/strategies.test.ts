@@ -15,6 +15,7 @@ import {
   type World,
 } from '@factory4x/sim';
 // H4: an H3 game is The Deep from a constructed campaign (createWorld starts on the overworld).
+import { minMix, probeWorld } from '../src/waves.ts';
 import { h3World } from '../../sim/test/h3-world.ts';
 // The frozen v8 fixture (fleet.cap 12, the Command limit item): the rules and numbers these tests pin never move with calibration.
 import { fixtureData as v4, fixtureV8 as data } from '../../sim/test/fixture.ts';
@@ -35,10 +36,12 @@ import {
   guardNeed,
   nextEconomyOrder,
   nextPurchase,
+  MAX_WAVES,
   nextTarget,
   nodeFinished,
   openAreas,
   readyToAttack,
+  winningMix,
   strategies,
   targetOrder,
   type CampaignStrategy,
@@ -222,26 +225,33 @@ describe('allocation', () => {
 });
 
 describe('target and closed areas', () => {
-  it('takes the first node in the H3 order whose best allocation passes the attack test', () => {
+  it('takes the first node in the H3 order that has a winning mix within the limit, and builds that mix', () => {
     const w = landed('veil');
-    const t = chooseTarget(w, 12, ALL)!;
+    const t = chooseTarget(w, data, 12, ALL)!;
     expect(t.passes).toBe(true);
-    // Order: pockets and the Root come before the heart; the fed heart (50 spores) is out of reach at 12.
-    expect(t.node).not.toBe(idx(w, 'heart'));
     const order = targetOrder(w);
-    for (const node of order.slice(0, order.indexOf(t.node))) {
-      expect(readyToAttack(w, node, bestAllocation(w, node, 12, ALL).power)).toBe(false);
-    }
-    // Skipping a failing node: starve the first passing one of its allowance by raising its wave count.
-    w.guardians.find((g) => g.node === t.node)!.wavesSent = 12;
-    const second = chooseTarget(w, 12, ALL)!;
-    expect(second.node).not.toBe(t.node);
+    // Every node before it has no winning mix at 12; it has one, and the fleet is exactly that mix.
+    for (const node of order.slice(0, order.indexOf(t.node))) expect(winningMix(w, data, node, 12, ALL), `node ${node}`).toBeNull();
+    const m = winningMix(w, data, t.node, 12, ALL)!;
+    expect(t.fleet).toEqual(m.fleet);
+    expect(total(t.fleet)).toBe(m.total);
+    expect(m.total).toBeLessThanOrEqual(12);
+    // The mix is the sim's minimum: one ship fewer of any single composition never wins (the probe's own search).
+    const base = probeWorld(1, data, 'veil', false);
+    expect(minMix(base, t.node, ALL, 12, data)!.total).toBe(m.total);
   });
 
-  it('is null when nothing passes (the area is closed at this limit), or the first node with passes false when asked for a fallback', () => {
+  it('a node that has had MAX_WAVES waves sent is skipped (its mix is not trusted again)', () => {
     const w = landed('veil');
-    expect(chooseTarget(w, 2, ALL)).toBeNull();
-    const fb = chooseTarget(w, 2, ALL, true)!;
+    const t = chooseTarget(w, data, 12, ALL)!;
+    w.guardians.find((g) => g.node === t.node)!.wavesSent = MAX_WAVES;
+    expect(chooseTarget(w, data, 12, ALL)?.node).not.toBe(t.node);
+  });
+
+  it('is null when no node has a winning mix (the area is closed at this limit), or the first node with passes false when asked for a fallback', () => {
+    const w = landed('veil');
+    expect(chooseTarget(w, data, 2, ALL)).toBeNull();
+    const fb = chooseTarget(w, data, 2, ALL, true)!;
     expect(fb.passes).toBe(false);
     expect(fb.node).toBe(targetOrder(w)[0]);
     expect(total(fb.fleet)).toBe(2);
@@ -249,8 +259,8 @@ describe('target and closed areas', () => {
 
   it('a raised limit opens what a smaller one closed', () => {
     const w = landed('veil');
-    expect(chooseTarget(w, 2, ALL)).toBeNull();
-    expect(chooseTarget(w, 30, ALL)).not.toBeNull();
+    expect(chooseTarget(w, data, 2, ALL)).toBeNull();
+    expect(chooseTarget(w, data, 30, ALL)).not.toBeNull();
   });
 
   it('a fed medium heart fails the attack test at the base limit and passes at a large one', () => {
@@ -316,7 +326,7 @@ describe('composer engine', () => {
   it('a forced visit at the base limit rallies from the landing, gathers the full allocation at a5 and attacks at least once', () => {
     // Premise: Frost Shelf at the base limit of 12 is closed (the heart needs more), so the visit is forced and plays out.
     const w = landed('shelf');
-    expect(chooseTarget(w, 12, ALL)).not.toBeNull(); // the pocket passes first, then the heart does not
+    expect(chooseTarget(w, data, 12, ALL)).not.toBeNull(); // the pocket has a winning mix first, then the heart does not
     const a5 = idx(w, 'a5');
     let strandedAfterEconomy = 0;
     for (let i = 0; i < 30 * 60 * 30 && runSummary(w).wavesSent === 0; i++) {

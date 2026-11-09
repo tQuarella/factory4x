@@ -6,6 +6,7 @@ import {
   SHIP_TYPES,
   areaStatus,
   designResearched,
+  fnv1a,
   fleetCap,
   fleetCount,
   fleetStatus,
@@ -28,6 +29,7 @@ import {
   type SimData,
   type World,
 } from '@factory4x/sim';
+import { minMix, probeWorld, shipsWin } from './waves.ts';
 
 /**
  * Strategies are stateless: every decision is derived from the world they are
@@ -270,23 +272,107 @@ export function targetOrder(world: Readonly<World>): number[] {
   return out;
 }
 
+/** The smallest winning mix at a node and one such fleet (the probe's minMix), as the composer allocates from it. */
+export interface Mix {
+  total: number;
+  fleet: ShipTypeCounts;
+}
+
+const baseCache = new Map<string, { data: SimData; world: World }>();
+const mixCache = new Map<string, Mix | null>();
+const waveCache = new Map<string, boolean>();
+
+const baseKey = (world: Readonly<World>, data: SimData, areaId: string): string => `${areaId}|${world.system.variant}|${fnv1a(JSON.stringify(world.tun))}|${data.dataVersion}`;
+
+/** The probe's world for the area the world is in, built with this world's tunables as the data's defaults so its battles use the same numbers. */
+function baseFor(world: Readonly<World>, data: SimData, areaId: string, key: string): { data: SimData; world: World } {
+  let b = baseCache.get(key);
+  if (b === undefined) {
+    const liveData = { ...data, tunables: Object.fromEntries(Object.entries(data.tunables).map(([k, v]) => [k, { ...v, default: world.tun[k as keyof typeof world.tun] }])) } as unknown as SimData;
+    b = { data: liveData, world: probeWorld(world.campaign.deepLayout, liveData, areaId, false) };
+    if (baseCache.size > 64) baseCache.clear();
+    baseCache.set(key, b);
+  }
+  return b;
+}
+
+/**
+ * Whether this exact wave, in this order and at these hps, takes `node` from full strength (the probe's battle, from
+ * waves.ts shipsWin). The minimum mix is verified against the ships actually parked, because a battle's damage falls
+ * on ships in id order and a mix that wins with its lancers first can lose with its flak first.
+ */
+export function waveWins(world: Readonly<World>, data: SimData, node: number, ships: ReadonlyArray<Readonly<{ type: ShipType; hp: number }>>): boolean {
+  const area = world.campaign.active;
+  if (area === null) return false;
+  const areaId = data.map.areas[area]!.id;
+  const base = baseKey(world, data, areaId);
+  const key = `${base}|${node}|${ships.map((s) => `${s.type[0]}${s.hp}`).join(',')}`;
+  const hit = waveCache.get(key);
+  if (hit !== undefined) return hit;
+  const b = baseFor(world, data, areaId, base);
+  const r = shipsWin(b.world, node, ships, b.data);
+  if (waveCache.size > 20000) waveCache.clear();
+  waveCache.set(key, r);
+  return r;
+}
+
+/**
+ * The probe's own minimum winning mix for `node` of the area the world is in: the smallest simultaneous wave of the
+ * `types` (at most `limit` ships) that takes the node from full strength under this world's tunables, from the real
+ * sim (waves.ts minMix). It lands the same area as the probe does (probeWorld: every other area reclaimed, both
+ * designs, yards off), so it doesn't depend on this world's ships or the guards' current wounds; cached per area
+ * and layout, node, limit, types, the node's caps and the tunables. Null if no mix within the limit wins.
+ */
+export function mixAt(world: Readonly<World>, data: SimData, node: number, limit: number, types: readonly ShipType[]): Mix | null {
+  const area = world.campaign.active;
+  if (area === null || limit < 1) return null;
+  const areaId = data.map.areas[area]!.id;
+  const g = guardianStatus(world, node).guards;
+  const base = baseKey(world, data, areaId);
+  const key = `${base}|${node}|${limit}|${types.join(',')}|${g.thorn.cap},${g.spore.cap}`;
+  if (mixCache.has(key)) {
+    const hit = mixCache.get(key)!;
+    return hit === null ? null : { total: hit.total, fleet: { ...hit.fleet } };
+  }
+  const b = baseFor(world, data, areaId, base);
+  const m = minMix(b.world, node, types, limit, b.data);
+  if (mixCache.size > 4000) mixCache.clear();
+  mixCache.set(key, m === null ? null : { total: m.total, fleet: { ...m.fleet } });
+  return m === null ? null : { total: m.total, fleet: { ...m.fleet } };
+}
+
+/** Waves that may be sent at a node before the composer stops trusting its mix there and treats the node as closed (a mix that wins from full strength and has lost twice means the premise fails). */
+export const MAX_WAVES = 2;
+
+/**
+ * The mix to build for `node` at `limit`: mixAt, unless MAX_WAVES waves have already been sent there. The wave is
+ * exactly the mix and nothing is added to a retry: the sim is not monotone in ship counts (extra ships can turn a
+ * winning wave into a loss), so only the composition the probe verified is sent.
+ */
+export function winningMix(world: Readonly<World>, data: SimData, node: number, limit: number, types: readonly ShipType[]): Mix | null {
+  const sent = world.guardians.find((x) => x.node === node)?.wavesSent ?? 0;
+  return sent >= MAX_WAVES ? null : mixAt(world, data, node, limit, types);
+}
+
 export interface Target {
   node: number;
   fleet: ShipTypeCounts;
-  /** The allocation passes the H3 attack test at this limit. */
+  /** A winning mix exists at this limit (the node is takeable); false for the forced fallback. */
   passes: boolean;
 }
 
 /**
- * The composer's target at `limit`: the first node in the H3 order whose best allocation passes the attack test
- * (power × 3 ≥ need + 20, raised per wave already sent). Null if none passes. `fallback` returns the first node
- * in the order with its best allocation instead (passes false) when none passes, for a visit that must be played.
+ * The composer's target at `limit`: the first node in the H3 order for which a winning mix of the buildable types
+ * exists within the limit (winningMix); its fleet is that mix. A node with no guards needs one drone. Null if none
+ * has one. `fallback` returns the first node in the order with the H3 best-power allocation instead (passes false)
+ * when none does, for a visit that must be played.
  */
-export function chooseTarget(world: Readonly<World>, limit: number, buildable: readonly ShipType[], fallback = false): Target | null {
+export function chooseTarget(world: Readonly<World>, data: SimData, limit: number, buildable: readonly ShipType[], fallback = false): Target | null {
   const order = targetOrder(world);
   for (const node of order) {
-    const a = bestAllocation(world, node, limit, buildable);
-    if (readyToAttack(world, node, a.power)) return { node, fleet: a.fleet, passes: true };
+    if (guardNeed(world, node) === 0) return { node, fleet: bestAllocation(world, node, limit, buildable).fleet, passes: true };
+    const m = winningMix(world, data, node, limit, buildable);
+    if (m !== null) return { node, fleet: m.fleet, passes: true };
   }
   if (fallback && order.length > 0) return { node: order[0]!, fleet: bestAllocation(world, order[0]!, limit, buildable).fleet, passes: false };
   return null;
@@ -322,7 +408,7 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
   const buildable = buildableTypes(world, opts.dronesOnly);
   const cap = fleetCap(world, data);
   const limit = cap ?? Math.max(1, fleetCount(world));
-  const target = chooseTarget(world, limit, buildable, opts.forced);
+  const target = chooseTarget(world, data, limit, buildable, opts.forced);
   const livingGuarded = world.guardians.some((g) => g.alive);
   if (target === null && !inFlight && livingGuarded && !opts.forced) return { inputs, closed: true };
 
@@ -343,25 +429,58 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
   // (the target test above is optimistic about it, as the capability windows are), so the first waves are drones.
   const unlocked = unlockStatus(world).ships;
   const planTypes = buildable.filter((t) => unlocked[t]);
-  const plan = target === null ? null : planTypes.length === buildable.length ? target.fleet : bestAllocation(world, target.node, limit, planTypes).fleet;
+  // The plan is a winning mix when one exists with the types that can be built now, else the best-power fleet of them
+  // (drones, while a component is still to come), which only the H3 threshold below can send.
+  let plan: ShipTypeCounts | null = null;
+  let viaMix = false;
+  if (target !== null) {
+    const m = planTypes.length === buildable.length ? (target.passes ? { fleet: target.fleet } : null) : winningMix(world, data, target.node, limit, planTypes);
+    viaMix = m !== null && guardNeed(world, target.node) > 0;
+    plan = m !== null ? m.fleet : bestAllocation(world, target.node, limit, planTypes).fleet;
+  }
   const have = counted(world, data);
+  const c = shipCounts(world);
+  const at = a5 >= 0 ? c.atByType[a5]! : { drone: 0, lancer: 0, flak: 0 };
+  const matches = plan !== null && SHIP_TYPES.every((t) => at[t] >= plan![t]);
+  // A winning mix is verified against the ships actually parked (their order and hp) before it is sent: the exact mix
+  // first, then everything parked. If neither wins and the fleet has room, the yards add ships of the mix's types and
+  // it is checked again next tick; if the fleet is full, everything parked goes (a wave that counts toward MAX_WAVES).
+  let launch: ShipTypeCounts | null = null;
+  let grow = false;
+  if (viaMix && matches && !inFlight && target !== null) {
+    const parked = world.ships.filter((s) => s.at === a5);
+    const pick = (counts: Readonly<ShipTypeCounts>): { type: ShipType; hp: number }[] => {
+      const left = { ...counts };
+      const out: { type: ShipType; hp: number }[] = [];
+      for (const s of parked) {
+        if (left[s.type] > 0) {
+          left[s.type]--;
+          out.push({ type: s.type, hp: s.hp });
+        }
+      }
+      return out;
+    };
+    const exact = { drone: plan!.drone, lancer: plan!.lancer, flak: plan!.flak };
+    if (waveWins(world, data, target.node, pick(exact))) launch = exact;
+    else if (parked.length > exact.drone + exact.lancer + exact.flak && waveWins(world, data, target.node, pick(SEND_ALL))) launch = SEND_ALL;
+    else if (isFleetFull(world, data)) launch = SEND_ALL;
+    else grow = true;
+  }
   for (const t of SHIP_TYPES) {
     // A wave in flight with no passing target keeps the yards as they are.
-    const want = plan === null ? world.yards[t].on : planTypes.includes(t) && have[t] < plan[t];
+    const want = plan === null ? world.yards[t].on : planTypes.includes(t) && (have[t] < plan[t] || (grow && plan[t] > 0));
     if (world.yards[t].on !== want) inputs.push({ type: 'setShipyard', shipType: t, on: want });
   }
-  const owned = world.stats.captures.map((c) => c.node).filter((n) => world.nodes[n]!.kind !== 'root');
+  const owned = world.stats.captures.map((cap) => cap.node).filter((n) => world.nodes[n]!.kind !== 'root');
   const out = buildPlan(world, owned);
   if (out.order) inputs.push(out.order);
-  const c = shipCounts(world);
   // Every idle ship regroups at a5: from captured nodes, the probe, or anywhere else that isn't a living guarded node (a wave).
   for (const n of world.nodes) {
     if (n.index !== a5 && c.at[n.index]! > 0 && !isGuarded(world, n.index)) inputs.push({ type: 'sendShips', from: n.index, to: a5, counts: SEND_ALL });
   }
   if (target === null || a5 < 0) return { inputs, closed: false };
-  const at = c.atByType[a5]!;
-  // Recycle: the fleet is full and a type parked at a5 is above its allocation.
-  if (isFleetFull(world, data)) {
+  // Recycle: the fleet is full and a type parked at a5 is above its allocation (not while a winning mix is being verified).
+  if (isFleetFull(world, data) && !(viaMix && matches)) {
     const surplus: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
     let n = 0;
     for (const t of SHIP_TYPES) {
@@ -371,10 +490,11 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
     if (n > 0) inputs.push({ type: 'recycleShips', node: a5, counts: surplus });
   }
   if (inFlight) return { inputs, closed: false };
-  // Attack: the ships at a5 match the allocation, or the H3 threshold is met with what is there.
-  const total = at.drone + at.lancer + at.flak;
-  const matches = SHIP_TYPES.every((t) => at[t] >= plan![t]);
-  if (total > 0 && (matches || readyToAttack(world, target.node, fleetPower(world, target.node, at)))) {
+  // Attack: a verified winning mix (see launch above), or, for a plan that is no mix, the H3 threshold met with what is there.
+  const parkedTotal = at.drone + at.lancer + at.flak;
+  if (viaMix) {
+    if (launch !== null) inputs.push({ type: 'sendShips', from: a5, to: target.node, counts: launch });
+  } else if (parkedTotal > 0 && (matches || readyToAttack(world, target.node, fleetPower(world, target.node, at)))) {
     inputs.push({ type: 'sendShips', from: a5, to: target.node, counts: SEND_ALL });
   }
   return { inputs, closed: false };
