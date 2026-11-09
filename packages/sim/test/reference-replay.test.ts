@@ -37,6 +37,11 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
  * second relay and repeat haul (Spire Relay), and The Deep without its Root at
  * the twice-raised limit. It also keeps H4's withdraw, cancel and research
  * steps, and uses every input type.
+ *
+ * h6-combat-target: in The Deep, weak lancers and flak fight the heart's
+ * Thorns and Spores across the 5400 checkpoint, so the determinism hashes
+ * depend on the combat amendment (each guard pool strikes the ship type it
+ * counters first).
  */
 describe('reference replay', () => {
   expect(referenceReplay.start).toBeDefined();
@@ -54,6 +59,8 @@ describe('reference replay', () => {
   const recycled: Array<{ area: string; tick: number; drones: number; ore: number; countBefore: number }> = [];
   const builtIn: Record<string, { lancer: number; flak: number; drone: number }> = {};
   let activeAt3000: number | null = null;
+  /** At each checkpoint (every 300 ticks) with a battle at a heart: the ships there as type + hp, and the guards left. */
+  const heartAtCheckpoint: Array<{ tick: number; area: string; ships: string[]; guards: { thorn: number; spore: number } }> = [];
   const areaId = (a: number): string => data.map.areas[a]!.id;
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
@@ -106,6 +113,17 @@ describe('reference replay', () => {
       }
     }
     if (w.tick === 3000) activeAt3000 = w.campaign.active;
+    if (a !== null && w.tick % 300 === 0) {
+      const hg = w.guardians.find((g) => w.nodes[g.node]!.kind === 'heart')!;
+      if (hg.battle !== null) {
+        heartAtCheckpoint.push({
+          tick: w.tick,
+          area: areaId(a),
+          ships: w.ships.filter((s) => s.at === hg.node).map((s) => `${s.type} ${s.hp}`),
+          guards: { thorn: hg.guards.filter((x) => x.type === 'thorn').length, spore: hg.guards.filter((x) => x.type === 'spore').length },
+        });
+      }
+    }
   }
   const area = (id: string): number => data.map.areas.findIndex((x) => x.id === id);
   const haul = (id: string): ResourceTriple => data.map.areas[area(id)]!.haul;
@@ -113,8 +131,8 @@ describe('reference replay', () => {
   const limit0 = 4;
   const relayStep = data.tunables['fleet.relayStep'].default;
 
-  it('reclaims Landfall, Glass Shoal, Glint Relay, Spore Veil and Spire Relay after the constructed Thorn Garden, then lands in The Deep', () => {
-    expect(w.campaign.reclaimOrder.map(areaId)).toEqual(['garden', 'landfall', 'shoal', 'glint', 'veil', 'spire']);
+  it('reclaims Landfall, Glass Shoal, Glint Relay, Spore Veil and Spire Relay after the constructed Thorn Garden, then lands in The Deep and takes it', () => {
+    expect(w.campaign.reclaimOrder.map(areaId)).toEqual(['garden', 'landfall', 'shoal', 'glint', 'veil', 'spire', 'deep']);
     expect(landings.map((l) => l.area)).toEqual(['landfall', 'shoal', 'shoal', 'glint', 'veil', 'spire', 'deep']);
     expect(areaId(w.campaign.active!)).toBe('deep');
     expect(activeAt3000).not.toBeNull();
@@ -128,11 +146,12 @@ describe('reference replay', () => {
     expect(paid('glint')).toEqual(decayedHaul(haul('glint'), pct));
     expect(paid('veil')).toEqual(haul('veil'));
     expect(paid('spire')).toEqual(decayedHaul(haul('spire'), pct));
+    expect(paid('deep')).toEqual(haul('deep'));
     // The premise: the decay takes something off both relays.
     expect(paid('glint')).not.toEqual(haul('glint'));
     expect(paid('spire')).not.toEqual(haul('spire'));
     for (const res of RAW_RESOURCES) {
-      const total = ['landfall', 'shoal', 'glint', 'veil', 'spire'].reduce((s, id) => s + paid(id)![res], 0);
+      const total = ['landfall', 'shoal', 'glint', 'veil', 'spire', 'deep'].reduce((s, id) => s + paid(id)![res], 0);
       expect(w.campaign.totals.hauled[res], res).toBe(total);
     }
   });
@@ -162,6 +181,9 @@ describe('reference replay', () => {
       'veil heart captured',
       'spire p2 captured',
       'spire heart captured',
+      'deep p2 captured',
+      'deep p1 captured',
+      'deep heart captured',
     ]);
   });
 
@@ -179,7 +201,7 @@ describe('reference replay', () => {
     expect(capAtSend).toEqual(battles.map((b) => {
       const id = b.split(' ')[0]!;
       const node = b.split(' ')[1]!;
-      return `${id} ${node} ${['veil', 'spire'].includes(id) ? limit0 + relayStep : limit0}`;
+      return `${id} ${node} ${id === 'deep' ? limit0 + 2 * relayStep : ['veil', 'spire'].includes(id) ? limit0 + relayStep : limit0}`;
     }));
   });
 
@@ -191,7 +213,13 @@ describe('reference replay', () => {
       expect(n, id).toBeLessThanOrEqual(cap);
     }
     const each = Math.floor((5 * data.tunables['fleet.recycleRefundPct'].default) / 100);
-    expect(recycled).toEqual([{ area: 'veil', tick: 2522, drones: 3, ore: 3 * each, countBefore: limit0 + relayStep }]);
+    expect(recycled[0]).toEqual({ area: 'veil', tick: 2522, drones: 3, ore: 3 * each, countBefore: limit0 + relayStep });
+    // The Deep recycles every drone at p1 too (drone yard off), so lancers and flak fill its limit.
+    expect(recycled.map((r) => [r.area, r.tick])).toEqual([
+      ['veil', 2522],
+      ['deep', 3872],
+    ]);
+    expect(recycled[1]!.ore).toBe(recycled[1]!.drones * each);
     expect(w.campaign.areas[area('veil')]).toMatchObject({ shipsRecycled: 3, oreRefunded: 3 * each });
     // The freed slots go to both component yards in Spore Veil (both designs, both prizes; the drone yard is off).
     expect(builtIn['veil']!.lancer).toBeGreaterThanOrEqual(1);
@@ -204,6 +232,31 @@ describe('reference replay', () => {
     expect(deep.rigged).toEqual(['a1']);
     expect(deep.droneTicks).toBe(Math.max(15, Math.floor((30 * (100 - data.tunables['research.yards.stepPct'].default)) / 100)));
     expect(w.routes.find((r) => r.from === 1)?.level).toBe(2);
+  });
+
+  it('a mixed fight spans a checkpoint: lancers and flak at The Deep\'s heart against Thorns and Spores at tick 5400, after losses past the first ship', () => {
+    const at5400 = heartAtCheckpoint.find((c) => c.tick === 5400)!;
+    expect(at5400.area).toBe('deep');
+    const types = new Set(at5400.ships.map((s) => s.split(' ')[0]));
+    expect([...types].sort()).toEqual(['flak', 'lancer']);
+    expect(at5400.guards.thorn).toBeGreaterThan(0);
+    expect(at5400.guards.spore).toBeGreaterThan(0);
+    // Some ships are wounded, not only dead or whole: hp is carried across the checkpoint.
+    const full = data.tunables['ship.lancer.hp'].default;
+    expect(at5400.ships.some((s) => Number(s.split(' ')[1]) < full)).toBe(true);
+    // More than one ship lost in that battle: each round's damage spills past the first ship.
+    // The heart's battle: lancers and flak only, both guard types at the start, and losses on both ship types, so
+    // each guard pool found its own target type and spilled past single ships.
+    const fight = w.guardians.find((g) => w.nodes[g.node]!.kind === 'heart')!.lastBattle!;
+    expect(fight.startTick).toBeLessThan(5400);
+    expect(fight.endTick).toBeGreaterThan(5400);
+    expect(fight.engagedByType.drone).toBe(0);
+    expect(fight.guardsAtStart.thorn > 0 && fight.guardsAtStart.spore > 0).toBe(true);
+    expect(fight.lostByType.lancer).toBeGreaterThan(0);
+    expect(fight.lostByType.flak).toBeGreaterThan(0);
+    expect(fight.shipsLost).toBeGreaterThanOrEqual(2);
+    // By the checkpoint, ships had already been lost.
+    expect(at5400.ships.length).toBeLessThan(fight.engagedByType.lancer + fight.engagedByType.flak);
   });
 
   it('uses every input type, with exactly two inputs ignored on purpose: research inside an area, and the band-locked landing', () => {

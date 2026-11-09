@@ -14,6 +14,14 @@ declare const console: { log(...args: unknown[]): void };
  * Pinned on the fixture, these check the rules, not the calibration.
  * The shipped (calibrated) numbers are reported at the end of this file.
  *
+ * h6-combat-target (DESIGN.md H6 "Combat amendment"): guards strike the
+ * ship type they counter first, so the best-mix column was re-derived. It was
+ * found with every lancer's id below every flak's, so all guard damage hit
+ * lancers first. Thorn-heavy nodes (9 / 4) now put their Thorns on the flak
+ * (11 to 13); Spore-heavy ones (2 / 18) no longer add the Thorns to the
+ * lancers (10 to 9); the hearts moved by 1 or 2 either way, and the Twin Seams
+ * Root from 7 to 6. Single-type minima can't depend on order and didn't move.
+ *
  * h4-sim acceptance 6 ("The Deep at defaults plays like H3"): since H4 the
  * worlds here are The Deep, landed at tick 0 from campaignWorld (baseWorld →
  * h3World → campaignWorld with every other area reclaimed and both designs
@@ -37,10 +45,10 @@ const LAYOUTS: Array<{ name: string; layout: number; cases: Case[] }> = [
     cases: [
       { id: 'p1', spec: [14, 17, 8, 5], sim: [13, 17, 8, 5] },
       { id: 'p2', spec: [13, 12, 20, 6], sim: [15, 12, 20, 6] },
-      { id: 'p3', spec: [25, 17, 35, 11], sim: [25, 17, 35, 11] },
-      { id: 'p4', spec: [22, 25, 18, 10], sim: [22, 25, 18, 10] },
+      { id: 'p3', spec: [25, 17, 35, 11], sim: [25, 17, 35, 13] },
+      { id: 'p4', spec: [22, 25, 18, 10], sim: [22, 25, 18, 9] },
       { id: 'root', spec: [16, 6, 25, 6], sim: [16, 6, 25, 6] },
-      { id: 'heart', spec: [32, 25, 39, 14], sim: [33, 25, 39, 14] },
+      { id: 'heart', spec: [32, 25, 39, 14], sim: [33, 25, 39, 15] },
       { id: 'starved heart', spec: [16, 10, 17, 7], sim: [16, 10, 17, 7] },
     ],
   },
@@ -50,10 +58,10 @@ const LAYOUTS: Array<{ name: string; layout: number; cases: Case[] }> = [
     cases: [
       { id: 'p1', spec: [14, 17, 8, 5], sim: [13, 17, 8, 5] },
       { id: 'p2', spec: [13, 12, 20, 6], sim: [15, 12, 20, 6] },
-      { id: 'p3', spec: [22, 25, 18, 10], sim: [22, 25, 18, 10] },
-      { id: 'p4', spec: [25, 17, 35, 11], sim: [25, 17, 35, 11] },
+      { id: 'p3', spec: [22, 25, 18, 10], sim: [22, 25, 18, 9] },
+      { id: 'p4', spec: [25, 17, 35, 11], sim: [25, 17, 35, 13] },
       { id: 'root', spec: [11, 17, 4, 4], sim: [11, 17, 4, 4] },
-      { id: 'heart', spec: [36, 23, 46, 16], sim: [37, 23, 46, 16] },
+      { id: 'heart', spec: [36, 23, 46, 16], sim: [37, 23, 46, 18] },
       { id: 'starved heart', spec: [17, 9, 21, 8], sim: [17, 9, 21, 8] },
     ],
   },
@@ -63,10 +71,10 @@ const LAYOUTS: Array<{ name: string; layout: number; cases: Case[] }> = [
     cases: [
       { id: 'p1', spec: [14, 15, 17, 5], sim: [15, 15, 17, 5] },
       { id: 'p2', spec: [14, 15, 17, 5], sim: [15, 15, 17, 5] },
-      { id: 'p3', spec: [22, 25, 18, 10], sim: [22, 25, 18, 10] },
-      { id: 'p4', spec: [25, 17, 35, 11], sim: [25, 17, 35, 11] },
-      { id: 'root', spec: [16, 16, 20, 7], sim: [17, 16, 20, 7] },
-      { id: 'heart', spec: [30, 28, 30, 13], sim: [30, 28, 30, 13] },
+      { id: 'p3', spec: [22, 25, 18, 10], sim: [22, 25, 18, 9] },
+      { id: 'p4', spec: [25, 17, 35, 11], sim: [25, 17, 35, 13] },
+      { id: 'root', spec: [16, 16, 20, 7], sim: [17, 16, 20, 6] },
+      { id: 'heart', spec: [30, 28, 30, 13], sim: [30, 28, 30, 12] },
       { id: 'starved heart', spec: [14, 11, 12, 6], sim: [14, 11, 12, 6] },
     ],
   },

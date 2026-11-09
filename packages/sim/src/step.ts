@@ -276,6 +276,15 @@ const TARGET_ORDER: Readonly<Record<'lancer' | 'flak', readonly GuardType[]>> = 
   flak: ['spore', 'thorn'],
 };
 
+/**
+ * Rule 7, guard damage (DESIGN.md H6 "Combat amendment"): the ship types each guard type's pool strikes, in order.
+ * Each strikes first the type that is Weak against it and last the type that counters it; drones sit between.
+ */
+export const GUARD_TARGET_ORDER: Readonly<Record<GuardType, readonly ShipType[]>> = {
+  thorn: ['flak', 'drone', 'lancer'],
+  spore: ['lancer', 'drone', 'flak'],
+};
+
 /** Damage multiplier, percent, of a ship type against a guard type: strong, weak, or 100 for drones. */
 export function counterPct(t: Readonly<Tunables>, ship: ShipType, guard: GuardType): number {
   if (ship === 'drone') return 100;
@@ -363,20 +372,29 @@ function combat(world: World, data: SimData, g: Guardian): void {
           battle.engagedByType[s.type] += 1;
         }
       }
-      // Both sides' damage comes from the state at the start of the round.
-      let guardDamage = 0;
-      for (const gd of g.guards) guardDamage += t[`guard.${gd.type}.damage`];
+      // Both sides' damage comes from the state at the start of the round: the guard pools are sized before
+      // the ships strike, so a guard that dies this round still hits.
+      const pools: Record<GuardType, number> = { thorn: 0, spore: 0 };
+      for (const gd of g.guards) pools[gd.type] += t[`guard.${gd.type}.damage`];
       playerDamage(t, g.guards, byType);
       let shipsKilled = 0;
-      for (const s of present) {
-        if (guardDamage <= 0) break;
-        const hit = Math.min(guardDamage, s.hp);
-        s.hp -= hit;
-        guardDamage -= hit;
-        if (s.hp <= 0) {
-          shipsKilled++;
-          battle.lostByType[s.type] += 1;
-          world.stats.shipsLost[s.type] += 1;
+      // H6 combat amendment: each guard pool strikes the ship type it counters first (GUARD_TARGET_ORDER), within
+      // a type in id order, with overflow to the next ship and the next type. Thorns, then spores on the ships left.
+      for (const gt of GUARD_TYPES) {
+        let pool = pools[gt];
+        for (const type of GUARD_TARGET_ORDER[gt]) {
+          for (const s of present) {
+            if (pool <= 0) break;
+            if (s.type !== type || s.hp <= 0) continue;
+            const hit = Math.min(pool, s.hp);
+            s.hp -= hit;
+            pool -= hit;
+            if (s.hp <= 0) {
+              shipsKilled++;
+              battle.lostByType[s.type] += 1;
+              world.stats.shipsLost[s.type] += 1;
+            }
+          }
         }
       }
       let guardsKilled = 0;

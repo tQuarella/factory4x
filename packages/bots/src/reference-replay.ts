@@ -25,7 +25,11 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *     (band 2 ice is new).
  *   - Spire Relay (area 8): a repeat of Thorn Garden (band 2, crystal), half its haul; the relay commands
  *     band 2. Every capture there is sent with the limit 12.
- *   - The Deep (area 9): lands with the limit 4 + 2 × 8 = 20, and no Root (H6: fed for good).
+ *   - The Deep (area 9): lands with the limit 4 + 2 × 8 = 20, and no Root (H6: fed for good). Drones take p2
+ *     (crystal) and p1 (ice); the drone yard goes off and the drones are recycled, so lancers and flak fill the limit.
+ *     Then, with their damage set to 1, they attack the heart's Thorns and Spores together: a fight from tick 5340
+ *     to 5550, across the 5400 checkpoint, where each guard pool strikes the ship type it counters first (H6
+ *     "Combat amendment"), so the hashes depend on that rule.
  *
  * One input is invalid on purpose (buyResearch inside an area) and one is refused by the band lock; both must
  * be ignored. Node indices are per area (its nodes in frame order): Landfall 0 probe, 1-5 a1-a5, 6 heart;
@@ -136,5 +140,19 @@ export const referenceReplay: Replay = {
     // Both bands commanded: The Deep, with the limit 20 and no Root.
     ...at(3422, { type: 'enterArea', area: 9 }),
     ...at(3423, { type: 'upgradeRoute', from: 1 }, { type: 'buildExtractor', node: 2 }, { type: 'setRally', node: 5 }),
+    // h6-combat-target: a mixed fight that spans a checkpoint. Drones take p2 (crystal) and p1 (ice); both are routed,
+    // the drone yard goes off and the drones are recycled, so lancers and flak fill the limit of 20.
+    ...at(3699, { type: 'sendShips', from: 5, to: 11, counts: SEND_ALL }),
+    ...at(3781, { type: 'buildRoute', from: 11, to: 0 }, { type: 'sendShips', from: 11, to: 10, counts: SEND_ALL }),
+    ...at(3871, { type: 'buildRoute', from: 10, to: 0 }, { type: 'setShipyard', shipType: 'drone', on: false }),
+    ...at(3872, { type: 'recycleShips', node: 10, counts: SEND_ALL }),
+    // Weak lancers and flak (damage 1) against the heart's Thorns and Spores: the battle runs from tick 5340 to 5550,
+    // across the 5400 checkpoint, and each guard pool strikes its own counter-weak type first.
+    ...at(
+      5220,
+      { type: 'setTunable', key: 'ship.lancer.damage', value: 1 },
+      { type: 'setTunable', key: 'ship.flak.damage', value: 1 },
+      { type: 'sendShips', from: 5, to: 14, counts: counts(0, 1_000_000, 1_000_000) },
+    ),
   ],
 };
