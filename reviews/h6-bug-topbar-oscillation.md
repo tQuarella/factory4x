@@ -99,3 +99,51 @@ Required changes:
 This is round 2.
 
 VERDICT: APPROVE
+
+## Round 3 · 2026-11-08
+
+**Why there is a round 3.** After my round-2 approval, `main` was merged into the branch (d8b8d7b, then 91dab72). Linux CI on 91dab72 failed `boot.spec.ts:129` ("overworld: tap an area for its sheet; a held area cannot be landed on") on the phone project, on both the first attempt and its retry. The engineer then changed only that test, in a4e791f. The question for this round is whether that change fixes the cause or hides a real problem with player taps.
+
+**The cause, measured on main (4d39f98).** Before the tap on Spore Veil, the test opens Landfall's sheet. That pans the map up about 290 px so Landfall clears the sheet. Positions of the six areas, settled 1 s after the tap:
+
+| Viewport | Map top | Positions after the pan (y) |
+| --- | --- | --- |
+| Pixel 7 (412x839) | 149 | Veil and Garden at 128, The Deep at −29 |
+| 375x667 | 149 | Veil and Garden at 78, The Deep at −48 |
+| 390x844 | 149 | Veil and Garden at 154, The Deep at 8 |
+| 430x932 | 149 | Veil and Garden at 203, The Deep at 38 |
+
+So on two of these phones, once the pan settles, Veil is above the canvas (under the top bar and the hint strip). The old test tapped wherever `areaScreenPos` said Veil was:
+- If the tap came before the pan finished (Veil at 331 at +0 ms, 144 at +100 ms), it hit Veil and passed.
+- If it came after, it hit `#hint-text` and failed.
+
+That timing race is why the test failed 2/5 on main under parallel load in round 1. Today I ran the old test 20 times on each project with 6 workers on main: it failed 10 of 40. It is also why it failed twice in a row on the Linux runner. Nothing on this branch caused it: the top-bar change only touches `#chips` in an area, never the overworld, and I measured identical positions on main.
+
+**The change.**
+- `tapArea` now waits until the area's position stops moving.
+- It then asserts the area is on the visible map (`y > #view.top`), so an unreachable target now fails loudly instead of mis-tapping.
+- The test closes Landfall's sheet (one tap on empty map, which pans back) before tapping Veil.
+
+This fixes the cause, the race, and makes `tapArea` stricter for every caller.
+
+**Does it hide a real player tap problem? No.** The tap lands on whatever is drawn under the finger. Veil is simply not on screen while Landfall's sheet is open on those phones, so a player can't see it to tap it, and nothing is mis-hit. Sheet switching (tapping another visible area with a sheet open) is still tested at 375x667 (Landfall to Frost Shelf, `boot.spec.ts` around line 812). What is real, and pre-existing, is that the "pan so the selected area clears the sheet" behaviour can hide the far areas while a sheet is open on a phone. That is a design property of the H5 overworld, not this task's bug. h6-client replaces that map with a pannable overworld, and BACKLOG already sends this test to h6-client for rewriting. See the note below.
+
+**Checks (clean detached worktrees, private ports):**
+- Gates on a4e791f: `npm run gates -- --base main` passed all six. Build passed.
+- The changed test, 20 runs on each project with 6 workers: 40/40 passed. The old test on main under the same load failed 10/40.
+- Full smoke on a4e791f: 150/150.
+- Branch CI on a4e791f: success (GitHub Actions, completed).
+- The round-2 HUD work is unchanged by the merges. Against its merge base with main, the branch changes only the round-2 files (`style.css`, `main.ts`, `env.d.ts`, `hud-stability.spec.ts`, `DECISIONS.md`, this review) plus `boot.spec.ts`.
+
+Pillar fit: unchanged from round 2. This round adds a test-only fix and no player-facing change.
+
+Gates: all six passed locally on a4e791f. Smoke: 150/150. Branch CI: green.
+
+Required changes:
+- none
+
+Note for the Director (not blocking): when h6-client builds the pannable overworld, make sure a player with an area's sheet open on a phone can still see the other areas, or reach them without closing the sheet. Today, opening Landfall's sheet at 375x667 pans Veil, Garden and The Deep off the top of the map.
+
+This is round 3. It is an approval, so the third-rejection parking rule in PROCESS.md does not apply.
+
+VERDICT: APPROVE
