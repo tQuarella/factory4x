@@ -34,7 +34,7 @@ const FRAMES = 240;
 const at = (k: string, i: number): number => WALKS[k]![i % WALKS[k]!.length]!;
 
 interface Box { x: number; y: number; w: number; h: number }
-interface Snap { boxes: Record<string, Box>; visible: string[]; rows: number }
+interface Snap { boxes: Record<string, Box>; visible: string[]; rows: number; gaps: Record<string, number>; bottoms: Record<string, number> }
 
 async function setup(page: Page, size: { width: number; height: number }): Promise<void> {
   await page.setViewportSize(size);
@@ -77,13 +77,32 @@ async function frame(page: Page, i: number): Promise<Snap> {
           const tops = new Set(
             [...document.querySelectorAll<HTMLElement>('#chips .chip')].filter((c) => c.getClientRects().length > 0).map((c) => Math.round(c.getBoundingClientRect().top / 4)),
           );
-          resolve({ boxes, visible, rows: tops.size });
+          // Each count's own text (a Range over the <b>'s contents, not the <b> box) starts beside its icon, whatever room the chip reserves.
+          // Bottoms are measured from the top of #controls, so a layout can't push a chip down toward the buttons unseen.
+          const gaps: Record<string, number> = {};
+          const bottoms: Record<string, number> = {};
+          const controlsTop = document.getElementById('controls')!.getBoundingClientRect().top;
+          for (const c of document.querySelectorAll<HTMLElement>('#chips .chip')) {
+            if (c.getClientRects().length === 0) continue;
+            const range = document.createRange();
+            range.selectNodeContents(c.querySelector('b')!);
+            const text = range.getClientRects()[0]!;
+            gaps[c.id] = text.left - c.querySelector('canvas')!.getBoundingClientRect().right;
+            bottoms[c.id] = c.getBoundingClientRect().bottom - controlsTop;
+          }
+          resolve({ boxes, visible, rows: tops.size, gaps, bottoms });
         }),
       ),
   );
 }
 
-async function run(page: Page, size: { width: number; height: number }, maxRows: number | null): Promise<void> {
+/**
+ * Phone landscape (667x375), bottom of each chip minus the top of #controls, on main (f8fabe3) with no rates showing, its shortest
+ * state. Chips already sit under the buttons there (a separate bug); this change must not push any lower.
+ */
+const MAIN_LANDSCAPE_BOTTOMS: Record<string, number> = { 'chip-ore': -96, 'chip-ice': -70, 'chip-crystal': -44, 'chip-lens': -18, 'chip-plating': 8, 'chip-drone': 34, 'chip-lancer': 60, 'chip-flak': 86, 'chip-fleet': 116 };
+
+async function run(page: Page, size: { width: number; height: number }, maxRows: number | null, bottoms: Record<string, number> | null = null): Promise<void> {
   await setup(page, size);
   const first = await frame(page, 0);
   expect(first.visible.length).toBe(9);
@@ -91,8 +110,10 @@ async function run(page: Page, size: { width: number; height: number }, maxRows:
   for (let i = 1; i < FRAMES; i++) {
     const cur = await frame(page, i);
     expect(cur.visible, `chips shown at frame ${i}`).toEqual(first.visible);
+    if (bottoms) for (const [id, b] of Object.entries(cur.bottoms)) if (b > bottoms[id]! + 1 && bad.length < 12) bad.push(`frame ${i} ${id}: bottom ${b.toFixed(0)} px from the controls' top, main has ${bottoms[id]}`);
     if (maxRows !== null) expect(cur.rows, `rows at frame ${i}`).toBeLessThanOrEqual(maxRows);
     expect(cur.rows, `row count at frame ${i}`).toBe(first.rows);
+    for (const [id, g] of Object.entries(cur.gaps)) if ((g > 8 || g < -1) && bad.length < 12) bad.push(`frame ${i} ${id}: its count starts ${g.toFixed(1)} px from its icon`);
     expect(Object.keys(cur.boxes), `elements at frame ${i}`).toEqual(Object.keys(first.boxes));
     for (const [k, b] of Object.entries(cur.boxes)) {
       const a = first.boxes[k]!;
@@ -101,7 +122,7 @@ async function run(page: Page, size: { width: number; height: number }, maxRows:
       }
     }
   }
-  expect(bad, 'HUD elements that moved or resized').toEqual([]);
+  expect(bad, 'HUD elements that moved or resized, or counts away from their icons').toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
 }
 
@@ -110,7 +131,7 @@ test('the HUD holds still while counts change every frame: 375 px portrait, wide
 });
 
 test('the HUD holds still while counts change every frame: landscape', async ({ page }) => {
-  await run(page, { width: 667, height: 375 }, null);
+  await run(page, { width: 667, height: 375 }, null, MAIN_LANDSCAPE_BOTTOMS);
 });
 
 test('the HUD holds still while counts change every frame: desktop', async ({ page }) => {

@@ -203,21 +203,23 @@ textarea { width: 100%; min-height: 120px; background: var(--panel2); color: var
 .chip { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: 4px; min-height: 24px; font-size: 14px; }
 .chip b { font-size: 15px; color: var(--ink); }
 .chip small { grid-column: 1 / -1; font-size: 10px; color: var(--dim); line-height: 1.1; }
-/* H6 bug (top bar oscillation): a chip never changes size with its numbers. The count and the rate each reserve room for their
-   widest realistic text with a hidden, zero-height sizer in the same font (so the room follows whatever font and letter spacing
-   are in use), the count is right-aligned in it, and the rate line always has its row, empty or not. Longer text still grows the chip. */
-:root { --num-pad: '0000'; --rate-pad: '+000'; }
-#ow-stats { --rate-pad: '+000.0/min'; }
-.chip b { display: inline-block; text-align: right; font-variant-numeric: tabular-nums; }
-.chip b::before { content: var(--num-pad); display: block; height: 0; overflow: hidden; visibility: hidden; white-space: nowrap; }
-.chip small { display: block; font-variant-numeric: tabular-nums; }
-.chip small::before { content: var(--rate-pad); display: block; height: 0; overflow: hidden; visibility: hidden; white-space: nowrap; }
-.chip small::after { content: '\200b'; }
+/* H6 bug (top bar oscillation): a chip in the area HUD never changes size with its numbers. The count and the rate each reserve room for
+   their widest realistic text with a hidden, zero-height sizer in the same font (so the room follows whatever font and letter spacing
+   are in use). The count is left-aligned in its room, so it always sits next to its own icon. The rate line always has its row, empty
+   or not. Longer text still grows the chip. The overworld chips are not touched (nothing there changes every tick). */
+#chips { --num-pad: '0000'; --rate-pad: '+000'; }
+#chips .chip b { display: inline-block; text-align: left; font-variant-numeric: tabular-nums; }
+#chips .chip b::before { content: var(--num-pad); display: block; height: 0; overflow: hidden; visibility: hidden; white-space: nowrap; }
+/* The icon track is sized by the icon alone; the rate line, which spans both columns, widens the 1fr count track instead (otherwise it
+   would stretch the icon column and push the count away from its icon). */
+#chips .chip { grid-template-columns: max-content 1fr; }
+#chips .chip small { display: block; width: max-content; font-variant-numeric: tabular-nums; }
+#chips .chip small::before { content: var(--rate-pad); display: block; height: 0; overflow: hidden; visibility: hidden; white-space: nowrap; }
+#chips .chip small::after { content: "\200b"; }
 /* Room by what each count can reach: ore, ice and crystal four digits; lens and plating are capped at 50 (component.stockCap max) and the ships
-   and the fleet are capped near 60, so two. Anything longer still grows the chip, once. */
+   and the fleet are capped near 60 (fleet.cap max), so two. Anything longer still grows the chip, once. */
 #chip-lens, #chip-plating, #chip-drone, #chip-lancer, #chip-flak { --num-pad: '00'; }
-.chip.fleet { --num-pad: 'Fleet 00/00'; }
-.chip.fleet b { text-align: left; }
+#chips .chip.fleet { --num-pad: 'Fleet 00/00'; }
 canvas.icon { display: block; flex: 0 0 auto; }
 .yard-row { padding: 4px 0; border-top: 1px solid var(--line); }
 .yr-top, .gr-top, .tr-top { display: flex; align-items: center; gap: 8px; min-height: 28px; flex-wrap: wrap; }
@@ -257,7 +259,10 @@ section.send > .send-btn.all { flex: 1 1 100%; }
      and the fleet chip shows its icon and "9/12" without the word, which doesn't fit 132 px (the tooltip keeps it). */
   .chip-row.ships { display: contents; }
   .chip.fleet .fl-word { display: none; }
-  .chip.fleet { --num-pad: '00/00'; }
+  #chips .chip.fleet { --num-pad: '00/00'; }
+  /* The rate goes beside the count, not under it, so a column chip is one 24 px row, as short as ever (it used to grow a second line). */
+  #chips .chip { grid-template-columns: max-content max-content 1fr; }
+  #chips .chip small { grid-column: auto; }
 }
 
 /* ---- H4: overworld HUD, area and research sheets, win panel ---- */
