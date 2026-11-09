@@ -37,11 +37,18 @@ Sometimes a code task adds a gate condition that the shipped data can't meet unt
 - The code task's acceptance says which gate result is judged on the stacked branch. The Critic reviews the code task as code and the data task with every gate green.
 - Before the data task's Critic round, merge the code task's approving review commit into the data branch. `merge-task` checks only `reviews/<data-id>.md`, so without this, `main` would record the code task's last verdict as a reject. h5-design-data round 1 was rejected for exactly that.
 
+The same holds when a task's gates wait on **another task's tests**, not only on calibration. A sim or data task that changes the shape of shipped data (removes a feature, changes the map) breaks every test that pins that shape, and those tests are often in another task's files. At the Split step, for each sim or data task, search `packages/*/test` and `tests/smoke` for the shipped names and values it removes or changes. If tests outside its file list would fail, it can't merge alone:
+- Stack the tasks that fix those tests on it, and name in `BACKLOG.md` the **top of the stack**: the one task whose `merge-task` lands the whole stack once every task in it is approved. Every other task in the stack is reviewed on its own and never merged alone.
+- Merge each lower task's approving review into the top branch before the top task's final Critic round, as above.
+- H6's backlog said h6-client and h6-bots start "after h6-sim merges", but h6-sim couldn't merge: the client tests pinned the six-area map, the Root and the Command limit. The plan changed twice (a948a53, then fc044d8) before the whole slice landed in one merge through h6-client.
+
 ## Review cycle and deadlock
 
 1. Critic rejects → task goes back to the same engineer with the review file.
 2. Second rejection → Director reassigns the task to the Core Engineer (Opus). If a Core Engineer from this iteration has finished its own task, resume it (a resume, not a launch) rather than launching a new one; in H4 one resumed core-engineer fixed h4-bots, h4-client and h4-design-data, and all three passed round 3. The brief names the task id, the branch, `reviews/<id>.md`, and how to commit: if `task/<id>` is checked out in another worktree, the agent works on a local alias branch started from `origin/task/<id>` and pushes with `git push origin HEAD:task/<id>`. `merge-task` merges `origin/task/<id>` when the local ref is behind it, so the Director doesn't move local refs by hand.
 3. Third rejection → task is parked. Director writes a Blocking question in `QUESTIONS.md` summarizing the disagreement and moves on.
+
+Any departure from these steps is a Director decision with a `DECISIONS.md` entry giving the reason. After its second rejection, h6-bots went back to its original engineer for round 3 with no entry. It passed, but the record doesn't say why the rule was set aside.
 
 Before launching or resuming the Critic, the Director reads the author's report for anything it left undone because it was outside its files, and routes it first (widen the scope in `BACKLOG.md` and resume the author, or hand it to the agent with that scope). h4-design-data round 2 was rejected for a one-word test title the Designer had logged as "a later fix".
 
@@ -68,7 +75,7 @@ Before launching or resuming the Critic, the Director reads the author's report 
 
 - Any session can stop at any time. State lives in git and the shared files.
 - `/resume` reads `CLAUDE.md`, `STATUS.md`, `QUESTIONS.md`, checks `git worktree list` and open `task/*` branches, and continues.
-- **A new machine** needs, before the first session: Node at the major version in `.nvmrc` (26); `gh auth login` with the GitHub account that owns the repo (tQuarella), then `gh auth setup-git`, and `gh repo view tQuarella/factory4x` to confirm access; `npm ci`; `npx playwright install chromium`. The git commit identity (`user.name` / `user.email`) is a separate setting and stays as configured. On the desktop move (2026-11-07) the owner had to install Node 26 and switch the GitHub login to tQuarella in separate steps. Give the owner this whole list in one message, and run every step that isn't a login yourself.
+- **A new machine** needs, before the first session: Node at the major version in `.nvmrc` (26); `gh auth login` with the GitHub account that owns the repo (tQuarella), then `gh auth setup-git`, and `gh repo view tQuarella/factory4x` to confirm access; `npm ci`; `npx playwright install chromium`; `git config core.autocrlf false` in the repo (Git for Windows sets it to true system-wide, and in H6 that left DESIGN.md with CRLF line endings in a checkout and broke a local test that reads it). The git commit identity (`user.name` / `user.email`) is a separate setting and stays as configured. On the desktop move (2026-11-07) the owner had to install Node 26 and switch the GitHub login to tQuarella in separate steps. Give the owner this whole list in one message, and run every step that isn't a login yourself.
 - For overnight runs the owner schedules `/resume` (Claude Code scheduled task or routine) at an interval longer than the usage-limit reset.
 
 ## Concurrent sessions in one working tree
