@@ -806,7 +806,7 @@ Any new colour gets a palette key and an ART_STYLE.md row. Draw contract (h6-cli
 
 #### Bots (H6): strategies and the probe
 
-**The engine:** the H5 composer engine, unchanged inside areas. Its Root step is inert.
+**The engine:** the H5 composer engine, with one change (Director, 2026-11-08, from reviews/h6-bots.md): it builds toward a mix that wins when one exists at the current limit. The H5 engine maximised a power estimate that is linear in ship counts, so it always built a single type. With the Root gone, and the H6 windows requiring that no single type fits a band 2 heart at L1, it could never take one. The engine now allocates from the probe's own minimum winning mix for the target (cached per node, limit, buildable types and caps) and attacks when the parked fleet matches it. Its Root step is inert.
 
 **Area choice, needs-driven** (replaces H4 greedy for H6 strategies):
 1. Find the first unmet goal, in this order:
@@ -815,7 +815,7 @@ Any new colour gets a palette key and an ART_STYLE.md row. Draw contract (h6-cli
    3. a band 2 relay reclaimed;
    4. The Deep reclaimed;
    5. the core is affordable.
-2. Among enterable areas, land in the one that advances that goal, cheapest by the H5 estimate. For a resource goal, an area advances it if its haul (decayed) adds the missing resource. Ties go to the strategy's side preference, then H4 order.
+2. Among enterable areas, land in the one that advances that goal, cheapest by the H5 estimate. For a resource goal, an area advances it if its haul (decayed) adds the missing resource. `ice-first` and `crystal-first` first narrow the candidates to their own side when any area there advances the goal, then take the cheapest; ties go to H4 order. (Director, 2026-11-08: a tie-break-only preference would almost never fire, which would make the three strategies near-identical and defeat flag 6.)
 3. Areas recorded closed are skipped, as in H5.
 4. Buy research by the H4 policy minus Command limit. Buy the core as soon as it's affordable.
 
