@@ -27,6 +27,7 @@ Launches: 6 / 12.
 | r3 | art-direction | h6-art | resume | Fix round 1 (cf6da1b) |
 | r4 | critic | h6-art | resume | Review round 2: REJECT (ART_STYLE contradictions, relay mark 1.024 r) |
 | r5 | core-engineer | h6-art | resume | Fix round 3, reassigned per deadlock rule (resumed the h5-sim core-engineer) |
+| r6 | engineer | h6-bug-topbar-oscillation | resume | Fix round 1 after Critic REJECT (counts drift from icons; landscape chips 8 px lower); then merge into the buffer branch |
 
 ## Iteration 5 ledger
 
