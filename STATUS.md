@@ -46,7 +46,9 @@ Launches: 8 / 12.
 | r22 | designer | h6-design-data | resume | Calibrate v11, stacked on task/h6-bots |
 | r23 | critic | h6-bug-topbar-oscillation r3 + buffer r2 | resume | APPROVE both; topbar merged b96f211, buffer merged 9a37ee2 |
 | r24 | critic | h6-design-data | resume | Review round 1: APPROVE (9ceae09); v11, all 7 flags met |
-| 8 | engineer | h6-client | launch | Build, from task/h6-combat-target + main; merges together with h6-sim and h6-combat-target |
+| 8 | engineer | h6-client | launch | Build (97d5390): gates green, smoke 178/178, design-data merged in |
+| r25 | critic | h6-client | resume | Review round 1: REJECT (flaky reachability test, tapArea retry, loosened/removed tests, combat line hard-coded) |
+| r26 | engineer | h6-client | resume | Fix round 1 |
 | r13 | engineer | h6-bug-topbar-oscillation | resume | Branch CI red on 91dab72: boot.spec:129 phone tap fails reliably on Linux (green on main). Fix cause, merge into buffer branch |
 
 ## Iteration 5 ledger
