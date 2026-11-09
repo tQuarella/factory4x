@@ -38,7 +38,8 @@ body { font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 .stat .num { font-size: 18px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .stat.big .num { font-size: 28px; color: var(--teal); line-height: 1; }
 .stat small { font-size: 11px; font-weight: 400; color: var(--dim); margin-left: 6px; }
-#thr-arrow { font-size: 16px; margin-left: 4px; }
+/* The arrow keeps its room whether or not it shows, so the number never shifts it. */
+#thr-arrow { font-size: 16px; margin-left: 2px; display: inline-block; min-width: 12px; text-align: center; }
 #thr-arrow.up { color: #6be28f; }
 #thr-arrow.down { color: var(--danger); }
 #controls { display: flex; height: 48px; align-items: center; justify-content: space-between; padding: 0 8px 4px; }
@@ -99,6 +100,11 @@ section:first-of-type { border-top: 0; }
 .lbl { color: var(--dim); font-size: 11px; }
 .note { font-size: 12px; color: var(--dim); margin: 4px 0; }
 .note.warn { color: var(--gold); background: rgba(255, 210, 122, 0.1); border: 1px solid rgba(255, 210, 122, 0.4); padding: 6px 8px; border-radius: 8px; }
+/* The backed-up warning always has its room: the sizer (the longest message, hidden) sets the height, the message sits over it. */
+.note.warn { position: relative; }
+.note.warn .sizer { display: block; visibility: hidden; }
+.note.warn .msg { position: absolute; left: 8px; right: 8px; top: 6px; }
+.note.warn.idle { visibility: hidden; }
 .actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .feeds-box { margin: 6px 0; padding: 6px 8px; border: 1px solid var(--bloom); border-radius: 8px; font-size: 12px; background: rgba(70, 12, 36, 0.35); }
 .feeds-box b { display: block; color: #ffb3cc; margin-bottom: 2px; }
@@ -191,6 +197,10 @@ textarea { width: 100%; min-height: 120px; background: var(--panel2); color: var
 @media (max-width: 480px) and (max-aspect-ratio: 1/1) {
   #chips { column-gap: 2px; }
   .chip-row.ships { column-gap: 2px; }
+  /* Chips now reserve room for four-digit counts (the top bar no longer shifts as they change), so the bar gives them a little more of the row. */
+  #stats { padding: 0 6px; gap: 4px; }
+  .stat.big { min-width: 66px; }
+  .chip-row .chip { column-gap: 2px; }
 }
 .chip-row.ships { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 2px 4px; max-width: 100%; }
 .chip-row.ships:not(:has(.chip:not([hidden]))) { display: none; }
@@ -198,6 +208,23 @@ textarea { width: 100%; min-height: 120px; background: var(--panel2); color: var
 .chip { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: 4px; min-height: 24px; font-size: 14px; }
 .chip b { font-size: 15px; color: var(--ink); }
 .chip small { grid-column: 1 / -1; font-size: 10px; color: var(--dim); line-height: 1.1; }
+/* H6 bug (top bar oscillation): a chip in the area HUD never changes size with its numbers. The count and the rate each reserve room for
+   their widest realistic text with a hidden, zero-height sizer in the same font (so the room follows whatever font and letter spacing
+   are in use). The count is left-aligned in its room, so it always sits next to its own icon. The rate line always has its row, empty
+   or not. Longer text still grows the chip. The overworld chips are not touched (nothing there changes every tick). */
+#chips { --num-pad: '0000'; --rate-pad: '+000'; }
+#chips .chip b { display: inline-block; text-align: left; font-variant-numeric: tabular-nums; }
+#chips .chip b::before { content: var(--num-pad); display: block; height: 0; overflow: hidden; visibility: hidden; white-space: nowrap; }
+/* The icon track is sized by the icon alone; the rate line, which spans both columns, widens the 1fr count track instead (otherwise it
+   would stretch the icon column and push the count away from its icon). */
+#chips .chip { grid-template-columns: max-content 1fr; }
+#chips .chip small { display: block; width: max-content; font-variant-numeric: tabular-nums; }
+#chips .chip small::before { content: var(--rate-pad); display: block; height: 0; overflow: hidden; visibility: hidden; white-space: nowrap; }
+#chips .chip small::after { content: "\200b"; }
+/* Room by what each count can reach: ore, ice and crystal four digits; lens and plating are capped at 50 (component.stockCap max) and the ships
+   and the fleet are capped near 60 (fleet.cap max), so two. Anything longer still grows the chip, once. */
+#chip-lens, #chip-plating, #chip-drone, #chip-lancer, #chip-flak { --num-pad: '00'; }
+#chips .chip.fleet { --num-pad: 'Fleet 00/00'; }
 canvas.icon { display: block; flex: 0 0 auto; }
 .yard-row { padding: 4px 0; border-top: 1px solid var(--line); }
 .yr-top, .gr-top, .tr-top { display: flex; align-items: center; gap: 8px; min-height: 28px; flex-wrap: wrap; }
@@ -237,6 +264,10 @@ section.send > .send-btn.all { flex: 1 1 100%; }
      and the fleet chip shows its icon and "9/12" without the word, which doesn't fit 132 px (the tooltip keeps it). */
   .chip-row.ships { display: contents; }
   .chip.fleet .fl-word { display: none; }
+  #chips .chip.fleet { --num-pad: '00/00'; }
+  /* The rate goes beside the count, not under it, so a column chip is one 24 px row, as short as ever (it used to grow a second line). */
+  #chips .chip { grid-template-columns: max-content max-content 1fr; }
+  #chips .chip small { grid-column: auto; }
 }
 
 /* ---- H4: overworld HUD, area and research sheets, win panel ---- */

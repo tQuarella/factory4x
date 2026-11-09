@@ -555,6 +555,7 @@ That's 11, with 1 spare.
 | h6-art | Relay icon, lock badge, far area state, band label, lane modes; gallery; ART_STYLE | art-direction | none (draw contract in the spec) | Ready |
 | h6-client | Panned overworld, area states, band labels, relay and lock sheet lines, decayed haul, the step moment, research and tuning changes, Root smoke tests removed | engineer | h6-sim merged; both bug tasks merged | Blocked |
 | h6-bots | Needs-driven area choice, four strategies plus the cap-off reference, probe on fed hearts, trial visits, H6 flags | engineer | h6-sim merged | Blocked |
+| h6-combat-target | Guard damage by type (DESIGN.md H6 "Combat amendment"), the order and superset tests, fixture-pinned combat numbers re-derived, replay re-baselined | core-engineer (resume of h6-sim) | none; merges before h6-bots resumes and before h6-design-data | Ready |
 | h6-design-data | Probe on v10, retune to the H6 windows, data v11 | designer (resume) | h6-bots Critic-approved (stacked) | Blocked |
 
 ### h6-bug-topbar-oscillation (engineer)
@@ -652,6 +653,11 @@ Owner: "When an asteroid buffer is full the toast warning shows and hides rapidl
 
    New smoke tests pass `--repeat-each 5` on both projects.
 5. A v9 save starts fresh with the existing toast. Gates pass, with green branch CI.
+6. **Added by the Director (from the h6-combat-target review):** heart and pocket sheets show the combat amendment's line "Thorns strike Flak first; Spores strike Lancers first" under the Strong/Weak tags. It fits at 375 px with the wide font. h6-client branches from `task/h6-combat-target` (which carries h6-sim), with main merged in.
+7. **Added by the Director (from the h6-bug-topbar-oscillation round 3 review):** on phones, opening an area's sheet pans the overworld so far areas (Veil, Garden, The Deep) sit above the map. On the pannable map, other areas must stay reachable while a sheet is open, either by panning or without closing the sheet.
+8. **Added by the Director (from the h6-bug-topbar-oscillation review):**
+   - In phone landscape (667x375) with the full HUD, no HUD chip may overlap the control buttons. On main today, the plating, ship and fleet chips render under them by 15–123 px.
+   - Fix the flaky phone test `boot.spec.ts:129` ("held area cannot be landed on"): the tap on area 3 lands on `#hint-text`. It fails 2 of 5 runs on main under parallel load. The new pannable map rewrites this test anyway; make the new version tap reliably.
 
 ### h6-bots (engineer, after h6-sim merges; parallel with h6-client)
 
@@ -667,6 +673,22 @@ Owner: "When an asteroid buffer is full the toast warning shows and hides rapidl
    - each flag computation, including one where two winners share a set (flag 6 fails) and one where a capturing wave is single-type (flag 4 fails).
 
    Tests use fixtures with explicit premises, pin no tuned value, run under about 5 s each and don't grow with game length. Report the numbers; don't retune.
+
+### h6-combat-target (core-engineer, resume of h6-sim; added 2026-11-08 from the h6-bots round 2 review)
+
+**Files:**
+- `packages/sim/src/step.ts` (combat) and `packages/sim/test/**`;
+- `packages/bots/src/reference-replay.ts` (re-baseline only);
+- DESIGN.md: dated notes on tables whose fixture numbers change (H3 "Calibration result", and the min-wave table in "Owner direction 2026-11-08b"), and nothing else.
+
+No `data/sim.json` and no `packages/bots/src` logic.
+
+**Acceptance:**
+1. Rule 7's guard damage exactly as the amendment says: pools by guard type, the per-pool type order, id order within a type, overflow, and thorns then spores.
+2. `combat-order.test.ts` with the permutation, superset and unit cases, as the amendment says. The permutation test is run on the pre-change code and fails (reported).
+3. Fixture-pinned combat outcomes (for example `min-waves.test.ts` on the v4 and v8 fixtures) are re-derived, never loosened, and the DESIGN.md tables that cite them get dated notes.
+4. Determinism hashes and the reference replay are re-baselined. Gates pass.
+5. `dataVersion` stays 10, because no data value changes. A v10 feedback replay recorded before the change won't reproduce; log that in DECISIONS. h6-design-data bumps to 11 anyway.
 
 ### h6-design-data (designer, resume; stacked on `task/h6-bots` after its Critic approval)
 
@@ -686,6 +708,7 @@ Owner: "When an asteroid buffer is full the toast warning shows and hides rapidl
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-root-code-removal** (core-engineer; from the H6 spec): the Root is out of play through data only (owner, Q19). After H6 ships, and if the owner hasn't asked for it back, delete the dormant Root code: the sim's wilt and starved rules and their fixture tests, the client's vine, Root sheet and wilt toast, the bots' Root targeting, and the `bloom.starved*` tunables. Acceptance: no reference to the Root kind outside the frame data and frozen fixtures; gates pass; determinism hashes are unchanged for shipped data.
+- **cw-sim-fleet-leftovers** (engineer; added by the Director from the h6-sim review): once h6-client has merged, remove the deprecated H5 leftovers that h6-sim kept only so the old client compiles: the `fleet` research id, the `limit` kind, `capOff`, and `FleetStatus.level`/`maxLevel` (which always return 0). Acceptance: no references remain in packages/sim, client or bots; gates pass; the reference replay is unchanged.
 - **cw-worktree-prune** (engineer; added by the Retrospective after build-20261108-4): after H5 the repo has 14 worktrees besides the main checkout and 40 local branches besides `main`, every one already in `main` (`git branch --merged main`): agent worktrees under `.claude/worktrees/` (h3, h4 and h5 tasks), alias branches (`h4-bots-core`, `h4-client-core`, `h4-dd-core`, `h5-client-core`, `h5-art-merge`) and `worktree-agent-*` branches. `npm run worktree -- remove <id>` only knows `../Factory4X-wt/<id>`, so the reminder `merge-task` prints doesn't fit agent worktrees. Add `npm run worktree -- prune [--dry-run]` to `scripts/worktree.mjs`: remove every worktree and local branch whose head is already in `main` and has no local-only commits, skip locked worktrees and any with uncommitted changes (list them instead), and never touch `origin`. Acceptance: `--dry-run` lists exactly what would go and why each kept item stays; a test or scripted check with a temporary merged and unmerged branch. The Director then runs it after each handoff.
 - **cw-veil-starved-tag** (designer): on data v9 the Root-cut Spore Veil heart's counter tags read Even/Even, but the minimum waves say Flak is Strong (14 flak vs 20 drones). Fix the tag or the guard mix so the sheet reads true (h5-design-data review, round 1).
 

@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 6, hypothesis H6: Open frontier, Root removed)
-**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Spec (designer resumed). Q20 (pillar 3 wording) is Can wait.
+**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Build/Review. Topbar merged (b96f211). Buffer approved, CI pending on 0e6a8f8. h6-sim + h6-combat-target approved (stacked); h6-bots approved; h6-design-data calibrating; h6-client next (after buffer merges). h6-art merged (e598eed). Topbar approved but branch CI red (boot.spec:129 phone); engineer fixing. Local note: the main checkout had core.autocrlf=true, which rewrote DESIGN.md with CRLF on a merge abort and broke a DESIGN-table test locally only; set core.autocrlf=false in local git config. In flight: h6-sim (core-engineer), h6-art (art-direction), h6-bug-topbar-oscillation (engineer; then resumed for h6-bug-buffer-toast-flicker). Note for h6-client: boot.spec.ts:129 (overworld tap area 3, phone) fails locally on Windows on unmodified main; Linux CI on main is green (b7679bc). Next: h6-client branches from task/h6-sim after both bugs merge, and merges together with h6-sim (a948a53); h6-design-data stacked on h6-bots. Q20 (pillar 3 wording) is Can wait.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-4 (H5 Fleet cap), commit f9ddf20, live (CI gates and deploy green; site shows f9ddf20 · data v9).
@@ -11,11 +11,40 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 6 ledger
 
-Launches: 1 / 12.
+Launches: 7 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | triage build-20261108-4; H6 candidates | launch | Plan (done, 62ac82b; owner picked A + remove the Root, f1c56f2) |
+| r1 | designer | H6 spec + task split | resume | Spec done (f8fabe3) |
+| 2 | core-engineer | h6-sim | launch | Build |
+| 3 | art-direction | h6-art | launch | Build |
+| 4 | engineer | h6-bug-topbar-oscillation | launch | Build (owner bug): green, 36f414e; smoke test fails before fix |
+| 5 | critic | h6-art | launch | Review round 1 (art green, c99543f) |
+| 6 | critic | h6-bug-topbar-oscillation | launch | Review round 1 |
+| r3a | critic | h6-art | resume | (round 1 was launch 5): REJECT (relay icon hid the haul; far centre; clipped lane) |
+| r2 | engineer | h6-bug-buffer-toast-flicker | resume | Build, branched from task/h6-bug-topbar-oscillation (merges after it): green, d869e14; smoke test fails before fix |
+| r3 | art-direction | h6-art | resume | Fix round 1 (cf6da1b) |
+| r4 | critic | h6-art | resume | Review round 2: REJECT (ART_STYLE contradictions, relay mark 1.024 r) |
+| r5 | core-engineer | h6-art | resume | Fix round 3, reassigned per deadlock rule (resumed the h5-sim core-engineer) |
+| r6 | engineer | h6-bug-topbar-oscillation | resume | Fix round 1 after Critic REJECT (counts drift from icons; landscape chips 8 px lower); then merge into the buffer branch |
+| r7 | critic | h6-art | resume | Review round 3: APPROVE (bce9bb7); main merged (728a058), waiting for branch CI |
+| r8 | critic | h6-sim | resume | Review round 1: APPROVE (7768a52), merges only together with h6-client. Gate gap: campaign timeouts of winners don't fail the bots gate; added to h6-bots. Don't hand off from a main without h6-bots |
+| 7 | engineer | h6-bots | launch | Build, branched from task/h6-sim |
+| r9 | critic | h6-bug-topbar-oscillation + h6-bug-buffer-toast-flicker | resume | Topbar round 2: APPROVE (ae6eb3e); buffer round 1: REJECT (test misses AC1-4) |
+| r10 | critic | h6-bots | resume | Review round 1: REJECT (composer builds single-type fleets; can't win a band 2 heart by design). Director amended spec bde97b0 |
+| r11 | engineer | h6-bots | resume | Fix round 1: composer builds the probe's winning mix |
+| r12 | engineer | h6-bug-buffer-toast-flicker | resume | Fix round 1: tests for AC1-4, DECISIONS (e6b7f61) |
+| r14 | engineer | h6-bots | resume | Fix round 1 (e91e033): bots gate green with no data change |
+| r15 | critic | h6-bots | resume | Review round 2: REJECT (pre-send battle sim beyond spec; non-monotone claim false). Found: guard damage in ship-id order makes build order decide fights (H3 rule 7) |
+| r16 | designer | combat order rule + pre-send check | resume | Combat amendment 3d3f889 (guards strike the type they counter); Director accepted, no pre-send sim (0552809) |
+| r17 | critic | topbar round 3 + buffer round 2 | resume | Review (topbar test-only CI fix a4e791f; buffer 65bb543) |
+| r18 | core-engineer | h6-combat-target | resume | Build (dda930c; replay now exercises the rule, final hash 67e5632c) |
+| r19 | critic | h6-combat-target | resume | Review round 1: APPROVE (924f97d) |
+| r20 | engineer | h6-bots | resume | Fix round 2 (6f9d01a): no pre-send sim; gate green on v10 |
+| r21 | critic | h6-bots | resume | Review round 3: APPROVE (4ec2c71); flags 2-3 data only |
+| r22 | designer | h6-design-data | resume | Calibrate v11, stacked on task/h6-bots |
+| r13 | engineer | h6-bug-topbar-oscillation | resume | Branch CI red on 91dab72: boot.spec:129 phone tap fails reliably on Linux (green on main). Fix cause, merge into buffer branch |
 
 ## Iteration 5 ledger
 
