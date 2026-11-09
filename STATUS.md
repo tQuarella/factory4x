@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 6, hypothesis H6: Open frontier, Root removed)
-**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Spec (designer resumed). Q20 (pillar 3 wording) is Can wait.
+**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Build. Spec f8fabe3. In flight: h6-sim (core-engineer), h6-art (art-direction), h6-bug-topbar-oscillation (engineer; then resumed for h6-bug-buffer-toast-flicker). Note for h6-client: boot.spec.ts:129 (overworld tap area 3, phone) fails locally on Windows on unmodified main; Linux CI on main is green (b7679bc). Next: h6-client and h6-bots after h6-sim and the bugs merge; h6-design-data stacked on h6-bots. Q20 (pillar 3 wording) is Can wait.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-4 (H5 Fleet cap), commit f9ddf20, live (CI gates and deploy green; site shows f9ddf20 · data v9).
@@ -11,11 +11,23 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 6 ledger
 
-Launches: 1 / 12.
+Launches: 6 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | triage build-20261108-4; H6 candidates | launch | Plan (done, 62ac82b; owner picked A + remove the Root, f1c56f2) |
+| r1 | designer | H6 spec + task split | resume | Spec done (f8fabe3) |
+| 2 | core-engineer | h6-sim | launch | Build |
+| 3 | art-direction | h6-art | launch | Build |
+| 4 | engineer | h6-bug-topbar-oscillation | launch | Build (owner bug): green, 36f414e; smoke test fails before fix |
+| 5 | critic | h6-art | launch | Review round 1 (art green, c99543f) |
+| 6 | critic | h6-bug-topbar-oscillation | launch | Review round 1 |
+| r3a | critic | h6-art | resume | (round 1 was launch 5): REJECT (relay icon hid the haul; far centre; clipped lane) |
+| r2 | engineer | h6-bug-buffer-toast-flicker | resume | Build, branched from task/h6-bug-topbar-oscillation (merges after it): green, d869e14; smoke test fails before fix |
+| r3 | art-direction | h6-art | resume | Fix round 1 (cf6da1b) |
+| r4 | critic | h6-art | resume | Review round 2: REJECT (ART_STYLE contradictions, relay mark 1.024 r) |
+| r5 | core-engineer | h6-art | resume | Fix round 3, reassigned per deadlock rule (resumed the h5-sim core-engineer) |
+| r6 | engineer | h6-bug-topbar-oscillation | resume | Fix round 1 after Critic REJECT (counts drift from icons; landscape chips 8 px lower); then merge into the buffer branch |
 
 ## Iteration 5 ledger
 

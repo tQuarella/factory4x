@@ -652,6 +652,9 @@ Owner: "When an asteroid buffer is full the toast warning shows and hides rapidl
 
    New smoke tests pass `--repeat-each 5` on both projects.
 5. A v9 save starts fresh with the existing toast. Gates pass, with green branch CI.
+6. **Added by the Director (from the h6-bug-topbar-oscillation review):**
+   - In phone landscape (667x375) with the full HUD, no HUD chip may overlap the control buttons. On main today, the plating, ship and fleet chips render under them by 15–123 px.
+   - Fix the flaky phone test `boot.spec.ts:129` ("held area cannot be landed on"): the tap on area 3 lands on `#hint-text`. It fails 2 of 5 runs on main under parallel load. The new pannable map rewrites this test anyway; make the new version tap reliably.
 
 ### h6-bots (engineer, after h6-sim merges; parallel with h6-client)
 
