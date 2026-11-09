@@ -304,6 +304,8 @@ So a fix has to make some choices about **what you can do**, not how fast you do
   | Twin Seams | 30 | 28 | 30 | 13 |
 
   The best mix needs 42–43% of the drone wave. A cap between the mix and the best single type means only a mix wins. A cap between the best single type and the drones means a counter is required. The shipped data roughly doubled every guard count (H3 calibration, "about x2.1"). The shipped single-type waves are in the H3 layout tables (for example, Frost Gate's heart 63 / 42 / 70). The shipped mix minimum isn't in any committed report yet; measuring it is the first job of the H5 calibration task.
+
+  *Updated 2026-11-08 by h6-combat-target (H6 "Combat amendment"):* guards now strike the ship type they counter first, so the best mixes were re-derived on the same fixture: Frost Gate 15, Glass Thicket 18, Twin Seams 12 (were 14, 16 and 13, found with every lancer built before every flak). The single-type columns can't depend on order and are unchanged. The best mix now needs 40–49% of the drone wave. The argument above still holds.
 - **A trickle doesn't beat the cap.** Guards regrow faster than you can rebuild:
   - one Spore every 20 ticks and one Thorn every 60 ticks per guarded node, both at once;
   - one ship every 90–120 ticks per yard.
@@ -2171,6 +2173,8 @@ If the numbers miss these, the engineers report them and do not retune. h3-desig
 3. Did unlocking a new ship type feel like a payoff? Did the game feel like one fixed sequence, or like a path you chose?
 
 #### Calibration result (h3-design-data, data v5)
+
+*Note 2026-11-08 (h6-combat-target):* every bot time and flag below was measured under H3's original guard-damage rule (all guard damage on the ships present in id order). H6's "Combat amendment" replaced it, so these are a record of what H3 measured, not what the current rule gives.
 
 The changes from v4:
 - every layout guard count is about x2.1;
