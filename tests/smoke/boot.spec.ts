@@ -40,7 +40,19 @@ async function tapNode(page: Page, node: number): Promise<void> {
 /** Taps an area on the overworld by its screen position (data order: landfall 0, shelf 1, shoal 2, veil 3, garden 4, deep 5). */
 async function tapArea(page: Page, area: number): Promise<void> {
   await settled(page);
-  const p = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), area);
+  // The map pans while a sheet opens or closes: wait until the area stops moving, and check it is on the visible map (a position above
+  // the canvas is under the notices strip, so the tap would land on the hint, not the area).
+  let p = { x: 0, y: 0 };
+  await expect
+    .poll(async () => {
+      const q = await page.evaluate((i) => window.__factory4x!.areaScreenPos(i), area);
+      const still = Math.abs(q.x - p.x) < 0.5 && Math.abs(q.y - p.y) < 0.5;
+      p = q;
+      return still;
+    })
+    .toBe(true);
+  const view = (await page.locator('#view').boundingBox())!;
+  expect(p.y, `area ${area} at y=${Math.round(p.y)} is above the map (top ${Math.round(view.y)})`).toBeGreaterThan(view.y);
   await page.mouse.click(p.x, p.y);
 }
 
@@ -135,6 +147,11 @@ test('overworld: tap an area for its sheet; a held area cannot be landed on', as
   await expect(page.locator('#sheet')).toContainText(/Reclaim to haul \d+ ore/);
   await expect(page.locator('#sheet')).toContainText(/then ships .* while you play elsewhere/);
   await expect(page.locator('#sheet button.land')).toBeEnabled();
+  // Landfall's sheet pans the map so Landfall clears it, which can carry Spore Veil off the top of the map on a tall phone: tap empty
+  // space to close the sheet (the map pans back) before tapping Veil.
+  const veilBox = (await page.locator('#view').boundingBox())!;
+  await page.mouse.click(veilBox.x + 4, veilBox.y + veilBox.height / 2);
+  await expect(page.locator('#sheet')).toBeHidden();
   await tapArea(page, 3);
   await expect(page.locator('#sheet h2')).toHaveText('Spore Veil');
   await expect(page.locator('#sheet .area-status')).toContainText('Held: reclaim a neighbour first');
