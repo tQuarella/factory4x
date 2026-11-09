@@ -73,3 +73,82 @@ It's still a reading of the spec, and it isn't logged.
 The inherited client failures are expected (a948a53) and aren't counted against this task.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+Scope: `git diff df0a46d..e91e033` (the main merge 4729454, which brings in the spec amendment bde97b0 and other main work, then e91e033). It touches `packages/bots/src/{strategies,waves}.ts`, a new `packages/bots/test/mix.test.ts`, `strategies.test.ts` and DECISIONS.md. No protected file is touched. I checked it against the amended DESIGN.md "Bots (H6)" (bde97b0) and my round 1 required changes.
+
+**Gates (run by me on e91e033):**
+- PASS lint, PASS determinism, PASS protected-files, **PASS bots**. Composer wins at about 38–40 game minutes, ice-first 52–57, crystal-first 48–50, and cap-off 43 on every seed. drones-only softlocks at 79 minutes, as expected.
+- FAIL typecheck and FAIL test, only on the five inherited client failures (a948a53).
+
+### Round 1 required changes
+
+1. **Met in substance: the mix engine.**
+   - The composer allocates from the probe's `minMix` (`mixAt`, cached per area, layout, node, limit, types, caps and tunables). It wins on v10 with no data change.
+   - `mix.test.ts` covers the case: no single type wins, the old best-power fleet loses, and the mix is built, sent and wins.
+   - But the change goes beyond the amendment; see "The pre-send check" below.
+2. **Met: side preference.** The spec was amended to "narrow first" (bde97b0), and the code and test match it.
+3. **Met: DECISIONS.** The cap-off reading, trials in the gate, drones-only greedy, and "step toward" are all logged. I accept each reading.
+4. **Met: re-run and report.** Flags 1, 5, 6 and 7 MET; 2, 3 and 4 MISSED.
+
+### The engineer's two sim claims, tested
+
+I tested both claims on v10 (`probeWorld` seed 1, plus all three Deep layouts), using the branch's own `shipsWin` and `minMix`.
+
+- **"Damage falls on ships in id order": true, and it's the spec'd rule, not a code defect.** DESIGN.md H3 rule 7 says guard damage is "applied to ships present in id order with overflow (as H1)" (`step.ts` `combat`). It's focus fire on the oldest ship. The effect on mixes is large:
+
+  | Heart | Probe's minimum mix (d/l/f) | Lancers built first | Flak built first | Round-robin (l, f, l, f…) | Flak first: extra lancers needed to win |
+  | --- | --- | --- | --- | --- | --- |
+  | veil | 0/8/8 | wins | loses | wins | +9 |
+  | garden | 0/14/2 | wins | loses | **loses** | +8 |
+  | mire | 0/10/8 | wins | loses | **loses** | more than 12 |
+  | spire | 0/15/3 | wins | loses | **loses** | +8 |
+  | glint | 0/7/1 | wins | loses | **loses** | +3 |
+  | deep (Glass Thicket) | 0/20/2 | wins | loses | **loses** | +7 |
+  | deep (Twin Seams) | 0/13/7 | wins | loses | **loses** | more than 12 |
+  | deep (Frost Gate) | 0/19/3 | wins | loses | **loses** | +11 |
+
+  The probe builds lancers before flak, which is the luckiest order. So 8 of 9 minimum mixes win only in that order, and 7 of 8 lose in the yards' natural alternating order.
+- **"The sim is not monotone in ship counts": not reproduced.** Starting from each heart's minimum mix, I added 1–6 drones, lancers and flak in every combination (3078 waves), with the extra ships either newest or oldest (another 162). **No superset of a winning wave lost.** What changes the outcome is *order*, not *count*. The DECISIONS text ("Adding ships does not reliably help… so a retry is the same mix") and the `winningMix` comment ("nothing is added to a retry… extra ships can turn a winning wave into a loss") state something the sim doesn't do. The code also contradicts them: when the exact mix fails, it sends everything parked, and it grows the wave with more ships.
+
+**Would a player feel it? Yes.**
+- The same fleet wins or loses depending on which yard finished first, and nothing on screen says why.
+- Building your counter first, the natural thing to do, is what loses.
+- With the yards alternating, the probe's "fits at L1" mixes lose at most band 2 hearts and The Deep, so the capability windows the Designer calibrates against are measured in the best case.
+
+Route it to the **Designer**, before h6-design-data calibrates. The question is whether to change the rule (for example, spread guard damage across ships, or aim it by counter) or to measure the windows in an order-robust way (the probe takes the worst or round-robin order). Changing combat targeting changes how fights play, so if the Designer proposes a rule change, it may need an owner question.
+
+### The pre-send check (`shipsWin` / `waveWins`): beyond the amended spec
+
+The amendment says "allocates from the probe's minimum winning mix … and attacks when the parked fleet matches it". The code adds a step: before each send, it simulates the battle against a fresh copy of the heart with the exact parked ships, in their real order and hp.
+- If the exact mix wins, it sends that.
+- Otherwise, if everything parked wins, it sends everything.
+- Otherwise it grows the wave while there's room, and sends everything once the fleet is full.
+- `MAX_WAVES` 2 then closes the node.
+
+The run reports show this fallback carrying real captures. The capturing waves are 0/15/4 at Spire against a mix of 0/15/3, and 1/20/6 and 0/21/3 at The Deep against 0/20/2 and 0/19/3.
+
+This isn't a defect in itself, but it's a judgment call the spec doesn't make:
+- It gives the bot foresight a player doesn't have. It never sends a wave the simulator says will lose.
+- That masks the order problem above. Flag 1 reads MET partly because the bot simulates the battle before it sends, while a player sending the same mix in the yards' natural order would lose.
+
+Engineers don't change the spec. Whether bots may verify a wave by simulation before sending it is the Director's call (bde97b0 was the Director's), and it should be made knowing the order finding.
+
+### Remaining flag misses: are they data only?
+
+- **Flag 2:** Twin Seams' best mix is 20, not more than L1 = 20, which is probe arithmetic. **Data.**
+- **Flag 3:** the deep-l1 trial on Twin Seams reclaims The Deep. That follows from flag 2, and an oracle-assisted bot is the strict direction for this flag. **Data.**
+- **Flag 4:** the capturing waves at Spire and at Glass Thicket and Frost Gate are 74–90% lancers because the probe's minimum mixes there are 83–90% lancers, and the bot builds the minimum. **Data**, given the probe's mix choice. But all three readings rest on lancers-first probe numbers. Once the order question is settled, recompute them.
+
+### Required changes
+
+1. **The Director decides on the pre-send check,** in DESIGN.md "Bots (H6)" with a DECISIONS entry, knowing the order finding above. Either amend the spec to allow simulating a wave before sending it (and say what the bot does when it would lose), or have the engineer remove it and attack on the parked fleet matching the mix, as bde97b0 says.
+2. **Correct the non-monotone claim** in DECISIONS.md (the h6-bots round 2 entry) and in the `winningMix` and `MAX_WAVES` comments. State the real cause (damage in id order makes the result depend on build order) and what the code actually does (it grows the wave and sends everything when the exact mix would lose). If the engineer has a case where a superset of a winning wave loses, add it to `mix.test.ts` as a test. Otherwise the claim goes.
+3. **If the check stays:** the report counts, per run, the waves sent that weren't the exact mix (grown, or everything parked) and the waves held back because the simulation said they'd lose. That way the order effect is visible in the report, not hidden.
+
+**For the Director (routing; not this task's code):**
+- The order-dependence finding goes to the Designer before h6-design-data starts, since the windows and flags 2–4 are measured in the probe's lancers-first order.
+- This is round 2 of h6-bots. A third rejection parks the task per PROCESS, so decide required change 1 before resuming the engineer.
+
+VERDICT: REJECT
