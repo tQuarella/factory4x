@@ -21,7 +21,7 @@ import rawV10 from './fixtures/sim-v10.json' with { type: 'json' };
 /**
  * h6-sim acceptance 1, 4 and 5: data v10. The shipped data/sim.json is checked
  * against the DESIGN.md H6 tables ("Areas", "Area guards", "Research",
- * "Tunables (H6 …)"), the 14 lanes and the frame, so a retune edits data and
+ * "Tunables (H6 …)"), the 16 lanes and the frame, so a retune edits data and
  * DESIGN.md together and no test. Nothing here pins a tuned number of its own.
  * The dataVersion pin lives here. Validation is tested on the frozen v10
  * fixture (fixtures/sim-v10.json), which is the shipped data as h6-sim left it.
@@ -99,8 +99,8 @@ function guardRows(d: SimData): string[][] {
 const sum = (d: SimData, res: keyof ResourceTriple): number => d.research.reduce((s, it) => s + it.levels.reduce((x, lv) => x + lv[res], 0), 0);
 
 describe('data/sim.json (shipped) at H6', () => {
-  it('is data version 10', () => {
-    expect(defaultData.dataVersion).toBe(10);
+  it('is data version 11', () => {
+    expect(defaultData.dataVersion).toBe(11);
   });
 
   it('matches the H6 "Areas" table (ten areas with side and relay)', () => {
@@ -108,9 +108,9 @@ describe('data/sim.json (shipped) at H6', () => {
     expect(areaRows(defaultData)).toEqual(rows);
   });
 
-  it('has the 14 spec lanes, and every area inside the spec frame (x 0–1000, y 0–2100)', () => {
-    const lanes = [...h6Text('Lanes (undirected, 14):', 'What this means in play').matchAll(/`(\w+)–(\w+)`/g)].map((m) => `${m[1]}–${m[2]}`);
-    expect(lanes).toHaveLength(14);
+  it('has the 16 spec lanes, and every area inside the spec frame (x 0–1000, y 0–2100)', () => {
+    const lanes = [...h6Text('Lanes (undirected, 16):', 'What this means in play').matchAll(/`(\w+)–(\w+)`/g)].map((m) => `${m[1]}–${m[2]}`);
+    expect(lanes).toHaveLength(16);
     expect(defaultData.map.lanes.map((l) => l.join('–'))).toEqual(lanes);
     const frame = /Frame x 0–(\d+), y 0–(\d+)\./.exec(design.slice(h6At))!;
     expect([OVERWORLD_FRAME.width, OVERWORLD_FRAME.height]).toEqual([Number(frame[1]), Number(frame[2])]);
