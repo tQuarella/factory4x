@@ -573,6 +573,7 @@ window.__factory4x = {
     hudOverride = clone;
     refreshUi();
   },
+  mapBackedUp: (node) => view.drawnBackedUp(node),
   debugShowResult: () => showAreaResult($('result'), app.session, () => send({ type: 'leaveArea' }), () => undefined),
   startCampaign,
   systemName: () => systemStatus(app.session.world).name,

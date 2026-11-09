@@ -55,6 +55,8 @@ interface Window {
       ships: Record<'drone' | 'lancer' | 'flak', number>;
       cap: number;
     }): void;
+    /** What the last map frame drew for a node: the "!" badge, and the dashed backed-up route from it. */
+    mapBackedUp(node: number): { badge: boolean; route: boolean };
     /** Shows the battle banner and a sample toast (or hides them), to check layout. */
     debugShowNotices(on: boolean): void;
     debugShowResult(): void;
