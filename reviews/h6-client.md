@@ -109,3 +109,49 @@ Notes (not blocking):
 This is round 1.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-08
+
+I reviewed head 1cab655. Since round 1 there are two commits: 5c60fa6 merges `origin/main` (docs only, and `origin/main` e2a4a40 is now an ancestor of the branch), and 1cab655 is the rework. I ran all my checks in a clean detached worktree at 1cab655, with the build served on its own port.
+
+**Gates:** `npm run gates -- --base origin/main` passed all six (typecheck, lint, test, determinism, bots, protected-files). The build passed.
+
+**Smoke:**
+- Full suite: 192/192.
+- `overworld.spec.ts --repeat-each 5`, both projects: 180/180.
+- The reachability test alone, 20 repeats on the desktop project (where it failed 11/40 in round 1): 20/20.
+- The step-skip, area-tap, first-slice and combat-line tests, 5 repeats on both projects: 60/60.
+
+**Required changes from round 1:**
+1. **Reachability test: done.** It waits for the pan and the sheet to stop changing (`panSettled`: the same scroll and sheet box on three frames running). Each drag now goes toward its target, sized to land the target mid-way in the uncovered part. The targets are the three highest areas and the lowest. Its pass rate is above.
+2. **Single tap: done.** `tapArea` moved to `tests/smoke/helpers.ts`, shared by both specs. It waits until the area is still and the canvas is under it, clicks once, and fails if the sheet didn't open. My round-1 experiment (210/210 single taps) said this would hold, and the repeat runs above confirm it.
+3. **Lost coverage: done.**
+   - (a) A known, guarded, locked area's sheet now shows guard rows, a lancer tag with "(not researched)" and a Strong/Even/Weak badge, plus the combat line within the sheet's width and `expectControlsFit`.
+   - (b) Four 375x667 wide-font tests cover an open area (Shelf), a locked area (Veil), a relay with a decayed haul (Rime) and a far area (The Deep). Each checks that the selected node and its label clear the sheet, that the node is on the map, that the sheet is under 60% of the map, and `expectControlsFit`. Land ends inside 667 px where there is one, and is absent only for the locked and far areas.
+4. **Exact unit assertions: done.**
+   - `openedByReclaim` is `toEqual(['Glint Relay','Mire Relay'])` for Rime, and `toEqual(['Spire Relay'])` for Glint after Shoal (the already-joined case: Thorn Garden is excluded).
+   - Hops are compared in full against an independent relaxation over the data's lanes, not the BFS under test, plus The Deep = min(Mire, Spire) + 1.
+   - The DECISIONS line is corrected to say the round-1 version had become inequalities.
+5. **`tierRequirementText`: done.** The four wordings are restored in `h5-client.test.ts`.
+6. **Combat line: done.**
+   - `GUARD_TARGET_LINE` is now built from the sim's `GUARD_TARGET_ORDER.thorn[0]` and `.spore[0]`, and a unit test checks the line against the same constants.
+   - A new test in the 375x667 portrait block (wide font via `ready`) checks the line's width and `expectControlsFit` on both the heart and the pocket sheets.
+   - It needed a one-line export in `packages/sim/src/index.ts`, outside the task's file list. It exports an existing constant, changes no behaviour, and is recorded in DECISIONS. I accept it.
+7. **Step skip by a real tap: done.** A real `page.mouse.click` on Mire Relay's position during the moment stops it and opens no sheet. That position would have opened Mire's sheet if the tap hadn't been swallowed. The test then checks that the pan is at rest, the opened band is in view and band 2's padlocks are gone.
+8. **Comment and spacing: done.**
+9. **Main merged and gates re-run: done.** Branch CI run 42555067869 on 1cab655: the `gates` job (gates, build and smoke on Linux) passed. The `deploy` job (the branch preview) was still running when I wrote this; it is not a merge gate.
+
+**New code since round 1:** test files, two spacing fixes, the derived `GUARD_TARGET_LINE` and the sim export. None of it changes how the game plays. The version-tag note stays a note; DECISIONS records why it was left.
+
+**The whole slice.** This merge lands h6-sim, h6-combat-target, h6-bots and h6-design-data (v11), all already approved, with this client on top. Gates (including the bots gate's H6 checks on v11) and the full smoke suite pass together on one head, which was the point of DECISIONS fc044d8.
+
+Pillar fit: within the H6 spec and the Director's additions, as in round 1. The open frontier reads and plays on a phone: you can pan, the locks and relays explain themselves, the step moment plays once, and every area stays reachable with a sheet open.
+
+Gates: all six passed locally on 1cab655. Smoke: 192/192. Repeats are clean, as listed above. Branch CI `gates` job: green.
+
+Required changes:
+- none
+
+This is round 2.
+
+VERDICT: APPROVE
