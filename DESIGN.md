@@ -860,7 +860,7 @@ The handoff's "What changed" says it in one line, so the owner can object if a f
    - The two pools apply in order on the same start-of-round state.
    - One case where damage doesn't divide evenly into ship hp.
 
-**Bots (Designer recommendation; the Director decides in "Bots (H6)").** Drop the pre-send battle simulation (`shipsWin` / `waveWins`):
+**Bots (decided by the Director in "Bots (H6)": accepted).** Drop the pre-send battle simulation (`shipsWin` / `waveWins`):
 - With this rule, a wave that matches the probe's mix, sent together from the staging rock against guards at or below the probe's counts, wins by construction. That's the same deterministic combat from the same per-type counts, and the result is monotone in counts. So the check adds nothing true, and what it adds is foresight a player doesn't have, which hides problems like this one.
 - The composer attacks when the parked fleet has at least the probe's mix per type.
 - If a wave is repelled anyway (guards regrown past the probe's state, or a trickle), it follows H3's raise-the-threshold rule up to the limit, and `MAX_WAVES` then records the node closed.
@@ -868,7 +868,7 @@ The handoff's "What changed" says it in one line, so the owner can object if a f
 
 #### Bots (H6): strategies and the probe
 
-**The engine:** the H5 composer engine, with one change (Director, 2026-11-08, from reviews/h6-bots.md): it builds toward a mix that wins when one exists at the current limit. The H5 engine maximised a power estimate that is linear in ship counts, so it always built a single type. With the Root gone, and the H6 windows requiring that no single type fits a band 2 heart at L1, it could never take one. The engine now allocates from the probe's own minimum winning mix for the target (cached per node, limit, buildable types and caps) and attacks when the parked fleet matches it. Its Root step is inert. *Pending the Director (2026-11-08):* the Designer recommends no pre-send battle simulation; see "Combat amendment" above.
+**The engine:** the H5 composer engine, with one change (Director, 2026-11-08, from reviews/h6-bots.md): it builds toward a mix that wins when one exists at the current limit. The H5 engine maximised a power estimate that is linear in ship counts, so it always built a single type. With the Root gone, and the H6 windows requiring that no single type fits a band 2 heart at L1, it could never take one. The engine now allocates from the probe's own minimum winning mix for the target (cached per node, limit, buildable types and caps) and attacks when the parked fleet matches it. Its Root step is inert. **Decided (Director, 2026-11-08): no pre-send battle simulation.** The composer attacks when the ships parked at its staging rock include at least the probe's mix of each type. After a repel it raises its threshold as in H3, up to the limit. After two waves at a node it records the node closed. The report counts repelled waves. See "Combat amendment" above.
 
 **Area choice, needs-driven** (replaces H4 greedy for H6 strategies):
 1. Find the first unmet goal, in this order:
