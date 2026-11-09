@@ -35,6 +35,9 @@ Launches: 7 / 12.
 | r10 | critic | h6-bots | resume | Review round 1: REJECT (composer builds single-type fleets; can't win a band 2 heart by design). Director amended spec bde97b0 |
 | r11 | engineer | h6-bots | resume | Fix round 1: composer builds the probe's winning mix |
 | r12 | engineer | h6-bug-buffer-toast-flicker | resume | Fix round 1: tests for AC1-4, DECISIONS (e6b7f61) |
+| r14 | engineer | h6-bots | resume | Fix round 1 (e91e033): bots gate green with no data change |
+| r15 | critic | h6-bots | resume | Review round 2: REJECT (pre-send battle sim beyond spec; non-monotone claim false). Found: guard damage in ship-id order makes build order decide fights (H3 rule 7) |
+| r16 | designer | combat order rule + pre-send check | resume | Design decision before h6-design-data |
 | r13 | engineer | h6-bug-topbar-oscillation | resume | Branch CI red on 91dab72: boot.spec:129 phone tap fails reliably on Linux (green on main). Fix cause, merge into buffer branch |
 
 ## Iteration 5 ledger
