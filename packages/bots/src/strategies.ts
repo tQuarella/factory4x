@@ -1,6 +1,7 @@
 import {
   GUARD_TYPES,
   PROBE,
+  RAW_RESOURCES,
   SEND_ALL,
   SHIP_TYPES,
   areaStatus,
@@ -21,6 +22,7 @@ import {
   weightedMultPct,
   type Input,
   type ResearchId,
+  type ResourceTriple,
   type ShipType,
   type ShipTypeCounts,
   type SimData,
@@ -382,18 +384,15 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
 // Research policy, area choice, strategies
 // ---------------------------------------------------------------------------------------------------------------------
 
-/** The research policy's order, as (item, level): H4's list with Command limit inserted (DESIGN.md H5 "Research policy"). */
+/** The research policy's order, as (item, level): H4's list without Command limit, which H6 removed (relays raise the limit; DESIGN.md H6 "Bots (H6)"). */
 export const RESEARCH_POLICY: ReadonlyArray<readonly [ResearchId, number]> = [
   ['core', 1],
   ['lancer', 1],
   ['flak', 1],
-  ['fleet', 1],
   ['opening', 1],
   ['extract', 1],
-  ['fleet', 2],
   ['rigs', 1],
   ['yards', 1],
-  ['fleet', 3],
   ['extract', 2],
   ['opening', 2],
   ['rigs', 2],
@@ -402,8 +401,8 @@ export const RESEARCH_POLICY: ReadonlyArray<readonly [ResearchId, number]> = [
   ['opening', 3],
 ];
 
-/** 'full' buys the whole policy; 'no-command' all but Command limit; 'grind' only the four grind items (no core, designs or Command limit); 'none' nothing. */
-export type ResearchKit = 'full' | 'no-command' | 'grind' | 'none';
+/** 'full' buys the whole policy; 'grind' only the four grind items (no core or designs); 'none' nothing. */
+export type ResearchKit = 'full' | 'grind' | 'none';
 
 const GRIND_ITEMS: readonly ResearchId[] = ['opening', 'extract', 'rigs', 'yards'];
 
@@ -412,8 +411,6 @@ export function kitEntries(kit: ResearchKit): ReadonlyArray<readonly [ResearchId
   switch (kit) {
     case 'full':
       return RESEARCH_POLICY;
-    case 'no-command':
-      return RESEARCH_POLICY.filter(([item]) => item !== 'fleet');
     case 'grind':
       return RESEARCH_POLICY.filter(([item]) => GRIND_ITEMS.includes(item));
     case 'none':
@@ -444,7 +441,7 @@ export function areaEstimate(world: Readonly<World>, data: SimData, area: number
   return { need, powerX100 };
 }
 
-/** Open areas in data order. */
+/** Open (enterable) areas in data order. */
 export function openAreas(world: Readonly<World>, data: SimData): number[] {
   const out: number[] = [];
   for (let a = 0; a < data.map.areas.length; a++) if (isAreaOpen(world, data, a)) out.push(a);
@@ -478,6 +475,9 @@ export function closedKey(world: Readonly<World>, data: SimData): string {
 /** Area index -> closedKey when it was recorded closed. */
 export type ClosedRecords = ReadonlyMap<number, string>;
 
+/** Which side of the map a strategy prefers when choosing between areas that advance its goal. */
+export type SidePreference = 'ice' | 'crystal';
+
 /**
  * A campaign strategy: what to buy on the overworld and which area to land in. Both are functions of the
  * world (and the closed records). Inside the area the composer engine plays, or the H3 engine for the cap-off reference.
@@ -486,14 +486,109 @@ export interface CampaignStrategy {
   name: string;
   description: string;
   kit: ResearchKit;
-  /** Area ids in the order to take them while open (and not closed); after the list the greedy choice. */
-  route: readonly string[];
+  /** The side to prefer among areas that advance the goal (none: only the estimate and data order decide). */
+  side?: SidePreference;
   /** 'composer' (default) or 'h3' (the cap-off reference). */
   engine?: 'composer' | 'h3';
-  /** Build drones only (the drones-only strategy). */
+  /** Build drones only, and choose areas by the H4 greedy rule (the drones-only strategy: it has no designs to save for). */
   dronesOnly?: boolean;
   /** Set `fleet.cap` to this on the first step (0 = the A/B reference); undefined keeps the data's default. */
   fleetCap?: number;
+}
+
+/** The first unmet goal of the needs-driven area choice (DESIGN.md H6 "Bots (H6)"). */
+export type Goal =
+  | { kind: 'designs'; missing: ResourceTriple }
+  | { kind: 'relay'; band: number }
+  | { kind: 'area'; id: string }
+  | { kind: 'core'; missing: ResourceTriple };
+
+/** The bands (tier values) that have a command relay in the data, ascending. */
+function relayBands(data: SimData): number[] {
+  const out: number[] = [];
+  for (const a of data.map.areas) if (a.relay && !out.includes(a.tier)) out.push(a.tier);
+  return out.sort((x, y) => x - y);
+}
+
+/** The area ids the core needs reclaimed (the data's win item). */
+function coreAreas(data: SimData): string[] {
+  const core = data.research.find((r) => r.kind === 'win');
+  const out: string[] = [];
+  for (const q of core?.requires ?? []) if ('area' in q) out.push(q.area);
+  return out;
+}
+
+const isMissing = (t: ResourceTriple): boolean => RAW_RESOURCES.some((r) => t[r] > 0);
+
+/**
+ * The first unmet goal, in order: (1) the stockpile can afford the designs not yet bought, (2) a band 1 relay is
+ * reclaimed, (3) a band 2 relay, (4) The Deep (each area the core needs), (5) the core is affordable. A relay goal
+ * the data has no relay for is skipped. Null when all are met (the core is then bought, which ends the game).
+ */
+export function firstUnmetGoal(world: Readonly<World>, data: SimData): Goal | null {
+  const rows = researchStatus(world, data);
+  const stock = world.campaign.stockpile;
+  const short = (cost: ResourceTriple | null): ResourceTriple => ({
+    ore: cost === null ? 0 : Math.max(0, cost.ore - stock.ore),
+    ice: cost === null ? 0 : Math.max(0, cost.ice - stock.ice),
+    crystal: cost === null ? 0 : Math.max(0, cost.crystal - stock.crystal),
+  });
+  // 1. Both designs affordable together (or already bought).
+  const need: ResourceTriple = { ore: 0, ice: 0, crystal: 0 };
+  for (const id of ['lancer', 'flak'] as const) {
+    const row = rows.find((r) => r.id === id);
+    if (row === undefined || row.level >= row.maxLevel || row.cost === null) continue;
+    for (const r of RAW_RESOURCES) need[r] += row.cost[r];
+  }
+  const designs = short(need);
+  if (isMissing(designs)) return { kind: 'designs', missing: designs };
+  // 2-3. A relay in each band that has one.
+  for (const band of relayBands(data)) {
+    const reclaimed = data.map.areas.some((a, i) => a.relay && a.tier === band && world.campaign.areas[i]!.reclaimedTick !== null);
+    if (!reclaimed) return { kind: 'relay', band };
+  }
+  // 4. The areas the core needs.
+  for (const id of coreAreas(data)) {
+    const i = data.map.areas.findIndex((a) => a.id === id);
+    if (i >= 0 && world.campaign.areas[i]!.reclaimedTick === null) return { kind: 'area', id };
+  }
+  // 5. The core affordable.
+  const core = rows.find((r) => r.id === 'core');
+  if (core === undefined || core.level >= core.maxLevel) return null;
+  const missing = short(core.cost);
+  return isMissing(missing) ? { kind: 'core', missing } : null;
+}
+
+/** Area indices lane-joined to `a`, in lane order. */
+function neighboursOf(data: SimData, a: number): number[] {
+  const id = data.map.areas[a]!.id;
+  const out: number[] = [];
+  for (const [x, y] of data.map.lanes) {
+    const other = x === id ? y : y === id ? x : null;
+    if (other !== null) out.push(data.map.areas.findIndex((z) => z.id === other));
+  }
+  return out;
+}
+
+/**
+ * The enterable areas that advance `goal`. A resource goal: areas whose haul now (decayed for a repeat) adds a missing
+ * resource. A relay or area goal: the target itself if enterable, else the enterable areas lane-joined to a target
+ * (the step toward it). Empty if none does.
+ */
+export function advancingAreas(world: Readonly<World>, data: SimData, goal: Goal, enterable: readonly number[]): number[] {
+  if (goal.kind === 'designs' || goal.kind === 'core') {
+    return enterable.filter((a) => {
+      const h = areaStatus(world, data, a).haulNow;
+      return RAW_RESOURCES.some((r) => goal.missing[r] > 0 && h[r] > 0);
+    });
+  }
+  const targets: number[] = [];
+  data.map.areas.forEach((area, i) => {
+    if (goal.kind === 'relay' ? area.relay && area.tier === goal.band : area.id === goal.id) targets.push(i);
+  });
+  const direct = enterable.filter((a) => targets.includes(a));
+  if (direct.length > 0) return direct;
+  return enterable.filter((a) => neighboursOf(data, a).some((n) => targets.includes(n)));
 }
 
 export interface AreaChoice {
@@ -502,16 +597,27 @@ export interface AreaChoice {
   forced: boolean;
 }
 
-/** The area the strategy lands in next, or null if none is open. Closed records (valid at the current limit and designs) are skipped; if every open area is closed, the cheapest by estimate, forced. */
+/**
+ * The area the strategy lands in next, or null if none is open. The candidates are the enterable areas not recorded
+ * closed at the current limit and designs, narrowed to those that advance the first unmet goal (if any do), then to
+ * the strategy's side (if any is on it): the cheapest by estimate, ties to data order. `drones-only` has no goal and
+ * takes the cheapest. If every open area is closed, the cheapest of them, forced.
+ */
 export function chooseArea(world: Readonly<World>, data: SimData, s: CampaignStrategy, closed: ClosedRecords = new Map()): AreaChoice | null {
   const key = closedKey(world, data);
   const open = openAreas(world, data);
   const live = open.filter((a) => closed.get(a) !== key);
-  for (const id of s.route) {
-    const a = data.map.areas.findIndex((x) => x.id === id);
-    if (a >= 0 && live.includes(a)) return { area: a, forced: false };
+  let pool = live;
+  const goal = s.dronesOnly === true ? null : firstUnmetGoal(world, data);
+  if (goal !== null) {
+    const adv = advancingAreas(world, data, goal, live);
+    if (adv.length > 0) pool = adv;
   }
-  const pick = cheapestOf(world, data, live);
+  if (s.side !== undefined) {
+    const preferred = pool.filter((a) => data.map.areas[a]!.side === s.side);
+    if (preferred.length > 0) pool = preferred;
+  }
+  const pick = cheapestOf(world, data, pool);
   if (pick !== null) return { area: pick, forced: false };
   const any = cheapestOf(world, data, open);
   return any === null ? null : { area: any, forced: true };
@@ -534,40 +640,31 @@ export function decideOverworld(world: Readonly<World>, data: SimData, s: Campai
 export const strategies: CampaignStrategy[] = [
   {
     name: 'composer',
-    description: 'Greedy area choice, the composer engine, the research policy with Command limit.',
+    description: 'Needs-driven area choice (designs, band 1 relay, band 2 relay, The Deep, the core), no side preference, the composer engine.',
     kit: 'full',
-    route: [],
   },
   {
     name: 'ice-first',
-    description: 'Landfall, Frost Shelf, then composer.',
+    description: 'The composer, preferring ice-side areas among those that advance its goal.',
     kit: 'full',
-    route: ['landfall', 'shelf'],
+    side: 'ice',
   },
   {
     name: 'crystal-first',
-    description: 'Landfall, Glass Shoal, then composer.',
+    description: 'The composer, preferring crystal-side areas among those that advance its goal.',
     kit: 'full',
-    route: ['landfall', 'shoal'],
-  },
-  {
-    name: 'no-command',
-    description: 'Composer, but never buys Command limit.',
-    kit: 'no-command',
-    route: [],
+    side: 'crystal',
   },
   {
     name: 'drones-only',
-    description: 'The composer engine with drones as the only buildable type. Buys only grind research: no designs, no Command limit, no core.',
+    description: 'The composer engine with drones as the only buildable type, H4 greedy area choice. Buys only grind research: no designs, no core.',
     kit: 'grind',
-    route: [],
     dronesOnly: true,
   },
   {
-    name: 'greedy',
-    description: 'Cap-off reference (fleet.cap 0, H4 rules): the H3 engine, greedy area choice, the research policy.',
+    name: 'cap-off',
+    description: 'Cap-off reference (fleet.cap 0): the composer strategy, the H3 engine inside areas. Relays still open bands.',
     kit: 'full',
-    route: [],
     engine: 'h3',
     fleetCap: 0,
   },
