@@ -353,9 +353,12 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 /* Phone landscape (short and wide): the bar was one column taller than the screen, so its chips ran under the buttons. Two columns instead:
    the chips on the left, the buttons in a column on the right, each taking only its own height. */
 @media (min-aspect-ratio: 1/1) and (max-height: 520px) {
-  #bars { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; width: 196px; overflow-y: auto; }
-  #stats { grid-column: 1; min-width: 0; }
-  #controls { grid-column: 2; grid-template-columns: 44px; gap: 4px; padding: 4px 0 0 2px; justify-content: end; }
-  #controls .ctl { width: 44px; }
-  #b-research { grid-column: auto; width: 44px; font-size: 10px; margin: 0; white-space: normal; }
+  #bars { display: grid; grid-template-columns: minmax(0, 1fr) 44px; column-gap: 4px; align-content: start; align-items: start; width: 204px; overflow-y: auto; }
+  /* The buttons join the bar's own grid: one column of 44 px buttons beside the chips; on the overworld the Research button spans the top. */
+  #controls { display: contents; }
+  #controls .ctl { grid-column: 2; width: 44px; height: 44px; margin: 0 0 4px; }
+  #stats { grid-column: 1; grid-row: 1 / span 20; min-width: 0; overflow: hidden; padding-right: 0; }
+  #app[data-mode='world'] #stats { grid-row: 2 / span 20; }
+  #controls #b-research { grid-column: 1 / -1; grid-row: 1; width: auto; flex: none; font-size: 14px; margin: 0 0 4px; }
+  #ow-stats .chip.fleet-limit b { white-space: normal; }
 }

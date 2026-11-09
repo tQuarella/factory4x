@@ -14,6 +14,8 @@ export interface Rect {
 /** Name label box: wide enough for a name and, once reclaimed, a second line of export rates. */
 const NAME_W = 130;
 const NAME_H = 32;
+/** Px between a node's rim and its name label: clear of the selection ring at r + 6. */
+export const NAME_GAP = 9;
 /** Marks reach about 1.49 of a node's radius (ART_STYLE.md H6 entities); the box is a square of 1.5 r. */
 const MARK_REACH = 1.5;
 
@@ -24,7 +26,7 @@ export function nodeBox(c: { x: number; y: number }, r: number): Rect {
 
 /** The name label's box under or over a node. */
 export function nameBox(c: { x: number; y: number }, r: number, side: 'above' | 'below'): Rect {
-  return { x: c.x - NAME_W / 2, y: side === 'above' ? c.y - r - 3 - NAME_H : c.y + r + 3, w: NAME_W, h: NAME_H };
+  return { x: c.x - NAME_W / 2, y: side === 'above' ? c.y - r - NAME_GAP - NAME_H : c.y + r + NAME_GAP, w: NAME_W, h: NAME_H };
 }
 
 export function overlap(a: Rect, b: Rect, pad = 0): boolean {

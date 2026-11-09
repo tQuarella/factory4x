@@ -306,6 +306,9 @@ const fleetSeen: { world: unknown; shown: boolean } = { world: null, shown: fals
 /** Which screen the last refresh showed, per world, so only a change inside one session raises a landing or return notice. */
 const modeSeen: { world: unknown; active: number | null } = { world: null, active: null };
 
+/** How many step moments have started in this page (a test hook: the step is over in 1.5 s). */
+let stepsStarted = 0;
+
 /** Raises the landing, return, withdraw or reclaim notice when the screen changed since the last look. */
 function modeTransition(): void {
   const s = app.session;
@@ -361,7 +364,10 @@ function modeTransition(): void {
   worldView.focus(prev);
   if (first) {
     s.flags.stepsShown.push(step.band);
-    if (step.opens !== null) worldView.startStep(step.opens);
+    if (step.opens !== null) {
+      stepsStarted++;
+      worldView.startStep(step.opens);
+    }
   }
 }
 
@@ -411,7 +417,7 @@ function refreshUi(): void {
   const lines = onWorld ? [] : bannerLines(w);
   const showBanner = lines.length > 0 || forceBanner;
   setHidden(el.banner, !showBanner);
-  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'ROOT · 6 Thorn 4 Spore · strip 0.8/s · 2 lost');
+  if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'P4 · 6 Thorn 4 Spore · strip 0.8/s · 2 lost');
   if (showBanner && el.banner.dataset.text !== lines.join('|')) {
     el.banner.dataset.text = lines.join('|');
     el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
@@ -563,9 +569,14 @@ window.__factory4x = {
     const r = canvas.getBoundingClientRect();
     return worldView.bandRects().map((b) => ({ ...b, x: r.left + b.x, y: r.top + b.y }));
   },
-  overworldScroll: () => ({ ...worldView.scroll, max: worldView.scrollLimits }),
+  areaLabelRects: () => {
+    const r = canvas.getBoundingClientRect();
+    return worldView.labelRects().map((b) => (b === null ? null : { x: r.left + b.x, y: r.top + b.y, w: b.w, h: b.h }));
+  },
+  overworldScroll:() => ({ ...worldView.scroll, max: worldView.scrollLimits }),
   centerOnArea: (a) => worldView.focus(a),
   stepActive: () => worldView.stepActive,
+  stepsStarted: () => stepsStarted,
   skipStep: () => worldView.skipStep(),
   selected: () => sheet.selected,
   selectedArea: () => areaSheet.selected,
@@ -592,7 +603,7 @@ window.__factory4x = {
   },
   debugShowNotices: (on) => {
     forceBanner = on;
-    if (on) toast.show('Root cut: 15 sent, 3 lost. The Heart wilts: 10 Thorns 14 Spores → 6 Thorns 7 Spores, regrows 5× slower.\n\nP4 held: 10 sent, 10 lost, 2 guards stripped\nRegrowth outpaced the wave. 10 ships strip 0.6 guards/s; P4 regrows 1/s.');
+    if (on) toast.show('Heart held: 15 sent, 3 lost, 4 guards stripped. 10 Thorns 14 Spores regrow 1 / 2.0 s and 1 / 0.7 s.\n\nP4 held: 10 sent, 10 lost, 2 guards stripped\nRegrowth outpaced the wave. 10 ships strip 0.6 guards/s; P4 regrows 1/s.');
     else toast.hide();
     refreshUi();
   },

@@ -7,7 +7,7 @@
  */
 import { areaStatus, isReclaimed, overworldStatus, type AreaStatus, type OverworldStatus, type SimData, type World } from '@factory4x/sim';
 import { clampScroll, fitOverworld, scrollMax, type OwFit } from './fit.ts';
-import { bandLabels, overlap, type BandLabel, type Rect } from './owlayout.ts';
+import { NAME_GAP, bandLabels, overlap, type BandLabel, type Rect } from './owlayout.ts';
 import { palette } from './palette.ts';
 import {
   drawAreaNode,
@@ -36,7 +36,7 @@ const RIM_GAP = 2;
 const LABEL_FONT = '600 11px ui-monospace, Menlo, Consolas, monospace';
 const BAND_FONT = '600 10px ui-monospace, Menlo, Consolas, monospace';
 /** px under (or over) a node that its two label lines need. */
-const LABEL_ROOM = 36;
+const LABEL_ROOM = 42;
 const EXPORT_FONT = '600 10px ui-monospace, Menlo, Consolas, monospace';
 /** A touch or drag that moves less than this (px) is a tap (DESIGN.md H6). */
 export const TAP_SLOP = 10;
@@ -121,7 +121,7 @@ export function labelSides(centers: readonly { x: number; y: number }[], lanes: 
   const placed: Rect[] = [];
   const out: Array<'above' | 'below'> = [];
   centers.forEach((c, i) => {
-    const rect = (above: boolean): Rect => ({ x: c.x - LW / 2, y: above ? c.y - r - 3 - LH : c.y + r + 3, w: LW, h: LH });
+    const rect = (above: boolean): Rect => ({ x: c.x - LW / 2, y: above ? c.y - r - NAME_GAP - LH : c.y + r + NAME_GAP, w: LW, h: LH });
     const score = (rc: Rect): number => {
       let s = 0;
       for (const p of samples) {
@@ -160,7 +160,13 @@ interface StepAnim {
   toY: number;
 }
 
-const easeOut = (t: number): number => 1 - (1 - t) * (1 - t) * (1 - t);
+function unionRect(a: Rect, b: Rect): Rect {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
+}
+
+const easeOut =(t: number): number => 1 - (1 - t) * (1 - t) * (1 - t);
 const ramp = (t: number, a: number, b: number): number => Math.max(0, Math.min(1, (t - a) / (b - a)));
 
 export class WorldView {
@@ -341,6 +347,13 @@ export class WorldView {
     return { x: this.fit.ox + area.x * this.fit.scale, y: this.fit.oy + area.y * this.fit.scale };
   }
 
+  /** The name labels as the last frame drew them (canvas CSS px, text widths measured), by area; null where not drawn. For the host's test hooks. */
+  private drawnLabels: Array<Rect | null> = [];
+
+  labelRects(): Array<Rect | null> {
+    return this.drawnLabels.map((r) => (r === null ? null : { ...r }));
+  }
+
   /** The band labels' boxes in canvas CSS px, with the pan, for the host's test hooks. */
   bandRects(): Array<{ band: number; x: number; y: number; w: number; h: number }> {
     return this.bands.map((b) => ({ band: b.band, x: b.rect.x - this.scrollX, y: b.rect.y - this.scrollY, w: b.rect.w, h: b.rect.h }));
@@ -463,7 +476,6 @@ export class WorldView {
       this.stepPending = null;
     }
     const m = this.limits();
-    let p1 = 1;
     let fade = 1;
     let reveal = 100;
     let opened = -1;
@@ -475,7 +487,7 @@ export class WorldView {
         this.step = null;
       } else {
         opened = s.opened;
-        p1 = easeOut(ramp(k, 0, 0.6));
+        const p1 = easeOut(ramp(k, 0, 0.6));
         fade = ramp(k, 0.35, 0.8);
         reveal = ramp(k, 0.4, 1) * 100;
         this.goalY = this.scrollY = s.fromY + (s.toY - s.fromY) * p1;
@@ -522,7 +534,8 @@ export class WorldView {
     }
 
     const pct = world.tun['shipments.pct'];
-    const labels: Array<{ name: string; sub: string; x: number; y: number; above: boolean; dim: boolean; reclaimed: boolean }> = [];
+    this.drawnLabels = data.map.areas.map(() => null);
+    const labels: Array<{ i: number; name: string; sub: string; x: number; y: number; above: boolean; dim: boolean; reclaimed: boolean }> = [];
     statuses.forEach((st, i) => {
       const { x, y } = this.areaPos(i);
       if (y < -3 * rr || y > h + 3 * rr) return;
@@ -569,6 +582,7 @@ export class WorldView {
       }
       const exp = exportX10(st.export, pct);
       labels.push({
+        i,
         name: st.name,
         sub: reclaimed ? ratesX10Text(exp) : '',
         x,
@@ -585,13 +599,17 @@ export class WorldView {
     ctx.textBaseline = 'alphabetic';
     for (const l of labels) {
       const lines = l.sub ? [l.name, l.sub] : [l.name];
-      const top = l.above ? l.y - rr - 3 - (lines.length * 14 + 2) : l.y + rr + 3;
+      const top = l.above ? l.y - rr - NAME_GAP - (lines.length * 14 + 2) : l.y + rr + NAME_GAP;
+      let box: Rect | null = null;
       lines.forEach((text, k) => {
         ctx.font = k === 0 ? LABEL_FONT : EXPORT_FONT;
         const wd = ctx.measureText(text).width + 8;
         const ly = top + 12 + k * 14;
         // Keep the pill inside the canvas whatever the text width.
         const lx = Math.min(w - wd / 2 - 2, Math.max(wd / 2 + 2, l.x));
+        const pill = { x: lx - wd / 2, y: ly - 11, w: wd, h: 14 };
+        box = box === null ? pill : unionRect(box, pill);
+        this.drawnLabels[l.i] = box;
         ctx.fillStyle = 'rgba(5, 7, 13, 0.78)';
         ctx.beginPath();
         ctx.roundRect(lx - wd / 2, ly - 11, wd, 14, 4);

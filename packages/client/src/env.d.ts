@@ -15,6 +15,8 @@ interface Window {
     areaRadius(): number;
     /** The band labels' boxes in viewport pixels. */
     bandRects(): Array<{ band: number; x: number; y: number; w: number; h: number }>;
+    /** The area name labels as last drawn (viewport pixels, measured text), by area; null where not drawn. */
+    areaLabelRects(): Array<{ x: number; y: number; w: number; h: number } | null>;
     /** The overworld pan now and the furthest it reaches now (it reaches further under an open sheet), px. */
     overworldScroll(): { x: number; y: number; max: { x: number; y: number } };
     /** Centres the overworld on an area at once (tests; a drag does the same for a player). */
@@ -22,6 +24,8 @@ interface Window {
     /** The step moment is playing. */
     stepActive(): boolean;
     skipStep(): void;
+    /** How many step moments this page has started. */
+    stepsStarted(): number;
     /** Selected node index, or null. */
     selected(): number | null;
     /** The area whose overworld sheet is open, or null. */

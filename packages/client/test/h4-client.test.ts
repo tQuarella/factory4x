@@ -342,7 +342,7 @@ describe('overworld layout helpers', () => {
       const sides = labelSides(centers, lanes, r, fit.contentW, fit.contentH);
       sides.forEach((side, i) => {
         const c = centers[i]!;
-        const top = side === 'above' ? c.y - r - 33 : c.y + r + 3;
+        const top = side === 'above' ? c.y - r - 9 - 30 : c.y + r + 9;
         expect(top, `${w}x${h} ${ids[i]}`).toBeGreaterThanOrEqual(0);
         expect(top + 30, `${w}x${h} ${ids[i]}`).toBeLessThanOrEqual(fit.contentH);
       });

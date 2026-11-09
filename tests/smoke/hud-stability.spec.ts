@@ -11,7 +11,7 @@ import type { CampaignStart } from '@factory4x/sim';
 const WIDE_FONT =
   '#sheet *, #research *, #sendpanel *, #result *, #win *, #chips *, #ow-stats *, #controls *, #tuning *, #feedback *, .card *, #banner, #toast, #toast::after, #hint { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.15em !important; line-height: 1.5 !important; }';
 
-const DEEP_START: CampaignStart = { reclaimed: ['landfall', 'shelf', 'shoal', 'veil', 'garden'], research: { lancer: 1, flak: 1 }, land: 'deep' };
+const DEEP_START: CampaignStart = { reclaimed: ['landfall', 'shelf', 'rime', 'mire'], research: { lancer: 1, flak: 1 }, land: 'deep' };
 
 /** Boundary-crossing walks; no two neighbours are equal (also round the end), so a count changes on every frame. */
 const WALKS: Record<string, number[]> = {
@@ -34,7 +34,7 @@ const FRAMES = 240;
 const at = (k: string, i: number): number => WALKS[k]![i % WALKS[k]!.length]!;
 
 interface Box { x: number; y: number; w: number; h: number }
-interface Snap { boxes: Record<string, Box>; visible: string[]; rows: number; gaps: Record<string, number>; bottoms: Record<string, number> }
+interface Snap { boxes: Record<string, Box>; visible: string[]; rows: number; gaps: Record<string, number>; overlaps: string[] }
 
 async function setup(page: Page, size: { width: number; height: number }): Promise<void> {
   await page.setViewportSize(size);
@@ -54,7 +54,8 @@ async function frame(page: Page, i: number): Promise<Snap> {
     ice: at('rateIce', i),
     crystal: at('rateCrystal', i),
     ships: { drone: at('drone', i), lancer: at('lancer', i), flak: at('flak', i) },
-    cap: 99,
+    // The fleet chip's room is two digits each side (fleet.cap is at most 60 and each relay adds at most 12 twice): the test's limit stays within that.
+    cap: 60,
   };
   await page.evaluate((v) => window.__factory4x!.debugHudFrame(v), f);
   return page.evaluate(
@@ -80,29 +81,28 @@ async function frame(page: Page, i: number): Promise<Snap> {
           // Each count's own text (a Range over the <b>'s contents, not the <b> box) starts beside its icon, whatever room the chip reserves.
           // Bottoms are measured from the top of #controls, so a layout can't push a chip down toward the buttons unseen.
           const gaps: Record<string, number> = {};
-          const bottoms: Record<string, number> = {};
-          const controlsTop = document.getElementById('controls')!.getBoundingClientRect().top;
+          const overlaps: string[] = [];
           for (const c of document.querySelectorAll<HTMLElement>('#chips .chip')) {
             if (c.getClientRects().length === 0) continue;
             const range = document.createRange();
             range.selectNodeContents(c.querySelector('b')!);
             const text = range.getClientRects()[0]!;
             gaps[c.id] = text.left - c.querySelector('canvas')!.getBoundingClientRect().right;
-            bottoms[c.id] = c.getBoundingClientRect().bottom - controlsTop;
+            const cb = c.getBoundingClientRect();
+            // No HUD chip may lie under a control button (phone landscape had the plating, ship and fleet chips under them).
+            for (const b of document.querySelectorAll<HTMLElement>("#controls .ctl")) {
+              if (b.getClientRects().length === 0) continue;
+              const r = b.getBoundingClientRect();
+              if (cb.left < r.right - 0.5 && cb.right > r.left + 0.5 && cb.top < r.bottom - 0.5 && cb.bottom > r.top + 0.5) overlaps.push(`${c.id} is under ${b.id || b.className}`);
+            }
           }
-          resolve({ boxes, visible, rows: tops.size, gaps, bottoms });
+          resolve({ boxes, visible, rows: tops.size, gaps, overlaps });
         }),
       ),
   );
 }
 
-/**
- * Phone landscape (667x375), bottom of each chip minus the top of #controls, on main (f8fabe3) with no rates showing, its shortest
- * state. Chips already sit under the buttons there (a separate bug); this change must not push any lower.
- */
-const MAIN_LANDSCAPE_BOTTOMS: Record<string, number> = { 'chip-ore': -96, 'chip-ice': -70, 'chip-crystal': -44, 'chip-lens': -18, 'chip-plating': 8, 'chip-drone': 34, 'chip-lancer': 60, 'chip-flak': 86, 'chip-fleet': 116 };
-
-async function run(page: Page, size: { width: number; height: number }, maxRows: number | null, bottoms: Record<string, number> | null = null): Promise<void> {
+async function run(page: Page, size: { width: number; height: number }, maxRows: number | null): Promise<void> {
   await setup(page, size);
   const first = await frame(page, 0);
   expect(first.visible.length).toBe(9);
@@ -110,7 +110,7 @@ async function run(page: Page, size: { width: number; height: number }, maxRows:
   for (let i = 1; i < FRAMES; i++) {
     const cur = await frame(page, i);
     expect(cur.visible, `chips shown at frame ${i}`).toEqual(first.visible);
-    if (bottoms) for (const [id, b] of Object.entries(cur.bottoms)) if (b > bottoms[id]! + 1 && bad.length < 12) bad.push(`frame ${i} ${id}: bottom ${b.toFixed(0)} px from the controls' top, main has ${bottoms[id]}`);
+    for (const o of cur.overlaps) if (bad.length < 12) bad.push(`frame ${i}: ${o}`);
     if (maxRows !== null) expect(cur.rows, `rows at frame ${i}`).toBeLessThanOrEqual(maxRows);
     expect(cur.rows, `row count at frame ${i}`).toBe(first.rows);
     for (const [id, g] of Object.entries(cur.gaps)) if ((g > 8 || g < -1) && bad.length < 12) bad.push(`frame ${i} ${id}: its count starts ${g.toFixed(1)} px from its icon`);
@@ -131,7 +131,7 @@ test('the HUD holds still while counts change every frame: 375 px portrait, wide
 });
 
 test('the HUD holds still while counts change every frame: landscape', async ({ page }) => {
-  await run(page, { width: 667, height: 375 }, null, MAIN_LANDSCAPE_BOTTOMS);
+  await run(page, { width: 667, height: 375 }, null);
 });
 
 test('the HUD holds still while counts change every frame: desktop', async ({ page }) => {

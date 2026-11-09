@@ -35,7 +35,7 @@ export function fitMap(nodes: readonly Box[], w: number, h: number): Fit {
 
 /** Overworld: px kept clear beside the outermost nodes (name labels are wider than a node) and above and below (two label lines). */
 const OW_PAD_X = 30;
-const OW_PAD_Y = 40;
+const OW_PAD_Y = 46;
 /** Largest overworld scale, so desktop nodes don't balloon. */
 const OW_MAX_SCALE = 0.7;
 /** Smallest on-screen node radius, px (the spec: area radius at least 22 px, so a node is a 44 px target). */
