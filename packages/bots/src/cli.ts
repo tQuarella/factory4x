@@ -9,8 +9,8 @@
  * Usage: npm run bots [-- --seeds 3 --ticks 54000 --out reports/bots-latest --trials on|off]
  *   --ticks is the per-visit cap in game ticks (the 30-minute visit cap); the campaign cap is 120 game minutes of play.
  *   --out is the report path without extension (default reports/bots-latest).
- *   --trials runs the trial visits (up to one 30-minute visit each); the gate run skips them (see DECISIONS.md), the
- *   full report asks for them: `npm run bots -- --trials on`.
+ *   --trials on|off: the trial visits (up to one 30-minute game visit each, about 25 s of wall time in all) run by default,
+ *   so the gate runs them too; `--trials off` skips them.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -37,7 +37,7 @@ const tr = data.tickRate;
 const seeds = arg('seeds', 3);
 const visitCap = arg('ticks', budgets.botGameTicks);
 const outBase = argStr('out', 'reports/bots-latest');
-const runTrials = argStr('trials', 'off') === 'on';
+const runTrials = argStr('trials', 'on') !== 'off';
 const opts = defaultRunOptions(data, visitCap);
 const limits = probeLimits(data);
 const started = performance.now();
@@ -202,7 +202,7 @@ const md = [
   '## Trial visits (a forced composer visit up to the visit cap, landed from campaignWorld behind the lock)',
   '',
   ...(trials === null
-    ? ['Not run (the gate run skips them; `npm run bots -- --trials on` runs them).']
+    ? ['Not run (--trials off).']
     : [
         '| Trial | Area | Seed | Limit (expected) | Result | Play time |',
         '| --- | --- | --- | --- | --- | --- |',
