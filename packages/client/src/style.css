@@ -100,6 +100,11 @@ section:first-of-type { border-top: 0; }
 .lbl { color: var(--dim); font-size: 11px; }
 .note { font-size: 12px; color: var(--dim); margin: 4px 0; }
 .note.warn { color: var(--gold); background: rgba(255, 210, 122, 0.1); border: 1px solid rgba(255, 210, 122, 0.4); padding: 6px 8px; border-radius: 8px; }
+/* The backed-up warning always has its room: the sizer (the longest message, hidden) sets the height, the message sits over it. */
+.note.warn { position: relative; }
+.note.warn .sizer { display: block; visibility: hidden; }
+.note.warn .msg { position: absolute; left: 8px; right: 8px; top: 6px; }
+.note.warn.idle { visibility: hidden; }
 .actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .feeds-box { margin: 6px 0; padding: 6px 8px; border: 1px solid var(--bloom); border-radius: 8px; font-size: 12px; background: rgba(70, 12, 36, 0.35); }
 .feeds-box b { display: block; color: #ffb3cc; margin-bottom: 2px; }

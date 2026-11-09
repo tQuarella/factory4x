@@ -53,6 +53,7 @@ import {
   regrowText,
   supplyLine,
   fleetLine,
+  isBackedUp,
   unlockHint,
 } from './report.ts';
 import type { Session } from './session.ts';
@@ -234,7 +235,11 @@ export class Sheet {
     h('span', 'lbl', 'Buffer', bufRow);
     const buf = bar(bufRow, 'buf');
     const bufText = h('span', 'val', '', bufRow);
-    const warn = this.note(sec, 'warn');
+    // The warning's room is always reserved (a hidden sizer holds the longest message), so showing it moves nothing below it.
+    const warn = h('div', 'note warn idle', '', sec);
+    const warnSizer = h('span', 'sizer', 'No route: this crystal goes nowhere. Build a route.', warn);
+    warnSizer.setAttribute('aria-hidden', 'true');
+    const warnMsg = h('span', 'msg', '', warn);
 
     const actions = h('div', 'actions', '', sec);
     const node = n.index;
@@ -288,17 +293,18 @@ export class Sheet {
         setText(route.val, `L${st.route.level}/${st.route.maxLevel} · carries ${st.route.capacityPerMin}/min${up}`);
       } else setText(route.val, st.routePending ? 'queued' : 'none');
       buf.set(st.buffer / Math.max(1, st.bufferCap));
-      toggleClass(buf.el, 'full', st.backedUp);
+      const backedUp = isBackedUp(this.world, node, st);
+      toggleClass(buf.el, 'full', backedUp);
       setText(bufText, `${st.buffer}/${st.bufferCap}`);
-      const msg = st.backedUp
+      const msg = backedUp
         ? st.route
           ? 'Backed up: route at capacity. Upgrade it.'
           : 'Backed up: no route. Build one.'
         : st.noRoute
           ? `No route: this ${st.prize ? RES_NAME[st.prize].toLowerCase() : 'ore'} goes nowhere. Build a route.`
           : '';
-      setHidden(warn, msg === '');
-      setText(warn, msg);
+      toggleClass(warn, 'idle', msg === '');
+      setText(warnMsg, msg);
     });
   }
 

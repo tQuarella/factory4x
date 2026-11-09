@@ -15,6 +15,7 @@ import {
   type GuardType,
   type HeartParams,
   type LandingEffects,
+  type NodeStatus,
   type ResearchRow,
   type SimData,
   type RawResource,
@@ -398,4 +399,26 @@ export function effectText(row: Pick<ResearchRow, 'id' | 'level' | 'maxLevel' | 
     default:
       return '';
   }
+}
+
+const backedUpLatch = new WeakMap<object, Map<number, boolean>>();
+
+/**
+ * Is this node backed up? A steady answer for the sheet's warning and the map's "!" and dashed route. The sim's `backedUp` is
+ * "buffer >= cap", which flips every time a pod leaves a full buffer (h6 bug: the warning showed and hid and moved the buttons).
+ * Without a route a full buffer never drains, so the sim's flag is already steady. With one, the node is backed up while its
+ * extractors out-produce the route: it turns on when the buffer is full and stays on until the buffer drops below half (a pod
+ * takes a level's worth, far less than that) or the route can carry the extraction, so an upgrade clears it at once.
+ */
+export function isBackedUp(world: Readonly<World>, node: number, st: NodeStatus): boolean {
+  let latch = backedUpLatch.get(world);
+  if (!latch) backedUpLatch.set(world, (latch = new Map()));
+  let on = latch.get(node) ?? false;
+  if (st.extractors <= 0) on = false;
+  else if (!st.route) on = st.backedUp;
+  else if (st.extractPerMinX10 <= st.route.capacityPerMin * 10) on = false;
+  else if (st.buffer >= st.bufferCap) on = true;
+  else if (st.buffer * 2 < st.bufferCap) on = false;
+  latch.set(node, on);
+  return on;
 }

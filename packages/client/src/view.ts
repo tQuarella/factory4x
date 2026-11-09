@@ -24,6 +24,7 @@ import {
   drawVine,
   drawWiltingThorn,
 } from './placeholders.ts';
+import { isBackedUp } from './report.ts';
 import { fitMap, type Fit } from './fit.ts';
 import { lerp, podTotalTicks, progressFrac } from './interp.ts';
 import type { Session } from './session.ts';
@@ -204,7 +205,7 @@ export class MapView {
     for (const route of world.routes) {
       const a = this.nodePos(route.from);
       const b = this.nodePos(route.to);
-      drawRoute(ctx, a.x, a.y, b.x, b.y, route.level, nodeStatus(world, route.from).backedUp);
+      drawRoute(ctx, a.x, a.y, b.x, b.y, route.level, isBackedUp(world, route.from, nodeStatus(world, route.from)));
     }
     const podTotal = (length: number): number => podTotalTicks(length, world.tun['route.podSpeedSu']);
     for (const route of world.routes) {
@@ -318,7 +319,7 @@ export class MapView {
       const parked = counts.at[n.index]!;
       if (parked > 0) this.badge(String(parked), x + rr * 0.85, y - rr * 0.75, palette.ship, '#0b1626');
       const ns = nodeStatus(world, n.index);
-      if (n.kind !== 'probe' && (ns.backedUp || ns.noRoute)) this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
+      if (n.kind !== 'probe' && (isBackedUp(world, n.index, ns) || ns.noRoute)) this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
     }
 
     // Labels last, each on a dark pill, so no guard ring hides the name of the node it rings or a neighbour.
