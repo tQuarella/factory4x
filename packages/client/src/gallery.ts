@@ -477,13 +477,16 @@ boundLines.push(`stockpile icon: ${(measure((c, r) => drawStockpileIcon(c, r)) /
 boundLines.push(`relay icon: ${(measure((c, r) => drawRelayIcon(c, r)) / 50).toFixed(3)} r`);
 boundLines.push(`relay mark: ${(measure((c, r) => drawRelayMark(c, r)) / 50).toFixed(3)} r`);
 boundLines.push(`lock badge: ${(measure((c, r) => drawLockBadge(c, r)) / 50).toFixed(3)} r`);
+// How far each corner mark reaches from the node's centre when placed as ART_STYLE "Callers" says (node r = 50).
+boundLines.push(`relay mark at the upper left, reach from the node centre: ${(measure((c, r) => { c.translate(-r * 0.7, -r * 0.7); drawRelayMark(c, r * 0.5); }) / 50).toFixed(3)} node r`);
+boundLines.push(`lock badge at the upper right, reach from the node centre: ${(measure((c, r) => { c.translate(r * 0.7, -r * 0.7); drawLockBadge(c, r * 0.5); }) / 50).toFixed(3)} node r`);
 for (const s of ['closed', 'open', 'owned'] as LaneState[]) {
   // Segment along x from -150 to 150, so the distance to it is |y| inside the span and the end distance beyond.
   const dist = (x: number, y: number): number => (Math.abs(x) <= 150 ? Math.abs(y) : Math.hypot(Math.abs(x) - 150, y));
   boundLines.push(`lane ${s}: ${measure((c) => drawLane(c, -150, 0, 150, 0, 1.1, s), dist).toFixed(2)} px from segment (limit 4)`);
 }
 const boundsEl = document.getElementById('bounds');
-if (boundsEl) boundsEl.textContent = ['(pixel scan includes antialiasing: 1.002 r or 4.00 px is the limit; exact geometry is checked in test/h4-art.test.ts)', ...boundLines].join('\n');
+if (boundsEl) boundsEl.textContent = ['(pixel scan includes antialiasing: 1.002 r or 4.00 px is the limit; exact geometry is checked in test/h4-art.test.ts and test/h6-art.test.ts)', ...boundLines].join('\n');
 
 // ---- Overworld mock at 375x667 ----
 {

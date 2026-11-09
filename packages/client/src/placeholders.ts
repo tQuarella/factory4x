@@ -926,13 +926,14 @@ export function drawRelayIcon(ctx: Ctx, r: number): void {
  * Relay corner mark (H6): the relay icon on a dark backing disc, for the upper
  * LEFT of an area node (the lock badge owns the upper right). It is added to
  * the node, never a replacement for the haul icon in the centre. `alpha` dims
- * it (a far relay shows it at the node's 0.5). Within r.
+ * it (a far relay shows it at the node's 0.5). The disc is 0.96 r so its
+ * antialiased edge stays within r; the icon is drawn at 0.86 scale on it.
  */
 export function drawRelayMark(ctx: Ctx, r: number, alpha = 1): void {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = palette.space;
-  disc(ctx, 0, 0, r);
+  disc(ctx, 0, 0, r * 0.96);
   ctx.fill();
   ctx.save();
   ctx.scale(0.86, 0.86);
