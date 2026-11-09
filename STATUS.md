@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 6, hypothesis H6: Open frontier, Root removed)
-**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Build. Spec f8fabe3. In flight: h6-sim (core-engineer), h6-art (art-direction), h6-bug-topbar-oscillation (engineer; then resumed for h6-bug-buffer-toast-flicker). Note for h6-client: boot.spec.ts:129 (overworld tap area 3, phone) fails locally on Windows on unmodified main; Linux CI on main is green (b7679bc). Next: h6-client branches from task/h6-sim after both bugs merge, and merges together with h6-sim (a948a53); h6-design-data stacked on h6-bots. Q20 (pillar 3 wording) is Can wait.
+**State:** Iteration 6 in progress. Owner answered H5 (Q1 yes, Q2 yes, Q3 no) and picked H6 = A Open frontier with the Root removed (Q19). Step: Build/Review. h6-art merged (e598eed). Topbar approved, branch CI pending on 91dab72. In flight: h6-sim (core-engineer), h6-art (art-direction), h6-bug-topbar-oscillation (engineer; then resumed for h6-bug-buffer-toast-flicker). Note for h6-client: boot.spec.ts:129 (overworld tap area 3, phone) fails locally on Windows on unmodified main; Linux CI on main is green (b7679bc). Next: h6-client branches from task/h6-sim after both bugs merge, and merges together with h6-sim (a948a53); h6-design-data stacked on h6-bots. Q20 (pillar 3 wording) is Can wait.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-4 (H5 Fleet cap), commit f9ddf20, live (CI gates and deploy green; site shows f9ddf20 · data v9).
@@ -31,7 +31,10 @@ Launches: 7 / 12.
 | r7 | critic | h6-art | resume | Review round 3: APPROVE (bce9bb7); main merged (728a058), waiting for branch CI |
 | r8 | critic | h6-sim | resume | Review round 1: APPROVE (7768a52), merges only together with h6-client. Gate gap: campaign timeouts of winners don't fail the bots gate; added to h6-bots. Don't hand off from a main without h6-bots |
 | 7 | engineer | h6-bots | launch | Build, branched from task/h6-sim |
-| r9 | critic | h6-bug-topbar-oscillation + h6-bug-buffer-toast-flicker | resume | Review rounds 2 and 1 |
+| r9 | critic | h6-bug-topbar-oscillation + h6-bug-buffer-toast-flicker | resume | Topbar round 2: APPROVE (ae6eb3e); buffer round 1: REJECT (test misses AC1-4) |
+| r10 | critic | h6-bots | resume | Review round 1: REJECT (composer builds single-type fleets; can't win a band 2 heart by design). Director amended spec bde97b0 |
+| r11 | engineer | h6-bots | resume | Fix round 1: composer builds the probe's winning mix |
+| r12 | engineer | h6-bug-buffer-toast-flicker | resume | Fix round 1: tests for AC1-4, DECISIONS |
 
 ## Iteration 5 ledger
 
