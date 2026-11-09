@@ -152,3 +152,56 @@ Engineers don't change the spec. Whether bots may verify a wave by simulation be
 - This is round 2 of h6-bots. A third rejection parks the task per PROCESS, so decide required change 1 before resuming the engineer.
 
 VERDICT: REJECT
+
+## Round 3 · 2026-11-08
+
+This is the third round on this task. Scope: `git diff 95490c3..6f9d01a`. That covers the merges of task/h6-combat-target (4ffcffe) and main (ea08ef7), then 6f9d01a, which touches `packages/bots/src/{cli,runner,strategies,waves}.ts`, `packages/bots/test/{mix,runner}.test.ts` and DECISIONS.md. No protected file is touched. I checked it against DESIGN.md "Bots (H6)" as decided in 0552809 (no pre-send battle simulation) and the H6 "Combat amendment".
+
+**Gates (run by me on 6f9d01a):**
+- PASS lint, PASS determinism (final 67e5632c, the combat-target baseline), PASS protected-files, **PASS bots**: composer 52–54, ice-first 52–55, crystal-first 71–73 and cap-off 43–44 game minutes on every seed. drones-only softlocks at 79 minutes, which is reported only.
+- FAIL typecheck and FAIL test, only on the five inherited client failures (a948a53). 604 other tests pass.
+
+### Round 2 required changes
+
+1. **Met: the Director decided (0552809), and the code follows it.**
+   - `shipsWin` and the strategy-level `waveWins` are gone, along with their cache, and nothing references them.
+   - The composer attacks when the ships parked at a5 include at least the plan's mix of each type, and it sends everything parked.
+   - After a repel, `raisedMix` scales each type by (5/4)^waves, rounded up and trimmed from the largest type to fit the limit. That's H3's raise rule applied per type.
+   - `MAX_WAVES` 2 then records the node closed. The H3 power threshold applies only while the plan isn't a mix (a component still to come).
+2. **Met: the non-monotone claim is withdrawn** in DECISIONS and in the `winningMix` and `MAX_WAVES` comments. The cause is stated correctly (the old id-order damage), and so is what the code does now. `mix.test.ts` now asserts the opposite properties: build order doesn't matter (flak-first parked ships win in one wave), and extra ships beyond the mix still win.
+3. **Met: the report counts repelled waves,** per run and per visit (a new column). Each winning run has 1 or 2 repels: one at The Deep, plus one at Thorn Garden for crystal-first.
+
+### Tests
+
+`mix.test.ts` covers, on a fixture with explicit premises:
+- the mix is targeted, built and sent;
+- build order doesn't matter;
+- a superset wins;
+- no attack while a type is short of the mix;
+- the raise after a repel, and closure after `MAX_WAVES`;
+- a retry needs the raised mix, not the base one;
+- `raisedMix` scaling and trimming.
+
+### Remaining flag misses: data only? Yes.
+
+- **Flag 2.** These are the probe's minimum mixes under the new combat rule, which are now order-independent.
+  - Spire's mix is 21, against at most 18 (L1 − 2), so it doesn't fit at L1.
+  - Twin Seams' mix is 19, not over L1 = 20, so it isn't closed at L1.
+  - Both follow from the guard counts, and the bot plays no part in them.
+- **Flag 3.** The deep-l1 trial on seed 2 (Twin Seams) reclaims The Deep at 22:02. That's the same Twin Seams fact seen in play, and a trial without pre-send simulation is the honest test of it.
+- **Flag 4** is now MET (for example mire 0/8/10 and deep 0/14/14). Flags 1, 5, 6 and 7 are MET.
+
+So the remaining misses are h6-design-data's to calibrate, as PROCESS "Gates that wait on calibration" intends.
+
+### Determinism and code quality
+
+The bots are stateless functions of the world. The caches are pure memoization keyed on area, layout, node, limit, types, caps and tunables, and the replay check passes. The round 2 machinery is removed cleanly, with no dead code left.
+
+### Non-blocking notes
+
+- **For h6-design-data: every winning run is repelled once at The Deep,** even though the parked fleet matches the probe's mix, and all ship types share one speed. The likely cause is that survivors of the pocket fights regroup at a5 wounded. They count toward the mix by type but not by hp, while the probe starts every ship fresh. That's a real gap between the probe and play, which a player would meet too. Check it when recalibrating, since a matched mix that loses once reads as "the right mix didn't work".
+- **The runner test for the repel counter is weak.** `runner.test.ts` only checks that the run total equals the sum over visits, so an always-zero counter would pass. The counter does work: the report shows real non-zero counts, and `mix.test.ts` exercises a repel. A test asserting at least one repel in that softlock run would pin it. The counter reads `world.lastBattle`, so two battles ending on the same tick would count once. The composer sends one wave at a time, so that can't happen today.
+
+Required changes: none.
+
+VERDICT: APPROVE
