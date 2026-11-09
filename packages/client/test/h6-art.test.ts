@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { palette } from '../src/palette.ts';
-import { drawAreaNode, drawBandDivider, drawBandPill, drawLane, drawLockBadge, drawRelayIcon, type AreaNodeState, type LaneMode, type LaneState } from '../src/placeholders.ts';
+import { drawAreaNode, drawBandDivider, drawBandPill, drawLane, drawLockBadge, drawRelayIcon, drawRelayMark, type AreaNodeState, type LaneMode, type LaneState } from '../src/placeholders.ts';
 
 type P = { x: number; y: number; pad: number };
 
@@ -200,4 +200,30 @@ describe('H6 band label', () => {
     drawBandDivider(d.ctx, 0, 10, 300);
     expect(d.hits.length).toBeGreaterThan(0);
   });
+});
+
+describe('H6 relay mark and lock badge on one node', () => {
+  const box = (draw: (c: CanvasRenderingContext2D) => void) => {
+    const { ctx, hits } = recorder();
+    draw(ctx);
+    const xs = hits.map((p) => p.x);
+    const ys = hits.map((p) => p.y);
+    return { x0: Math.min(...xs.map((x, i) => x - hits[i]!.pad)), x1: Math.max(...xs.map((x, i) => x + hits[i]!.pad)), y0: Math.min(...ys.map((y, i) => y - hits[i]!.pad)), y1: Math.max(...ys.map((y, i) => y + hits[i]!.pad)) };
+  };
+  for (const rr of [12, 22, 50]) {
+    it(`the relay mark stays within its r and the pair do not overlap on a node of r = ${rr}`, () => {
+      const m = recorder();
+      drawRelayMark(m.ctx, rr * 0.5);
+      expect(maxRadius(m.hits)).toBeLessThanOrEqual(rr * 0.5 * 1.0001);
+      const mark = box((c) => {
+        c.translate(-rr * 0.7, -rr * 0.7);
+        drawRelayMark(c, rr * 0.5);
+      });
+      const lock = box((c) => {
+        c.translate(rr * 0.7, -rr * 0.7);
+        drawLockBadge(c, rr * 0.5);
+      });
+      expect(mark.x1).toBeLessThan(lock.x0);
+    });
+  }
 });

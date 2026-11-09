@@ -923,6 +923,25 @@ export function drawRelayIcon(ctx: Ctx, r: number): void {
 }
 
 /**
+ * Relay corner mark (H6): the relay icon on a dark backing disc, for the upper
+ * LEFT of an area node (the lock badge owns the upper right). It is added to
+ * the node, never a replacement for the haul icon in the centre. `alpha` dims
+ * it (a far relay shows it at the node's 0.5). Within r.
+ */
+export function drawRelayMark(ctx: Ctx, r: number, alpha = 1): void {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = palette.space;
+  disc(ctx, 0, 0, r);
+  ctx.fill();
+  ctx.save();
+  ctx.scale(0.86, 0.86);
+  drawRelayIcon(ctx, r);
+  ctx.restore();
+  ctx.restore();
+}
+
+/**
  * Lock badge (H6): a small padlock for the upper right of an area node. A
  * steel-grey body (neutral, not the locked-rock blue-grey) with a dark
  * keyhole and an amber shackle; a dark outline lifts it off the rocks. The "!"
