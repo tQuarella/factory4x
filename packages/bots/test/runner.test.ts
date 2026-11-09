@@ -137,6 +137,9 @@ describe('campaign runner (frozen v8 fixture)', () => {
     expect(forced).toHaveLength(2);
     expect(new Set(forced.map((v) => v.area)).size).toBe(1);
     expect(forced.every((v) => v.result === 'withdrawn' && !v.closed && v.playTicks === 900)).toBe(true);
+    // Repelled waves are counted per visit and over the run (a limit of 2 can't take Frost Shelf's heart).
+    expect(r.repelled).toBe(r.visits.reduce((n, v) => n + v.repelled, 0));
+    expect(r.visits.every((v) => v.repelled >= 0)).toBe(true);
     expect(r.outcome).toBe('softlock');
   });
 

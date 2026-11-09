@@ -151,11 +151,11 @@ const md = [
   '',
   '## Per run',
   '',
-  '| Strategy | Seed | Outcome | Play time | Area order | Untaken | Visits (closed = withdrawn when nothing passes the attack test, timeout = visit cap) | Capturing wave per heart (d/l/f at limit) | Haul paid of nominal (o/i/c) | Built / lost / recycled | Research (play time) | Hauled vs shipped (o/i/c) | Tick p50 / p95 (ms) |',
-  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  '| Strategy | Seed | Outcome | Play time | Area order | Untaken | Visits (closed = withdrawn when nothing passes the attack test, timeout = visit cap) | Capturing wave per heart (d/l/f at limit) | Haul paid of nominal (o/i/c) | Built / lost / recycled | Repelled waves (per visit) | Research (play time) | Hauled vs shipped (o/i/c) | Tick p50 / p95 (ms) |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ...results.map(
     (r) =>
-      `| ${r.strategy} | ${r.seed} | ${r.outcome} | ${r.outcome === 'won' ? tickMmss(r.playTicks, tr) : `${tickMmss(r.playTicks, tr)} (not won)`} | ${orderText(r)} | ${r.skipped.length}: ${r.skipped.join(', ') || '-'} | ${visitText(r)} | ${waveText(r)} | ${haulText(r)} | ${r.shipsBuilt} / ${r.shipsLost} / ${r.shipsRecycled} | ${researchText(r)} | ${triple(r.hauled)} vs ${triple(r.shipped)} | ${r.tickMsP50.toFixed(4)} / ${r.tickMsP95.toFixed(4)} |`,
+      `| ${r.strategy} | ${r.seed} | ${r.outcome} | ${r.outcome === 'won' ? tickMmss(r.playTicks, tr) : `${tickMmss(r.playTicks, tr)} (not won)`} | ${orderText(r)} | ${r.skipped.length}: ${r.skipped.join(', ') || '-'} | ${visitText(r)} | ${waveText(r)} | ${haulText(r)} | ${r.shipsBuilt} / ${r.shipsLost} / ${r.shipsRecycled} | ${r.repelled}${r.repelled > 0 ? ` (${r.visits.filter((v) => v.repelled > 0).map((v) => `${v.area} ${v.repelled}`).join(", ")})` : ""} | ${researchText(r)} | ${triple(r.hauled)} vs ${triple(r.shipped)} | ${r.tickMsP50.toFixed(4)} / ${r.tickMsP95.toFixed(4)} |`,
   ),
   '',
   '## Per-seed comparison (time to the core)',
@@ -191,7 +191,7 @@ const md = [
   `Limits at the shipped tunables: L0 ${limits.l0}, L1 ${limits.l1}, L2 ${limits.l2}. d / l / f are the smallest single-type waves that capture the heart from full strength (">80" = none within 80 ships). Mix is the smallest winning total over the locally buildable types (search cap L2 + 6 = ${limits.l2 + 6}), with one such fleet (fewest drones, then fewest lancers). "Fits at L" means mix ≤ L − 2; "closed at L" means mix > L; "tight" is between (L − 2 < mix ≤ L). Every heart is fed (no area has a Root). Pocket d is the smallest drones-alone wave at a tier 2 area's first pocket. The Deep is probed per seed (its layout).`,
   '',
   '| Heart | Tier | Relay | Buildable | d | l | f | Mix | Mix fleet (d/l/f) | Lancer share | Pocket d | Best mix at L0 / L1 / L2 | Windows (met / missed) |',
-  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ...probe.map((r) => {
     const w = windowChecks(r, limits).map((c) => `${c.met ? 'MET' : 'MISSED'}: ${c.name}`).join('; ');
     const fleet = r.mixFleet ? `${r.mixFleet.drone}/${r.mixFleet.lancer}/${r.mixFleet.flak}` : '-';

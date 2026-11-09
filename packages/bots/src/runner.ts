@@ -47,6 +47,8 @@ export interface Visit {
   shipsBuilt: number;
   shipsLost: number;
   shipsRecycled: number;
+  /** Waves repelled in the visit. */
+  repelled: number;
   /** The Root was cut before the heart fell (reclaimed visits): null when the area has no Root. */
   rootCutBeforeHeart: boolean | null;
   /** The fleet limit the visit played under (null: off), and, for a reclaimed visit, the haul the reclaim paid (decayed for a repeat). */
@@ -84,6 +86,8 @@ export interface CampaignResult {
   shipsBuilt: number;
   shipsLost: number;
   shipsRecycled: number;
+  /** Waves repelled over the run (battles that ended without the node falling): any gap between the probe and play. */
+  repelled: number;
   hauled: ResourceTriple;
   shipped: ResourceTriple;
   /** Shipped units over hauled + shipped units, in percent (integer); 0 if neither. */
@@ -150,6 +154,9 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
   let nextForced = opts.forceFirstVisit === true;
   let loggedResearch = camp.researchLog.length;
   let reclaims = 0;
+  let repelledTotal = 0;
+  let visitRepelled = 0;
+  let lastBattleEnd = -1;
   let outcome: Outcome = 'timeout';
   let error: string | undefined;
   const cap0 = opts.fleetCap ?? strategy.fleetCap;
@@ -170,6 +177,7 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
       shipsBuilt: s.shipsBuilt,
       shipsLost: s.shipsLost,
       shipsRecycled: s.shipsRecycled,
+      repelled: visitRepelled,
       limit: visit.limit,
       haulPaid: result === 'reclaimed' && rec.haulPaid !== null ? { ...rec.haulPaid } : null,
       rootCutBeforeHeart: result === 'reclaimed' && rootIndex(world) >= 0 ? s.rootCutTick !== null : null,
@@ -177,6 +185,7 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
     });
     if (result === 'reclaimed') reclaims++;
     visit = null;
+    visitRepelled = 0;
   };
 
   try {
@@ -232,6 +241,14 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
       }
       const t0 = performance.now();
       step(world, data, inputs);
+      const lb = world.lastBattle;
+      if (lb !== null && lb.endTick !== lastBattleEnd) {
+        lastBattleEnd = lb.endTick;
+        if (lb.outcome === 'repelled') {
+          repelledTotal++;
+          visitRepelled++;
+        }
+      }
       if (inArea) times.push(performance.now() - t0);
       if (camp.active !== null && visit !== null && visit.openingTicks === null && throughputPerMin(world) >= OPENING_ORE_PER_MIN) {
         visit.openingTicks = world.tick - camp.areaStartTick;
@@ -273,6 +290,7 @@ export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimD
     shipsBuilt: sum.shipsBuilt,
     shipsLost: sum.shipsLost,
     shipsRecycled: sum.shipsRecycled,
+    repelled: repelledTotal,
     hauled: sum.hauled,
     shipped: sum.shipped,
     shippedSharePct: hauledUnits + shippedUnits === 0 ? 0 : Math.floor((shippedUnits * 100) / (hauledUnits + shippedUnits)),

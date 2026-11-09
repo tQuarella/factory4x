@@ -29,7 +29,7 @@ import {
   type SimData,
   type World,
 } from '@factory4x/sim';
-import { minMix, probeWorld, shipsWin } from './waves.ts';
+import { minMix, probeWorld } from './waves.ts';
 
 /**
  * Strategies are stateless: every decision is derived from the world they are
@@ -280,7 +280,6 @@ export interface Mix {
 
 const baseCache = new Map<string, { data: SimData; world: World }>();
 const mixCache = new Map<string, Mix | null>();
-const waveCache = new Map<string, boolean>();
 
 const baseKey = (world: Readonly<World>, data: SimData, areaId: string): string => `${areaId}|${world.system.variant}|${fnv1a(JSON.stringify(world.tun))}|${data.dataVersion}`;
 
@@ -294,26 +293,6 @@ function baseFor(world: Readonly<World>, data: SimData, areaId: string, key: str
     baseCache.set(key, b);
   }
   return b;
-}
-
-/**
- * Whether this exact wave, in this order and at these hps, takes `node` from full strength (the probe's battle, from
- * waves.ts shipsWin). The minimum mix is verified against the ships actually parked, because a battle's damage falls
- * on ships in id order and a mix that wins with its lancers first can lose with its flak first.
- */
-export function waveWins(world: Readonly<World>, data: SimData, node: number, ships: ReadonlyArray<Readonly<{ type: ShipType; hp: number }>>): boolean {
-  const area = world.campaign.active;
-  if (area === null) return false;
-  const areaId = data.map.areas[area]!.id;
-  const base = baseKey(world, data, areaId);
-  const key = `${base}|${node}|${ships.map((s) => `${s.type[0]}${s.hp}`).join(',')}`;
-  const hit = waveCache.get(key);
-  if (hit !== undefined) return hit;
-  const b = baseFor(world, data, areaId, base);
-  const r = shipsWin(b.world, node, ships, b.data);
-  if (waveCache.size > 20000) waveCache.clear();
-  waveCache.set(key, r);
-  return r;
 }
 
 /**
@@ -341,17 +320,33 @@ export function mixAt(world: Readonly<World>, data: SimData, node: number, limit
   return m === null ? null : { total: m.total, fleet: { ...m.fleet } };
 }
 
-/** Waves that may be sent at a node before the composer stops trusting its mix there and treats the node as closed (a mix that wins from full strength and has lost twice means the premise fails). */
+/** Waves that may be sent at a node before the composer records it closed: a mix that wins from full strength and was repelled twice means the guards are past the probe's state. */
 export const MAX_WAVES = 2;
 
+/** `mix` scaled by (5/4)^waves per type, rounded up (H3's raise-the-threshold rule), then trimmed from the largest type until it fits `limit`. */
+export function raisedMix(mix: Mix, waves: number, limit: number): Mix {
+  const fleet = { ...mix.fleet };
+  for (const t of SHIP_TYPES) fleet[t] = Math.ceil((mix.fleet[t] * 5 ** waves) / 4 ** waves);
+  let n = fleet.drone + fleet.lancer + fleet.flak;
+  while (n > limit) {
+    let big: ShipType = 'drone';
+    for (const t of SHIP_TYPES) if (fleet[t] > fleet[big]) big = t;
+    fleet[big]--;
+    n--;
+  }
+  return { total: n, fleet };
+}
+
 /**
- * The mix to build for `node` at `limit`: mixAt, unless MAX_WAVES waves have already been sent there. The wave is
- * exactly the mix and nothing is added to a retry: the sim is not monotone in ship counts (extra ships can turn a
- * winning wave into a loss), so only the composition the probe verified is sent.
+ * The mix to build and attack with at `node`: mixAt (the probe's minimum winning mix, which wins by construction
+ * against guards at the probe's counts), raised by (5/4) per wave already sent there up to the limit, and null
+ * once MAX_WAVES waves have been sent (the node is then recorded closed).
  */
 export function winningMix(world: Readonly<World>, data: SimData, node: number, limit: number, types: readonly ShipType[]): Mix | null {
   const sent = world.guardians.find((x) => x.node === node)?.wavesSent ?? 0;
-  return sent >= MAX_WAVES ? null : mixAt(world, data, node, limit, types);
+  if (sent >= MAX_WAVES) return null;
+  const m = mixAt(world, data, node, limit, types);
+  return m === null || sent === 0 ? m : raisedMix(m, sent, limit);
 }
 
 export interface Target {
@@ -442,33 +437,9 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
   const c = shipCounts(world);
   const at = a5 >= 0 ? c.atByType[a5]! : { drone: 0, lancer: 0, flak: 0 };
   const matches = plan !== null && SHIP_TYPES.every((t) => at[t] >= plan![t]);
-  // A winning mix is verified against the ships actually parked (their order and hp) before it is sent: the exact mix
-  // first, then everything parked. If neither wins and the fleet has room, the yards add ships of the mix's types and
-  // it is checked again next tick; if the fleet is full, everything parked goes (a wave that counts toward MAX_WAVES).
-  let launch: ShipTypeCounts | null = null;
-  let grow = false;
-  if (viaMix && matches && !inFlight && target !== null) {
-    const parked = world.ships.filter((s) => s.at === a5);
-    const pick = (counts: Readonly<ShipTypeCounts>): { type: ShipType; hp: number }[] => {
-      const left = { ...counts };
-      const out: { type: ShipType; hp: number }[] = [];
-      for (const s of parked) {
-        if (left[s.type] > 0) {
-          left[s.type]--;
-          out.push({ type: s.type, hp: s.hp });
-        }
-      }
-      return out;
-    };
-    const exact = { drone: plan!.drone, lancer: plan!.lancer, flak: plan!.flak };
-    if (waveWins(world, data, target.node, pick(exact))) launch = exact;
-    else if (parked.length > exact.drone + exact.lancer + exact.flak && waveWins(world, data, target.node, pick(SEND_ALL))) launch = SEND_ALL;
-    else if (isFleetFull(world, data)) launch = SEND_ALL;
-    else grow = true;
-  }
   for (const t of SHIP_TYPES) {
     // A wave in flight with no passing target keeps the yards as they are.
-    const want = plan === null ? world.yards[t].on : planTypes.includes(t) && (have[t] < plan[t] || (grow && plan[t] > 0));
+    const want = plan === null ? world.yards[t].on : planTypes.includes(t) && have[t] < plan[t];
     if (world.yards[t].on !== want) inputs.push({ type: 'setShipyard', shipType: t, on: want });
   }
   const owned = world.stats.captures.map((cap) => cap.node).filter((n) => world.nodes[n]!.kind !== 'root');
@@ -479,8 +450,8 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
     if (n.index !== a5 && c.at[n.index]! > 0 && !isGuarded(world, n.index)) inputs.push({ type: 'sendShips', from: n.index, to: a5, counts: SEND_ALL });
   }
   if (target === null || a5 < 0) return { inputs, closed: false };
-  // Recycle: the fleet is full and a type parked at a5 is above its allocation (not while a winning mix is being verified).
-  if (isFleetFull(world, data) && !(viaMix && matches)) {
+  // Recycle: the fleet is full and a type parked at a5 is above its allocation.
+  if (isFleetFull(world, data)) {
     const surplus: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
     let n = 0;
     for (const t of SHIP_TYPES) {
@@ -490,11 +461,11 @@ export function decideComposer(world: Readonly<World>, data: SimData, opts: Comp
     if (n > 0) inputs.push({ type: 'recycleShips', node: a5, counts: surplus });
   }
   if (inFlight) return { inputs, closed: false };
-  // Attack: a verified winning mix (see launch above), or, for a plan that is no mix, the H3 threshold met with what is there.
+  // Attack (no pre-send battle simulation): the ships parked at a5 include at least the plan's mix of each type, or,
+  // for a plan that is no mix (a component still to come), the H3 threshold is met with what is there. Everything
+  // parked goes.
   const parkedTotal = at.drone + at.lancer + at.flak;
-  if (viaMix) {
-    if (launch !== null) inputs.push({ type: 'sendShips', from: a5, to: target.node, counts: launch });
-  } else if (parkedTotal > 0 && (matches || readyToAttack(world, target.node, fleetPower(world, target.node, at)))) {
+  if (parkedTotal > 0 && (matches || (!viaMix && readyToAttack(world, target.node, fleetPower(world, target.node, at))))) {
     inputs.push({ type: 'sendShips', from: a5, to: target.node, counts: SEND_ALL });
   }
   return { inputs, closed: false };
