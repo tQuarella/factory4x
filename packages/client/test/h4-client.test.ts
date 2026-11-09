@@ -30,7 +30,8 @@ import {
   withdrawNotice,
 } from '../src/report.ts';
 import { YARD_STATE_TEXT } from '../src/sheet.ts';
-import { fitOverworld } from '../src/fit.ts';
+import { clampScroll, fitOverworld, scrollMax } from '../src/fit.ts';
+import { bandLabels, nameBox, nodeBox, overlap } from '../src/owlayout.ts';
 import { hopsFromStart, labelSides, laneDraws, prizeOf } from '../src/worldview.ts';
 import { areaStateText, guardedRowText } from '../src/worldsheets.ts';
 
@@ -171,12 +172,15 @@ describe('overworld text comes from selectors and live tunables', () => {
   it('openedByReclaim names the neighbours this reclaim opened, not ones already open', () => {
     const afterLandfall = campaignWorld(1, data, { reclaimed: ['landfall'] });
     expect(openedByReclaim(afterLandfall, data, idx('landfall'))).toEqual(['Frost Shelf', 'Glass Shoal']);
+    // A neighbour behind a locked band is not "opened" by a lane alone: Spore Veil waits for a band 1 relay (H6).
     const afterShelf = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf'] });
-    expect(openedByReclaim(afterShelf, data, idx('shelf'))).toEqual(['Spore Veil']);
-    const afterVeil = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf', 'veil'] });
-    expect(openedByReclaim(afterVeil, data, idx('veil'))).toEqual(['Thorn Garden', 'The Deep']);
-    const bothMedium = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf', 'veil', 'garden'] });
-    expect(openedByReclaim(bothMedium, data, idx('garden'))).toEqual([]);
+    expect(openedByReclaim(afterShelf, data, idx('shelf'))).toEqual(['Rime Relay']);
+    // The first band 1 relay opens band 2: its new neighbours, not ones another reclaimed area already joined.
+    const afterRime = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf', 'rime'] });
+    const opened = openedByReclaim(afterRime, data, idx('rime'));
+    expect(opened).toContain('Mire Relay');
+    expect(opened).toContain('Glint Relay');
+    expect(opened).not.toContain('Frost Shelf');
   });
 
   it('a disabled research button says why: items, then areas, then the shortest missing resource', () => {
@@ -238,22 +242,26 @@ describe('area sheet text', () => {
     const w = campaignWorld(1, data, { reclaimed: ['landfall'] });
     const st = (id: string) => areaStatus(w, data, idx(id));
     expect(areaStateText(st('shelf'), data.tickRate)).toBe('Open');
-    expect(areaStateText(st('veil'), data.tickRate)).toBe('Held: reclaim a neighbour first');
-    expect(areaStateText({ state: 'reclaimed', record: { ...st('landfall').record, reclaimPlayTicks: 492 * data.tickRate } }, data.tickRate)).toBe('Reclaimed in 8:12');
+    // H6: far from the reclaimed area, a held area is unscouted (the old "Held: reclaim a neighbour first" is retired).
+    expect(areaStateText(st('deep'), data.tickRate)).toBe('Unscouted');
+    expect(areaStateText({ state: 'reclaimed', known: true, record: { ...st('landfall').record, reclaimPlayTicks: 492 * data.tickRate } }, data.tickRate)).toBe('Reclaimed in 8:12');
   });
 
   it('guarded rows show the caps the sim reports, Root-fed on a fed heart, and the starved caps', () => {
     const w = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf', 'shoal'] });
+    // H6 removed the Root from play: no shipped area has one, so its row text is checked on a constructed node (the dormant path stays).
     const st = areaStatus(w, data, idx('veil'));
-    expect(st.hasRoot).toBe(true);
+    expect(st.hasRoot).toBe(false);
     const heart = st.guarded[st.guarded.length - 1]!;
     const row = guardedRowText(heart, st.hasRoot);
     expect(row.title).toBe('Heart · Ore');
     expect(row.counts).toContain(`${heart.caps.thorn} Thorn`);
     expect(row.counts).toContain(`${heart.caps.spore} Spore`);
-    expect(row.counts).toContain('Root-fed');
-    expect(heart.starvedCaps).not.toBeNull();
-    expect(row.starved).toContain(`${heart.starvedCaps!.spore} Spore`);
+    expect(row.counts).not.toContain('Root-fed');
+    expect(heart.starvedCaps).toBeNull();
+    const fed = guardedRowText({ ...heart, caps: { thorn: 3, spore: 4 }, starvedCaps: { thorn: 1, spore: 2 } }, true);
+    expect(fed.counts).toBe('3 Thorn 4 Spore · Root-fed');
+    expect(fed.starved).toBe('Root cut: 1 Thorn 2 Spore');
     const landfall = areaStatus(w, data, idx('landfall'));
     expect(guardedRowText(landfall.guarded[0]!, false).counts).toBe('no guards');
   });
@@ -271,7 +279,9 @@ describe('overworld layout helpers', () => {
     const hops = hopsFromStart(data);
     expect(hops[idx('landfall')]).toBe(0);
     expect(hops[idx('shelf')]).toBe(1);
-    expect(hops[idx('deep')]).toBe(3);
+    // The map is taller than H4's: The Deep is further than any band 1 area and than the medium areas.
+    expect(hops[idx('deep')]).toBeGreaterThan(hops[idx('veil')]!);
+    expect(hops[idx('deep')]).toBeGreaterThan(hops[idx('rime')]!);
     const w = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf'] });
     const lanes = laneDraws(w, data);
     expect(lanes).toHaveLength(data.map.lanes.length);
@@ -280,39 +290,100 @@ describe('overworld layout helpers', () => {
     expect(find('landfall', 'shelf').state).toBe('owned');
     expect(ids[find('landfall', 'shelf').from]).toBe('shelf');
     expect(find('landfall', 'shoal').state).toBe('open');
-    expect(find('shelf', 'veil').state).toBe('open');
-    expect(find('veil', 'deep').state).toBe('closed');
+    expect(find('shelf', 'rime').state).toBe('open');
+    expect(find('mire', 'deep').state).toBe('closed');
   });
 
-  it('fits the six areas on 375x667 with nodes at least 44 px across and labels inside the canvas', () => {
-    // Canvas height at 375x667 under the two-row HUD (about 100 px) and one notice row (about 50 px).
-    for (const [w, h] of [[375, 500], [375, 540], [390, 600], [1000, 800]] as const) {
+  // Canvas sizes: a phone under the two-row HUD (about 100 px) and a notice row (about 50 px), a bigger phone, a landscape map, a desktop.
+  const SIZES = [[375, 500], [375, 540], [390, 600], [320, 420], [467, 375], [1000, 800], [1280, 720]] as const;
+
+  it('every area node is at least 44 px across and inside the width, and the whole frame is reachable by panning', () => {
+    for (const [w, h] of SIZES) {
       const fit = fitOverworld(data.map.areas, 80, w, h);
       expect(80 * fit.scale * 2, `${w}x${h}`).toBeGreaterThanOrEqual(44);
+      let top = Infinity;
+      let bottom = -Infinity;
       for (const a of data.map.areas) {
-        const x = fit.ox + a.x * fit.scale;
-        const y = fit.oy + a.y * fit.scale;
         const r = 80 * fit.scale;
-        expect(x - r, 'left').toBeGreaterThanOrEqual(0);
-        expect(x + r, 'right').toBeLessThanOrEqual(w);
-        expect(y - r - 30, 'top with a label above').toBeGreaterThanOrEqual(-1);
-        expect(y + r + 30, 'bottom with two label lines').toBeLessThanOrEqual(h + 1);
+        const x = fit.ox + a.x * fit.scale;
+        if (fit.contentW <= w) {
+          expect(x - r, `${w}x${h} left`).toBeGreaterThanOrEqual(0);
+          expect(x + r, `${w}x${h} right`).toBeLessThanOrEqual(w);
+        }
+        top = Math.min(top, fit.oy + a.y * fit.scale - r);
+        bottom = Math.max(bottom, fit.oy + a.y * fit.scale + r);
+      }
+      // At the top of the pan the first node (and its label room) is on screen; at the bottom of the pan the last one is.
+      expect(top - 30, `${w}x${h} top room`).toBeGreaterThanOrEqual(-1);
+      expect(h - (bottom - scrollMax(fit.contentH, h)), `${w}x${h} bottom room`).toBeGreaterThanOrEqual(30 - 1);
+      // The frame is reachable: nothing the content holds is beyond the pan's limit.
+      expect(fit.contentH, 'content holds the nodes').toBeGreaterThanOrEqual(bottom);
+    }
+  });
+
+  it('the frame fills the width on a phone (it pans) and shows whole on a wide screen (it does not)', () => {
+    const phone = fitOverworld(data.map.areas, 80, 375, 500);
+    expect(scrollMax(phone.contentH, 500)).toBeGreaterThan(0);
+    expect(phone.contentW).toBeLessThanOrEqual(375 + 1);
+    const wide = fitOverworld(data.map.areas, 80, 1280, 720);
+    expect(scrollMax(wide.contentH, 720)).toBe(0);
+    // A sheet covering part of the map lets the pan reach that much further.
+    expect(scrollMax(phone.contentH, 500, 200)).toBe(scrollMax(phone.contentH, 500) + 200);
+    expect(clampScroll(-5, 10)).toBe(0);
+    expect(clampScroll(50, 10)).toBe(10);
+  });
+
+  it('label sides keep each label inside the content and off the other nodes and labels', () => {
+    for (const [w, h] of SIZES) {
+      const fit = fitOverworld(data.map.areas, 80, w, h);
+      const centers = data.map.areas.map((a) => ({ x: fit.ox + a.x * fit.scale, y: fit.oy + a.y * fit.scale }));
+      const lanes = data.map.lanes.map(([a, b]): [number, number] => [idx(a), idx(b)]);
+      const r = 80 * fit.scale;
+      const sides = labelSides(centers, lanes, r, fit.contentW, fit.contentH);
+      sides.forEach((side, i) => {
+        const c = centers[i]!;
+        const top = side === 'above' ? c.y - r - 33 : c.y + r + 3;
+        expect(top, `${w}x${h} ${ids[i]}`).toBeGreaterThanOrEqual(0);
+        expect(top + 30, `${w}x${h} ${ids[i]}`).toBeLessThanOrEqual(fit.contentH);
+      });
+    }
+  });
+
+  it('band labels sit clear of every node, its marks and its name label, at every size', () => {
+    for (const [w, h] of SIZES) {
+      const fit = fitOverworld(data.map.areas, 80, w, h);
+      const centers = data.map.areas.map((a) => ({ x: fit.ox + a.x * fit.scale, y: fit.oy + a.y * fit.scale }));
+      const lanes = data.map.lanes.map(([a, b]): [number, number] => [idx(a), idx(b)]);
+      const r = 80 * fit.scale;
+      const sides = labelSides(centers, lanes, r, fit.contentW, fit.contentH);
+      const labels = bandLabels({ centers, bands: data.map.areas.map((a) => a.tier), sides, r, contentH: fit.contentH, pill: () => ({ w: 90, h: 18 }) });
+      expect(labels.map((l) => l.band)).toEqual([...new Set(data.map.areas.map((a) => a.tier))].sort());
+      for (const l of labels) {
+        centers.forEach((c, i) => {
+          expect(overlap(l.rect, nodeBox(c, r)), `${w}x${h} band ${l.band} vs ${ids[i]}`).toBe(false);
+          expect(overlap(l.rect, nameBox(c, r, sides[i]!)), `${w}x${h} band ${l.band} vs the name of ${ids[i]}`).toBe(false);
+        });
       }
     }
   });
 
-  it('label sides keep each label inside the canvas', () => {
-    const fit = fitOverworld(data.map.areas, 80, 375, 520);
-    const centers = data.map.areas.map((a) => ({ x: fit.ox + a.x * fit.scale, y: fit.oy + a.y * fit.scale }));
-    const lanes = data.map.lanes.map(([a, b]): [number, number] => [idx(a), idx(b)]);
-    const r = 80 * fit.scale;
-    const sides = labelSides(centers, lanes, r, 375, 520);
-    sides.forEach((side, i) => {
-      const c = centers[i]!;
-      const top = side === 'above' ? c.y - r - 33 : c.y + r + 3;
-      expect(top).toBeGreaterThanOrEqual(0);
-      expect(top + 30).toBeLessThanOrEqual(520);
-    });
+  it('name labels of two near neighbours (the relay pair) never overlap each other or the other node', () => {
+    for (const [w, h] of SIZES) {
+      const fit = fitOverworld(data.map.areas, 80, w, h);
+      const centers = data.map.areas.map((a) => ({ x: fit.ox + a.x * fit.scale, y: fit.oy + a.y * fit.scale }));
+      const lanes = data.map.lanes.map(([a, b]): [number, number] => [idx(a), idx(b)]);
+      const r = 80 * fit.scale;
+      const sides = labelSides(centers, lanes, r, fit.contentW, fit.contentH);
+      const boxes = centers.map((c, i) => nameBox(c, r, sides[i]!));
+      boxes.forEach((a, i) => {
+        boxes.forEach((b, k) => {
+          if (k > i) expect(overlap(a, b), `${w}x${h} labels of ${ids[i]} and ${ids[k]}`).toBe(false);
+        });
+        centers.forEach((c, k) => {
+          if (k !== i) expect(overlap(a, { x: c.x - r, y: c.y - r, w: 2 * r, h: 2 * r }), `${w}x${h} label of ${ids[i]} on ${ids[k]}`).toBe(false);
+        });
+      });
+    }
   });
 });
 

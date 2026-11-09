@@ -1,45 +1,21 @@
 /**
- * H5 client text and wiring that needs no DOM: the fleet notices, the repelled hint, the research wording and disabled reasons,
- * and the Session path of a recycle. Numbers are read from the sim (tunables, selectors), never pinned.
+ * H5 client text and wiring that needs no DOM, as H6 left it: the fleet notices, the repelled hint, and the Session path of a
+ * recycle. Numbers are read from the sim (tunables, selectors), never pinned. The Command limit research (H5) is removed with
+ * its tests: the limit rises by reclaiming command relays now (see h6-client.test.ts).
  */
 import { describe, expect, it } from 'vitest';
-import {
-  campaignWorld,
-  defaultData,
-  fleetStatus,
-  landingEffects,
-  recycleRefund,
-  researchStatus,
-  type BattleResult,
-  type ShipTypeCounts,
-} from '@factory4x/sim';
+import { campaignWorld, defaultData, fleetStatus, landingEffects, recycleRefund, type BattleResult, type ShipTypeCounts } from '@factory4x/sim';
 import { Session } from '../src/session.ts';
-import {
-  effectText,
-  fleetChipText,
-  fleetFullNotice,
-  fleetLine,
-  fullFleetHint,
-  landingNotice,
-  purchaseNotice,
-  recycleNotice,
-  recycledText,
-  researchBlock,
-  tierRequirementText,
-} from '../src/report.ts';
+import { fleetChipText, fleetFullNotice, fleetLine, fullFleetHint, landingNotice, recycleNotice, recycledText } from '../src/report.ts';
 import { YARD_STATE_TEXT } from '../src/sheet.ts';
 import { TUNE_LABEL } from '../src/panels.ts';
 
 const data = defaultData;
-const itemLabel = (id: string, level: number): string => `${id} ${level}`;
-const areaName = (id: string): string => id;
-const row = (w: ReturnType<typeof campaignWorld>, id: string) => researchStatus(w, data).find((r) => r.id === id)!;
 
 describe('fleet text', () => {
   it('words the chip, the Yards header and the notices', () => {
     expect(fleetChipText(9, 12)).toBe('Fleet 9/12');
-    expect(fleetLine({ count: 9, cap: 12, level: 1, maxLevel: 3 })).toBe('Fleet 9/12 · Command limit 1/3');
-    expect(fleetLine({ count: 9, cap: 12, level: 0, maxLevel: 0 })).toBe('Fleet 9/12');
+    expect(fleetLine({ count: 9, cap: 12 })).toBe('Fleet 9/12');
     expect(fleetFullNotice(12, 12)).toBe('Fleet full (12/12): yards paused. Recycle ships at a node to change your mix.');
   });
 
@@ -57,58 +33,11 @@ describe('fleet text', () => {
   });
 
   it('the landing notice names the limit from landingEffects, and nothing when it is off', () => {
-    const w = campaignWorld(1, data, { reclaimed: ['landfall'], research: { fleet: 1 } });
+    const w = campaignWorld(1, data, { reclaimed: ['landfall'] });
     const fx = landingEffects(w, data);
     expect(fx.fleetCap).not.toBeNull();
     expect(landingNotice('Frost Shelf', fx)).toContain(`fleet limit ${fx.fleetCap}`);
     expect(landingNotice('Frost Shelf', { ...fx, fleetCap: null })).not.toContain('fleet limit');
-  });
-});
-
-describe('Command limit research', () => {
-  it('words the effect as limits, from the row and live tunables', () => {
-    const w = campaignWorld(1, data, {});
-    const r = row(w, 'fleet');
-    expect(r.kind).toBe('limit');
-    expect(effectText(r, w.tun, w.tickRate)).toBe(`Fleet limit ${r.effect} → ${r.nextEffect}`);
-    expect(r.nextEffect).toBe(r.effect + w.tun['research.fleet.step']);
-  });
-
-  it('says the limit is off when fleet.cap is 0, in the effect line and the disabled button', () => {
-    const w = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf'], stockpile: { ore: 999, ice: 99, crystal: 99 } });
-    w.tun['fleet.cap'] = 0;
-    const r = row(w, 'fleet');
-    expect(r.missing.capOff).toBe(true);
-    expect(researchBlock(r, itemLabel, areaName)).toBe('Fleet limit is off (tuning)');
-    expect(effectText(r, w.tun, w.tickRate)).toBe('Fleet limit is off (tuning)');
-  });
-
-  it('a disabled Command limit says which tier of area it needs, then what it lacks', () => {
-    const none = campaignWorld(1, data, { stockpile: { ore: 999, ice: 99, crystal: 99 } });
-    const need = row(none, 'fleet').missing.tiers[0]!;
-    expect(researchBlock(row(none, 'fleet'), itemLabel, areaName)).toBe(`Needs ${tierRequirementText(need.tier, need.count)}`);
-    expect(researchBlock(row(none, 'fleet'), itemLabel, areaName)).toBe('Needs a light area reclaimed');
-    const light = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf'], stockpile: { ore: 0, ice: 0, crystal: 0 } });
-    expect(row(light, 'fleet').missing.tiers).toEqual([]);
-    expect(researchBlock(row(light, 'fleet'), itemLabel, areaName)).toMatch(/^Needs \d+ (ore|ice|crystal)$/);
-  });
-
-  it('words the tier requirement', () => {
-    expect(tierRequirementText(1, 1)).toBe('a light area reclaimed');
-    expect(tierRequirementText(2, 1)).toBe('a medium area reclaimed');
-    expect(tierRequirementText(2, 2)).toBe('both medium areas reclaimed');
-    expect(tierRequirementText(2, 3)).toBe('3 medium areas reclaimed');
-  });
-
-  it('the purchase notice names the new limit, and the landing shows the same number', () => {
-    const w = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf'], stockpile: { ore: 999, ice: 99, crystal: 99 } });
-    const s = new Session(data, { seed: 1, world: w });
-    const idx = data.research.findIndex((r) => r.id === 'fleet');
-    expect(s.send({ type: 'buyResearch', item: idx })).toBe(true);
-    const after = row(s.world, 'fleet');
-    expect(after.level).toBe(1);
-    expect(purchaseNotice(after, [])).toBe(`Command limit 1: fleet limit now ${after.effect}.`);
-    expect(landingEffects(s.world, data).fleetCap).toBe(after.effect);
   });
 });
 
@@ -123,18 +52,17 @@ describe('the repelled hint', () => {
     expect(fullFleetHint(fed, result(heart, 12, null), data)).toBe('');
   });
 
-  it('fires at capAtSend - 1 ships, leading with the Root cut for a fed heart', () => {
-    expect(fullFleetHint(fed, result(heart, 11, 12), data)).toBe(' You sent a full fleet. Cut the Root, change the mix, or raise the limit (Command limit).');
+  it('fires at capAtSend - 1 ships and points at a command relay, not at Command limit (H6)', () => {
+    const hint = fullFleetHint(fed, result(heart, 11, 12), data);
+    expect(hint).toBe(' You sent a full fleet. Change the mix, or reclaim a command relay to raise the limit.');
+    expect(fullFleetHint(fed, result(pocket, 12, 12), data)).toBe(hint);
+    expect(hint).not.toContain('Command limit');
   });
 
-  it('leaves the Root cut out when the target is not a fed heart', () => {
-    expect(fullFleetHint(fed, result(pocket, 12, 12), data)).toBe(' You sent a full fleet. Change the mix or raise the limit (Command limit).');
-  });
-
-  it('leaves "raise the limit" out at the last Command limit level', () => {
-    const maxed = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf', 'shoal', 'veil', 'garden'], research: { fleet: 3 }, land: 'deep' });
+  it('leaves the relay part out once every band has its relay reclaimed', () => {
+    const maxed = campaignWorld(1, data, { reclaimed: ['landfall', 'shelf', 'rime', 'mire', 'veil'], land: 'deep' });
     const f = fleetStatus(maxed, data);
-    expect(f.level).toBe(f.maxLevel);
+    expect(f.commandedBands).toBe(f.maxCommandedBands);
     const p = maxed.nodes.findIndex((n) => n.kind === 'pocket');
     expect(fullFleetHint(maxed, result(p, 12, 12), data)).toBe(' You sent a full fleet. Change the mix.');
   });
@@ -160,11 +88,13 @@ describe('recycling through the session', () => {
 });
 
 describe('tuning labels', () => {
-  it('labels the three H5 keys, fleet.cap as the A/B switch', () => {
+  it('labels the fleet and H6 keys, fleet.cap as the A/B switch; the removed Command limit step has none', () => {
     expect(TUNE_LABEL['fleet.cap']).toBe('Fleet limit (0 = none)');
-    for (const k of ['fleet.cap', 'fleet.recycleRefundPct', 'research.fleet.step']) {
+    for (const k of ['fleet.cap', 'fleet.recycleRefundPct', 'fleet.relayStep', 'areas.repeatHaulPct', 'overworld.bandLock']) {
       expect(Object.keys(data.tunables)).toContain(k);
       expect(TUNE_LABEL[k]).toBeTruthy();
     }
+    expect(Object.keys(data.tunables)).not.toContain('research.fleet.step');
+    expect(TUNE_LABEL['research.fleet.step']).toBeUndefined();
   });
 });

@@ -7,7 +7,7 @@
  */
 import { areaStatus, isReclaimed, overworldStatus, type AreaStatus, type OverworldStatus, type SimData, type World } from '@factory4x/sim';
 import { clampScroll, fitOverworld, scrollMax, type OwFit } from './fit.ts';
-import { bandLabels, type BandLabel, type Rect } from './owlayout.ts';
+import { bandLabels, overlap, type BandLabel, type Rect } from './owlayout.ts';
 import { palette } from './palette.ts';
 import {
   drawAreaNode,
@@ -117,7 +117,10 @@ export function labelSides(centers: readonly { x: number; y: number }[], lanes: 
   }
   const LW = 120;
   const LH = 30;
-  return centers.map((c) => {
+  // Labels already placed (by index), so two neighbours close together (the 200 su relay pair) don't put their names on each other.
+  const placed: Rect[] = [];
+  const out: Array<'above' | 'below'> = [];
+  centers.forEach((c, i) => {
     const rect = (above: boolean): Rect => ({ x: c.x - LW / 2, y: above ? c.y - r - 3 - LH : c.y + r + 3, w: LW, h: LH });
     const score = (rc: Rect): number => {
       let s = 0;
@@ -128,10 +131,17 @@ export function labelSides(centers: readonly { x: number; y: number }[], lanes: 
       }
       if (rc.y < 2 || rc.y + rc.h > h - 2) s += 1000;
       if (rc.x < 0 || rc.x + rc.w > w) s += 5;
+      for (const o of placed) if (overlap(rc, o)) s += 500;
+      centers.forEach((o, k) => {
+        if (k !== i && overlap(rc, { x: o.x - r - 3, y: o.y - r - 3, w: 2 * r + 6, h: 2 * r + 6 })) s += 500;
+      });
       return s;
     };
-    return score(rect(false)) <= score(rect(true)) ? 'below' : 'above';
+    const side = score(rect(false)) <= score(rect(true)) ? 'below' : 'above';
+    placed.push(rect(side === 'above'));
+    out.push(side);
   });
+  return out;
 }
 
 interface Cache {
