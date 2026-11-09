@@ -582,20 +582,23 @@ Frame x 0–1000, y 0–2100. Area nodes are drawn at radius 80 su, as in H4.
 ```
                     [The Deep]                      band 3
                    /          \
-         (Mire Relay)        (Spire Relay)          band 2 relays
-           |      \          /      |
-     [Spore Veil] ------- [Thorn Garden]            band 2
-           |   \            /   |
-         (Rime Relay) --- (Glint Relay)             band 1 relays
-           |                    |
-     [Frost Shelf]          [Glass Shoal]           band 1
-                \          /
-                 [Landfall]                         band 0
+            (Mire Relay)    (Spire Relay)           band 2 relays
+            /    |      \  /     |     \
+  [Spore Veil] --|-------\/------|-- [Thorn Garden] band 2
+     |    \      |       /\      |      /    |
+     |    (Rime Relay) ---- (Glint Relay)    |      band 1 relays
+     |    /                         \       |
+  [Frost Shelf]                    [Glass Shoal]    band 1
+            \                          /
+                    [Landfall]                      band 0
 ```
 
-Lanes (undirected, 14):
+*(h6-design-data, data v11: the relays moved inward (Rime 400 / 1270, Glint 600 / 1270, Mire 300 / 520, Spire 700 / 520) so the two new lanes and `rime–mire` / `glint–spire` clear every other node by at least 130 su. The diagram is schematic.)*
+
+Lanes (undirected, 16):
 - `landfall–shelf`, `landfall–shoal`;
 - `shelf–rime`, `shoal–glint`, `rime–glint`;
+- `shelf–veil`, `shoal–garden` (added at data v11: see "Calibration result (h6-design-data, data v11)");
 - `rime–veil`, `rime–mire`, `glint–garden`, `glint–spire`, `veil–garden`, `veil–mire`, `garden–spire`;
 - `mire–deep`, `spire–deep`.
 
@@ -603,22 +606,23 @@ What this means in play:
 - The shortest win is about 6 areas: Landfall, one light area, its side's relay, a band 2 relay, The Deep, plus one area from the other side for the second design's resource. Either relay side works.
 - The mediums (Spore Veil, Thorn Garden), the second relay of each band and the other light area are optional: 4 of 10. What they give is resources for grind research and a second route.
 - `rime–mire` and `glint–spire` let you go from a band 1 relay straight to a band 2 relay, skipping the mediums.
+- `shelf–veil` and `shoal–garden` put a medium next to each light area. With band locks on (the default), you see the medium's ring and guards before you can enter it: the lock from the closed side. With `overworld.bandLock` 0, you can land there at limit 12 and meet the wall in play.
 
 #### Areas (H6, data `map.areas`)
 
-`side` is `ice`, `crystal` or `none`, and decides repeat hauls. `relay` marks a command relay. Nodes are frame ids. **No area includes `root`.** Haul and export are ore / ice / crystal. The four relays are new. Values are h6-sim's starting points; h6-design-data calibrates them.
+`side` is `ice`, `crystal` or `none`, and decides repeat hauls. `relay` marks a command relay. Nodes are frame ids. **No area includes `root`.** Haul and export are ore / ice / crystal. The four relays are new. Values are data v11 (h6-design-data moved the four relays; hauls and exports are h6-sim's, unchanged).
 
 | id | name | tier | side | relay | x | y | nodes | haul | export/min |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `landfall` | Landfall | 0 | none | no | 500 | 1940 | probe a1 a2 a3 a4 a5 heart | 100 / 0 / 0 | 4 / 0 / 0 |
 | `shelf` | Frost Shelf | 1 | ice | no | 220 | 1640 | probe a1 a2 a3 a5 p1 heart | 130 / 80 / 0 | 3 / 2 / 0 |
 | `shoal` | Glass Shoal | 1 | crystal | no | 780 | 1640 | probe a1 a2 a4 a5 p1 heart | 130 / 0 / 80 | 3 / 0 / 2 |
-| `rime` | Rime Relay | 1 | ice | yes | 220 | 1300 | probe a1 a2 a3 a5 a6 p1 heart | 200 / 60 / 20 | 3 / 2 / 0 |
-| `glint` | Glint Relay | 1 | crystal | yes | 780 | 1300 | probe a1 a2 a4 a5 a7 p2 heart | 200 / 20 / 60 | 3 / 0 / 2 |
+| `rime` | Rime Relay | 1 | ice | yes | 400 | 1270 | probe a1 a2 a3 a5 a6 p1 heart | 200 / 60 / 20 | 3 / 2 / 0 |
+| `glint` | Glint Relay | 1 | crystal | yes | 600 | 1270 | probe a1 a2 a4 a5 a7 p2 heart | 200 / 20 / 60 | 3 / 0 / 2 |
 | `veil` | Spore Veil | 2 | ice | no | 220 | 900 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 heart | 420 / 90 / 70 | 5 / 3 / 0 |
 | `garden` | Thorn Garden | 2 | crystal | no | 780 | 900 | probe a1 a2 a3 a4 a5 a6 a7 p1 p2 heart | 420 / 70 / 90 | 5 / 0 / 3 |
-| `mire` | Mire Relay | 2 | ice | yes | 220 | 560 | probe a1 a2 a3 a5 a6 a8 p1 p3 heart | 300 / 60 / 40 | 4 / 2 / 1 |
-| `spire` | Spire Relay | 2 | crystal | yes | 780 | 560 | probe a1 a2 a4 a5 a7 a9 p2 p4 heart | 300 / 40 / 60 | 4 / 1 / 2 |
+| `mire` | Mire Relay | 2 | ice | yes | 300 | 520 | probe a1 a2 a3 a5 a6 a8 p1 p3 heart | 300 / 60 / 40 | 4 / 2 / 1 |
+| `spire` | Spire Relay | 2 | crystal | yes | 700 | 520 | probe a1 a2 a4 a5 a7 a9 p2 p4 heart | 300 / 40 / 60 | 4 / 1 / 2 |
 | `deep` | The Deep | 3 | none | no | 500 | 180 | probe a1 a2 a3 a4 a5 a6 a7 a8 a9 p1 p2 p3 p4 heart | 920 / 100 / 100 | 8 / 3 / 3 |
 
 The Deep keeps `layout: "seed"` (the run's H3 layout). Its node list leaves out `root`, so the sim ignores that layout's `root` and starved counts (the existing no-Root path: `hasRoot` false, `fed` true for good).
@@ -627,26 +631,26 @@ The Deep keeps `layout: "seed"` (the run's H3 layout). Its node list leaves out 
 
 #### Area guards (H6)
 
-T/S before `guard.capPct`, in the H4 layout format. These are h6-sim's starting points; h6-design-data calibrates to "Capability windows (H6)". The four relays are new, and Spore Veil and Thorn Garden lose their Root and starved counts. Unchanged areas: Landfall, Frost Shelf and Glass Shoal as data v9.
+T/S before `guard.capPct`, in the H4 layout format. Calibrated by h6-design-data to "Capability windows (H6)" under the combat amendment (data v11; see "Calibration result (h6-design-data, data v11)"). The four relays are new, and Spore Veil and Thorn Garden lose their Root and starved counts. Unchanged areas: Landfall, Frost Shelf and Glass Shoal as data v9.
 
 | Area | Node | Prize | Slots | Guards (T/S) |
 | --- | --- | --- | --- | --- |
 | rime | p1 | ice | 2 | 0 / 5 |
-| rime | heart | ore | 4 | 1 / 18 |
+| rime | heart | ore | 4 | 1 / 16 |
 | glint | p2 | crystal | 2 | 0 / 5 |
-| glint | heart | ore | 4 | 7 / 2 |
+| glint | heart | ore | 4 | 7 / 1 |
 | veil | p1 | ice | 2 | 0 / 6 |
-| veil | p2 | crystal | 2 | 2 / 6 |
+| veil | p2 | crystal | 2 | 3 / 3 |
 | veil | heart | ore | 4 | 4 / 34 |
 | garden | p1 | crystal | 2 | 0 / 5 |
 | garden | p2 | ice | 2 | 4 / 3 |
-| garden | heart | ore | 4 | 14 / 9 |
+| garden | heart | ore | 4 | 13 / 8 |
 | mire | p1 | ice | 2 | 0 / 8 |
-| mire | p3 | crystal | 3 | 4 / 4 |
-| mire | heart | ore | 4 | 6 / 38 |
+| mire | p3 | crystal | 3 | 5 / 2 |
+| mire | heart | ore | 4 | 4 / 36 |
 | spire | p2 | crystal | 2 | 0 / 8 |
 | spire | p4 | ice | 3 | 5 / 2 |
-| spire | heart | ore | 4 | 16 / 11 |
+| spire | heart | ore | 4 | 12 / 9 |
 | deep | all | as H3 | as H3 | the H3 layout tables (heart: fed counts only) |
 
 #### Fleet limit, relays and band locks
@@ -923,6 +927,82 @@ The handoff's "What changed" says it in one line, so the owner can object if a f
    - the composer's cached mixes, which follow from the probe.
 
    Then retune. Tags may need the formula or the guard mixes adjusted if accuracy drops, because Weak now also means "draws that guard's fire first".
+
+#### Calibration result (h6-design-data, data v11)
+
+Sources (all `npm run bots -- --seeds 3`; the seeds pick The Deep's layout: 1 Glass Thicket, 2 Twin Seams, 3 Frost Gate; times are game minutes of play):
+- **Before:** `reports/archive/h6-probe-v10.md`, data v10 on `task/h6-bots` 4ec2c71, which already has the combat amendment. So every number here is under the new rule; no pre-amendment number is reused.
+- **After:** `reports/archive/h6-design-data-v11.md`.
+- **Tags:** `reports/archive/h6-design-data-v11-tags.md`, every pocket and heart of every area.
+
+**What changed (data v10 → v11).** Guards, two lanes and four positions. Hauls, exports, research and every tunable are unchanged, so the haul invariant's bound is still 2070 / 310 / 310 against 1660 / 220 / 220.
+
+| Where | v10 → v11 | Why |
+| --- | --- | --- |
+| Spire Relay heart | 16 / 11 → 12 / 9 | Best mix 21 → 16. It missed "fits L1" (needs ≤ 18). |
+| Twin Seams heart (The Deep) | 10 / 34 → 12 / 42 | Best mix 19 → 23. It missed "closed at L1" (needs > 20) and "binds at L2" (≥ 22). It also fixes flag 3: the seed 2 Deep trial at L1 had reclaimed it. |
+| Thorn Garden heart | 14 / 9 → 13 / 8 | Best mix 18 → 17: one slot off the edge (see "Wounded arrivals"). |
+| Mire Relay heart | 6 / 38 → 4 / 36 | Best mix 18 → 16, for the same margin. It also makes its lancer tag read true (it read Even where the waves said Weak). |
+| Glass Thicket heart (The Deep) | 21 / 11 → 19 / 11 | Best mix 26 → 24: off the L2 − 2 edge, still ≥ 22. |
+| Frost Gate heart (The Deep) | 18 / 21 → 17 / 21 | Best mix 25 → 23. |
+| Rime Relay heart | 1 / 18 → 1 / 16 | Best mix 10 → 9 (flak), off the L0 − 2 edge; drones alone still need 18 (closed at 12). |
+| Glint Relay heart | 7 / 2 → 7 / 1 | Best mix 10 → 8 (lancers); drones alone still need 19. |
+| Twin Seams p1 / p2 | 2 / 6 and 2 / 6 → 0 / 8 and 3 / 3 | The two pockets read Even / Even where the waves said both counters were worse than drones (the old H3 misread). Now p1 reads Weak / Strong and p2 Strong / Weak, and both read true. |
+| Spore Veil p2 | 2 / 6 → 3 / 3 | The same misread (Even / Even; the waves said Weak / Weak). Now Strong / Weak, true. |
+| Mire Relay p3 | 4 / 4 → 5 / 2 | Its lancer tag read Strong where the waves said Even. Now Strong, true. |
+| Lanes | + `shelf–veil`, + `shoal–garden` (14 → 16) | Band locks never refused a reachable area on the v10 lanes (band 2 touched only relays), so `overworld.bandLock` 0 changed nothing. See "Band locks" below. |
+| Relay positions | Rime 220 / 1300 → 400 / 1270, Glint 780 / 1300 → 600 / 1270, Mire 220 / 560 → 300 / 520, Spire 780 / 560 → 700 / 520 | So that `shelf–veil` doesn't run through Rime, and every lane clears every other node by at least 130 su. |
+
+**Probe after** (limits L0 12, L1 20, L2 28; "Best mix" is d / l / f):
+
+| Heart | d / l / f | Best mix | Windows |
+| --- | --- | --- | --- |
+| Rime Relay | 18 / 23 / 9 | 9 (0 / 0 / 9) | drones closed at L0; fits L0 with flak |
+| Glint Relay | 19 / 8 / 29 | 8 (0 / 8 / 0) | drones closed at L0; fits L0 with lancers |
+| Spore Veil | 34 / 37 / 26 | 15 (0 / 7 / 8) | closed L0, fits L1, no single type fits L1 |
+| Thorn Garden | 34 / 22 / 45 | 17 (0 / 9 / 8) | the same |
+| Mire Relay | 35 / 39 / 27 | 16 (0 / 7 / 9) | the same, and binds at L1 |
+| Spire Relay | 34 / 23 / 42 | 16 (0 / 9 / 7) | the same, and binds at L1 |
+| The Deep, Glass Thicket | 47 / 28 / 59 | 24 (0 / 13 / 11) | closed L1, fits L2, no single type fits L2, binds |
+| The Deep, Twin Seams | 52 / 47 / 47 | 23 (0 / 10 / 13) | the same |
+| The Deep, Frost Gate | 49 / 34 / 55 | 23 (0 / 13 / 10) | the same |
+
+Every window cell is met. Every best mix has both counters at 30% or more.
+
+**Flags, v10 → v11:**
+
+| Flag | v10 | v11 |
+| --- | --- | --- |
+| 1. No softlock | met | met: all 9 winning runs buy the core |
+| 2. A relay opens a band | missed (Spire 21; Twin Seams 19) | met |
+| 3. The lock is real | missed (the seed 2 Deep trial reclaimed The Deep at L1) | met: all 9 trials time out |
+| 4. The mix is used | met | met |
+| 5. The new limit is used | met | met |
+| 6. The set is a choice | met (3 sets per seed) | met (2 sets per seed; see below) |
+| 7. Determinism and replay | met | met |
+
+**Runs after** (per-seed table in the report):
+- `composer` 46:16–46:37 (v10: 52:08–54:12);
+- `ice-first` 55:44–61:41 (52:28–54:32);
+- `crystal-first` 52:13–58:10 (71:11–73:15);
+- the cap-off reference 42:32–42:57 (43:07–44:04);
+- `drones-only` softlocks at 79:10 with three areas, as designed.
+
+**Tags:** 70 of 70 pocket and heart tags read true across every area and Deep layout (`h6-design-data-v11-tags.md`). The v10 misreads named in the table above came from scratch runs of the same script during tuning, so they aren't cited by number.
+
+**Wounded arrivals (Critic note).** Ships never heal, so survivors of pocket fights reach the heart wounded, while the probe sends fresh ships. Every winning run is repelled once or more at its band 2 relay or The Deep (1–4 repelled waves per run in v11), and then wins with a larger wave inside the limit.
+- **Decision: keep the probe on fresh ships, and keep the margin in the windows.** The probe measures what an area *is*, and a model of wounds would depend on the route each player took to the heart. The "fits at L − 2" rule already reserves two slots. I moved the edge cases (Garden, Mire, Glass Thicket, Frost Gate, both band 1 relays) one to two slots further inside.
+- In a scratch check (not cited by number), the minimum mix with a few half-wounded ships loses, and the same mix plus two ships wins.
+- **For the handoff:** if you send exactly what an area's heart needs right after your pocket fights, you may be repelled once. Bringing two spare ships, or recycling wounded ones, avoids it. The repel costs time, never the area.
+
+**Band locks.** On the v10 lanes, band 2 was lane-joined only to the band 1 relays, so reclaiming the relay that made band 2 reachable also unlocked it. The lock never refused a reachable area, and `overworld.bandLock` 0 changed nothing. Two new lanes, `shelf–veil` and `shoal–garden`, make each medium a neighbour of a light area:
+- With locks on (the default), the medium shows its ring and guards on the overworld before you can enter: you see the lock from the closed side.
+- With locks off, you can land there at limit 12 and meet the wall in play (flag 3's trials show 12 can't take any band 2 area).
+- Band 3 still touches only the band 2 relays, so the lock never refuses The Deep. That's accepted: a lane from a medium to The Deep would cross a relay node on this layout.
+
+**What the bots don't exercise, candidly.**
+- **No winner takes a medium** (Spore Veil, Thorn Garden). All three winning strategies go light area → its relay → the other light area → a band 2 relay → The Deep. `composer` and `crystal-first` take the same set on every seed, so flag 6 holds with two sets per seed, its minimum. The mediums pay only resources for grind research, and the needs-driven bots never need them. Whether a player takes them, and enjoys it, is the owner's judgement (fun question 2).
+- **The bots buy no Recycle beyond the composer's surplus rule,** and never meet a band lock (they only land where they are allowed). Both are left to the owner.
 
 #### Success criteria (H6; the owner, one 30–40 minute phone session; 4x is fine)
 
@@ -1450,7 +1530,7 @@ Totals: haul 2120 / 340 / 340 (data v8), which covers every research level (2100
 
 *Updated 2026-11-08 by h5-sim (data v8):* the `veil`, `garden` and `deep` hauls rose from 300 / 60 / 40, 300 / 40 / 60 and 720 / 60 / 60 (v7, calibrated by h4-design-data; totals then 1680 / 240 / 240 against 1660 / 220 / 220) to cover the H5 Command limit levels (H5 spec, "Command limit"). The prose below is the record of what H4 tested at v7.
 
-*Superseded at data v10 by H6 (h6-sim, 2026-11-08):* this table, its totals line and the lanes above describe data v9. Data v10 has ten areas with `side` and `relay`, 14 lanes, the frame y 0–2100 and no Root (H6 "The overworld" and "Areas"). The no-softlock check is now H6's haul invariant, with repeat hauls at their worst position.
+*Superseded at data v10 by H6 (h6-sim, 2026-11-08):* this table, its totals line and the lanes above describe data v9. Data v10 has ten areas with `side` and `relay`, 14 lanes (16 from v11), the frame y 0–2100 and no Root (H6 "The overworld" and "Areas"). The no-softlock check is now H6's haul invariant, with repeat hauls at their worst position.
 
 **Area guards** (data, before `guard.capPct`; T/S; "starved" is the heart after the Root is cut). First derived from the H3 layouts at about 20% (light) and 60% (medium) and pushed toward each side's theme, then calibrated by h4-design-data (see "Calibration result (h4-design-data, data v7)"), and recalibrated for the fleet limit by h5-design-data (data v9; see H5 "Calibration result (h5-design-data, data v9)"). The tag columns give the sheet's Strong/Even/Weak for lancer / flak at full caps (hp-weighted multiplier in brackets, worked from the H3 formula).
 
@@ -1927,7 +2007,7 @@ Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per
 | p3 | ice | 3 | 13 / 6 | 34 / 20 / 44 | Strong (178) / Weak (46) |
 | p4 | crystal | 3 | 3 / 26 | 28 / 31 / 22 | Weak (73) / Strong (151) |
 | root | none | 0 | 0 / 25 | 18 / 27 / 8 | Weak / Strong |
-| heart | ore | 4 | 18 / 21, starved 12 / 14 | 50 / 35 / 58; starved 30 / 18 / 31 | Strong (154) / Weak (70) |
+| heart | ore | 4 | 17 / 21, starved 12 / 14 | 49 / 34 / 55 (v11); starved: not measured since H6 | Strong / Weak |
 
 **Layout 1: Glass Thicket**
 
@@ -1938,18 +2018,18 @@ Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per
 | p3 | ice | 3 | 3 / 26 | 28 / 31 / 22 | Weak / Strong |
 | p4 | crystal | 3 | 13 / 6 | 34 / 20 / 44 | Strong / Weak |
 | root | none | 0 | 12 / 0 | 27 / 11 / 39 | Strong / Weak |
-| heart | ore | 4 | 21 / 11, starved 16 / 8 | 50 / 29 / 63; starved 33 / 17 / 40 | Strong (176) / Weak (48) |
+| heart | ore | 4 | 19 / 11, starved 16 / 8 | 47 / 28 / 59 (v11); starved: not measured since H6 | Strong / Weak |
 
 **Layout 2: Twin Seams**
 
 | Node | Prize | Slots | Guards (T/S) | Min wave d / l / f | Tags l / f |
 | --- | --- | --- | --- | --- | --- |
-| p1 | ice | 2 | 2 / 6 | 15 / 16 / 17 | Even (117) / Even (107) |
-| p2 | crystal | 2 | 2 / 6 | 15 / 16 / 17 | Even / Even |
+| p1 | ice | 2 | 0 / 8 | 9 / 15 / 3 (v11) | Weak / Strong |
+| p2 | crystal | 2 | 3 / 3 | 15 / 12 / 20 (v11) | Strong / Weak |
 | p3 | crystal | 3 | 3 / 26 | 28 / 31 / 22 | Weak / Strong |
 | p4 | ice | 3 | 13 / 6 | 34 / 20 / 44 | Strong / Weak |
 | root | none | 0 | 6 / 12 | 26 / 22 / 28 | Even (134) / Even (90) |
-| heart | ore | 4 | 10 / 34, starved 8 / 21 | 45 / 40 / 41; starved 27 / 21 / 23 | Even (111) / Even (113) |
+| heart | ore | 4 | 12 / 42, starved 8 / 21 | 52 / 47 / 47 (v11); starved: not measured since H6 | Even / Even |
 
 **Tag accuracy at these numbers (data v9).** Say a type's tag is "right" when Strong means it needs at most 80% of the drones' wave, Weak means it needs more than the drones, and Even is anything in between. By that test (the shipped-data report in `packages/sim/test/min-waves.test.ts`, run on v9), 31 of the 36 tags at full caps are right, and 36 of 42 when the starved heart is included (v5: 33 of 36 and 38 of 42). The six misreads, all in Twin Seams:
 - **p1 lancer and p1 flak:** they need 16 and 17 against the drones' 15 and read Even; by the test both should read Weak. h5-design-data shrank p1 and p2 from 4 / 10 to 2 / 6, so the first pocket falls to drones within the fleet limit, and drones are relatively stronger against small mixed nodes.
@@ -1958,6 +2038,8 @@ Guard counts are written `Thorns T / Spores S`. "Starved" is the heart's cap per
 - **Starved heart lancer:** needs 21 against the drones' 27 (78%) and reads Even; it should read Strong. Unchanged since v5.
 
 Twin Seams reads Even/Even for both counters at its Root and at its heart, fed and starved, so there the tags give no guidance in the final fight. Whether that is intended for the symmetric layout is a Designer follow-up (Critic note).
+
+*Updated 2026-11-08 by h6-design-data (data v11):* the three Deep hearts, and Twin Seams' p1 and p2, were retuned under the H6 combat amendment (guards strike the ship type they counter). The "(v11)" wave cells are from `reports/archive/h6-design-data-v11.md` (probe) and `reports/archive/h6-design-data-v11-tags.md`. Every other wave cell, and the Root and starved columns, predate the amendment. The Root is out of play since H6, so those are kept as the record, not re-measured. At v11 every pocket and heart tag in every area reads true by the rule above: 70 of 70 (`reports/archive/h6-design-data-v11-tags.md`). That includes the Twin Seams misreads described above, which p1 0 / 8 and p2 3 / 3 fix.
 
 The H2-era mixes are kept in git history (data v4).
 

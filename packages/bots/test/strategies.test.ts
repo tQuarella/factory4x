@@ -15,6 +15,7 @@ import {
   type World,
 } from '@factory4x/sim';
 // H4: an H3 game is The Deep from a constructed campaign (createWorld starts on the overworld).
+import { minMix, probeWorld } from '../src/waves.ts';
 import { h3World } from '../../sim/test/h3-world.ts';
 // The frozen v8 fixture (fleet.cap 12, the Command limit item): the rules and numbers these tests pin never move with calibration.
 import { fixtureData as v4, fixtureV8 as data } from '../../sim/test/fixture.ts';
@@ -33,13 +34,14 @@ import {
   decideOverworld,
   fleetPower,
   guardNeed,
-  kitEntries,
   nextEconomyOrder,
   nextPurchase,
+  MAX_WAVES,
   nextTarget,
   nodeFinished,
   openAreas,
   readyToAttack,
+  winningMix,
   strategies,
   targetOrder,
   type CampaignStrategy,
@@ -223,26 +225,33 @@ describe('allocation', () => {
 });
 
 describe('target and closed areas', () => {
-  it('takes the first node in the H3 order whose best allocation passes the attack test', () => {
+  it('takes the first node in the H3 order that has a winning mix within the limit, and builds that mix', () => {
     const w = landed('veil');
-    const t = chooseTarget(w, 12, ALL)!;
+    const t = chooseTarget(w, data, 12, ALL)!;
     expect(t.passes).toBe(true);
-    // Order: pockets and the Root come before the heart; the fed heart (50 spores) is out of reach at 12.
-    expect(t.node).not.toBe(idx(w, 'heart'));
     const order = targetOrder(w);
-    for (const node of order.slice(0, order.indexOf(t.node))) {
-      expect(readyToAttack(w, node, bestAllocation(w, node, 12, ALL).power)).toBe(false);
-    }
-    // Skipping a failing node: starve the first passing one of its allowance by raising its wave count.
-    w.guardians.find((g) => g.node === t.node)!.wavesSent = 12;
-    const second = chooseTarget(w, 12, ALL)!;
-    expect(second.node).not.toBe(t.node);
+    // Every node before it has no winning mix at 12; it has one, and the fleet is exactly that mix.
+    for (const node of order.slice(0, order.indexOf(t.node))) expect(winningMix(w, data, node, 12, ALL), `node ${node}`).toBeNull();
+    const m = winningMix(w, data, t.node, 12, ALL)!;
+    expect(t.fleet).toEqual(m.fleet);
+    expect(total(t.fleet)).toBe(m.total);
+    expect(m.total).toBeLessThanOrEqual(12);
+    // The mix is the sim's minimum: one ship fewer of any single composition never wins (the probe's own search).
+    const base = probeWorld(1, data, 'veil', false);
+    expect(minMix(base, t.node, ALL, 12, data)!.total).toBe(m.total);
   });
 
-  it('is null when nothing passes (the area is closed at this limit), or the first node with passes false when asked for a fallback', () => {
+  it('a node that has had MAX_WAVES waves sent is skipped (its mix is not trusted again)', () => {
     const w = landed('veil');
-    expect(chooseTarget(w, 2, ALL)).toBeNull();
-    const fb = chooseTarget(w, 2, ALL, true)!;
+    const t = chooseTarget(w, data, 12, ALL)!;
+    w.guardians.find((g) => g.node === t.node)!.wavesSent = MAX_WAVES;
+    expect(chooseTarget(w, data, 12, ALL)?.node).not.toBe(t.node);
+  });
+
+  it('is null when no node has a winning mix (the area is closed at this limit), or the first node with passes false when asked for a fallback', () => {
+    const w = landed('veil');
+    expect(chooseTarget(w, data, 2, ALL)).toBeNull();
+    const fb = chooseTarget(w, data, 2, ALL, true)!;
     expect(fb.passes).toBe(false);
     expect(fb.node).toBe(targetOrder(w)[0]);
     expect(total(fb.fleet)).toBe(2);
@@ -250,8 +259,8 @@ describe('target and closed areas', () => {
 
   it('a raised limit opens what a smaller one closed', () => {
     const w = landed('veil');
-    expect(chooseTarget(w, 2, ALL)).toBeNull();
-    expect(chooseTarget(w, 30, ALL)).not.toBeNull();
+    expect(chooseTarget(w, data, 2, ALL)).toBeNull();
+    expect(chooseTarget(w, data, 30, ALL)).not.toBeNull();
   });
 
   it('a fed medium heart fails the attack test at the base limit and passes at a large one', () => {
@@ -317,7 +326,7 @@ describe('composer engine', () => {
   it('a forced visit at the base limit rallies from the landing, gathers the full allocation at a5 and attacks at least once', () => {
     // Premise: Frost Shelf at the base limit of 12 is closed (the heart needs more), so the visit is forced and plays out.
     const w = landed('shelf');
-    expect(chooseTarget(w, 12, ALL)).not.toBeNull(); // the pocket passes first, then the heart does not
+    expect(chooseTarget(w, data, 12, ALL)).not.toBeNull(); // the pocket has a winning mix first, then the heart does not
     const a5 = idx(w, 'a5');
     let strandedAfterEconomy = 0;
     for (let i = 0; i < 30 * 60 * 30 && runSummary(w).wavesSent === 0; i++) {
@@ -381,10 +390,11 @@ describe('research policy', () => {
   };
   const NO_DEEP = ['landfall', 'shelf', 'shoal', 'veil', 'garden'];
 
-  it('lists the spec order: core, designs, Command limit 1, opening 1, extract 1, Command limit 2, rigs 1, yards 1, Command limit 3, then the rest', () => {
+  it('lists the H4 order without Command limit: core, designs, opening 1, extract 1, rigs 1, yards 1, then the rest', () => {
     expect(RESEARCH_POLICY.map(([i, l]) => `${i}${l}`)).toEqual([
-      'core1', 'lancer1', 'flak1', 'fleet1', 'opening1', 'extract1', 'fleet2', 'rigs1', 'yards1', 'fleet3', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3',
+      'core1', 'lancer1', 'flak1', 'opening1', 'extract1', 'rigs1', 'yards1', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3',
     ]);
+    expect(RESEARCH_POLICY.some(([i]) => i === 'fleet')).toBe(false);
   });
 
   it('never buys Command limit: H6 removed it from the sim and the data (h6-sim), so its policy entries find no row', () => {
@@ -413,10 +423,7 @@ describe('research policy', () => {
     expect(nextPurchase(w, data, 'full')).toBeNull();
   });
 
-  it('no-command is the policy without Command limit; grind buys only the four grind items, never a design, the core or Command limit', () => {
-    expect(kitEntries('no-command').some(([i]) => i === 'fleet')).toBe(false);
-    expect(kitEntries('no-command')).toHaveLength(RESEARCH_POLICY.length - 3);
-    expect(buy(rich({}, NO_DEEP), 'no-command')).toEqual(['lancer1', 'flak1', 'opening1', 'extract1', 'rigs1', 'yards1', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3']);
+  it('grind buys only the four grind items, never a design or the core', () => {
     const all = [...NO_DEEP, 'deep'];
     expect(buy(rich({}, all), 'grind')).toEqual(['opening1', 'extract1', 'rigs1', 'yards1', 'extract2', 'opening2', 'rigs2', 'yards2', 'extract3', 'opening3']);
     expect(nextPurchase(rich(DESIGNS, all), data, 'grind')).toBe('opening');
@@ -442,15 +449,11 @@ describe('area choice', () => {
     expect(openAreas(reclaimed('landfall'), data)).toEqual([area('shelf'), area('shoal')]);
   });
 
-  it('ice-first goes Landfall, Frost Shelf, then the greedy choice; crystal-first goes Landfall, Glass Shoal', () => {
-    const ice = by('ice-first');
-    expect(chosen(createWorld(1, data), ice)).toEqual({ area: area('landfall'), forced: false });
-    expect(chosen(reclaimed('landfall'), ice)!.area).toBe(area('shelf'));
-    const after = reclaimed('landfall', 'shelf');
-    expect(chosen(after, ice)!.area).toBe(cheapestOpenArea(after, data));
-    const crystal = by('crystal-first');
-    expect(chosen(reclaimed('landfall'), crystal)!.area).toBe(area('shoal'));
-    expect(chosen(reclaimed('landfall', 'shoal'), crystal)!.area).toBe(cheapestOpenArea(reclaimed('landfall', 'shoal'), data));
+  it('ice-first prefers the ice side among the areas that advance the goal, crystal-first the crystal side', () => {
+    // Premise: nothing in stock and no design bought, so the goal is the designs and both light areas add what is missing.
+    expect(chosen(createWorld(1, data), by('ice-first'))).toEqual({ area: area('landfall'), forced: false });
+    expect(chosen(reclaimed('landfall'), by('ice-first'))!.area).toBe(area('shelf'));
+    expect(chosen(reclaimed('landfall'), by('crystal-first'))!.area).toBe(area('shoal'));
   });
 
   it('greedy takes the lowest estimate: need / best power, lowest index on ties', () => {
@@ -480,7 +483,7 @@ describe('area choice', () => {
     const second = first === area('shelf') ? area('shoal') : area('shelf');
     const closed = new Map([[first, closedKey(w, data)]]);
     expect(chosen(w, by('composer'), closed)).toEqual({ area: second, forced: false });
-    // A route entry that is closed is skipped too.
+    // A preferred side that is closed is skipped too.
     const ice = new Map([[area('shelf'), closedKey(w, data)]]);
     expect(chosen(w, by('ice-first'), ice)).toEqual({ area: area('shoal'), forced: false });
   });
@@ -524,14 +527,13 @@ describe('area choice', () => {
 });
 
 describe('strategies', () => {
-  it('are the five H5 strategies and the cap-off reference', () => {
-    expect(strategies.map((s) => [s.name, s.kit, s.engine ?? 'composer', s.dronesOnly ?? false, s.fleetCap ?? null])).toEqual([
-      ['composer', 'full', 'composer', false, null],
-      ['ice-first', 'full', 'composer', false, null],
-      ['crystal-first', 'full', 'composer', false, null],
-      ['no-command', 'no-command', 'composer', false, null],
-      ['drones-only', 'grind', 'composer', true, null],
-      ['greedy', 'full', 'h3', false, 0],
+  it('are the four H6 strategies and the cap-off reference', () => {
+    expect(strategies.map((s) => [s.name, s.kit, s.side ?? null, s.engine ?? 'composer', s.dronesOnly ?? false, s.fleetCap ?? null])).toEqual([
+      ['composer', 'full', null, 'composer', false, null],
+      ['ice-first', 'full', 'ice', 'composer', false, null],
+      ['crystal-first', 'full', 'crystal', 'composer', false, null],
+      ['drones-only', 'grind', null, 'composer', true, null],
+      ['cap-off', 'full', null, 'h3', false, 0],
     ]);
     expect(WINNING_STRATEGIES).toEqual(['composer', 'ice-first', 'crystal-first']);
   });
