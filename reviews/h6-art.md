@@ -74,3 +74,38 @@ Scope: `git diff 525d810 cf6da1b` (one commit on top of round 1). It touches `pl
 The next round on this task would be the third. If these four items aren't all met then, the Director parks it per `PROCESS.md`.
 
 VERDICT: REJECT
+
+## Round 3 · 2026-11-08
+
+This is the third round on this task. It was reassigned to a core-engineer under the deadlock rule. Scope: `git diff e8c4c15 70be19a` (origin/task/h6-art, fetched and fast-forwarded locally). It touches `placeholders.ts` (the relay mark disc goes from r to 0.96 r), `gallery.ts` (two reach lines in the bounds list) and `ART_STYLE.md`. No protected file is touched.
+
+**Gates (run by me on 70be19a):** `npm run gates -- --base main` passes: typecheck, lint, test, determinism, bots and protected-files.
+
+**Gallery:** the engineer only read the bounds text, so I inspected the redrawn mark myself. I loaded `gallery.html` in Chromium on 70be19a, with no console errors, and looked at the H6 24 px strips in colour and greyscale, the four relay-node entries, the plain-node entry and the lane modes.
+- The relay mark still reads as a blue beacon on a dark dot at the upper left. The 0.96 r disc doesn't clip the icon: it's drawn at 0.86 scale and reaches about 0.75 r.
+- Ice and crystal still read in the centre of the reclaimed and open relay nodes. On the locked relay, the mark and the lock sit on opposite corners. The far relay shows only the dimmed mark.
+
+Bounds list as read by me: relay mark 0.984 r, relay icon 0.877 r, lock 0.721 r. Reach from the node centre: relay mark 1.488 node r, lock 1.306 node r.
+
+**Round 2 required changes:**
+1. **Met.** The lock badge row now says callers pass 0.5 of the node's r at (0.7 r, −0.7 r), which matches the Callers rule and the gallery.
+2. **Met.** The "Relay is told apart" rule now reads "amber rim, haul icon in the centre, blue beacon at the upper left". It also clarifies that the "!" badge is drawn only on in-area nodes. I checked that: `view.ts:321` is the asteroid view, never the overworld, so the "!" never shares a node with the relay mark.
+3. **Met.** The reach figures are now 1.49 (relay mark) and 1.31 (lock), measured by new gallery bounds lines that agree with my run. The text adds the overworld consequence (up to about 33 px at node r = 22) for h6-client's labels and selection ring.
+4. **Met.** The relay mark measures 0.984 r against the 1.002 r pixel limit, and the recording test still checks exact geometry.
+
+The new ART_STYLE table row for `drawRelayMark` and the expanded far and lane rows match the code.
+
+**Overall:** every original acceptance item holds.
+- The draw contract is complete, and the old `drawLane` call still draws exactly what it did before.
+- Each draw is told apart at 24 px and at overworld size, in colour and greyscale.
+- Everything stays within r with no new palette keys, and the gates pass.
+
+The caller guidance is now consistent and keeps the ice/crystal cue on relay nodes. Client draw code only, so there are no determinism or data concerns.
+
+**Non-blocking notes:**
+- The relay mark's dark disc covers a short arc of the reclaimed amber rim at the upper left. It reads as a badge sitting on the rim, which is acceptable.
+- The lock body still shares the `plating` colour, as noted in round 1.
+
+Required changes: none.
+
+VERDICT: APPROVE
