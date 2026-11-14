@@ -838,3 +838,8 @@ Scope: `git log build-20261108-4..build-20261108-5`, `reviews/h6-*.md`, the "Ite
 4. **H6's three fun questions are dropped, not deferred to the owner.** They're about the overworld, which A parks, and finishing the H6 run would cost the owner a session on mechanics we're setting aside.
 
 **Why:** since H2, every trade-off has been paid in time and wasn't felt (PLAYTEST_LOG.md H4 triage). An enemy that raids the economy is the first mechanic that makes the economy-against-army split a felt choice. One field isolates that claim: if it fails, we know what failed. Pillars 3 and 4 conflict with raids, so their wording goes to the owner as Q21. Activating the dormant Faction AI agent for raids is the Director's call, not made here.
+
+## 2026-11-14 · Director · Owner picks H7 A; pillars 3 and 4 rewritten; Faction AI activated
+
+**Decision:** The owner answered Q21 "A, yes" in chat. H7 is scope A, "One field, live enemy" (DESIGN.md → "H7 candidates"). VISION.md pillars 3 and 4 are replaced with the Q21 wording, applied by the Director under the protected-file exception (APPROVED-PROTECTED line under Q21 and in VISION.md); this also settles Q20. The **faction-ai agent is activated** from today: it owns raid behaviour (target choice, raid sizing from the player's economy, raiders drawn from hive guards) under `packages/sim` `factions/` and its tunables in `data/`.
+**Why:** raids are the mechanic that makes the economy-against-army split felt, and the owner said the enemy has to be active for the ship economy to work. Raid behaviour is the faction-ai agent's charter; leaving it dormant would push enemy logic onto engineers without that brief. The balance agent stays dormant: tuning in H7 is calibration the Designer already owns.

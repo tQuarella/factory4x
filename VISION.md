@@ -30,8 +30,8 @@ You are a von Neumann probe arriving in a new star system. Everything you will e
 
 1. **Throughput is the throttle.** The rate your network delivers resources to your factories and shipyards gates everything else.
 2. **Risk scales with reward.** The best resources are the best guarded; taking them costs ships, and a bad commitment wastes production.
-3. **Guardians have factories.** Mobs only defend, but they repair and replace up to a cap. Win a node by out-producing their replacement, or cut their supply first.
-4. **A puzzle, not a race.** No clock and no pressure. The challenge is building an efficient network.
+3. **Guardians have factories.** Mobs guard the best resources and raid what you build; their factories repair and replace up to a cap. Win a node by out-producing their replacement.
+4. **Pressure, not a clock.** Raids grow with what you build, never with time, so waiting never makes things worse. The challenge is balancing an efficient economy against the force that protects it.
 5. **Every system makes the next one stronger.** Research and probe design carry forward, and each new system is richer and harder.
 
 ## Approved protected changes
@@ -39,3 +39,4 @@ You are a von Neumann probe arriving in a new star system. Everything you will e
 <!-- The owner adds lines here or in QUESTIONS.md of the form: APPROVED-PROTECTED: <path> -->
 
 - 2026-11-06: revised fixed decisions and pillars (QUESTIONS.md Q7). APPROVED-PROTECTED: VISION.md
+- 2026-11-14: pillars 3 and 4 rewritten for active raids (QUESTIONS.md Q21). APPROVED-PROTECTED: VISION.md

@@ -42,7 +42,9 @@ Your spider-graph idea is the plan: the probe builds extractor and hauler ships,
 
 Answer like "A, yes" (yes approves both edits; the Director applies them with a permission prompt), or give a letter and your own wording. Default if unanswered: A, with no pillar edit yet. Raids ship as an experiment with an off switch in the tuning panel, and the pillars are revisited after play.
 
-**Answer:**
+**Answer (owner, in chat, 2026-11-14):** "A, yes"
+
+APPROVED-PROTECTED: VISION.md (pillars 3 and 4 replaced with the wording above)
 
 ## Answered
 
@@ -337,7 +339,7 @@ Pillar 3 in VISION.md ends "Win a node by out-producing their replacement, or cu
 
 *Folded into Q21 part 2 (2026-11-14, Designer): its pillar 3 wording drops the same clause. Answering Q21 answers this.*
 
-**Answer:**
+**Answer:** settled by Q21 ("A, yes", 2026-11-14); the clause is dropped.
 
 ### Q10. Let agents list secret names (2026-11-06, Retrospective)
 
