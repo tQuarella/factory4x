@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 7 ledger
 
-Launches: 6 / 12.
+Launches: 7 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -27,7 +27,9 @@ Launches: 6 / 12.
 | 6 | engineer | h7-client | launch | Build, from task/h7-sim (top of stack) |
 | r5 | critic | h7-raids | resume | Review round 1: APPROVE (c46e2b5); bots and client told to merge it |
 | r6 | critic | h7-bots | resume | Review round 1: REJECT (econ limit skipped in raid branch; all-zero dead end; gate ignores sweep; greedy offence before hit) |
-| r7 | engineer | h7-bots | resume | Fix round 1; Director: adaptive takes other pocket, else recycles econ, to make room |
+| r7 | engineer | h7-bots | resume | Fix round 1 (a61cba3): adaptive and greedy win ~19-20 min on v12; bots gate green |
+| r8 | critic | h7-bots | resume | Review round 2 |
+| 7 | critic | h7-client | launch | Review round 1 (economy + raid UI, 9a7f480; v13 not merged yet) |
 
 ## Iteration 6 ledger
 
