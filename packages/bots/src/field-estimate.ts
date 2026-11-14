@@ -4,6 +4,8 @@ import {
   countGuards,
   fnv1a,
   guardCaps,
+  raidMix,
+  raidSize,
   guardianAt,
   heartIndex,
   type GuardCounts,
@@ -120,6 +122,17 @@ export function fullRaidAwayCounts(world: Readonly<World>, node: number): { home
   const thorn = total === 0 ? 0 : Math.floor((size * full.thorn) / total);
   const spore = size - thorn;
   return { home: { thorn: full.thorn - thorn, spore: full.spore - spore }, raid: { thorn, spore } };
+}
+
+/**
+ * The hive's guards at home once the raid that `econ` economy ships would muster is out (R4: size from econ, the
+ * tunables and the hive's guards alive; the mix follows the hive). What the bots plan the counter-attack window on.
+ */
+export function raidAwayAtEcon(world: Readonly<World>, node: number, econ: number): { home: GuardCounts; raid: GuardCounts } {
+  const g = guardianAt(world, node)!;
+  const alive = countGuards(g);
+  const raid = raidMix(raidSize(world, econ, g), alive);
+  return { home: { thorn: alive.thorn - raid.thorn, spore: alive.spore - raid.spore }, raid };
 }
 
 /** The hive's node index. */

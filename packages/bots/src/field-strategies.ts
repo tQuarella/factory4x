@@ -1,27 +1,39 @@
 import {
   BUILD_TYPES,
   PROBE,
+  allocStatus,
+  econAtByType,
+  fieldSummary,
   fleetCap,
+  fleetStatus,
   guardianAt,
   heartIndex,
   isGuarded,
-  isMineable,
   isTypeUnlocked,
+  isValidInput,
+  nodeDistance,
+  raidStatus,
+  rockStatus,
+  shipsAtByType,
   type Input,
   type ShipType,
   type ShipTypeCounts,
   type SimData,
   type World,
 } from '@factory4x/sim';
-import { fieldMix, fullRaidAwayCounts, guardFull, guardsAtHome } from './field-estimate.ts';
+import { fieldMix, raidAwayAtEcon, guardFull, guardsAtHome } from './field-estimate.ts';
 import type { FieldBot, FieldStrategy, Weights } from './field-runner.ts';
 import { raisedMix } from './strategies.ts';
 
 /**
- * The H7 field strategies (DESIGN.md H7 "Bots (H7): strategies"). Bots see what a player sees: the world through
- * the sim's selectors and plain reads (the raid is read from `world.raid` and `world.stats.raids`, which are what
- * `raidStatus` reports). The only battle estimate is the min-wave estimate (field-estimate.ts). A bot keeps its own
+ * The H7 field strategies (DESIGN.md H7 "Bots (H7): strategies"). Bots see what a player sees: the sim's
+ * selectors (`raidStatus`, `fleetStatus`, `allocStatus`, `rockStatus`, `fieldSummary`, `shipsAtByType`) and the
+ * map's structure. The only battle estimate is the min-wave estimate (field-estimate.ts). A bot keeps its own
  * memory in its closure (made per run), so a run is a pure function of the seed and the data.
+ *
+ * Reads that no selector gives, kept as plain reads or exported helpers and named in the h7-bots report:
+ * `guardianAt(...).wavesSent` and `.battle` (waves already sent at a node; a battle running there), where the
+ * rally is (the bot remembers what it set), where a ship in flight is going, and the node list's kind and prize.
  */
 
 /** Econ count at which `adaptive` shifts to offence (DESIGN.md: "At econ >= 12"). */
@@ -30,63 +42,76 @@ export const OFFENCE_AT_ECON = 12;
 const MAX_RAISE = 4;
 /** Economy ships the trade in slots leaves free beyond the plan: ships already paid for in the bays and one hauler for the counter pocket still land after the weights drop. */
 const ECON_MARGIN = 3;
+/** Ticks between two recycle orders (one ship each), so the economy comes down at a human pace. */
+const RECYCLE_EVERY = 15;
 
 const ZERO: Weights = { extractor: 0, hauler: 0, drone: 0, lancer: 0, flak: 0 };
 const WARSHIPS: readonly ShipType[] = ['drone', 'lancer', 'flak'];
+const EMPTY: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
 
 // ---- Reading the world ----------------------------------------------------------------------------------------
 
-/** Economy ships alive and in the bays, by type. */
-export function econCounts(world: Readonly<World>): { extractor: number; hauler: number } {
-  const f = world.field!;
-  const c = { extractor: 0, hauler: 0 };
-  for (const s of f.econ) c[s.type]++;
-  c.extractor += f.bays.extractor.ticksLeft > 0 ? 1 : 0;
-  c.hauler += f.bays.hauler.ticksLeft > 0 ? 1 : 0;
-  return c;
+/** Economy ships alive and in the bays, by type (fleetStatus). */
+export function econCounts(world: Readonly<World>, data: SimData): { extractor: number; hauler: number } {
+  const f = fleetStatus(world, data);
+  return { extractor: f.econByType.extractor + f.econBuildingByType.extractor, hauler: f.econByType.hauler + f.econBuildingByType.hauler };
 }
 
 /** Economy ships alive (R2's `econ`: the ships in the bays are not counted). */
-export const econAliveNow = (world: Readonly<World>): number => world.field!.econ.length;
+export function econAliveNow(world: Readonly<World>, data: SimData): number {
+  const f = fleetStatus(world, data);
+  return f.econByType.extractor + f.econByType.hauler;
+}
 
-/** Extractor slots on the nodes that can be mined now (Mine-marked, not guarded), less the free extractors. */
+/** Extractor slots on the rocks that can be mined now (Mine-marked, not guarded), less the free extractors (rockStatus). */
 export function openSlots(world: Readonly<World>): number {
   let n = 0;
-  for (const node of world.nodes) if (node.kind !== 'probe' && isMineable(world, node.index)) n += Math.max(0, node.slots - world.field!.free[node.index]!);
+  for (const node of world.nodes) {
+    if (node.kind === 'probe') continue;
+    const r = rockStatus(world, node.index);
+    if (r.mineable) n += Math.max(0, r.slots - r.freeExtractors);
+  }
   return n;
 }
 
 /** Warships parked (not in transit) at each node: node -> counts by type. */
 export function parkedWarships(world: Readonly<World>): Map<number, ShipTypeCounts> {
   const out = new Map<number, ShipTypeCounts>();
-  for (const s of world.ships) {
-    if (s.at === null || s.transit !== null) continue;
-    let c = out.get(s.at);
-    if (c === undefined) {
-      c = { drone: 0, lancer: 0, flak: 0 };
-      out.set(s.at, c);
-    }
-    c[s.type]++;
+  for (const node of world.nodes) {
+    const c = shipsAtByType(world, node.index);
+    if (c.drone + c.lancer + c.flak > 0) out.set(node.index, c);
   }
   return out;
+}
+
+/**
+ * Warships fit to fight, by type, at `node` (or anywhere): hp at least half the type's full hp. The min-wave
+ * estimate assumes full-health ships, and survivors of an earlier fight stay wounded (a ship's hp is plain state;
+ * no selector reports it), so a wounded one counts as not there.
+ */
+export function soundShips(world: Readonly<World>, node: number | null = null): ShipTypeCounts {
+  const c: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
+  for (const s of world.ships) if ((node === null || s.at === node) && s.hp * 2 >= world.tun[`ship.${s.type}.hp`]) c[s.type]++;
+  return c;
 }
 
 const total = (c: Readonly<ShipTypeCounts>): number => c.drone + c.lancer + c.flak;
 const covers = (have: Readonly<ShipTypeCounts>, need: Readonly<ShipTypeCounts>): boolean => have.drone >= need.drone && have.lancer >= need.lancer && have.flak >= need.flak;
 
-/** The warship types that can be built now (unlocked), minus `except`. */
+/** The warship types that can be built now (unlocked). */
 function unlockedWarships(world: Readonly<World>, dronesOnly: boolean): ShipType[] {
   return WARSHIPS.filter((t) => isTypeUnlocked(world, t) && (!dronesOnly || t === 'drone'));
 }
 
 /** The setAlloc inputs that move the weights to `target` (clamped to alloc.maxWeight); none when nothing changes. */
-export function weightInputs(world: Readonly<World>, target: Readonly<Weights>): Input[] {
+export function weightInputs(world: Readonly<World>, data: SimData, target: Readonly<Weights>): Input[] {
   const out: Input[] = [];
   const max = world.tun['alloc.maxWeight'];
-  for (const type of BUILD_TYPES) {
+  const rows = allocStatus(world, data).rows;
+  BUILD_TYPES.forEach((type, i) => {
     const w = Math.max(0, Math.min(max, target[type]));
-    if (world.field!.alloc[type] !== w) out.push({ type: 'setAlloc', shipType: type, weight: w });
-  }
+    if (rows[i]!.weight !== w) out.push({ type: 'setAlloc', shipType: type, weight: w });
+  });
   return out;
 }
 
@@ -95,7 +120,7 @@ function warshipRoom(world: Readonly<World>, data: SimData, fallback: number): n
   const cap = fleetCap(world, data);
   if (cap === null) return fallback;
   if (world.tun['fleet.countsEconomy'] < 1) return cap;
-  const e = econCounts(world);
+  const e = econCounts(world, data);
   return Math.max(0, cap - e.extractor - e.hauler);
 }
 
@@ -109,21 +134,21 @@ const searchMax = (world: Readonly<World>, data: SimData): number => fleetCap(wo
  * Economy weights: extractors until every open slot has one, haulers until there is one per slot, each type at
  * 0 once full (an extra extractor would idle at the probe). `lean` (offence) drops both to 1.
  */
-export function economyWeights(world: Readonly<World>, lean: boolean): Pick<Weights, 'extractor' | 'hauler'> {
+export function economyWeights(world: Readonly<World>, data: SimData, lean: boolean): Pick<Weights, 'extractor' | 'hauler'> {
   const slots = openSlots(world);
-  const c = econCounts(world);
+  const c = econCounts(world, data);
   return { extractor: c.extractor >= slots ? 0 : lean ? 1 : world.tun['alloc.start.extractor'] || 3, hauler: c.hauler >= slots ? 0 : lean ? 1 : world.tun['alloc.start.hauler'] || 2 };
 }
 
 // ---- The adaptive rules ---------------------------------------------------------------------------------------
 
 export interface AdaptiveOptions {
-  /** Answer musters (the raid response and the standing guard). `greedy` turns it on after its first hit. */
+  /** Answer musters (the raid response and the standing guard). `greedy` plays adaptive's rules, so it is on after its first hit. */
   respond: boolean;
   /** Never set Lancer or Flak above 0 (the `drones-only` control). */
   dronesOnly: boolean;
-  /** Offence starts when this holds (latched); `adaptive`: econ >= 12, `greedy`: every open slot has an extractor. */
-  offenceGate: (world: Readonly<World>) => boolean;
+  /** Offence starts when this holds (latched). */
+  offenceGate: (world: Readonly<World>, data: SimData) => boolean;
 }
 
 /** The type that counters a raid's majority: Flak against Spores, Lancer against Thorns, a Drone while neither is unlocked. */
@@ -132,13 +157,18 @@ export function counterFor(world: Readonly<World>, planned: Readonly<{ thorn: nu
   return !dronesOnly && isTypeUnlocked(world, want) ? want : 'drone';
 }
 
+/** A pocket's node and the type it unlocks. */
+function pocketOf(world: Readonly<World>, type: 'lancer' | 'flak'): number | null {
+  const prize = type === 'flak' ? 'ice' : 'crystal';
+  const node = world.nodes.find((n) => n.kind === 'pocket' && n.prize === prize);
+  return node === undefined ? null : node.index;
+}
+
 /** The counter for the hive's majority: the type its pocket unlocks, and that pocket's node (null if the map has none). */
 export function hiveCounter(world: Readonly<World>): { type: 'lancer' | 'flak'; pocket: number | null } {
   const caps = guardFull(world, heartIndex(world));
   const type = caps.spore > caps.thorn ? 'flak' : 'lancer';
-  const prize = type === 'flak' ? 'ice' : 'crystal';
-  const node = world.nodes.find((n) => n.kind === 'pocket' && n.prize === prize);
-  return { type, pocket: node === undefined ? null : node.index };
+  return { type, pocket: pocketOf(world, type) };
 }
 
 /** The fleet a wave at `node` should be, raised for waves already sent (H3's 5/4 rule), or null when nothing within `upTo` wins. */
@@ -157,10 +187,10 @@ export function weightsFor(world: Readonly<World>, fleet: Readonly<ShipTypeCount
   return { drone: w(fleet.drone), lancer: w(fleet.lancer), flak: w(fleet.flak) };
 }
 
-/** Weights for what is still missing of `fleet`: the ships alive (anywhere) are subtracted per type, so a type already covered goes to 0. */
-export function deficitWeights(world: Readonly<World>, fleet: Readonly<ShipTypeCounts>): Pick<Weights, 'drone' | 'lancer' | 'flak'> {
-  const have: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
-  for (const s of world.ships) have[s.type]++;
+/** Weights for what is still missing of `fleet`: the ships alive (anywhere) are subtracted per type, so a covered type goes to 0. */
+export function deficitWeights(world: Readonly<World>, data: SimData, fleet: Readonly<ShipTypeCounts>): Pick<Weights, 'drone' | 'lancer' | 'flak'> {
+  void data;
+  const have = soundShips(world);
   return weightsFor(world, { drone: Math.max(0, fleet.drone - have.drone), lancer: Math.max(0, fleet.lancer - have.lancer), flak: Math.max(0, fleet.flak - have.flak) });
 }
 
@@ -180,7 +210,9 @@ function regroup(world: Readonly<World>, parked: Map<number, ShipTypeCounts>, st
 
 /**
  * `adaptive` (and `greedy` after its first hit, and the `drones-only` and `adaptive-no-raids` variants). In order
- * each tick: answer a raid; else offence once latched; else the standing guard.
+ * each tick: attack the hive if it can be taken now; answer a raid; take the counter pocket; build for the hive
+ * (and, when no plan fits the fleet limit, take the other pocket or recycle economy ships: the Director's rule);
+ * else keep the standing guard. In offence every branch ends with the trade in slots (`limitEconomy`).
  */
 export class AdaptiveBot implements FieldBot {
   private offence = false;
@@ -188,76 +220,68 @@ export class AdaptiveBot implements FieldBot {
   private lastPlanned = 0;
   private lastRaidMix: { thorn: number; spore: number } = { thorn: 0, spore: 0 };
   private standAt: number = PROBE;
+  /** The rally this bot last set (no selector reports it). */
+  private rally: number = PROBE;
   respond: boolean;
-  constructor(
-    private readonly opts: Omit<AdaptiveOptions, 'respond'> & { respond: boolean },
-  ) {
+  constructor(private readonly opts: AdaptiveOptions) {
     this.respond = opts.respond;
   }
 
   decide(world: Readonly<World>, data: SimData): Input[] {
-    const inputs: Input[] = [];
     const heart = heartIndex(world);
-    const raid = world.raid;
+    const rs = raidStatus(world);
+    const raid = rs.phase === 'none' ? null : rs;
     const parked = parkedWarships(world);
-    if (!this.offence && this.opts.offenceGate(world)) this.offence = true;
+    if (!this.offence && this.opts.offenceGate(world, data)) this.offence = true;
 
     // Bookkeeping: the last raid's size, mix and target (the standing guard).
-    if (raid !== null) {
+    if (raid !== null && raid.target !== null) {
       this.lastPlanned = raid.planned.thorn + raid.planned.spore;
       this.lastRaidMix = { ...raid.planned };
       this.standAt = raid.target;
     }
-    const raidActive = this.respond && raid !== null;
+    const raidActive = this.respond && raid !== null && raid.target !== null;
     const limit = searchMax(world, data);
-    const eco = economyWeights(world, this.offence);
-    const w: Weights = { ...ZERO, ...eco };
+    const w: Weights = { ...ZERO, ...economyWeights(world, data, this.offence) };
     const types = unlockedWarships(world, this.opts.dronesOnly);
-
-    // The hive window: ready for the hive at its current strength, or for the raid window.
     const hiveNow = guardsAtHome(world, heart);
     const hiveMix = this.offence ? waveFor(world, data, heart, types, limit, hiveNow) : null;
     const room = warshipRoom(world, data, limit);
 
     // Where the warships gather: the raid's target while answering one, the standing post otherwise.
-    const stage = raidActive ? raid.target : this.respond && this.standAt !== PROBE && world.field!.mine[this.standAt] ? this.standAt : PROBE;
-    if (world.rally !== stage) inputs.push({ type: 'setRally', node: stage });
-    const here = parked.get(stage) ?? { drone: 0, lancer: 0, flak: 0 };
+    const stage = raidActive ? raid.target! : this.respond && this.standAt !== PROBE && rockStatus(world, this.standAt).mine ? this.standAt : PROBE;
+    const inputs: Input[] = [];
+    if (this.rally !== stage) {
+      inputs.push({ type: 'setRally', node: stage });
+      this.rally = stage;
+    }
+    const here = parked.get(stage) ?? EMPTY;
+    const fit = soundShips(world, stage);
+    /** Every branch ends here: the trade in slots in offence, then the weights. */
+    const finish = (extra: Input[]): Input[] => {
+      this.limitEconomy(world, data, w, types, limit);
+      return [...inputs, ...extra, ...weightInputs(world, data, w)];
+    };
 
     // 1. Offence first when the hive can be taken right now (the raid window included: raiders away shrink hiveNow).
-    if (this.offence && isGuarded(world, heart) && hiveMix !== null && covers(here, hiveMix.fleet) && guardianAt(world, heart)!.battle === null && raid?.phase !== 'fight') {
-      Object.assign(w, deficitWeights(world, hiveMix.fleet));
-      this.limitEconomy(world, data, w, types, limit);
-      inputs.push(...weightInputs(world, w));
-      inputs.push(sendInput(stage, heart, here));
-      return inputs;
+    if (this.offence && isGuarded(world, heart) && hiveMix !== null && covers(fit, hiveMix.fleet) && guardianAt(world, heart)!.battle === null && raid?.phase !== 'fight') {
+      Object.assign(w, deficitWeights(world, data, hiveMix.fleet));
+      return finish([sendInput(stage, heart, here)]);
     }
 
     if (raidActive) {
       // 2. Answer the raid: the counter for its majority at full weight until the defence matches it, sent to the target.
       const counter = counterFor(world, raid.planned, this.opts.dronesOnly);
-      const defenders = total(here) + this.inFlightTo(world, stage);
-      const need = raid.planned.thorn + raid.planned.spore;
-      if (defenders < need) w[counter] = world.tun['alloc.maxWeight'];
-      inputs.push(...regroup(world, parked, stage));
-      inputs.push(...weightInputs(world, w));
-      return inputs;
+      const defenders = total(fleetStatus(world, data).byType);
+      if (defenders < raid.planned.thorn + raid.planned.spore) w[counter] = world.tun['alloc.maxWeight'];
+      return finish(regroup(world, parked, stage));
     }
 
     // 3. Counter pocket (the hive's majority counter), once offence has started or a raid has been answered.
     const counter = hiveCounter(world);
-    if (!this.opts.dronesOnly && counter.pocket !== null && isGuarded(world, counter.pocket) && !isTypeUnlocked(world, counter.type) && (this.offence || (this.respond && world.stats.raids.mustered > 0))) {
-      const pocketMix = waveFor(world, data, counter.pocket, ['drone'], limit, guardsAtHome(world, counter.pocket));
-      if (pocketMix !== null && pocketMix.total <= room) {
-        if (covers(here, pocketMix.fleet) && guardianAt(world, counter.pocket)!.battle === null) {
-          inputs.push(sendInput(stage, counter.pocket, pocketMix.fleet));
-        }
-        Object.assign(w, deficitWeights(world, pocketMix.fleet));
-        this.limitEconomy(world, data, w, types, limit);
-        inputs.push(...weightInputs(world, w));
-        inputs.push(...regroup(world, parked, stage));
-        return inputs;
-      }
+    if (!this.opts.dronesOnly && counter.pocket !== null && !isTypeUnlocked(world, counter.type) && (this.offence || (this.respond && rs.last !== null))) {
+      const extra = this.pocketAssault(world, data, counter.pocket, w, here, fit, stage, limit, room);
+      if (extra !== null) return finish([...extra, ...regroup(world, parked, stage)]);
     }
 
     if (this.offence && isGuarded(world, heart)) {
@@ -265,65 +289,157 @@ export class AdaptiveBot implements FieldBot {
       // hive with a full-size raid away), and wait there for a raid to go out.
       let plan = hiveMix !== null && hiveMix.total <= room ? hiveMix : null;
       if (plan === null) {
-        const away = fullRaidAwayCounts(world, heart).home;
+        const away = raidAwayAtEcon(world, heart, econAliveNow(world, data)).home;
         const m = waveFor(world, data, heart, types, limit, away);
-        if (m !== null && m.total <= room) plan = m;
+        if (m !== null && m.total <= room && rs.enabled) plan = m;
       }
-      if (plan !== null) Object.assign(w, deficitWeights(world, plan.fleet));
-      this.limitEconomy(world, data, w, types, limit);
-      inputs.push(...regroup(world, parked, stage));
-      inputs.push(...weightInputs(world, w));
-      return inputs;
+      const extra: Input[] = regroup(world, parked, stage);
+      if (plan !== null) {
+        Object.assign(w, deficitWeights(world, data, plan.fleet));
+        // The fleet is full of ships the plan can't use (wounded, or a type it doesn't need): scrap one to open a slot.
+        const missing = w.drone + w.lancer + w.flak > 0;
+        const r = missing && fleetStatus(world, data).full ? this.recycleUnfit(world, data, plan.fleet) : null;
+        if (r !== null) extra.push(r);
+      } else if (!this.opts.dronesOnly && this.lockedTaken(world).length > 0) {
+        // Not a dead end: a pocket is taken and its first delivery, which unlocks its type, is on the way.
+      } else {
+        // The dead end (the Director's rule): no hive plan fits fleetCap minus the economy. A player can (a) take
+        // the other pocket if that unlocks a mix that fits, else (b) Recycle economy ships until the wave fits.
+        const other = this.otherPocket(world, data, counter, types, limit);
+        const e = other === null ? null : this.pocketAssault(world, data, other, w, here, fit, stage, limit, room);
+        if (e !== null) extra.push(...e);
+        else {
+          const r = this.recycleStep(world, data, heart, types, limit, room);
+          if (r !== null) extra.push(r);
+        }
+      }
+      return finish(extra);
     }
 
     // 5. The standing guard: half the last raid, counter type for it, until there is that many.
     if (this.respond && this.lastPlanned > 0) {
       const guard = Math.ceil(this.lastPlanned / 2);
-      const have = total(here) + this.inFlightTo(world, stage);
-      if (have < guard) {
-        w[counterFor(world, this.lastRaidMix, this.opts.dronesOnly)] = world.tun['alloc.maxWeight'];
+      if (total(here) < guard) w[counterFor(world, this.lastRaidMix, this.opts.dronesOnly)] = world.tun['alloc.maxWeight'];
+    }
+    return finish(regroup(world, parked, stage));
+  }
+
+  /** Assault a pocket with drones when the min-wave for it fits the room: weights toward it, and send once the ships at the stage cover it. Null when it doesn't fit. */
+  private pocketAssault(world: Readonly<World>, data: SimData, node: number, w: Weights, here: ShipTypeCounts, fit: ShipTypeCounts, stage: number, limit: number, room: number): Input[] | null {
+    if (!isGuarded(world, node)) return null;
+    const mix = waveFor(world, data, node, ['drone'], limit, guardsAtHome(world, node));
+    if (mix === null || mix.total > room) return null;
+    Object.assign(w, deficitWeights(world, data, mix.fleet));
+    if (covers(fit, mix.fleet)) return guardianAt(world, node)!.battle === null ? [sendInput(stage, node, mix.fleet)] : [];
+    // Full of ships this wave can't use (wounded, or other types): scrap one to open a slot.
+    const r = w.drone + w.lancer + w.flak > 0 && fleetStatus(world, data).full ? this.recycleUnfit(world, data, mix.fleet) : null;
+    return r === null ? [] : [r];
+  }
+
+  /**
+   * (a) of the dead end: the other pocket, when its type is locked and unlocking it gives a hive mix that fits the
+   * fleet limit with the economy at its floor.
+   */
+  private otherPocket(world: Readonly<World>, data: SimData, counter: { type: 'lancer' | 'flak'; pocket: number | null }, types: readonly ShipType[], limit: number): number | null {
+    if (this.opts.dronesOnly) return null;
+    const otherType = counter.type === 'flak' ? 'lancer' : 'flak';
+    const node = pocketOf(world, otherType);
+    const cap = fleetCap(world, data);
+    if (node === null || cap === null || !isGuarded(world, node) || isTypeUnlocked(world, otherType)) return null;
+    const m = this.smallestHiveWave(world, data, [...types, otherType], limit);
+    return m !== null && m + this.econFloor(world) <= cap ? node : null;
+  }
+
+  /** The smallest hive wave over the hive as it is and, when raids are on, with a full-size raid away. */
+  private smallestHiveWave(world: Readonly<World>, data: SimData, types: readonly ShipType[], limit: number): number | null {
+    const heart = heartIndex(world);
+    const totals: number[] = [];
+    const now = waveFor(world, data, heart, types, limit, guardsAtHome(world, heart));
+    if (now !== null) totals.push(now.total);
+    if (raidStatus(world).enabled) {
+      const away = waveFor(world, data, heart, types, limit, raidAwayAtEcon(world, heart, econAliveNow(world, data)).home);
+      if (away !== null) totals.push(away.total);
+    }
+    return totals.length === 0 ? null : Math.min(...totals);
+  }
+
+  /** The economy the wave still needs to be paid for: raid.firstAtEcon ships (the size below which raids stop and the first income runs). */
+  private econFloor(world: Readonly<World>): number {
+    return world.tun['raid.firstAtEcon'];
+  }
+
+  /**
+   * (b) of the dead end: one Recycle order, worst-placed economy ship first (idle at the probe, then the most
+   * exposed rocks, nearest the hive, then the lowest yield; haulers before extractors), while the smallest hive wave
+   * does not fit the room and the economy stays above its floor. Null when nothing needs to or can be recycled.
+   */
+  private recycleStep(world: Readonly<World>, data: SimData, heart: number, types: readonly ShipType[], limit: number, room: number): Input | null {
+    if (world.tick % RECYCLE_EVERY !== 0) return null;
+    const cap = fleetCap(world, data);
+    if (cap === null || world.tun['fleet.countsEconomy'] < 1) return null;
+    const target = this.smallestHiveWave(world, data, types, limit);
+    const floor = this.econFloor(world);
+    if (target === null || target <= room || target + floor > cap || econAliveNow(world, data) <= floor) return null;
+    const nodes = world.nodes
+      .filter((n) => !isGuarded(world, n.index))
+      .map((n) => ({ node: n.index, probe: n.kind === 'probe' ? 0 : 1, dist: nodeDistance(world, n.index, heart), yield: n.kind === 'probe' ? 0 : rockStatus(world, n.index).deliveredPerMin }))
+      .sort((a, b) => a.probe - b.probe || a.dist - b.dist || a.yield - b.yield || a.node - b.node);
+    for (const n of nodes) {
+      const at = econAtByType(world, n.node);
+      for (const type of ['hauler', 'extractor'] as const) {
+        if (at[type] === 0) continue;
+        const input: Input = { type: 'recycleShips', node: n.node, counts: { drone: 0, lancer: 0, flak: 0, extractor: type === 'extractor' ? 1 : 0, hauler: type === 'hauler' ? 1 : 0 } };
+        if (isValidInput(world, data, input)) return input;
       }
     }
-    inputs.push(...regroup(world, parked, stage));
-    inputs.push(...weightInputs(world, w));
-    return inputs;
+    return null;
+  }
+
+  /**
+   * One Recycle order for a warship the plan cannot use, parked away from a living guard: a wounded one (hp under
+   * half, so the estimate can't count it), else one of a type the plan has more of than it needs. It holds a slot.
+   */
+  private recycleUnfit(world: Readonly<World>, data: SimData, need: Readonly<ShipTypeCounts>): Input | null {
+    if (world.tick % RECYCLE_EVERY !== 0) return null;
+    const sound = soundShips(world);
+    const pick = (s: World['ships'][number]): boolean => s.hp * 2 < world.tun[`ship.${s.type}.hp`] || sound[s.type] > need[s.type];
+    for (const s of world.ships) {
+      if (s.at === null || s.transit !== null || !pick(s)) continue;
+      const input: Input = { type: 'recycleShips', node: s.at, counts: { drone: s.type === 'drone' ? 1 : 0, lancer: s.type === 'lancer' ? 1 : 0, flak: s.type === 'flak' ? 1 : 0, extractor: 0, hauler: 0 } };
+      if (isValidInput(world, data, input)) return input;
+    }
+    return null;
+  }
+
+  /** The pockets that are taken but whose type is still locked (no delivery from them yet). */
+  private lockedTaken(world: Readonly<World>): number[] {
+    const out: number[] = [];
+    for (const type of ['flak', 'lancer'] as const) {
+      const node = pocketOf(world, type);
+      if (node !== null && !isGuarded(world, node) && !isTypeUnlocked(world, type)) out.push(node);
+    }
+    return out;
   }
 
   /**
    * The trade in slots: in offence the economy grows only while one more ship still leaves the fleet limit room
    * for the smallest hive wave (the hive as it is now, or with a full-size raid away when raids are on, the
-   * counter included). It never stops a hauler that has to reach the counter's pocket: that first delivery is
-   * what unlocks the counter.
+   * counter included). It never stops the one hauler a taken pocket still lacks: its deliveries pay for
+   * Lancers and Flak, and the first one unlocks the type.
    */
   private limitEconomy(world: Readonly<World>, data: SimData, w: Weights, types: readonly ShipType[], limit: number): void {
     const cap = fleetCap(world, data);
     if (!this.offence || cap === null || world.tun['fleet.countsEconomy'] < 1) return;
-    const heart = heartIndex(world);
     const counter = hiveCounter(world);
     const withCounter = this.opts.dronesOnly || types.includes(counter.type) ? types : [...types, counter.type];
-    const totals: number[] = [];
-    const now = waveFor(world, data, heart, withCounter, limit, guardsAtHome(world, heart));
-    if (now !== null) totals.push(now.total);
-    if (world.tun['raid.enabled'] >= 1) {
-      const away = waveFor(world, data, heart, withCounter, limit, fullRaidAwayCounts(world, heart).home);
-      if (away !== null) totals.push(away.total);
-    }
-    const e = econCounts(world);
-    if (totals.length > 0 && e.extractor + e.hauler + ECON_MARGIN + Math.min(...totals) <= cap) return;
+    const smallest = this.smallestHiveWave(world, data, withCounter, limit);
+    const e = econCounts(world, data);
+    if (smallest !== null && e.extractor + e.hauler + ECON_MARGIN + smallest <= cap) return;
     w.extractor = 0;
     w.hauler = 0;
-    if (!this.opts.dronesOnly && counter.pocket !== null && !isGuarded(world, counter.pocket) && !isTypeUnlocked(world, counter.type)) {
-      let served = false;
-      for (const s of world.field!.econ) if (s.type === 'hauler' && s.target === counter.pocket) served = true;
-      if (!served && economyWeights(world, true).hauler > 0) w.hauler = 1;
-    }
-  }
-
-  /** Warships in flight to `node`. */
-  private inFlightTo(world: Readonly<World>, node: number): number {
-    let n = 0;
-    for (const s of world.ships) if (s.transit !== null && s.transit.to === node) n++;
-    return n;
+    if (this.opts.dronesOnly || economyWeights(world, data, true).hauler === 0) return;
+    // A taken pocket with no hauler yields nothing: one hauler each (the first delivery unlocks its type).
+    for (const node of world.nodes) if (node.kind === 'pocket' && !isGuarded(world, node.index) && rockStatus(world, node.index).haulers === 0) w.hauler = 1;
   }
 }
 
@@ -332,33 +448,37 @@ export class AdaptiveBot implements FieldBot {
 const adaptiveOpts = (over: Partial<AdaptiveOptions> = {}): AdaptiveOptions => ({
   respond: true,
   dronesOnly: false,
-  offenceGate: (w) => econAliveNow(w) >= OFFENCE_AT_ECON,
+  offenceGate: (w, d) => econAliveNow(w, d) >= OFFENCE_AT_ECON,
   ...over,
 });
 
-/** `greedy`: all economy until every open slot has an extractor, no warships, ignoring musters; its first hit turns it into `adaptive`. */
+/**
+ * `greedy`: all economy until every open slot has an extractor, no warships, no pocket, ignoring musters. After
+ * its first raid that hits (`fieldSummary.raids.hit >= 1`) it plays `adaptive`'s rules for the rest of the run.
+ */
 class GreedyBot implements FieldBot {
-  private readonly inner = new AdaptiveBot(adaptiveOpts({ respond: false, offenceGate: (w) => econCounts(w).extractor >= openSlots(w) && openSlots(w) > 0 }));
+  private inner: AdaptiveBot | null = null;
   decide(world: Readonly<World>, data: SimData): Input[] {
-    if (!this.inner.respond && world.stats.raids.hit >= 1) this.inner.respond = true;
-    return this.inner.decide(world, data);
+    if (this.inner === null && fieldSummary(world).raids.hit >= 1) this.inner = new AdaptiveBot(adaptiveOpts());
+    if (this.inner !== null) return this.inner.decide(world, data);
+    return weightInputs(world, data, { ...ZERO, ...economyWeights(world, data, false) });
   }
 }
 
 /** `idle`: holds econ at raid.firstAtEcon - 1, then builds warships only. */
 class IdleBot implements FieldBot {
-  decide(world: Readonly<World>): Input[] {
-    const f = world.field!;
-    const c = econCounts(world);
+  decide(world: Readonly<World>, data: SimData): Input[] {
+    const c = econCounts(world, data);
     // A full share starts its bay next tick, so it counts as built.
-    const pending = (['extractor', 'hauler'] as const).filter((t) => f.bays[t].ticksLeft === 0 && f.share[t] > 0 && f.share[t] >= world.tun[`ship.${t}.cost`]).length;
+    const rows = allocStatus(world, data).rows;
+    const pending = BUILD_TYPES.filter((t, i) => (t === 'extractor' || t === 'hauler') && rows[i]!.ticksLeft === 0 && rows[i]!.share > 0 && rows[i]!.share >= rows[i]!.cost.ore).length;
     const hold = world.tun['raid.firstAtEcon'] - 1;
     const w: Weights = { ...ZERO };
     if (c.extractor + c.hauler + pending < hold) {
       w.extractor = world.tun['alloc.start.extractor'] || 3;
       w.hauler = world.tun['alloc.start.hauler'] || 2;
     } else w.drone = world.tun['alloc.maxWeight'];
-    return weightInputs(world, w);
+    return weightInputs(world, data, w);
   }
 }
 
@@ -381,21 +501,21 @@ export const STATIC_SHAPES: readonly StaticShape[] = [
 class StaticBot implements FieldBot {
   constructor(private readonly weights: Weights) {}
   decide(world: Readonly<World>, data: SimData): Input[] {
-    const inputs = weightInputs(world, this.weights);
+    const inputs = weightInputs(world, data, this.weights);
     const limit = searchMax(world, data);
     const parked = parkedWarships(world);
-    const here = parked.get(PROBE) ?? { drone: 0, lancer: 0, flak: 0 };
+    const here = parked.get(PROBE) ?? EMPTY;
     const types = WARSHIPS.filter((t) => this.weights[t] > 0 && isTypeUnlocked(world, t));
     // The guarded nodes, the cheapest estimate first: attack the first one the ships at the probe can take.
     const rows: { node: number; mix: { total: number; fleet: ShipTypeCounts } }[] = [];
-    for (const g of world.guardians) {
-      if (!g.alive || g.battle !== null) continue;
-      const m = waveFor(world, data, g.node, types, limit, guardsAtHome(world, g.node));
-      if (m !== null) rows.push({ node: g.node, mix: m });
+    for (const n of world.nodes) {
+      if (!isGuarded(world, n.index) || guardianAt(world, n.index)!.battle !== null) continue;
+      const m = waveFor(world, data, n.index, types, limit, guardsAtHome(world, n.index));
+      if (m !== null) rows.push({ node: n.index, mix: m });
     }
     rows.sort((a, b) => a.mix.total - b.mix.total || a.node - b.node);
     for (const r of rows) {
-      if (covers(here, r.mix.fleet)) {
+      if (covers(soundShips(world, PROBE), r.mix.fleet)) {
         inputs.push(sendInput(PROBE, r.node, r.node === heartIndex(world) ? here : r.mix.fleet));
         break;
       }
@@ -417,13 +537,13 @@ export function staticStrategy(shape: StaticShape): FieldStrategy {
 
 export const adaptive: FieldStrategy = {
   name: 'adaptive',
-  description: 'economy first; answers a muster with the counter type at the target; takes the counter pocket; offence at econ 12, attacking when the best mix fits, preferring a raid out',
+  description: 'economy first; answers a muster with the counter type at the target; takes the counter pocket; offence at econ 12, attacking when the best mix fits, preferring a raid out; recycles or takes the other pocket when no plan fits',
   expectedWin: true,
   make: () => new AdaptiveBot(adaptiveOpts()),
 };
 export const greedy: FieldStrategy = {
   name: 'greedy',
-  description: 'all economy until every open slot has an extractor, no warships, ignores musters; after its first hit it plays adaptive',
+  description: 'all economy until every open slot has an extractor, nothing else, ignores musters; after its first hit it plays adaptive',
   expectedWin: true,
   make: () => new GreedyBot(),
 };
@@ -447,8 +567,6 @@ export const adaptiveNoRaids: FieldStrategy = {
   make: () => new AdaptiveBot(adaptiveOpts()),
 };
 
-/** The strategies the gate runs (static is run as its sweep and reported as the best shape). */
-export const FIELD_STRATEGY_NAMES = ['adaptive', 'greedy', 'static', 'idle', 'drones-only', 'adaptive-no-raids'] as const;
 /** The strategies the gate expects to win. */
 export const FIELD_WINNERS: readonly string[] = ['adaptive', 'greedy'];
 /** Every non-static strategy, in report order. */

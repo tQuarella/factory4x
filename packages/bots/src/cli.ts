@@ -13,7 +13,7 @@ import { performance } from 'node:perf_hooks';
 import { defaultData } from '@factory4x/sim';
 import budgets from '../../../scripts/gates/budgets.json' with { type: 'json' };
 import { computeFieldFlags } from './field-flags.ts';
-import { FIELD_CAP_MIN, SOFTLOCK_MIN, fieldGateFailures, runField, tickMmss, type FieldResult } from './field-runner.ts';
+import { FIELD_CAP_MIN, SOFTLOCK_MIN, fieldGateFailures, gateRuns, runField, tickMmss, type FieldResult } from './field-runner.ts';
 import { FIELD_WINNERS, STATIC_SHAPES, fieldStrategies, staticStrategy } from './field-strategies.ts';
 
 function arg(name: string, fallback: number): number {
@@ -61,7 +61,7 @@ for (let seed = 1; seed <= seeds; seed++) {
 const runSec = (performance.now() - started) / 1000;
 const flags = computeFieldFlags(results, data);
 const names = ['adaptive', 'greedy', 'static', 'idle', 'drones-only', 'adaptive-no-raids'];
-const failures = fieldGateFailures(results, FIELD_WINNERS, names, budgets.tickBudgetMsP95, tr);
+const failures = fieldGateFailures(gateRuns(results, sweep), FIELD_WINNERS, names, budgets.tickBudgetMsP95, tr);
 
 mkdirSync(dirname(outBase), { recursive: true });
 writeFileSync(

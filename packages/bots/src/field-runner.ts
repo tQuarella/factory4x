@@ -223,5 +223,13 @@ export function fieldGateFailures(results: readonly FieldResult[], winners: read
   return out;
 }
 
+/**
+ * The runs the gate judges: every run of every strategy, and for `static` every shape of the sweep (not just the
+ * best one the report shows), so a crash or a slow tick in any shape fails the gate.
+ */
+export function gateRuns(results: readonly FieldResult[], sweep: readonly FieldResult[]): FieldResult[] {
+  return [...results.filter((r) => r.strategy !== 'static'), ...sweep];
+}
+
 /** The weights a bot sets, as a record. */
 export type Weights = Record<BuildType, number>;

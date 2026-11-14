@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BUILD_TYPES, createWorld, defaultData, isTypeUnlocked, step, type Input, type SimData, type World } from '@factory4x/sim';
+import { BUILD_TYPES, createWorld, defaultData, isTypeUnlocked, isValidInput, step, type Input, type SimData, type World } from '@factory4x/sim';
 import { fixtureV12 } from '../../sim/test/fixture.ts';
 import { fieldMix, fullRaidAwayCounts, guardsAtHome } from '../src/field-estimate.ts';
 import { computeFieldFlags } from '../src/field-flags.ts';
-import { FIELD_CAP_MIN, SOFTLOCK_MIN, defaultFieldOptions, fieldGateFailures, runField, type FieldBot, type FieldResult, type FieldStrategy } from '../src/field-runner.ts';
+import { FIELD_CAP_MIN, SOFTLOCK_MIN, defaultFieldOptions, fieldGateFailures, gateRuns, runField, type FieldBot, type FieldResult, type FieldStrategy } from '../src/field-runner.ts';
 import {
   FIELD_WINNERS,
   STATIC_SHAPES,
@@ -12,6 +12,7 @@ import {
   counterFor,
   dronesOnly,
   economyWeights,
+  soundShips,
   fieldStrategies,
   greedy,
   hiveCounter,
@@ -43,8 +44,8 @@ const nothing: FieldStrategy = {
   description: 'no weights, no ships',
   expectedWin: false,
   make: () => ({
-    decide(world: Readonly<World>): Input[] {
-      return weightInputs(world, { extractor: 0, hauler: 0, drone: 0, lancer: 0, flak: 0 });
+    decide(world: Readonly<World>, data: SimData): Input[] {
+      return weightInputs(world, data, { extractor: 0, hauler: 0, drone: 0, lancer: 0, flak: 0 });
     },
   }),
 };
@@ -140,8 +141,8 @@ describe('the six strategies (acceptance 2)', () => {
 
   it('weightInputs only emits the weights that change, clamped to alloc.maxWeight', () => {
     const w = createWorld(1, fixtureV12);
-    expect(weightInputs(w, { extractor: 3, hauler: 2, drone: 0, lancer: 0, flak: 0 })).toEqual([]);
-    expect(weightInputs(w, { extractor: 3, hauler: 2, drone: 99, lancer: 0, flak: 0 })).toEqual([{ type: 'setAlloc', shipType: 'drone', weight: w.tun['alloc.maxWeight'] }]);
+    expect(weightInputs(w, fixtureV12, { extractor: 3, hauler: 2, drone: 0, lancer: 0, flak: 0 })).toEqual([]);
+    expect(weightInputs(w, fixtureV12, { extractor: 3, hauler: 2, drone: 99, lancer: 0, flak: 0 })).toEqual([{ type: 'setAlloc', shipType: 'drone', weight: w.tun['alloc.maxWeight'] }]);
   });
 
   it('adaptive opens economy only: no warship weight, build or send until the first muster', () => {
@@ -161,11 +162,11 @@ describe('the six strategies (acceptance 2)', () => {
 
   it('economyWeights: an extractor type at 0 once every open slot has one (it would idle at the probe)', () => {
     const w = createWorld(1, easy);
-    expect(economyWeights(w, false).extractor).toBeGreaterThan(0);
+    expect(economyWeights(w, easy, false).extractor).toBeGreaterThan(0);
     const slots = openSlots(w);
     expect(slots).toBeGreaterThan(0);
     for (let i = 0; i < slots; i++) w.field!.econ.push({ id: 1000 + i, type: 'extractor', hp: 6, at: 0, transit: null, target: null, cargo: 0, cargoRes: null });
-    expect(economyWeights(w, false).extractor).toBe(0);
+    expect(economyWeights(w, easy, false).extractor).toBe(0);
   });
 
   it('counterFor: Flak against Spores, Lancer against Thorns, a Drone before either is unlocked, and always a Drone for drones-only', () => {
@@ -514,5 +515,117 @@ describe('raids in the runs (h7-raids merged)', () => {
     for (let i = 0; i < 20 * MIN && !(w.raid !== null && w.raid.phase === 'out'); i++) step(w, fixtureV12, bot.decide(w, fixtureV12));
     expect(w.raid).not.toBeNull();
     expect(w.rally).toBe(w.raid!.target);
+  });
+});
+
+/** Test setup: economy ships parked at the probe. */
+function addEcon(w: World, extractors: number, haulers: number): void {
+  for (let i = 0; i < extractors + haulers; i++) w.field!.econ.push({ id: w.nextId++, type: i < extractors ? 'extractor' : 'hauler', hp: 6, at: 0, transit: null, target: null, cargo: 0, cargoRes: null });
+}
+const weightOf = (inputs: Input[], t: string): number | undefined => (inputs.find((i) => i.type === 'setAlloc' && i.shipType === t) as { weight: number } | undefined)?.weight;
+
+describe('review round 1: the economy limit, the dead end, the gate and greedy', () => {
+  it('in offence a muster in progress still applies the trade in slots: with econ + margin + the smallest hive wave above the limit, extractor and hauler weights go to 0', () => {
+    const w = createWorld(1, easy);
+    w.tun['field.fleetCap'] = 24;
+    addEcon(w, 8, 6); // econ 14 >= 12: offence; 14 + 3 + 15 > 24
+    w.field!.alloc.extractor = 1;
+    w.field!.alloc.hauler = 1;
+    w.stats.firstDeliveredTick.ice = 1;
+    const a5 = w.nodes.findIndex((n) => n.id === 'a5');
+    setRaid(w, 'muster', a5, { thorn: 1, spore: 3 });
+    const inputs = adaptive.make(easy).decide(w, easy);
+    expect(weightOf(inputs, 'extractor')).toBe(0);
+    expect(weightOf(inputs, 'hauler')).toBe(0);
+    expect(inputs).toContainEqual({ type: 'setAlloc', shipType: 'flak', weight: w.tun['alloc.maxWeight'] });
+  });
+
+  it('the dead end (offence latched, no plan fits, ore piling up): adaptive recycles economy ships, idle ones at the probe first, then builds the wave', () => {
+    const w = createWorld(1, easy);
+    w.tun['field.fleetCap'] = 22;
+    w.tun['raid.enabled'] = 0;
+    w.stats.firstDeliveredTick.ice = 1;
+    addEcon(w, 8, 6);
+    w.stock.ore = 500;
+    w.stock.ice = 200;
+    const bot = adaptive.make(easy);
+    const first = bot.decide(w, easy);
+    const rec = first.filter((i) => i.type === 'recycleShips');
+    expect(rec).toHaveLength(1);
+    expect(rec[0]).toMatchObject({ node: 0 });
+    let recycled = 0;
+    let hiveSent = false;
+    for (let i = 0; i < 20 * MIN && w.capturedTick === null; i++) {
+      const inputs = bot.decide(w, easy);
+      for (const x of inputs) {
+        if (x.type === 'recycleShips') recycled++;
+        if (x.type === 'sendShips' && x.to === 10) hiveSent = true;
+        if (x.type !== 'setAlloc') expect(isValidInput(w, easy, x), JSON.stringify(x)).toBe(true);
+      }
+      step(w, easy, inputs);
+    }
+    expect(recycled).toBeGreaterThan(0);
+    expect(w.field!.econ.length).toBeGreaterThanOrEqual(w.tun['raid.firstAtEcon']);
+    expect(hiveSent).toBe(true);
+  });
+
+  it('it never recycles below the economy floor, and not when even the floor leaves no room for the wave', () => {
+    const w = createWorld(1, easy);
+    w.tun['field.fleetCap'] = 18; // floor 6 + wave 15 > 18: hopeless, nothing to recycle toward
+    w.tun['raid.enabled'] = 0;
+    w.stats.firstDeliveredTick.ice = 1;
+    addEcon(w, 8, 6);
+    expect(adaptive.make(easy).decide(w, easy).some((i) => i.type === 'recycleShips')).toBe(false);
+  });
+
+  it('the dead end takes the other pocket first when that unlocks a mix that fits', () => {
+    const w = createWorld(1, fixtureV12); // the 12/24 hive: Drone + Flak is over the cap, with Lancers it fits
+    w.tun['raid.enabled'] = 0;
+    w.stats.firstDeliveredTick.ice = 1;
+    addEcon(w, 7, 5);
+    const p2 = w.nodes.findIndex((n) => n.id === 'p2');
+    const bot = adaptive.make(fixtureV12);
+    const inputs = bot.decide(w, fixtureV12);
+    expect(inputs.some((i) => i.type === 'recycleShips')).toBe(false);
+    expect(weightOf(inputs, 'drone')).toBeGreaterThan(0);
+    for (let i = 0; i < 15; i++) w.ships.push({ id: 800 + i, type: 'drone', hp: 10, at: 0, transit: null, engagedIn: -1 });
+    expect(bot.decide(w, fixtureV12).filter((i) => i.type === 'sendShips')).toEqual([{ type: 'sendShips', from: 0, to: p2, counts: expect.anything() }]);
+  });
+
+  it('wounded survivors do not count as ready: the estimate assumes full health', () => {
+    const w = createWorld(1, easy);
+    w.ships.push({ id: 1, type: 'drone', hp: 10, at: 0, transit: null, engagedIn: -1 }, { id: 2, type: 'drone', hp: 2, at: 0, transit: null, engagedIn: -1 });
+    expect(soundShips(w, 0).drone).toBe(1);
+  });
+
+  it('every static shape counts toward the gate: a crash in a non-best shape fails it', () => {
+    const base = { variant: null, seed: 1, outcome: 'won', ticks: 1, hiveTick: 1, tickMsP95: 0 } as unknown as FieldResult;
+    const best = { ...base, strategy: 'static', variant: 'even' } as FieldResult;
+    const crashed = { ...base, strategy: 'static', variant: 'war-lean', outcome: 'crash', error: 'boom' } as FieldResult;
+    const slow = { ...base, strategy: 'static', variant: 'flak-heavy', tickMsP95: 9 } as FieldResult;
+    const names = ['static'];
+    expect(fieldGateFailures(gateRuns([best], [best, crashed]), FIELD_WINNERS, names, 2, TR).join()).toContain('static seed 1: crash (boom)');
+    expect(fieldGateFailures(gateRuns([best], [best, slow]), FIELD_WINNERS, names, 2, TR).join()).toContain('static: tick p95');
+    expect(fieldGateFailures(gateRuns([best], [best]), FIELD_WINNERS, names, 2, TR)).toEqual([]);
+  });
+
+  it('greedy builds no warship, sends nothing and takes no pocket before its first hit, even with every open slot filled (raids off)', () => {
+    const w = createWorld(1, easy);
+    const log = play(w, easy, greedy.make(easy), 16 * MIN, (t) => (t === 0 ? [{ type: 'setTunable', key: 'raid.enabled', value: 0 }] : []));
+    expect(w.field!.econ.length).toBeGreaterThanOrEqual(openSlots(w));
+    expect(log.some((l) => l.input.type === 'sendShips' || l.input.type === 'setRally' || l.input.type === 'recycleShips')).toBe(false);
+    expect(log.some((l) => l.input.type === 'setAlloc' && l.input.weight > 0 && l.input.shipType !== 'extractor' && l.input.shipType !== 'hauler')).toBe(false);
+    expect(w.stats.shipsBuilt).toEqual({ drone: 0, lancer: 0, flak: 0 });
+    expect(w.stats.captures).toHaveLength(0);
+  });
+});
+
+describe('the frozen v12 field (no dead end)', () => {
+  it('adaptive and greedy take the hive within the cap on the v12 fixture, with raids on', () => {
+    for (const s of [adaptive, greedy]) {
+      const r = runField(s, 1, fixtureV12);
+      expect(r.outcome, s.name).toBe('won');
+      expect(r.ticks).toBeLessThan(FIELD_CAP_MIN * MIN);
+    }
   });
 });
