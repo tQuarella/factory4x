@@ -30,7 +30,8 @@ Launches: 7 / 12.
 | r7 | engineer | h7-bots | resume | Fix round 1 (a61cba3): adaptive and greedy win ~19-20 min on v12; bots gate green |
 | r8 | critic | h7-bots | resume | Review round 2: REJECT (wounded drone in pocket wave; dead end after failed pocket wave) |
 | r9 | core-engineer | h7-bots | resume | Fix round 3, reassigned per deadlock rule (h7-sim core-engineer) |
-| 7 | critic | h7-client | launch | Review round 1 (economy + raid UI, 9a7f480; v13 not merged yet) |
+| 7 | critic | h7-client | launch | Review round 1 (9a7f480): REJECT (probe sheet scrolls with Recycle; raid line wrong after retarget; raid texts untested) |
+| r10 | engineer | h7-client | resume | Fix round 1; Director: compact probe sheet, map keeps ~200 px |
 
 ## Iteration 6 ledger
 
