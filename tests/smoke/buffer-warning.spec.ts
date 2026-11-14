@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { stepSimUntil } from './helpers.ts';
 
 /**
  * H6 bug: "When an asteroid buffer is full the warning shows and hides rapidly, shifting the buttons under it." A buffer that
@@ -103,6 +104,7 @@ async function backedUp(page: Page, size: { width: number; height: number }, spe
   const a1 = await setup(page, size, speed, 1, tunables);
   const [ref] = await record(page, a1, 2);
   expect(ref!.shown, 'no warning before the buffer fills').toBe(false);
+  await stepSimUntil(page, async () => (await warnText(page)).includes('Backed up: route at capacity'), 6000, 'the route-at-capacity warning');
   await expect.poll(() => warnText(page), { timeout: 120_000, intervals: [100] }).toContain('Backed up: route at capacity');
   const held = await record(page, a1, holdTicks);
   expect(held.length).toBeGreaterThan(40);
@@ -143,10 +145,12 @@ test('with no route: "No route" then "Backed up: no route" hold steady and move 
   const [ref] = await record(page, a1, 2);
   expect(ref!.shown).toBe(false);
   await page.locator('#sheet button', { hasText: /^Extractor/ }).click();
+  await stepSimUntil(page, async () => /^No route: this ore goes nowhere\. Build a route\.$/.test(await warnText(page)), 3000, 'the no-route warning');
   await expect.poll(() => warnText(page), { timeout: 30_000, intervals: [50] }).toMatch(/^No route: this ore goes nowhere\. Build a route\.$/);
   const noRoute = await record(page, a1, 5 * TICKS_PER_SEC);
   expect(check(noRoute, ref!, { warning: /^No route: this ore goes nowhere\. Build a route\.$/, badge: true, route: false }), 'the no-route warning flickered or the sheet moved').toEqual([]);
   // The buffer fills with nothing to carry it away.
+  await stepSimUntil(page, async () => /^Backed up: no route\. Build one\.$/.test(await warnText(page)), 6000, 'the backed-up no-route warning');
   await expect.poll(() => warnText(page), { timeout: 60_000, intervals: [50] }).toMatch(/^Backed up: no route\. Build one\.$/);
   const full = await record(page, a1, 5 * TICKS_PER_SEC);
   expect(check(full, ref!, { warning: /^Backed up: no route\. Build one\.$/, badge: true, route: false }), 'the full-buffer no-route warning flickered or the sheet moved').toEqual([]);

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { defaultData, type CampaignStart } from '@factory4x/sim';
-import { expectControlsFit, settled, tapArea } from './helpers.ts';
+import { expectControlsFit, settled, stepSimUntil, tapArea } from './helpers.ts';
 
 /**
  * H6 client: the pannable overworld on the real 10-area map, in the fullest state a game reaches (every chip, the notices strip up,
@@ -395,6 +395,7 @@ async function reclaimRime(page: Page): Promise<void> {
   await expect(page.locator('#toast')).toContainText('Landed in');
   await page.locator('#b-s4').click();
   const heart = await page.evaluate(() => window.__factory4x!.nodeIndex('heart'));
+  await stepSimUntil(page, async () => (await page.evaluate(() => window.__factory4x!.shipsAt(0))) >= FLEET_CAP, 3000, 'a full fleet at the probe');
   await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 30_000 }).toBeGreaterThanOrEqual(FLEET_CAP);
   const p = await page.evaluate((i) => window.__factory4x!.nodeScreenPos(i), heart);
   await page.mouse.click(p.x, p.y);
@@ -402,7 +403,8 @@ async function reclaimRime(page: Page): Promise<void> {
   for (let n = 0; n < 6 && !(await page.locator('#result').isVisible()); n++) {
     const attack = page.locator('#sheet button', { hasText: /^Attack with all from Probe/ });
     await attack.click({ timeout: 2000 }).catch(() => undefined);
-    await page.waitForTimeout(1500);
+    // 1.5 s of play at 4x, as game ticks.
+    await page.evaluate(() => window.__factory4x!.advanceTicks(180));
   }
   await expect(page.locator('#result')).toBeVisible({ timeout: 40_000 });
 }
