@@ -989,3 +989,46 @@ Result at 375x667: no scrolling with Recycle shown and the longest lines, normal
 
 **Other tests added:** unit tests for every raid text (`raidChipText` in all states, `raidEndText` for each outcome and loss kind, `raidMixText`, `raidMusterLine`), the rock sheet's raid-rank line (shown on rank 1, absent elsewhere and after Stop), and a real hive capture that opens the result panel once from the real trigger (tuned for a small hive and cheap fast drones; the run is stepped with `advanceTicks`). Removed `ROW_SELECTOR` and `incomeText`; fixed the `buildProbeSheet` comment.
 
+## 2026-11-14 · Engineer · h7-bots: field runner, six strategies, seven flags, campaign bots retired from the gate
+
+- **Campaign bots stay in code, off the gate.** `runner.ts` (runCampaign, H6 flags), `strategies.ts`, `waves.ts` and their tests stay; their tests build worlds with `withRunMode(defaultData, 'campaign')`. The old CLI is `campaign-cli.ts` (runnable by hand, not an npm script); `npm run bots` is the new field suite (`cli.ts`). *Rejected:* deleting them (the H4-H6 tests would be rewritten for nothing; the overworld may return).
+- **New files:** `field-runner.ts` (runField: won / timeout 45 min / softlock 5 min with no bay start and no hauler delivery / crash; raid log from `world.raid` and `stats.raids`), `field-strategies.ts`, `field-estimate.ts` (the min-wave estimate on an inert copy of the field, via the existing `minMix` and `minSingle`; its cache keys include the field layout, after a collision found in testing), `field-flags.ts`, `cli.ts`.
+- **Readings of the spec where it was silent:**
+  - Offence waits on the fleet limit: warships get `fleetCap - economy` slots. Adaptive builds for the hive at its current strength if that fits, else for the hive with a full-size raid away (R4 arithmetic), and attacks the moment the estimate on the guards at home is covered (so a raid out opens the window). It sends all ships at its staging node to the hive.
+  - In offence the economy grows only while `econ + 3 + smallest hive wave <= cap` (the trade in slots; the margin covers ships already paid for). A hauler may still go to the counter's pocket: its first delivery unlocks the counter.
+  - The counter pocket (Spores: ice, Thorns: crystal) is taken at econ 12 or after the first muster, with the pocket's min-wave of drones. Only the majority's pocket, as written, so the other counter is never unlocked.
+  - Warship weights follow the missing ships (need minus alive, per type), so a covered type goes to 0.
+  - Raid response: counter type at max weight until defenders (at or flying to the target) match the planned size; rally and idle warships go to the target; after the raid the standing guard is ceil(planned / 2) at the target. `greedy` is economy only until its first hit, then adaptive (see Round 1 fixes).
+  - `static` best-of: a win, then the earlier hive, then fewer economy ships lost. Sweep (extractor/hauler/drone/lancer/flak): econ-lean 4/3/1/1/1, even 3/2/2/2/2, drone-heavy 3/2/4/1/1, flak-heavy 3/2/1/1/4, lancer-heavy 3/2/1/4/1, war-lean 2/1/3/2/3.
+  - `idle` counts a full share as built, so it holds econ at exactly `raid.firstAtEcon - 1`.
+  - Bots read `world.raid` and `stats.raids` directly (what `raidStatus` reports). They never use Stop (not in the spec).
+- **Round 1 fixes (Critic REJECT, a186071).**
+  - **The Director's decision on the dead end** (a spec addition: "no softlock" outranks a minimal adaptive; Recycle is a player action). When adaptive's hive plan does not fit `fleetCap - economy`, it (a) takes the other pocket if that unlocks a mix that fits (with the economy at its floor), else (b) Recycles economy ships, worst-placed first (idle at the probe, then the rocks nearest the hive, then the lowest yield; haulers before extractors), one order per 15 ticks, until the smallest hive wave fits, and never below `raid.firstAtEcon` economy ships (and not at all if wave + floor exceeds the cap). `greedy` uses the same rules once it has turned adaptive.
+  - Found while testing it, same family (all player inputs): when the fleet is full and the plan still lacks ships, it Recycles one warship the plan cannot use (wounded, hp under half, which the min-wave estimate cannot count, or a type it has more of than needed); a taken pocket always gets one hauler (its deliveries pay for Lancers and Flak); the raid-window plan uses the raid that today's econ would muster (R4: `raidSize`, `raidMix`), not a full-size raid (a full-size raid never comes at econ 14, so waiting for it was a second dead end). Flag 4 still removes a full-size raid, as the spec says.
+  - Every offence branch, the raid response included, ends in the trade in slots (`limitEconomy`).
+  - Every static shape counts for the gate's crash and p95 checks (`gateRuns`), not just the best one.
+  - `greedy` is now economy only (no offence latch, no pocket, no recycle) until its first hit (`fieldSummary.raids.hit`), then a fresh adaptive. The earlier entry's "greedy ignores musters" now matches the code.
+  - Bots read through the selectors (`raidStatus`, `fleetStatus`, `allocStatus`, `rockStatus`, `fieldSummary`, `shipsAtByType`, plus `econAtByType`, `isValidInput`). Still plain reads, each for something no selector gives: `guardianAt(...).wavesSent` and `.battle`, ship `hp` (wounded ships), the node list's kind and prize, and ships in flight (none says where they go). The rally is remembered by the bot.
+- **Flags 1-3 read the run logs; 4-7 the estimate on a fresh field.** Flag 6's "full economy" is the open Mine slots plus `peakHaulers` of the adaptive runs.
+
+## 2026-11-14 · Core Engineer · h7-bots round 3 (deadlock rule): exact pocket waves, recycling for a pocket, no idling
+
+Round 3 was reassigned to the Core Engineer under PROCESS step 2. It answers the round-2 review (488b4f9) on top of a61cba3.
+
+- **Director's decision, extending the recycle rule:** once a pocket is adaptive's plan (the counter pocket in offence, or the other pocket at the dead end), recycling may also free room for that pocket's (raised) wave, down to the same `raid.firstAtEcon` floor. It happens only in offence, with the fleet limit counting economy ships, and only when wave + floor ≤ `field.fleetCap`. Economy ships go worst-placed first, one order per 15 ticks: the same rule as for the hive, now shared as `recycleEconToward`. While it recycles, the economy weights are 0.
+  - *Why:* in round 2's trace a failed p2 wave raised the next wave above the room. Only the hive's wave could open room, so the bot idled for 35 minutes with 2,547 ore. "No softlock" outranks a minimal adaptive, as in the first decision.
+- **A pocket wave sends exactly the sound ships the estimate counted (`exactSend`).**
+  - *The problem:* `sendShips` takes the lowest-id ships of each type, so a wounded low-id drone went in place of a sound one.
+  - *The rule:* per type, walk the ships parked at the stage in id order. Send each run of sound ships, and recycle a wounded ship that would come next (it is then the lowest id left, so `recycleShips {type: 1}` takes exactly it). Wounded ships past the wave stay where they are.
+  - All the sends go out in one tick, so the sim folds them into one wave (rule 1).
+  - The stage is never a living guarded node, so the recycle is always valid.
+  - `static` uses `exactSend` for its pocket waves too. The hive attacks still send everything parked, as before.
+  - *Rejected:* sending everything parked at a pocket. It isn't "exactly" the wave, and it would pull the standing guard off its post.
+- **Found while testing the pocket recycle: a pocket with a wave on the way is committed.** While warships fly to a pocket, or a battle runs there, `pocketAssault` makes no new plan. Before, the wave's own order raised `wavesSent`, so the bot planned a bigger wave and recycled economy ships while the first wave was still in flight. The trace went down to 6 economy ships instead of the 11 the wave needed.
+- **The pocket's own trade in slots:** in offence, while econ + 3 (the margin) + the pocket wave is over the limit, the economy weights are 0. This is the same rule as `limitEconomy` for the hive, so the economy doesn't regrow into the room just freed.
+- **`FieldRunOptions.onTick`:** an optional read-only observer, called after each step. It exists so a test can watch every tick of a whole run (the idle-stretch check), and it changes nothing about a run.
+- **Measured on v12 (`npm run bots`, 3 seeds, every seed identical):**
+  - adaptive wins in 19:00 (8 raids: 6 beaten, 1 hit; 4 economy ships lost).
+  - greedy wins in 19:49 (9 raids: 7 beaten, 1 hit; 6 lost).
+  - adaptive-no-raids now wins in 14:37. In round 2 it timed out with a 35-minute idle stretch.
+  - The bots gate passes.

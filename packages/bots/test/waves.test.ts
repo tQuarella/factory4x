@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { campaignWorld, commandedBands, defaultData, isAreaOpen, isLaneOpen, type ShipType, type ShipTypeCounts } from '@factory4x/sim';
+import { campaignWorld, commandedBands, defaultData as shippedData, isAreaOpen, isLaneOpen, withRunMode, type ShipType, type ShipTypeCounts } from '@factory4x/sim';
+
+// The H6 campaign bots are retired from the gate (h7-bots); their tests run on shipped data in campaign mode.
+const defaultData = withRunMode(shippedData, 'campaign');
 // The frozen v8 fixture: the probe's numbers on it never move with calibration.
 import { fixtureV8 as fx } from '../../sim/test/fixture.ts';
 import {
