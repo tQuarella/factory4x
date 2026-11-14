@@ -6,6 +6,24 @@ export async function settled(page: Page): Promise<void> {
 }
 
 /**
+ * Waits in game time, not wall time: steps the sim 30 ticks at a time (the advanceTicks hook, which pauses) until `cond` holds, so a
+ * wait costs no real seconds. If the game was running when called, play is resumed afterwards (at the same speed), so the test goes
+ * on as the wait it replaces would have left it (`resume` false leaves it paused, for waits that end on a panel covering the controls). Fails if `cap` ticks pass first. The assertion the test already makes after the
+ * wait stays in place and runs against the live page.
+ */
+export async function stepSimUntil(page: Page, cond: () => Promise<boolean>, cap: number, what: string, resume = true): Promise<void> {
+  const wasPaused = await page.evaluate(() => window.__factory4x!.paused());
+  for (let t = 0; !(await cond()); t += 30) {
+    if (t > cap) throw new Error(`${what} was not reached in ${cap} ticks`);
+    await page.evaluate(() => window.__factory4x!.advanceTicks(30));
+  }
+  if (resume && !wasPaused && (await page.evaluate(() => window.__factory4x!.paused()))) {
+    await page.locator('#b-pause').click();
+    expect(await page.evaluate(() => window.__factory4x!.paused()), 'play resumed after stepping').toBe(false);
+  }
+}
+
+/**
  * Taps an area on the overworld, once. The map is a pan, so the area is first centred in the part of the map no sheet covers (what a
  * drag does, in one step). The tap then waits until the area has stopped moving and the point under it is the canvas itself, not a
  * notice or the hint a layout shift has put there (the old boot.spec tap landed on #hint-text 2 runs in 5). The click is made once:

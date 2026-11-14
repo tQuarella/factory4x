@@ -464,13 +464,14 @@ test.describe('375x667 portrait, by touch', () => {
 
   test('the top bar holds still: the field HUD fits 375 px under a wide font, with the fleet chip and no per-type ship chips', async ({ page }) => {
     await ready(page, PHONE);
-    await page.evaluate(() => window.__factory4x!.setSpeed(4));
     await expect(page.locator('#chip-fleet')).toBeVisible();
     await expect(page.locator('#chip-fleet')).toContainText(/Fleet \d+\/\d+/);
     for (const t of ['drone', 'lancer', 'flak', 'lens', 'plating']) await expect(page.locator(`#chip-${t}`)).toBeHidden();
     const boxes: string[] = [];
     for (let i = 0; i < 12; i++) {
-      await page.waitForTimeout(400);
+      // 400 ms of play at 4x is 48 ticks: step them (12 samples, 576 ticks), then let the frame draw.
+      await page.evaluate(() => window.__factory4x!.advanceTicks(48));
+      await settled(page);
       boxes.push(
         await page.evaluate(() => {
           const r = (id: string): string => {

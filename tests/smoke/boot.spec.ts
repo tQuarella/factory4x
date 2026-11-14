@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createWorld, defaultData, replayHashes, serializeWorld, type CampaignStart } from '@factory4x/sim';
-import { tapArea } from './helpers.ts';
+import { stepSimUntil, tapArea } from './helpers.ts';
 import { referenceReplay } from '../../packages/bots/src/reference-replay.ts';
 
 function watchErrors(page: Page): string[] {
@@ -165,6 +165,7 @@ async function landfallRun(page: Page): Promise<void> {
   await expect(page.locator('#b-world')).toBeVisible();
   await expect(page.locator('#b-research')).toBeHidden();
   await page.locator('#b-s4').click();
+  await stepSimUntil(page, async () => (await page.evaluate(() => window.__factory4x!.shipsAt(0))) >= 1, 3000, 'a ship at the probe');
   await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 30_000 }).toBeGreaterThanOrEqual(1);
   const heart = await page.evaluate(() => window.__factory4x!.nodeIndex('heart'));
   await tapNode(page, heart);
@@ -172,6 +173,7 @@ async function landfallRun(page: Page): Promise<void> {
   // The heart has no Root, so no supply line.
   await expect(page.locator('#sheet .supply')).toBeHidden();
   await page.locator('#sheet button', { hasText: /^Attack with all from Probe/ }).click();
+  await stepSimUntil(page, () => page.locator('#result').isVisible(), 4500, 'the area result', false);
   await expect(page.locator('#result')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('#result h2')).toHaveText('Landfall reclaimed');
   await expect(page.locator('#result .haul-line')).toContainText(/\+\d+ ore/);
@@ -679,9 +681,16 @@ test('paused "Attack with all" from two sources is one press, one tick, one wave
   await page.locator('#b-s4').click();
 
   // Stage ships at A5 (node 5), then let more gather at the Probe (node 0).
+  await stepSimUntil(page, async () => (await page.evaluate(() => window.__factory4x!.shipsAt(0))) >= 2, 3000, 'two ships at the probe');
   await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
   await tapNode(page, 5);
   await page.locator('#sheet button', { hasText: /^Send all from Probe/ }).click();
+  await stepSimUntil(
+    page,
+    async () => (await page.evaluate(() => [window.__factory4x!.shipsAt(5) > 0, window.__factory4x!.shipsAt(0) > 0].join())) === 'true,true',
+    4500,
+    'ships at A5 and the probe',
+  );
   await expect
     .poll(() => page.evaluate(() => [window.__factory4x!.shipsAt(5) > 0, window.__factory4x!.shipsAt(0) > 0].join()), { timeout: 30_000 })
     .toBe('true,true');
@@ -880,6 +889,7 @@ async function h3PlayThrough(page: Page): Promise<void> {
   const ice = await page.evaluate(() => window.__factory4x!.pocketNode('ice'));
   expect(crystal).toBeGreaterThan(0);
   expect(ice).toBeGreaterThan(0);
+  await stepSimUntil(page, async () => (await page.evaluate(() => window.__factory4x!.shipsAt(0))) >= 3, 3000, 'three ships at the probe');
   await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 20_000 }).toBeGreaterThanOrEqual(3);
   // Stop the drone yard so the start stock is left for components and lancers.
   await tapNode(page, 0);
@@ -894,11 +904,13 @@ async function h3PlayThrough(page: Page): Promise<void> {
   await expect(page.locator('#sheet [data-ship="lancer"]')).toBeHidden();
   await expectControlsFit(page, '#sheet', 'pocket sheet');
   await page.locator('#sheet button', { hasText: /^Attack with all from Probe/ }).click();
+  await stepSimUntil(page, () => page.evaluate((n) => window.__factory4x!.owned(n), crystal), 3000, 'the crystal pocket captured');
   await expect.poll(() => page.evaluate((n) => window.__factory4x!.owned(n), crystal), { timeout: 20_000 }).toBe(true);
 
   // The captured pocket is a producer: route its crystal to the probe, and the crystal chip appears.
   await expect(page.locator('#sheet h2')).toContainText('Crystal');
   await page.locator('#sheet button', { hasText: /^Route to probe/ }).click();
+  await stepSimUntil(page, () => page.locator('#chip-crystal').isVisible(), 4500, 'the crystal chip');
   await expect(page.locator('#chip-crystal')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('#toast')).toContainText(/Crystal delivered: Lens and Lancers unlocked\. The Lancer yard is on/);
   await expect(page.locator('#chip-lens')).toBeVisible();
@@ -921,12 +933,27 @@ async function h3PlayThrough(page: Page): Promise<void> {
   // The first wave took every drone, so start the drone yard again for the mixed fleet.
   await droneRow.locator('button.tog').click();
   await expect(droneRow.locator('button.tog')).toHaveText('ON');
+  await stepSimUntil(
+    page,
+    async () => (await page.locator('#chip-lancer').isVisible()) && (await page.locator('#chip-lancer b').textContent()) !== '0',
+    4500,
+    'the lancer chip with a count',
+  );
   await expect(page.locator('#chip-lancer')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('#chip-lancer b')).not.toHaveText('0', { timeout: 30_000 });
   await expectControlsFit(page, '#bars', 'HUD with chips');
   await expectHudNoWrap(page, 'HUD with chips');
 
   // Wait for a mixed fleet at the probe, then open the ice pocket and choose ships.
+  await stepSimUntil(
+    page,
+    () => page.evaluate(() => {
+      const c = window.__factory4x!.shipsAtByType(0);
+      return c.drone > 0 && c.lancer > 0;
+    }),
+    4500,
+    'a mixed fleet at the probe',
+  );
   await expect
     .poll(() => page.evaluate(() => {
       const c = window.__factory4x!.shipsAtByType(0);
@@ -1016,8 +1043,10 @@ const SHOAL = AREA.shoal!;
 async function fillFleet(page: Page, cap: number): Promise<void> {
   await startCampaign(page, { reclaimed: ['landfall'], land: 'shelf' }, { 'fleet.cap': cap });
   await page.locator('#b-s4').click();
+  await stepSimUntil(page, async () => (await page.locator('#chip-fleet b').textContent()) === `Fleet ${cap}/${cap}`, 4500, 'the fleet full');
   await expect(page.locator('#chip-fleet b')).toHaveText(`Fleet ${cap}/${cap}`, { timeout: 30_000 });
   // The count includes a ship in a yard: wait until every ship is built and parked (the yard row then reads "fleet full").
+  await stepSimUntil(page, async () => (await page.evaluate(() => window.__factory4x!.shipsAt(0))) === cap, 4500, 'every ship parked at the probe');
   await expect.poll(() => page.evaluate(() => window.__factory4x!.shipsAt(0)), { timeout: 30_000 }).toBe(cap);
 }
 
@@ -1076,6 +1105,7 @@ test('H5: recycle frees a slot, the stock rises by the preview, and the yard res
   // The yard resumes: switch it back on and play on.
   await page.locator('#sheet .yard-row[data-yard="drone"] button.tog').click();
   await page.locator('#b-pause').click();
+  await stepSimUntil(page, async () => (await page.locator('#chip-fleet b').textContent()) === 'Fleet 2/2', 4500, 'the fleet full again');
   await expect(page.locator('#chip-fleet b')).toHaveText('Fleet 2/2', { timeout: 30_000 });
   await page.waitForTimeout(300);
   expect(await page.evaluate(() => window.__factory4x!.replayMatchesLive())).toBe(true);
