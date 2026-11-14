@@ -1112,3 +1112,9 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 6. **Q18 (pillar 1) isn't folded into Q22**, to keep Q22 a one-word reply. It is flagged to the Director in DESIGN.md "H8 candidates".
 
 **Why:** each choice keeps the owner's next reply to one word, and fixes what they named as wrong without changing what H7 showed works.
+
+## 2026-11-14 · Director · Owner picks H8 B (move ships by hand), drag gesture
+
+**Decision:** H8 is option B from DESIGN.md "H8 candidates" with every ride-along: haulers staffed by need, rebalancing at the probe, no surplus haulers, a raid target icon, a fleet panel with Recycle from the Fleet chip. The owner's gesture replaces the tap-Move-tap design: drag from a rock to another rock moves its ships; long-press then drag moves half. Tap-then-tap stays only if the Designer finds drag can't be made reliable on a phone canvas (then it's an A/B in the tuning panel).
+**Why:** QUESTIONS.md Q22, owner answer "B, can we tap and drag to move ships?  Long-tap then drag to move half?".
+**VISION check:** "Ships take orders at nodes; no unit micro" holds. A drag is a group order from one node to another, never per-ship control, so no protected edit is needed. The spec must keep it that way (no selecting single ships).

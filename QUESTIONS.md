@@ -54,6 +54,10 @@ Then pick one:
 
 Details: DESIGN.md → "H8 candidates (iteration 8)". Answer like "A", "A, plus B" (about half a build more), or "C". Also, if "Hate the economy stuff" meant you dislike the economy layer itself (I read it as "ate the economy stuff", the raid killing your haulers), say so in a word. Default if unanswered: A.
 
+**Answer (owner, 2026-11-14):** "B, can we tap and drag to move ships?  Long-tap then drag to move half?"
+
+*Director: B with the ride-alongs (hauler staffing by need, rebalance at home, no surplus haulers, raid target icon, fleet panel with Recycle). Gesture: drag from a rock to another moves all its ships of the chosen kind; long-press then drag moves half. "Hate the economy stuff" left as read (no correction).*
+
 ## Build build-20261108-5 is ready (2026-11-08): H6, the Open frontier
 
 Play: https://factory4x.pages.dev (on your phone, portrait). A run to the probe core takes the bots about 46–62 game minutes, so roughly 12–16 real minutes at 4x plus your decisions. Your old save is from an older data version, so the game starts fresh.
