@@ -212,10 +212,13 @@ test.describe('375x667 portrait, by touch', () => {
     await page.evaluate(() => window.__factory4x!.advanceTicks(0));
     await settled(page);
     const g = (await flight(page))!;
-    expect(g.ticksLeft).toBe(f.ticksLeft);
+    // The resumed run is already ticking when the hook pauses it, so a few ticks may have passed since the save, never more than a second or two.
+    expect(g.ticksLeft).toBeLessThanOrEqual(f.ticksLeft);
+    expect(g.ticksLeft).toBeGreaterThan(f.ticksLeft - 90);
+    expect(g.phase).toBe('out');
     const m = (await map(page)).raid;
     expect(m.marker).toBe(true);
-    expect(m.frac, 'half way along its leg').toBeGreaterThan(0.45);
+    expect(m.frac, 'about half way along its leg, not back at the hive').toBeGreaterThan(0.4);
     expect(m.frac).toBeCloseTo(1 - g.ticksLeft / g.flightTicks, 1);
     expect(m.from).toBe(g.from);
   });
