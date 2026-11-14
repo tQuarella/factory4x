@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { campaignWorld, defaultData as data, type World } from '@factory4x/sim';
+import { campaignWorld, defaultData, withRunMode, type World } from '@factory4x/sim';
 import { advancingAreas, areaEstimate, chooseArea, closedKey, decideOverworld, firstUnmetGoal, openAreas, strategies, type CampaignStrategy, type Goal } from '../src/strategies.ts';
+
+// The H6 campaign bots are retired from the gate (h7-bots); their tests run on shipped data in campaign mode.
+const data = withRunMode(defaultData, 'campaign');
 
 /**
  * H6 area choice on the shipped map. Premises are explicit and none pins a tuned value: the structure (areas, lanes,
