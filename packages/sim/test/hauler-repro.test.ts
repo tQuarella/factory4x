@@ -160,3 +160,62 @@ describe('the same cases under hauler.autoNeed 0 (H7 F6 exactly): they guard the
     ]);
   });
 });
+
+/**
+ * The two other ways into the owner's state named in DECISIONS.md (h8-sim, the repro entry): a recycle and a Stop
+ * then re-mark each leave A1 Mine-marked, with ore in its buffer, no docked extractor and no hauler. Under
+ * hauler.autoNeed 0 the next hauler goes to A2 (H7's order); under 1 it goes to A1.
+ */
+describe('other ways into "A1 has no haulers": a recycle, and a Stop then re-mark', () => {
+  /** A2 with 2 docked extractors and 2 haulers waiting; A1 with 2 docked extractors, 1 hauler waiting and a buffer of 10. */
+  function both(auto: number): World {
+    const w = a1a2(auto);
+    for (const n of [F.a1, F.a1, F.a2, F.a2]) addEcon(w, 'extractor', n, n);
+    addEcon(w, 'hauler', F.a2, F.a2);
+    addEcon(w, 'hauler', F.a2, F.a2);
+    addEcon(w, 'hauler', F.a1, F.a1);
+    w.nodes[F.a1]!.buffer = 10;
+    return w;
+  }
+
+  for (const [auto, want] of [
+    [0, F.a2],
+    [1, F.a1],
+  ] as const) {
+    const name = want === F.a1 ? 'A1' : 'A2';
+    it(`recycleShips of A1's extractors and hauler: A1 marked, buffer 10, no extractor, no hauler; the next hauler goes to ${name} (hauler.autoNeed ${auto})`, () => {
+      const w = both(auto);
+      step(w, D13, [{ type: 'recycleShips', node: F.a1, counts: { drone: 0, lancer: 0, flak: 0, extractor: 2, hauler: 1 } }]);
+      expect([w.field!.mine[F.a1], w.nodes[F.a1]!.buffer >= 1, w.nodes[F.a1]!.extractors, assigned(w)[F.a1]]).toEqual([true, true, 0, 0]);
+      const next = addEcon(w, 'hauler', PROBE);
+      stepW(w);
+      expect(next.target).toBe(want);
+    });
+
+    it(`Stop then re-mark of A1: its hauler takes 4 and goes, its extractors leave and fly back on re-mark, so A1 is marked with 6 left and no docked extractor; ${auto === 1 ? 'A1 gets a hauler at once (the idle one, H2)' : 'A1 has no hauler and the next one goes to A2'} (hauler.autoNeed ${auto})`, () => {
+      const w = both(auto);
+      step(w, D13, [{ type: 'setMine', node: F.a1, on: false }]);
+      // The waiting hauler loaded min(10, 4) and left; the extractors had nowhere to go and fly home.
+      expect(w.nodes[F.a1]!.buffer).toBe(6);
+      // A1's hauler gets home and drops A1 at the probe (A1 is unmarked); its extractors are home and idle.
+      const h = w.field!.econ.find((s) => s.type === 'hauler' && s.target === F.a1)!;
+      for (let i = 0; i < 400 && h.target === F.a1; i++) stepW(w);
+      for (let i = 0; i < 400 && w.field!.econ.some((s) => s.type === 'extractor' && s.transit !== null); i++) stepW(w);
+      expect(assigned(w)[F.a1]).toBe(0);
+      expect(w.field!.econ.filter((s) => s.type === 'extractor' && s.at === PROBE && s.target === null)).toHaveLength(2);
+      // H7: the hauler that dropped A1 took A2 (ratio 2/2 against nothing worked); H8: A2 was at its target (1), so it idles.
+      expect(h.target).toBe(auto === 1 ? null : F.a2);
+      step(w, D13, [{ type: 'setMine', node: F.a1, on: true }]);
+      expect([w.field!.mine[F.a1], w.nodes[F.a1]!.buffer, w.nodes[F.a1]!.extractors]).toEqual([true, 6, 0]);
+      if (auto === 1) {
+        // The idle hauler takes A1's shortfall the tick it is re-marked.
+        expect([h.target, assigned(w)[F.a1]]).toEqual([F.a1, 1]);
+        return;
+      }
+      expect(assigned(w)[F.a1]).toBe(0);
+      const next = addEcon(w, 'hauler', PROBE);
+      stepW(w);
+      expect(next.target).toBe(want);
+    });
+  }
+});

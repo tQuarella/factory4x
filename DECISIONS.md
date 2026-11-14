@@ -1168,3 +1168,81 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 **So the state that produces the observation in play is "a raid (or a recycle, or a Stop then re-mark) leaves a marked rock with ore in its buffer, no docked extractor and no hauler".** The opening's first raids land on a1, so A1 is the rock most likely to be in it. Two more states make the owner's words true without any rule fault: a marked rock whose extractors are still flying in with an empty buffer (not worked, so nothing to haul yet), and a rock that is Stopped (only Mine-marked rocks get haulers, Director 2026-11-14).
 
 **Fix:** H2 (assignment by shortfall) gives every haulable rock a target of at least 1 (`max(1, …)` in H1), so a buffer-only rock with 0 haulers has shortfall 1 and ranks by shortfall, not after every producing rock. The H8 commit shows both failing tests pass under H2 (`hauler.autoNeed` 1). Under `hauler.autoNeed` 0 the order stays as H7 had it, because H5 asks for H7's F6 exactly and the H7 hauler tests to pass unchanged (one of them pins this order).
+
+## 2026-11-14 · Core Engineer · h8-sim: staffing by need, fleet orders, data v14
+
+**Finding for the Director (a rule finding, not a calibration):** on shipped data with no inputs, H1 and H4 as written delay the first hauler by about 3 minutes. At the landing no rock is worked yet, because the extractors are still flying, so every target is 0 and the Hauler is ineligible. The 40 starting ore all goes to extractor shares. Once a1 docks (tick 185) the Hauler becomes eligible, but its share then fills only from probe mining at 2/5 of 12 ore/min.
+
+| v14, seed 1, no inputs | First hauler built | First ore delivered | Ore delivered by minute 1–10 |
+| --- | --- | --- | --- |
+| `hauler.autoNeed` 1 | tick 5790 (3:13) | tick 6051 | 0, 0, 0, 20, 68, 136, 204, 284, 384, 507 |
+| `hauler.autoNeed` 0 (H7) | tick 90 | tick 1035 | 8, 20, 40, 60, 88, 124, 153, 189, 241, 297 |
+
+These numbers are from a scratch run of this branch's code. No value fixes it, because the Hauler is ineligible whatever its weight. It is also why `tests/smoke/h7-economy.spec.ts:286` goes red: that test raises the warship weights at once and waits up to 2400 ticks for a ship parked at the probe. I implemented the spec as written. One amendment, for the Designer to judge: count a Mine-marked rock with extractors *bound* (docked or flying in) as haulable for H1. Then the landing has a need of 1 at a1 and a2 before the first dock.
+
+**Repro, after the rule change:**
+- Under H2 (`hauler.autoNeed` 1), every case in `hauler-repro.test.ts` passes, including the two that failed on the v13 rules.
+- Under `hauler.autoNeed` 0, the same file pins H7's outcomes. The buffer-only hauler goes to A2, and the Stop and re-mark run gives the same two violations, word for word.
+- The repro entry above names a recycle and a Stop then re-mark as other ways into the state. Both now have tests (the last `describe` in that file).
+- Under H8, a Stop and re-mark doesn't leave A1 empty at all. The hauler that dropped A1 idles, because A2 is at its target, and it takes A1 back on the tick A1 is re-marked.
+
+**Architecture (packages/sim):**
+1. **H1–H4 are derived, never stored.** `haulerNeed`, `haulerTarget`, `haulerShortfall` and `haulersWanted` (field.ts) read nodes, economy ships and tunables each time. The only new state is `field.haulerSet`, which is saved and hashed. *Rejected:* a cached per-node target. It would need invalidating on every dock, raid kill, capture and live tuning, for the same reason h7-sim derived `node.extractors`.
+2. **New module `orders.ts`** holds `moveCounts` (H6), and `recycleOrder` and `applyRecycleFleet` (H8). It imports no rule module, so `fleet.ts` (fleetStatus) can read `recycleOrder` without an import cycle. Like `recycleEcon`, `applyRecycleFleet` takes `recycleRefundEach` as a callback, and `inputs.ts` runs `syncExtractors` after it. For the same reason, `shipsAtByType` moved to `ships.ts` and `perExtractorPerMin` to `world.ts`. Both are re-exported where they were, so no caller changed.
+3. **The H10 stub** `haulersHeld(world, node)` is in `factions/index.ts` and returns false. `runHaulers` asks it in two places, so h8-raids only writes the predicate:
+   - at the probe: held means stay, keep the node, and skip the rebalance;
+   - at the node: held means load what is there and leave.
+
+   This makes an import cycle between field.ts and factions, which the backlog's placement forces. It is safe, because neither module calls the other while loading. *Rejected:* a callback passed from step.ts, which would move the call site out of `runHaulers`, against the backlog.
+4. **Cost:** the bots gate on this branch (18 runs, 45 game minutes cap) reports a tick p95 of at most 0.0094 ms, against the 2.0 ms budget. `haulersWanted` is read once per F2 call, not once per ore moved.
+
+**Spec readings (calls the spec doesn't make):**
+- **H4 also gates the bay start, not only F2 eligibility.** Otherwise a full Hauler share, filled while a rock was short, would start a hauler after the shortfall closed, which breaks "the probe never builds a hauler that no rock needs". The share is kept, as the spec says.
+- **H3's "on arrival" is F6's at-probe pass,** the tick after the hauler reaches the probe and unloads in F7. A hauler with a node sits at the probe only on that pass (or while held), so nothing else is rebalanced.
+- **Order at the probe:**
+  1. drop a node that isn't haulable (H7);
+  2. keep a held node (H10);
+  3. rebalance (H3);
+  4. pick (H2);
+  5. stay if the picked node is held.
+- **`rock.haulerMax` tuned below a set count:** the target is capped at the new max when read (`haulerSetOf`), and `rockStatus.haulerSet` shows the capped value. The stored count is kept, so raising the max restores it. This follows the way `alloc.maxWeight` caps the weights, without rewriting saved state.
+- **`setHaulers` stays valid under `hauler.autoNeed` 0.** The count is stored and ignored, so the player's counts survive switching the A/B back.
+- **`recycleFleet` groups:**
+  - "Idle at the probe" is a warship parked at the probe, or an economy ship at the probe with no node. An economy ship at the probe with a node (a hauler that just arrived, or one held by H10) ranks with "parked at a node", at index 0.
+  - "At a guarded node in battle" is read as "at a living guarded node", the nodes `recycleShips` already refuses.
+  - "At a raid's target in its fight phase" is `raid.phase === 'fight'` and `at === raid.target`. Ships flying to or from the target stay eligible.
+- **The need table:** "1 each for p1 and p2 once taken" is with the free extractor only. With a second extractor docked, p1 needs 2. The captured hive with its free extractor needs 4. All of these are pinned in `h8-haulers.test.ts`.
+- **`allocStatus`:**
+  - The state order is building, off, enough, locked, waitingResource, fleetFull, filling.
+  - An `enough` Hauler still counts in the `incomePct` sum. The spec sums the unlocked types with a weight above 0, and the weight is now a priority.
+- **`rockStatus`:**
+  - `haulerNeed` and `haulerTarget` are computed under `hauler.autoNeed` 0 too; the client hides the stepper then.
+  - `raidTarget` is a literal false for h8-raids to fill; `haulersHeld` reads the stub.
+- **`fleetStatus.types`** gives alive, idle, building (0 or 1) and recyclable per type. It is all zero in a campaign world, where `recycleFleet` is never valid.
+
+**Fixtures:**
+- `sim-v13.json` is the shipped data at v13, frozen in the repro commit. `sim-v14.json` is the shipped data as this task leaves it.
+- The older fixtures (v4, v8, v10, v12) and v13 carry the nine new keys, with `hauler.autoNeed`, `raid.shieldEcon` and `raid.haulersHold` at 0. So every older rule test keeps its rules, as h6-sim did with `overworld.bandLock`.
+- `h8-autoneed-off.test.ts` shows that `hauler.autoNeed` 0 is H7. It plays 6 game minutes of the v13 opening, with a Stop, a re-mark, a weight change and a recycle, and matches the v13 code's state hash at every 600th tick. The pinned hashes came from running the same loop against 0291294's `packages/sim/src`.
+
+**Reference replay:** `hauler.autoNeed` is set to 0 at tick 0, so the H7 items keep their timings. The H8 items run after the hive falls at 8010, with `hauler.autoNeed` back to 1 from 8100:
+- a rebalance and need-based picks;
+- the `enough` state;
+- `setHaulers` lowering a count;
+- `moveShips` split (including the 1-ship fallback) and all;
+- `recycleFleet` of a docked extractor and of haulers in every group, ending with one in transit.
+
+*Rejected:* `hauler.autoNeed` 1 throughout. That moves every H7 timing (the first muster goes from tick 95 to 150), p2 is no longer taken, and ice is no longer delivered on the script's weights, so the H7 script and its tests would need rewriting. Running both modes also puts the comparison mode in the gate. Determinism: 30 checkpoints over 9000 ticks, final b8d34d88 (was df9ea7c5).
+
+**Test changes outside the new files (all in packages/sim/test; none loosened):**
+- `data-h7.test.ts`: the dataVersion pin moved to `data-h8.test.ts` (14). The H7 key slice now ends at `hauler.autoNeed` instead of `stats.throughputWindowSec`.
+- `field-selectors.test.ts` and `fleet.test.ts`: the exact `rockStatus` and `fleetStatus` `toEqual`s gain the new fields, with exact values.
+- `reference-replay.test.ts`:
+  - `allocChanges` is 9: the 6 from before, plus the three at tick 8100;
+  - `econRecycled` is `{extractor: 2, hauler: 4}`: the `{1, 0}` from before, plus the recycleFleet;
+  - the input types add `moveShips`, `recycleFleet` and `setHaulers`;
+  - six H8 tests are added, and every H7 test is unchanged.
+
+**Edits outside the file list:**
+- `packages/client/src/fieldreport.ts` (compile-only): `allocStateText` switches over every `AllocState`, so it needs a case for the new `enough`. The case returns the spec's "enough haulers" and is reachable only in that state.
+- `packages/client/test/h7-client.test.ts` (compile-only): the test's `AllocRow` and `RockStatus` literals gain the new required fields: `incomePct: 0`, and `haulerNeed: 0, haulerSet: null, haulerTarget: 0, raidTarget: false, haulersHeld: false`. This test file is outside the backlog's list. Without the change the typecheck gate is red, and acceptance 7 needs it green. Every assertion is unchanged.
