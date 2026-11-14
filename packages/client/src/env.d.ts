@@ -6,7 +6,7 @@ interface Window {
     /** Full build version. */
     version: string;
     tick(): number;
-    replayHashes(ticks: number, every: number, replay: import('@factory4x/sim').Replay): string[];
+    replayHashes(ticks: number, every: number, replay: import('@factory4x/sim').Replay & { mode?: 'campaign' }): string[];
     /** Node center in client (viewport) pixels. */
     nodeScreenPos(node: number): { x: number; y: number };
     /** Area centre on the overworld, in client (viewport) pixels. */
@@ -72,6 +72,8 @@ interface Window {
     }): void;
     /** What the last map frame drew for a node: the "!" badge, and the dashed backed-up route from it. */
     mapBackedUp(node: number): { badge: boolean; route: boolean };
+    /** H7: what the last map frame drew for the economy, as JSON text: {mine: node[], haul: [node, level][], econ: {docked, idle, waiting, moving}}. */
+    mapField(): string;
     /** Shows the battle banner and a sample toast (or hides them), to check layout. */
     debugShowNotices(on: boolean): void;
     debugShowResult(): void;
@@ -80,5 +82,24 @@ interface Window {
     /** Node index of the Root. */
     rootNode(): number;
     newSystem(): void;
+    /** H7: the same as newSystem (a field run's New run). */
+    newRun(): void;
+    /** The session is a field run (H7). */
+    isField(): boolean;
+    /** allocStatus, rockStatus(node) and fieldSummary as JSON text (field mode). */
+    allocStatus(): string;
+    rockStatus(node: number): string;
+    fieldSummary(): string;
+    /** The economy ships, as JSON text: [{id, type, at, target, moving}]. */
+    econShips(): string;
+    /** raidStatus as JSON text (field mode). */
+    raidStatus(): string;
+    /** The raid's flight state as JSON text ({phase, from, target, ticksLeft, flightTicks}), or "null" (tests). */
+    raidFlight(): string;
+    /** Pauses and steps exactly n ticks, then refreshes the screen (tests). */
+    advanceTicks(n: number): void;
+    /** The session's input log (inputs only), as JSON text. */
+    log(): string;
+    setSpeed(speed: 1 | 2 | 4): void;
   };
 }

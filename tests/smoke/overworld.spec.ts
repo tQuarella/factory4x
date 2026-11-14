@@ -26,6 +26,9 @@ async function ready(page: Page, size: { width: number; height: number }): Promi
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
   await page.addStyleTag({ content: WIDE_FONT });
+  // H7: the shipped build is a field run; the overworld is the parked campaign, reached by the dev hook (see boot.spec.ts `ready`).
+  await page.evaluate(() => window.__factory4x!.startCampaign({}, {}));
+  await settled(page);
 }
 
 async function startCampaign(page: Page, start: CampaignStart, tunables: Record<string, number> = {}): Promise<void> {

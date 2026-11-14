@@ -4,13 +4,16 @@
  * its tests: the limit rises by reclaiming command relays now (see h6-client.test.ts).
  */
 import { describe, expect, it } from 'vitest';
-import { campaignWorld, defaultData, fleetStatus, landingEffects, recycleRefund, type BattleResult, type ShipTypeCounts } from '@factory4x/sim';
+import { campaignWorld, defaultData as shippedData, withRunMode, fleetStatus, landingEffects, recycleRefund, type BattleResult, type ShipTypeCounts } from '@factory4x/sim';
 import { Session } from '../src/session.ts';
 import { fleetChipText, fleetFullNotice, fleetLine, fullFleetHint, landingNotice, recycleNotice, recycledText, tierRequirementText } from '../src/report.ts';
 import { YARD_STATE_TEXT } from '../src/sheet.ts';
 import { TUNE_LABEL } from '../src/panels.ts';
 
-const data = defaultData;
+/** H7: shipped data is field mode. These tests are about the parked H4 to H6 campaign, so they run on campaign-mode data. */
+const campaignData = withRunMode(shippedData, 'campaign');
+
+const data = campaignData;
 
 describe('fleet text', () => {
   it('words the chip, the Yards header and the notices', () => {

@@ -93,11 +93,12 @@ describe('the frozen test fixture (data v4)', () => {
     expect(fixtureData.tunables['stats.throughputWindowSec']).toEqual({ default: 60, min: 60, max: 60 });
   });
 
-  it('drops every key the spec removes, and map.variants (the shipped data too); H4 adds map.areas and map.lanes', () => {
+  it('drops every key the spec removes, and map.variants (the shipped data too); H4 adds map.areas and map.lanes; H7 adds map.field to the shipped data', () => {
     for (const raw of [rawData, shippedRaw]) {
       for (const k of REMOVED) expect(Object.keys(raw.tunables)).not.toContain(k);
-      expect(Object.keys(raw.map)).toEqual(['nodes', 'layouts', 'areas', 'lanes']);
     }
+    expect(Object.keys(rawData.map)).toEqual(['nodes', 'layouts', 'areas', 'lanes']);
+    expect(Object.keys(shippedRaw.map)).toEqual(['nodes', 'field', 'layouts', 'areas', 'lanes']);
   });
 
   it('has the 16-node field at the spec positions, every node at least 160 su from every other', () => {

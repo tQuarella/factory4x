@@ -1,8 +1,12 @@
 import { buyResearch, canBuyResearch, isAreaOpen, isWon, leaveActive } from './campaign.ts';
-import { SHIP_TYPES, isSimTunableKey, type ShipType, type SimData, type TunableKey } from './data.ts';
+import { BUILD_TYPES, ECON_TYPES, SHIP_TYPES, isSimTunableKey, type BuildType, type ShipType, type SimData, type TunableKey } from './data.ts';
+import { applySetAlloc, applySetMine, clampEconCounts, isMarkable, recycleEcon } from './field.ts';
 import { fleetCap, recycleRefundEach } from './fleet.ts';
-import { ceilDiv } from './math.ts';
-import { PROBE, guardianAt, isGuarded, landArea, nodeDistance, routeFrom, type ShipTypeCounts, type World } from './world.ts';
+import { startTransit } from './ships.ts';
+import { PROBE, guardianAt, isGuarded, landArea, nodeDistance, routeFrom, type EconTypeCounts, type ShipTypeCounts, type World } from './world.ts';
+
+/** recycleShips counts: the warship counts, plus (H7 field mode) optional extractor and hauler counts. */
+export type RecycleCounts = ShipTypeCounts & Partial<EconTypeCounts>;
 
 /**
  * Player intent (DESIGN.md H1 "Player inputs", with the H3 changes: the yard
@@ -31,9 +35,13 @@ export type Input =
    * there (not in transit); the lowest-id ships of each type go. Valid in an area, before the win, at a node that
    * isn't a living guarded node, if the clamped total is at least 1.
    */
-  | { type: 'recycleShips'; node: number; counts: ShipTypeCounts }
+  | { type: 'recycleShips'; node: number; counts: RecycleCounts }
   | { type: 'setRally'; node: number }
-  | { type: 'setTunable'; key: TunableKey; value: number };
+  | { type: 'setTunable'; key: TunableKey; value: number }
+  /** H7 F12 (field mode only): set a type's allocation weight, 0..alloc.maxWeight. At 0 its share goes back to stock. */
+  | { type: 'setAlloc'; shipType: BuildType; weight: number }
+  /** H7 F12 (field mode only): Mine-mark an asteroid, or a captured pocket or hive, on or off. */
+  | { type: 'setMine'; node: number; on: boolean };
 
 function isIndex(world: Readonly<World>, v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < world.nodes.length;
@@ -98,10 +106,25 @@ function extractable(world: Readonly<World>, node: number): boolean {
   return (kind === 'pocket' || kind === 'heart') && !isGuarded(world, node);
 }
 
-/** True if `input` would change the world this tick. Invalid inputs are ignored by `step`; the client greys them out. */
+/** H7: optional economy counts, each absent or an integer ≥ 0. */
+function validEconCounts(v: unknown): boolean {
+  const c = v as Record<string, unknown>;
+  return ECON_TYPES.every((t) => c[t] === undefined || (typeof c[t] === 'number' && Number.isInteger(c[t]) && (c[t] as number) >= 0));
+}
+
+function isBuildType(v: unknown): v is BuildType {
+  return typeof v === 'string' && (BUILD_TYPES as readonly string[]).includes(v);
+}
+
+/**
+ * True if `input` would change the world this tick. Invalid inputs are ignored by `step`; the client greys them out.
+ * (A valid setAlloc or setMine that repeats the current value changes nothing, but is accepted.)
+ */
 export function isValidInput(world: Readonly<World>, data: SimData, input: Input): boolean {
   // After the win only live tuning is accepted; the area inputs need an area.
   if (input.type === 'setTunable') return validTunable(data, input.key, input.value);
+  // H7: field mode has its own table (F12), and free play continues after the hive falls.
+  if (world.field !== null) return validFieldInput(world, input);
   if (isWon(world)) return false;
   const active = world.campaign.active !== null;
   switch (input.type) {
@@ -121,6 +144,32 @@ function validTunable(data: SimData, key: unknown, value: unknown): boolean {
   if (typeof value !== 'number' || !Number.isInteger(value)) return false;
   const range = data.tunables[key];
   return value >= range.min && value <= range.max;
+}
+
+/**
+ * H7 F12, field mode: setAlloc, setMine, sendShips (warships only, as H5), recycleShips (with extractor and hauler
+ * counts), setRally (rally applies to warships only). Every campaign input (build, route, upgrade, cancel, yard
+ * switch, enterArea, leaveArea, buyResearch) is never valid here.
+ */
+function validFieldInput(world: Readonly<World>, input: Input): boolean {
+  switch (input.type) {
+    case 'setAlloc':
+      return isBuildType(input.shipType) && Number.isInteger(input.weight) && input.weight >= 0 && input.weight <= world.tun['alloc.maxWeight'];
+    case 'setMine':
+      return isIndex(world, input.node) && typeof input.on === 'boolean' && isMarkable(world, input.node);
+    case 'sendShips':
+      return validAreaInput(world, input);
+    case 'recycleShips': {
+      if (!isIndex(world, input.node) || isGuarded(world, input.node) || !validCounts(input.counts) || !validEconCounts(input.counts)) return false;
+      const c = clampSendCounts(world, input.node, input.counts);
+      const e = clampEconCounts(world, input.node, input.counts);
+      return c.drone + c.lancer + c.flak + e.extractor + e.hauler >= 1;
+    }
+    case 'setRally':
+      return isIndex(world, input.node);
+    default:
+      return false;
+  }
 }
 
 /** The H3 rules for the area inputs (an area is active). */
@@ -182,13 +231,7 @@ export function inputCost(world: Readonly<World>, input: Input): number {
   }
 }
 
-/** Starts transit for one ship. */
-export function startTransit(world: World, ship: World['ships'][number], to: number): void {
-  const from = ship.at ?? PROBE;
-  const total = ceilDiv(nodeDistance(world, from, to), world.tun['ship.speedSu']);
-  ship.at = null;
-  ship.transit = { from, to, ticksLeft: total, totalTicks: total };
-}
+export { startTransit };
 
 /** Rule 1: apply one input if valid; otherwise do nothing. */
 export function applyInput(world: World, data: SimData, input: Input): void {
@@ -248,10 +291,18 @@ export function applyInput(world: World, data: SimData, input: Input): void {
         return false;
       });
       world.ships = kept;
+      // H7: then the economy ships (field mode only; a campaign world has none).
+      if (world.field !== null) refund += recycleEcon(world, input.node, input.counts, (t) => recycleRefundEach(world, t));
       world.stock.ore += refund;
       world.stats.oreRefunded += refund;
       return;
     }
+    case 'setAlloc':
+      applySetAlloc(world, input.shipType, input.weight);
+      return;
+    case 'setMine':
+      applySetMine(world, input.node, input.on);
+      return;
     case 'setRally':
       world.rally = input.node;
       return;

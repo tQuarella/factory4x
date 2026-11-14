@@ -1,20 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
-  RAW_RESOURCES,
-  bandOpen,
-  campaignWorld,
-  decayedHaul,
+  PROBE,
+  allocStatus,
+  createWorld,
   defaultData as data,
   fleetStatus,
-  isLaneOpen,
   isValidInput,
-  landingEffects,
-  rootIndex,
+  raidStatus,
+  replayHashes,
+  rockStatus,
   step,
-  yardBuildTicks,
-  yardStatus,
   type Input,
-  type ResourceTriple,
   type World,
 } from '../src/index.ts';
 import { referenceReplay } from '../../bots/src/reference-replay.ts';
@@ -23,246 +19,188 @@ import { applyInput } from '../src/inputs.ts';
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 /**
- * h4-sim acceptance 7, h5-sim acceptance 6 and h6-sim acceptance 6: the
- * reference replay (determinism gate and browser cross-engine check). It runs
- * on the shipped data, as the gate and the browser do, so a calibration that
- * breaks the script shows here: regenerate the replay then. Numbers are read
- * from the shipped data, not pinned.
- *
- * H6 (DESIGN.md "Save, data version and replay"): from a campaignWorld start
- * with both designs (and Thorn Garden held, the only way to put a band-locked
- * area on a lane), it covers Landfall, an enterArea refused by the band lock, a
- * relay reclaim (Glint Relay, which is also a repeat haul), a landing in band 2
- * with the raised limit, a yard at the limit, a recycleShips, captures, a
- * second relay and repeat haul (Spire Relay), and The Deep without its Root at
- * the twice-raised limit. It also keeps H4's withdraw, cancel and research
- * steps, and uses every input type.
- *
- * h6-combat-target: in The Deep, weak lancers and flak fight the heart's
- * Thorns and Spores across the 5400 checkpoint, so the determinism hashes
- * depend on the combat amendment (each guard pool strikes the ship type it
- * counters first).
+ * h7-sim acceptance 7: the reference replay (the determinism gate and the browser cross-engine check) runs in
+ * field mode on the shipped data, as the gate does, and covers DESIGN.md H7 "Save, data version and replay", with
+ * the raid items h7-raids added (a raid mustered, launched and beaten by defenders; a raid that hits an undefended
+ * rock; the hive captured with a raid out, which withers): a landing; setAlloc changes, one to 0 that returns a share to stock; an
+ * extractor dispatched and docked and an idle one re-dispatched; a hauler delivery; a setMine off; a pocket
+ * capture that unlocks the Flak; a bay held by the fleet limit; and a recycleShips of an economy ship. Numbers are
+ * read from the shipped data, not pinned; a calibration that breaks the script shows here (regenerate it then).
  */
-describe('reference replay', () => {
-  expect(referenceReplay.start).toBeDefined();
-  const w: World = campaignWorld(referenceReplay.seed, data, referenceReplay.start!);
-  const battles: string[] = [];
+describe('reference replay (field mode)', () => {
+  expect(referenceReplay.start).toBeUndefined();
+  const w: World = createWorld(referenceReplay.seed, data);
+  const landing = { alloc: { ...w.field!.alloc }, stock: w.stock.ore, rally: w.rally };
   const typesApplied = new Set<string>();
   const ignored: string[] = [];
-  /** Why each refused enterArea was refused: [tick, area id, lane-open, band open]. */
-  const refusedLandings: Array<[number, string, boolean, boolean]> = [];
-  const landings: Array<{ area: string; tick: number; ore: number; rigged: string[]; droneTicks: number; fleetCap: number | null; hasRoot: boolean }> = [];
-  /** Per area id: ticks a switched-on yard reported 'fleetFull', and the most ships counted against the limit. */
-  const fullTicks: Record<string, number> = {};
-  const maxCount: Record<string, number> = {};
-  const capAtSend: string[] = [];
-  const recycled: Array<{ area: string; tick: number; drones: number; ore: number; countBefore: number }> = [];
-  const builtIn: Record<string, { lancer: number; flak: number; drone: number }> = {};
-  let activeAt3000: number | null = null;
-  /** At each checkpoint (every 300 ticks) with a battle at a heart: the ships there as type + hp, and the guards left. */
-  const heartAtCheckpoint: Array<{ tick: number; area: string; ships: string[]; guards: { thorn: number; spore: number } }> = [];
-  const areaId = (a: number): string => data.map.areas[a]!.id;
+  let shareReturned: { tick: number; share: number; stockBefore: number; stockAfter: number; shareAfter: number } | null = null;
+  let redispatched: { tick: number; id: number; to: number | null } | null = null;
+  const unboundAtUnmark: number[] = [];
+  let firstDock: { tick: number; node: number } | null = null;
+  let fleetFullTicks = 0;
+  let recycle: { tick: number; econBefore: number; econAfter: number; refund: number } | null = null;
+  const raidLog: Array<{ tick: number; phase: string; target: number | null; raids: World['stats']['raids']; econ: number; warshipsAtTarget: number }> = [];
+  let raidPhase = 'none:null';
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
-    // Judge validity in log order, as step does: earlier inputs of the tick apply first.
     const probe = inputs.length > 0 ? clone(w) : w;
     for (const input of inputs) {
       if (isValidInput(probe, data, input)) typesApplied.add(input.type);
-      else {
-        ignored.push(`${t} ${JSON.stringify(input)}`);
-        if (input.type === 'enterArea') {
-          const tier = data.map.areas[input.area]!.tier;
-          refusedLandings.push([t, areaId(input.area), isLaneOpen(probe, data, input.area), bandOpen(probe, data, tier)]);
-        }
-      }
+      else ignored.push(`${t} ${JSON.stringify(input)}`);
       applyInput(probe, data, input);
     }
-    const before = w.campaign.active;
-    const prevBattles = w.guardians.map((g) => g.lastBattle);
-    const recycledBefore = before === null ? 0 : w.stats.shipsRecycled.drone;
-    const refundBefore = before === null ? 0 : w.stats.oreRefunded;
-    const countBefore = before === null ? 0 : fleetStatus(w, data).count;
+    const f = w.field!;
+    const zeroing = inputs.find((i): i is Extract<Input, { type: 'setAlloc' }> => i.type === 'setAlloc' && i.weight === 0 && f.share[i.shipType] > 0);
+    const before = zeroing ? { share: f.share[zeroing.shipType], stock: w.stock.ore } : null;
+    const idle = f.econ.filter((s) => s.type === 'extractor' && s.target === null && s.at === PROBE && s.transit === null).map((s) => s.id);
+    const unmark = inputs.find((i): i is Extract<Input, { type: 'setMine' }> => i.type === 'setMine' && !i.on && t > 0);
+    const boundThere = unmark ? f.econ.filter((s) => s.type === 'extractor' && s.target === unmark.node).map((s) => s.id) : [];
+    const econBefore = f.econ.length;
+    const refundBefore = w.stats.oreRefunded;
     step(w, data, inputs);
-    const a = w.campaign.active;
-    if (a !== null && a !== before) {
-      landings.push({
-        area: areaId(a),
-        tick: w.campaign.areaStartTick,
-        // The opening stock: what is left plus what the landing tick spent.
-        ore: w.stock.ore + w.stats.oreSpentShips + w.stats.oreSpentEconomy + w.stats.oreSpentComponents,
-        rigged: w.nodes.filter((n) => n.kind === 'asteroid' && n.extractors > 0).map((n) => n.id),
-        droneTicks: yardBuildTicks(w, 'drone'),
-        fleetCap: landingEffects(w, data).fleetCap,
-        hasRoot: rootIndex(w) >= 0,
+    if (zeroing && before && shareReturned === null) {
+      shareReturned = { tick: t, share: before.share, stockBefore: before.stock, stockAfter: w.stock.ore, shareAfter: f.share[zeroing.shipType] };
+    }
+    if (redispatched === null && idle.length > 0) {
+      const s = f.econ.find((x) => idle.includes(x.id) && x.target !== null);
+      if (s) redispatched = { tick: t, id: s.id, to: s.target };
+    }
+    if (unmark) for (const id of boundThere) if (f.econ.find((s) => s.id === id)!.target !== unmark.node) unboundAtUnmark.push(id);
+    if (firstDock === null) {
+      const n = w.nodes.find((x) => x.kind === 'asteroid' && rockStatus(w, x.index).docked > 0);
+      if (n) firstDock = { tick: t, node: n.index };
+    }
+    if (fleetStatus(w, data).full && allocStatus(w, data).rows.some((r) => r.state === 'fleetFull')) fleetFullTicks++;
+    const rst = raidStatus(w);
+    if (`${rst.phase}:${rst.target}` !== raidPhase) {
+      raidPhase = `${rst.phase}:${rst.target}`;
+      raidLog.push({
+        tick: t,
+        phase: rst.phase,
+        target: rst.target,
+        raids: { ...w.stats.raids },
+        econ: rst.econ,
+        warshipsAtTarget: rst.target === null ? 0 : w.ships.filter((x) => x.at === rst.target).length,
       });
     }
-    if (a !== null && a === before) {
-      const id = areaId(a);
-      w.guardians.forEach((g, i) => {
-        const lb = g.lastBattle;
-        if (lb !== null && lb !== prevBattles[i]) {
-          battles.push(`${id} ${w.nodes[g.node]!.id} ${lb.outcome}`);
-          capAtSend.push(`${id} ${w.nodes[g.node]!.id} ${String(lb.capAtSend)}`);
-        }
-      });
-      builtIn[id] = { ...w.stats.shipsBuilt };
-      if (yardStatus(w, data).yards.some((y) => y.state === 'fleetFull')) fullTicks[id] = (fullTicks[id] ?? 0) + 1;
-      maxCount[id] = Math.max(maxCount[id] ?? 0, fleetStatus(w, data).count);
-      if (w.stats.shipsRecycled.drone > recycledBefore) {
-        recycled.push({ area: id, tick: t, drones: w.stats.shipsRecycled.drone - recycledBefore, ore: w.stats.oreRefunded - refundBefore, countBefore });
-      }
-    }
-    if (w.tick === 3000) activeAt3000 = w.campaign.active;
-    if (a !== null && w.tick % 300 === 0) {
-      const hg = w.guardians.find((g) => w.nodes[g.node]!.kind === 'heart')!;
-      if (hg.battle !== null) {
-        heartAtCheckpoint.push({
-          tick: w.tick,
-          area: areaId(a),
-          ships: w.ships.filter((s) => s.at === hg.node).map((s) => `${s.type} ${s.hp}`),
-          guards: { thorn: hg.guards.filter((x) => x.type === 'thorn').length, spore: hg.guards.filter((x) => x.type === 'spore').length },
-        });
-      }
-    }
+    if (inputs.some((i) => i.type === 'recycleShips')) recycle = { tick: t, econBefore, econAfter: f.econ.length, refund: w.stats.oreRefunded - refundBefore };
   }
-  const area = (id: string): number => data.map.areas.findIndex((x) => x.id === id);
-  const haul = (id: string): ResourceTriple => data.map.areas[area(id)]!.haul;
-  const pct = data.tunables['areas.repeatHaulPct'].default;
-  const limit0 = 4;
-  const relayStep = data.tunables['fleet.relayStep'].default;
+  const nodeId = (i: number): string => w.nodes[i]!.id;
+  const t = data.tunables;
 
-  it('reclaims Landfall, Glass Shoal, Glint Relay, Spore Veil and Spire Relay after the constructed Thorn Garden, then lands in The Deep and takes it', () => {
-    expect(w.campaign.reclaimOrder.map(areaId)).toEqual(['garden', 'landfall', 'shoal', 'glint', 'veil', 'spire', 'deep']);
-    expect(landings.map((l) => l.area)).toEqual(['landfall', 'shoal', 'shoal', 'glint', 'veil', 'spire', 'deep']);
-    expect(areaId(w.campaign.active!)).toBe('deep');
-    expect(activeAt3000).not.toBeNull();
-    expect(w.campaign.totals.shipped.ore).toBeGreaterThan(0);
+  it('lands in the field: the alloc.start weights with every warship at 0, economy.startStock ore, the rally at the probe', () => {
+    expect(landing).toEqual({
+      alloc: { extractor: t['alloc.start.extractor'].default, hauler: t['alloc.start.hauler'].default, drone: 0, lancer: 0, flak: 0 },
+      stock: t['economy.startStock'].default,
+      rally: PROBE,
+    });
   });
 
-  it('pays repeat hauls: Glint Relay after Glass Shoal and Spire Relay after Thorn Garden pay areas.repeatHaulPct; the others pay in full', () => {
-    const paid = (id: string) => w.campaign.areas[area(id)]!.haulPaid;
-    expect(paid('landfall')).toEqual(haul('landfall'));
-    expect(paid('shoal')).toEqual(haul('shoal'));
-    expect(paid('glint')).toEqual(decayedHaul(haul('glint'), pct));
-    expect(paid('veil')).toEqual(haul('veil'));
-    expect(paid('spire')).toEqual(decayedHaul(haul('spire'), pct));
-    expect(paid('deep')).toEqual(haul('deep'));
-    // The premise: the decay takes something off both relays.
-    expect(paid('glint')).not.toEqual(haul('glint'));
-    expect(paid('spire')).not.toEqual(haul('spire'));
-    for (const res of RAW_RESOURCES) {
-      const total = ['landfall', 'shoal', 'glint', 'veil', 'spire', 'deep'].reduce((s, id) => s + paid(id)![res], 0);
-      expect(w.campaign.totals.hauled[res], res).toBe(total);
-    }
+  it('changes the allocation six times; the setAlloc to 0 at tick 280 returns the extractor share to stock', () => {
+    expect(w.stats.allocChanges).toBe(6); // 450 x2, 280 x2, 850, and drone 5 at tick 7000
+    expect(shareReturned).not.toBeNull();
+    expect(shareReturned!.tick).toBe(280);
+    expect(shareReturned!.share).toBeGreaterThan(0);
+    expect(shareReturned!.shareAfter).toBe(0);
+    expect(shareReturned!.stockAfter).toBeGreaterThanOrEqual(shareReturned!.stockBefore + shareReturned!.share);
   });
 
-  it('refuses the Spore Veil landing by the band lock (lane-joined through Thorn Garden, band 2 not yet open), and lands there once Glint Relay is reclaimed', () => {
-    expect(refusedLandings).toEqual([[272, 'veil', true, false]]);
-    expect(landings.find((l) => l.area === 'veil')!.tick).toBeGreaterThan(w.campaign.areas[area('glint')]!.reclaimedTick!);
+  it('dispatches and docks extractors, and re-dispatches an idle one the tick a3 is marked (tick 400)', () => {
+    expect(firstDock).not.toBeNull();
+    expect(nodeId(firstDock!.node)).toBe('a1');
+    expect(redispatched).toMatchObject({ tick: 400 });
+    expect(nodeId(redispatched!.to!)).toBe('a3');
   });
 
-  it('withdraws from Glass Shoal once; the second landing carries Opening ore 1, and the withdraw kept the research', () => {
-    expect(w.campaign.areas[area('shoal')]).toMatchObject({ entries: 2, withdrawals: 1 });
-    const opening = data.tunables['economy.startStock'].default + data.tunables['research.opening.step'].default;
-    expect([landings[1]!.ore, landings[2]!.ore]).toEqual([opening, opening]);
-    expect(landings[0]!.ore).toBe(data.tunables['economy.startStock'].default);
-    expect(w.campaign.researchLog.map((r) => `${r.item} ${r.level}`)).toEqual(['opening 1', 'extract 1', 'rigs 1', 'yards 1']);
+  it('haulers deliver ore and ice', () => {
+    expect(w.stats.delivered.ore).toBeGreaterThan(0);
+    expect(w.stats.firstDeliveredTick.ore).not.toBeNull();
+    expect(w.stats.delivered.ice).toBeGreaterThan(0);
   });
 
-  it('captures pockets and hearts in every area it plays', () => {
-    expect(battles).toEqual([
-      'landfall heart captured',
-      'shoal p1 captured',
-      'shoal heart captured',
-      'glint p2 captured',
-      'glint heart captured',
-      'veil p1 captured',
-      'veil p2 captured',
-      'veil heart captured',
-      'spire p2 captured',
-      'spire heart captured',
-      'deep p2 captured',
-      'deep p1 captured',
-      'deep heart captured',
-    ]);
+  it('a setMine off (a1, tick 600) unbinds every extractor bound there', () => {
+    // a1 has 2 slots, both filled by then.
+    expect(unboundAtUnmark.length).toBe(2);
+    expect(rockStatus(w, 1)).toMatchObject({ mine: false, bound: 0 });
   });
 
-  it('relays raise the limit from the next landing: 4, then 12 in band 2, then 20 in The Deep', () => {
-    expect(landings.map((l) => [l.area, l.fleetCap])).toEqual([
-      ['landfall', limit0],
-      ['shoal', limit0],
-      ['shoal', limit0],
-      ['glint', limit0],
-      ['veil', limit0 + relayStep],
-      ['spire', limit0 + relayStep],
-      ['deep', limit0 + 2 * relayStep],
-    ]);
-    // Every battle records the limit its wave was sent at; Glint's own capture is still at 4.
-    expect(capAtSend).toEqual(battles.map((b) => {
-      const id = b.split(' ')[0]!;
-      const node = b.split(' ')[1]!;
-      return `${id} ${node} ${id === 'deep' ? limit0 + 2 * relayStep : ['veil', 'spire'].includes(id) ? limit0 + relayStep : limit0}`;
-    }));
+  it('the drones take the ice pocket p1 (then p2); its ice unlocks the Flak, which is built paying ice', () => {
+    expect(w.stats.captures.map((c) => nodeId(c.node))).toEqual(['p1', 'p2', 'heart']);
+    const p1 = w.stats.captures[0]!.tick;
+    expect(w.stats.firstDeliveredTick.ice).toBeGreaterThan(p1);
+    expect(w.stats.shipsBuilt.flak).toBeGreaterThanOrEqual(1);
+    expect(rockStatus(w, 8)).toMatchObject({ mine: true, freeExtractors: 1 });
   });
 
-  it('a yard at the limit: the yards report fleetFull in Spore Veil and the count never passes 12; a recycle there frees slots', () => {
-    expect(fullTicks['veil']).toBeGreaterThan(0);
-    expect(maxCount['veil']).toBe(limit0 + relayStep);
-    for (const [id, n] of Object.entries(maxCount)) {
-      const cap = landings.find((l) => l.area === id)!.fleetCap!;
-      expect(n, id).toBeLessThanOrEqual(cap);
-    }
-    const each = Math.floor((5 * data.tunables['fleet.recycleRefundPct'].default) / 100);
-    expect(recycled[0]).toEqual({ area: 'veil', tick: 2522, drones: 3, ore: 3 * each, countBefore: limit0 + relayStep });
-    // The Deep recycles every drone at p1 too (drone yard off), so lancers and flak fill its limit.
-    expect(recycled.map((r) => [r.area, r.tick])).toEqual([
-      ['veil', 2522],
-      ['deep', 3872],
-    ]);
-    expect(recycled[1]!.ore).toBe(recycled[1]!.drones * each);
-    expect(w.campaign.areas[area('veil')]).toMatchObject({ shipsRecycled: 3, oreRefunded: 3 * each });
-    // The freed slots go to both component yards in Spore Veil (both designs, both prizes; the drone yard is off).
-    expect(builtIn['veil']!.lancer).toBeGreaterThanOrEqual(1);
-    expect(builtIn['veil']!.flak).toBeGreaterThanOrEqual(1);
+  it('a bay is held by the fleet limit (fleetFull) for part of the run', () => {
+    expect(fleetFullTicks).toBeGreaterThan(0);
   });
 
-  it('lands in The Deep without a Root, with A1 rigged and Fast yards 1 on the drone build time', () => {
-    const deep = landings[landings.length - 1]!;
-    expect(deep.hasRoot).toBe(false);
-    expect(deep.rigged).toEqual(['a1']);
-    expect(deep.droneTicks).toBe(Math.max(15, Math.floor((30 * (100 - data.tunables['research.yards.stepPct'].default)) / 100)));
-    expect(w.routes.find((r) => r.from === 1)?.level).toBe(2);
+  it('recycles a docked extractor at a2 (tick 900) for its refund (the replay tunes ship.extractor.cost to 5)', () => {
+    expect(recycle).not.toBeNull();
+    expect(recycle!.tick).toBe(900);
+    // One economy ship fewer after the tick (no economy bay finishes then: both economy weights are 0 from tick 280).
+    expect(recycle!.econBefore).toBeGreaterThan(0);
+    expect(recycle!.econAfter).toBe(recycle!.econBefore - 1);
+    expect(recycle!.refund).toBe(Math.floor((5 * t['fleet.recycleRefundPct'].default) / 100));
+    expect(w.stats.econRecycled).toEqual({ extractor: 1, hauler: 0 });
   });
 
-  it('a mixed fight spans a checkpoint: lancers and flak at The Deep\'s heart against Thorns and Spores at tick 5400, after losses past the first ship', () => {
-    const at5400 = heartAtCheckpoint.find((c) => c.tick === 5400)!;
-    expect(at5400.area).toBe('deep');
-    const types = new Set(at5400.ships.map((s) => s.split(' ')[0]));
-    expect([...types].sort()).toEqual(['flak', 'lancer']);
-    expect(at5400.guards.thorn).toBeGreaterThan(0);
-    expect(at5400.guards.spore).toBeGreaterThan(0);
-    // Some ships are wounded, not only dead or whole: hp is carried across the checkpoint.
-    const full = data.tunables['ship.lancer.hp'].default;
-    expect(at5400.ships.some((s) => Number(s.split(' ')[1]) < full)).toBe(true);
-    // More than one ship lost in that battle: each round's damage spills past the first ship.
-    // The heart's battle: lancers and flak only, both guard types at the start, and losses on both ship types, so
-    // each guard pool found its own target type and spilled past single ships.
-    const fight = w.guardians.find((g) => w.nodes[g.node]!.kind === 'heart')!.lastBattle!;
-    expect(fight.startTick).toBeLessThan(5400);
-    expect(fight.endTick).toBeGreaterThan(5400);
-    expect(fight.engagedByType.drone).toBe(0);
-    expect(fight.guardsAtStart.thorn > 0 && fight.guardsAtStart.spore > 0).toBe(true);
-    expect(fight.lostByType.lancer).toBeGreaterThan(0);
-    expect(fight.lostByType.flak).toBeGreaterThan(0);
-    expect(fight.shipsLost).toBeGreaterThanOrEqual(2);
-    // By the checkpoint, ships had already been lost.
-    expect(at5400.ships.length).toBeLessThan(fight.engagedByType.lancer + fight.engagedByType.flak);
+  it('a raid musters once the economy reaches raid.firstAtEcon (tick 95), is mustered, launched at a1 and, a1 being stopped, retargets to the captured p1', () => {
+    const first = raidLog.find((e) => e.phase === 'muster')!;
+    expect(first.tick).toBe(95);
+    expect(first.econ).toBeGreaterThanOrEqual(t['raid.firstAtEcon'].default);
+    expect(nodeId(first.target!)).toBe('a1');
+    const outs = raidLog.filter((e) => e.phase === 'out');
+    // The log shows the state after the tick: the muster's first call is tick 95 and its last (the launch) is musterTicks - 1 later.
+    expect(outs[0]!.tick - first.tick).toBe(t['raid.musterTicks'].default - 1);
+    expect(nodeId(outs[0]!.target!)).toBe('a1');
+    // Still raid 1: a1 was stopped at tick 600, and the raid retargeted once on arrival.
+    expect(outs[1]!.raids.mustered).toBe(1);
+    expect(nodeId(outs[1]!.target!)).toBe('p1');
+    expect(outs[1]!.tick).toBeGreaterThan(600);
   });
 
-  it('uses every input type, with exactly two inputs ignored on purpose: research inside an area, and the band-locked landing', () => {
-    expect([...typesApplied].sort()).toEqual(
-      ['buildExtractor', 'buildRoute', 'buyResearch', 'cancelBuild', 'enterArea', 'leaveArea', 'recycleShips', 'sendShips', 'setRally', 'setShipyard', 'setTunable', 'upgradeRoute'].sort(),
-    );
-    expect(ignored).toEqual([`0 ${JSON.stringify({ type: 'buyResearch', item: 2 })}`, `272 ${JSON.stringify({ type: 'enterArea', area: area('veil') })}`]);
+  it('the first raid is beaten at p1 by the defenders there (no economy ship lost)', () => {
+    const fight = raidLog.find((e) => e.phase === 'fight')!;
+    expect(nodeId(fight.target!)).toBe('p1');
+    expect(fight.warshipsAtTarget).toBeGreaterThan(0);
+    const end = raidLog.find((e) => e.phase === 'none' && e.raids.beaten === 1)!;
+    expect(end.tick).toBeGreaterThan(fight.tick);
+    expect(end.raids).toEqual({ mustered: 1, beaten: 1, hit: 0, turnedBack: 0 });
+  });
+
+  it('the second raid hits p1 undefended: it kills a docked extractor and comes home (hit)', () => {
+    const fights = raidLog.filter((e) => e.phase === 'fight');
+    expect(fights.length).toBeGreaterThanOrEqual(2);
+    expect(nodeId(fights[1]!.target!)).toBe('p1');
+    expect(fights[1]!.warshipsAtTarget).toBe(0);
+    const hit = raidLog.find((e) => e.phase === 'none' && e.raids.hit === 1)!;
+    expect(hit.raids).toEqual({ mustered: 2, beaten: 1, hit: 1, turnedBack: 0 });
+  });
+
+  it('the hive is captured (tick 8010) with the third raid out at p1: it withers (removed, not counted as an outcome)', () => {
+    const cap = w.stats.captures.find((c) => nodeId(c.node) === 'heart')!;
+    expect(w.capturedTick).toBe(cap.tick);
+    const third = raidLog.filter((e) => e.phase === 'fight')[2]!;
+    expect(third.tick).toBeLessThan(cap.tick);
+    const end = raidLog.find((e) => e.phase === 'none' && e.tick > third.tick)!;
+    expect(end.tick).toBe(cap.tick);
+    expect(w.raid).toBeNull();
+    expect(w.lastRaid).toMatchObject({ id: 3, outcome: 'withered' });
+    expect(w.stats.raids).toEqual({ mustered: 3, beaten: 1, hit: 1, turnedBack: 0 });
+    expect(w.guardians.find((g) => nodeId(g.node) === 'heart')!.guards).toEqual([]);
+  });
+
+  it('uses every field input type it needs, with no input ignored', () => {
+    expect([...typesApplied].sort()).toEqual(['recycleShips', 'sendShips', 'setAlloc', 'setMine', 'setRally', 'setTunable']);
+    expect(ignored).toEqual([]);
+  });
+
+  it('is deterministic: two runs give the same 30 checkpoint hashes', () => {
+    const a = replayHashes(referenceReplay, data, 9000, 300);
+    const b = replayHashes(referenceReplay, data, 9000, 300);
+    expect(a).toHaveLength(30);
+    expect(a).toEqual(b);
   });
 });

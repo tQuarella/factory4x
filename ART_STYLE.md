@@ -49,6 +49,7 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Closed lane | `#707b90` |
 | Open lane | `#9fb4d4` |
 | Owned lane | `#ffd27a` |
+| Economy ship hull | `#f0a83a` |
 
 Contrast check: every entity color must read against `#05070d` at 4.5:1 or better.
 
@@ -190,3 +191,23 @@ Rules:
 - **Far node centre.** A far node shows no prize icon (the area sheet withholds the haul too). A far relay shows only the relay mark, dimmed with `drawRelayMark(ctx, 0.5 * r, 0.5)` to the node's own 0.5 alpha, at the same upper-left position. A far non-relay node is the bare hollow cluster. Far never carries a lock badge.
 - **Keep the lock badge and relay mark clear of text and rings.** Placed as above, they reach outside the node's circle diagonally: the relay mark to about 1.49 of the node's r, the lock badge to about 1.31 (the gallery's bounds list measures both, "reach from the node centre"). At the overworld size (node r ≥ 22) that is up to about 33 px, past the selection ring at r + 6. Place name labels below the node (or clear of the corners) and keep the selection ring at r + 6 from covering them, drawing marks after the ring; the caller owns this.
 - **`drawRelayMark` bounds.** Stays within its own r: the disc is 0.96 r so the antialiased edge does too (gallery pixel scan 0.984 r against the 1.002 r limit; exact geometry in the test). The relay icon alone is for the sheet and the notice.
+
+## H7 entities
+
+One field, live enemy: economy ships, the raid marker, the radar and the mine badge. Draw functions are in `packages/client/src/placeholders.ts`. Bounds are checked in `packages/client/test/h7-art.test.ts` (recording context) and the gallery's pixel scan (`tests/smoke/h7-art.spec.ts` reads it). The gallery shows a 24 px strip in colour and greyscale with the hulls beside the warships and a rock, and prints each hull's 24 px mask overlap (intersection over union) with the others. New palette entry: `econ` `#f0a83a` (the economy hull, an orange amber so it is not the probe's `#ffd27a`).
+
+| Entity | Draw | Look | 24 px read |
+| --- | --- | --- | --- |
+| Extractor | `drawExtractor(ctx, r, heading)` | squat chamfered amber hull with a dark cab slot and a pale drill prong to the nose; faces right | short amber block with a pale spike |
+| Hauler | `drawHauler(ctx, r, heading)` | amber chassis and cab behind a big square cargo pod with a dark cross brace, pale windscreen | amber box with an X |
+| Raid marker | `drawRaidMarker(ctx, r, mix)` | the raiders' ring (Thorn arc `thorn`, Spore arc `spore`, each its share of the circle) round a hot-pink (`bloom`) chevron pointing right | pink arrow in a two-colour ring |
+| Radar | `drawRadar(ctx, w, h, weights, max)` | pentagon grid in `starDim` (one ring per weight step), an axis to each type's icon (extractor, hauler, drone, lancer, flak, clockwise from the top), the weights filled in `probe` amber at 0.3 alpha with a solid edge | amber pentagon on a grid |
+| Mine badge | `drawMineBadge(ctx, r)` | a teal pick on a dark disc with a teal ring | round teal pick |
+| Rock under raid | `drawAsteroid(..., 'raided', t)` | the rock with a pulsing `mobGlow` and a jagged `mob` red rim | rock in a red burst |
+
+Rules:
+- **Bounds.** Extractor, hauler, raid marker and mine badge stay within r (measured 0.96, 0.98, 1.00 and 0.98 r in the gallery); the raided rock's glow and rim stay within 1.1 r; the radar, icons included, stays inside its w by h box.
+- **Told apart at 24 px.** The extractor and hauler each overlap the other hull, the three warships and a rock by under 0.75 (gallery check, currently 0.35 to 0.60), and each covers over 80 px of its 24 px cell. The extractor is the small one with a spike; the hauler the big one with a box.
+- **Amber.** The economy hull is `econ`, not the probe amber; the radar fill is the probe amber (it is the player's allocation). Neither hull uses player blue or any mob colour (tested). The mine badge is teal with no amber, so it is not the lock (amber shackle) or the "!" (amber pill).
+- **Callers.** A docked extractor sits on its rock's upper arc with its drill toward the rock (about 6.5 px), idle ships wait in a row under the probe, a loaded hauler wears a teal dot, the mine badge sits at the rock's lower right, the raid marker rides a dashed `mob` line from the hive to its target with its seconds under it, and the hive pulses with a `mob` ring while a raid musters.
+

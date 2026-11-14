@@ -1,21 +1,24 @@
 import {
-  COMBAT_ORDER,
   COMPONENTS,
   COMPONENT_INPUT,
   GUARD_TYPES,
   SHIP_COMPONENT,
   YARD_ORDER,
   YARD_ROTATION,
-  type GuardType,
-  type RawResource,
   type ShipType,
   type SimData,
   type Tunables,
 } from './data.ts';
 import { designResearched, extractPct, reclaimActive, shipments, yardBuildTicks } from './campaign.ts';
+import { allocate, captureField, fieldStats, moveEcon, recordDelivery, runBays, runExtractors, runHaulers, syncExtractors } from './field.ts';
+import { hiveRegrow, raidStep, raidWither } from './factions/index.ts';
+export { ECON_STRIKE_ORDER, GUARD_TARGET_ORDER, counterPct, guardPools, guardStrike, playerDamage } from './combat.ts';
+export type { StrikeKills } from './combat.ts';
+import { guardPools, guardStrike, playerDamage } from './combat.ts';
 import { fleetCap, isFleetFull } from './fleet.ts';
-import { applyInput, startTransit, type Input } from './inputs.ts';
+import { applyInput, type Input } from './inputs.ts';
 import { ceilDiv } from './math.ts';
+import { advance, newShip } from './ships.ts';
 import {
   PROBE,
   addGuard,
@@ -31,7 +34,6 @@ import {
   type Battle,
   type BattleOutcome,
   type BattleResult,
-  type Guard,
   type Guardian,
   type Ship,
   type Wilt,
@@ -126,16 +128,9 @@ function extraction(world: World): void {
   }
 }
 
-/** The per-second delivery ring buffer for a resource. */
-function bucketsOf(world: World, res: RawResource): number[] {
-  return res === 'ore' ? world.stats.deliveredBuckets : world.stats.prizeBuckets[res];
-}
-
 /** Rule 4. */
 function routes(world: World): void {
   const t = world.tun;
-  const st = world.stats;
-  const bucket = Math.floor(world.tick / world.tickRate) % st.deliveredBuckets.length;
   for (const route of world.routes) {
     if (route.cooldown > 0) route.cooldown -= 1;
     const src = world.nodes[route.from]!;
@@ -149,11 +144,7 @@ function routes(world: World): void {
     for (const pod of route.pods) {
       pod.ticksLeft -= 1;
       if (pod.ticksLeft <= 0) {
-        world.stock[pod.res] += pod.amount;
-        st.delivered[pod.res] += pod.amount;
-        if (st.firstDeliveredTick[pod.res] === null) st.firstDeliveredTick[pod.res] = world.tick;
-        const b = bucketsOf(world, pod.res);
-        b[bucket] = b[bucket]! + pod.amount;
+        recordDelivery(world, pod.res, pod.amount);
         delivered = true;
       }
     }
@@ -192,15 +183,6 @@ function assemblers(world: World): void {
       a.ticksLeft = t['component.buildTicks'];
     }
   }
-}
-
-function newShip(world: World, type: ShipType): Ship {
-  const ship: Ship = { id: world.nextId++, type, hp: world.tun[`ship.${type}.hp`], at: PROBE, transit: null, engagedIn: -1 };
-  world.ships.push(ship);
-  world.stats.shipsBuilt[type] += 1;
-  if (world.stats.firstShipTick === null) world.stats.firstShipTick = world.tick;
-  if (world.rally !== PROBE) startTransit(world, ship, world.rally);
-  return ship;
 }
 
 /**
@@ -252,15 +234,7 @@ function yards(world: World, data: SimData): void {
 
 /** Rule 6. */
 function movement(world: World): void {
-  for (const s of world.ships) {
-    const tr = s.transit;
-    if (tr === null) continue;
-    tr.ticksLeft -= 1;
-    if (tr.ticksLeft <= 0) {
-      s.at = tr.to;
-      s.transit = null;
-    }
-  }
+  for (const s of world.ships) advance(s);
 }
 
 /** Ships parked at `node`, in id order. */
@@ -268,74 +242,6 @@ function shipsAt(world: World, node: number): Ship[] {
   const present: Ship[] = [];
   for (const s of world.ships) if (s.at === node) present.push(s);
   return present;
-}
-
-/** Target order per ship type (rule 7). Drones use all guards in id order and are handled apart. */
-const TARGET_ORDER: Readonly<Record<'lancer' | 'flak', readonly GuardType[]>> = {
-  lancer: ['thorn', 'spore'],
-  flak: ['spore', 'thorn'],
-};
-
-/**
- * Rule 7, guard damage (DESIGN.md H6 "Combat amendment"): the ship types each guard type's pool strikes, in order.
- * Each strikes first the type that is Weak against it and last the type that counters it; drones sit between.
- */
-export const GUARD_TARGET_ORDER: Readonly<Record<GuardType, readonly ShipType[]>> = {
-  thorn: ['flak', 'drone', 'lancer'],
-  spore: ['lancer', 'drone', 'flak'],
-};
-
-/** Damage multiplier, percent, of a ship type against a guard type: strong, weak, or 100 for drones. */
-export function counterPct(t: Readonly<Tunables>, ship: ShipType, guard: GuardType): number {
-  if (ship === 'drone') return 100;
-  const strong = (ship === 'lancer') === (guard === 'thorn');
-  return strong ? t['counter.strongPct'] : t['counter.weakPct'];
-}
-
-/**
- * Applies `dmg` to the living guards (hp > 0) of `type` (or of every type when
- * null) in id order, overflowing from one to the next as in H1. Returns the
- * damage left over.
- */
-function applyToGuards(guards: Guard[], type: GuardType | null, dmg: number): number {
-  for (const gd of guards) {
-    if (dmg <= 0) break;
-    if (gd.hp <= 0 || (type !== null && gd.type !== type)) continue;
-    const hit = Math.min(dmg, gd.hp);
-    gd.hp -= hit;
-    dmg -= hit;
-  }
-  return dmg;
-}
-
-function anyLiving(guards: readonly Guard[], type: GuardType): boolean {
-  for (const gd of guards) if (gd.type === type && gd.hp > 0) return true;
-  return false;
-}
-
-/**
- * Rule 7 player damage for one round: each ship type present, in the order
- * lancer, flak, drone, pools its damage and walks its target order. Damage
- * from earlier types is already applied when later types act.
- */
-export function playerDamage(t: Readonly<Tunables>, guards: Guard[], present: Readonly<Record<ShipType, number>>): void {
-  for (const type of COMBAT_ORDER) {
-    const n = present[type];
-    if (n === 0) continue;
-    let base = n * t[`ship.${type}.damage`];
-    if (type === 'drone') {
-      applyToGuards(guards, null, base);
-      continue;
-    }
-    for (const gt of TARGET_ORDER[type]) {
-      if (base <= 0) break;
-      // A type with no living guards takes nothing, so the pool passes on unconverted (DECISIONS.md, h3-sim).
-      if (!anyLiving(guards, gt)) continue;
-      const pct = counterPct(t, type, gt);
-      const left = applyToGuards(guards, gt, Math.floor((base * pct) / 100));
-      base = anyLiving(guards, gt) ? 0 : Math.floor((left * 100) / pct);
-    }
-  }
 }
 
 function newBattle(world: World, data: SimData, g: Guardian): Battle {
@@ -374,28 +280,13 @@ function combat(world: World, data: SimData, g: Guardian): void {
       }
       // Both sides' damage comes from the state at the start of the round: the guard pools are sized before
       // the ships strike, so a guard that dies this round still hits.
-      const pools: Record<GuardType, number> = { thorn: 0, spore: 0 };
-      for (const gd of g.guards) pools[gd.type] += t[`guard.${gd.type}.damage`];
+      const pools = guardPools(t, g.guards);
       playerDamage(t, g.guards, byType);
       let shipsKilled = 0;
-      // H6 combat amendment: each guard pool strikes the ship type it counters first (GUARD_TARGET_ORDER), within
-      // a type in id order, with overflow to the next ship and the next type. Thorns, then spores on the ships left.
-      for (const gt of GUARD_TYPES) {
-        let pool = pools[gt];
-        for (const type of GUARD_TARGET_ORDER[gt]) {
-          for (const s of present) {
-            if (pool <= 0) break;
-            if (s.type !== type || s.hp <= 0) continue;
-            const hit = Math.min(pool, s.hp);
-            s.hp -= hit;
-            pool -= hit;
-            if (s.hp <= 0) {
-              shipsKilled++;
-              battle.lostByType[s.type] += 1;
-              world.stats.shipsLost[s.type] += 1;
-            }
-          }
-        }
+      for (const s of guardStrike(pools, present).ships) {
+        shipsKilled++;
+        battle.lostByType[s.type] += 1;
+        world.stats.shipsLost[s.type] += 1;
       }
       let guardsKilled = 0;
       for (const gd of g.guards) {
@@ -488,7 +379,14 @@ function capture(world: World, data: SimData, g: Guardian): void {
     endBattle(world, g, 'captured', wilt(world));
     return;
   }
-  if (node.kind === 'pocket') {
+  if (world.field !== null) {
+    // H7 F11: Mine-marked with its free extractor; capturing the hive wins the run (free play continues).
+    captureField(world, g.node);
+    if (node.kind === 'heart') {
+      world.capturedTick = world.tick;
+      raidWither(world);
+    }
+  } else if (node.kind === 'pocket') {
     node.extractors = Math.min(world.tun['pocket.freeExtractors'], node.slots);
   } else {
     node.extractors = Math.min(world.tun['heart.freeExtractors'], node.slots);
@@ -500,6 +398,10 @@ function capture(world: World, data: SimData, g: Guardian): void {
 
 /** Rule 9, for one living guardian: each type regrows toward its effective cap at its own period. */
 function regrowth(world: World, g: Guardian): void {
+  if (world.field !== null && world.nodes[g.node]!.kind === 'heart') {
+    hiveRegrow(world, g, (type) => addGuard(world, g, type));
+    return;
+  }
   const caps = guardCaps(world, g);
   const count = countGuards(g);
   for (const type of GUARD_TYPES) {
@@ -546,6 +448,35 @@ function stats(world: World): void {
   }
 }
 
+/**
+ * H7 field mode, one tick after F1 (the inputs), in DESIGN.md H7's order: F2 allocation, F3 bays, F4 extraction,
+ * F5 extractors, F6 haulers, F7 movement (warships, then economy ships, then docking), F8 the raid hook, F10
+ * combat, F11 capture and regrowth (each over every guardian in node order), then stats. F9 (the fleet limit) is
+ * checked inside F3. The campaign rules 2, 4, 5 and 10 (construction, routes, assemblers and yards, shipments)
+ * never run in field mode.
+ */
+function fieldStep(world: World, data: SimData): void {
+  const gs = world.guardians;
+  // A recycle among the inputs may have removed a docked extractor.
+  syncExtractors(world);
+  allocate(world);
+  runBays(world, data);
+  extraction(world);
+  runExtractors(world);
+  // An extractor unbound in F5 no longer works its node: haulers there see it this tick.
+  syncExtractors(world);
+  runHaulers(world);
+  movement(world);
+  moveEcon(world);
+  syncExtractors(world);
+  raidStep(world, data);
+  for (const g of gs) if (g.alive) combat(world, data, g);
+  for (const g of gs) if (g.alive) capture(world, data, g);
+  for (const g of gs) if (g.alive) regrowth(world, g);
+  stats(world);
+  fieldStats(world);
+}
+
 /** Advances the world by one tick, applying `inputs` first (rule 1). Throws if `data` is for a different data version. */
 export function step(world: World, data: SimData, inputs: readonly Input[]): void {
   if (world.dataVersion !== data.dataVersion) {
@@ -568,6 +499,11 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
       }
     }
     world.stats.wavesSent -= extra;
+  }
+  if (world.field !== null) {
+    fieldStep(world, data);
+    world.tick += 1;
+    return;
   }
   // The overworld is paused: rule 1 only.
   if (world.campaign.active === null) {

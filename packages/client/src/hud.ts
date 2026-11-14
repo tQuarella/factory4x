@@ -2,7 +2,8 @@
  * The HUD chips: icon + count per resource and per ship type, hidden until owned (DESIGN.md H3 "HUD").
  * Built once; `update` touches text and visibility only. All values come from the sim's selectors.
  */
-import { RAW_RESOURCES, RESOURCES, SHIP_TYPES, campaignStatus, fleetCap, fleetStatus, prizePerMin, shipCounts, unlockStatus, type RawResource, type Resource, type ShipType, type SimData, type World } from '@factory4x/sim';
+import { raidStatus, RAW_RESOURCES, RESOURCES, SHIP_TYPES, campaignStatus, fleetCap, fleetStatus, isField, prizePerMin, shipCounts, unlockStatus, type RawResource, type Resource, type ShipType, type SimData, type World } from '@factory4x/sim';
+import { raidChipText } from './fieldreport.ts';
 import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { fmt10 } from './format.ts';
 import { fleetIcon, paintIcon, resourceIcon, shipIcon, stockpileIcon } from './icons.ts';
@@ -31,6 +32,8 @@ export class Hud {
   private readonly res = new Map<Resource, Chip>();
   private readonly ships = new Map<ShipType, Chip>();
   private readonly fleet: Chip & { icon: HTMLCanvasElement; full: boolean; numbers: HTMLElement };
+  /** H7: the raid chip, "Raid 0:12"; hidden in a campaign and when raid.enabled is 0. */
+  private readonly raid: Chip;
 
   constructor(root: HTMLElement) {
     // Two rows, so the fleet chip always sits with the ship chips it counts: resources, then ships and the fleet.
@@ -53,6 +56,9 @@ export class Hud {
     h('span', 'fl-word', 'Fleet ', chip.count);
     const numbers = h('span', 'fl-n', '', chip.count);
     this.fleet = { ...chip, icon, full: false, numbers };
+    this.raid = makeChip(shipRow, 'chip-raid', 'Raids', () => undefined, false);
+    this.raid.el.classList.add('raid');
+    this.raid.el.hidden = true;
   }
 
   update(world: Readonly<World>, data: SimData): void {
@@ -69,11 +75,21 @@ export class Hud {
         paintIcon(this.fleet.icon, 26, (ctx, r) => drawFleetIcon(ctx, r, f.full));
       }
     }
+    const rs = isField(world) ? raidStatus(world) : null;
+    const chipText = rs === null ? null : raidChipText(rs, world.tickRate);
+    setHidden(this.raid.el, chipText === null);
+    if (rs !== null && chipText !== null) {
+      setText(this.raid.count, chipText);
+      toggleClass(this.raid.el, 'active', rs.phase !== 'none');
+      this.raid.el.title = rs.phase === 'none' ? `Raids begin once you have ${rs.nextRaidAtEcon} economy ships (you have ${rs.econ})` : 'A raid is on its way';
+    }
     const unlocked = unlockStatus(world);
     const perMin = prizePerMin(world);
+    // H7: a field run has no lens or plating (no assemblers) and no per-type ship chips (the fleet chip counts every ship).
+    const field = isField(world);
     for (const r of RESOURCES) {
       const c = this.res.get(r)!;
-      setHidden(c.el, !unlocked.resources[r]);
+      setHidden(c.el, !unlocked.resources[r] || (field && (r === 'lens' || r === 'plating')));
       setText(c.count, String(world.stock[r]));
       if (c.rate) {
         const v = r === 'ice' || r === 'crystal' ? perMin[r] : 0;
@@ -85,7 +101,7 @@ export class Hud {
     const counts = shipCounts(world).byType;
     for (const s of SHIP_TYPES) {
       const c = this.ships.get(s)!;
-      setHidden(c.el, !unlocked.ships[s]);
+      setHidden(c.el, field || !unlocked.ships[s]);
       setText(c.count, String(counts[s]));
     }
   }

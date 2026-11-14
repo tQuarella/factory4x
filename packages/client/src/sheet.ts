@@ -12,8 +12,10 @@ import {
   combatRates,
   fleetStatus,
   guardianStatus,
+  econAtByType,
   inputCost,
   isCaptured,
+  isField,
   isGuarded,
   isRootCut,
   isValidInput,
@@ -57,6 +59,8 @@ import {
   isBackedUp,
   unlockHint,
 } from './report.ts';
+import { BUILD_PLURAL } from './fieldreport.ts';
+import { buildProbeSheet, buildRockSheet, type FieldSheetHost } from './fieldsheets.ts';
 import type { Session } from './session.ts';
 
 export interface SheetHost {
@@ -104,14 +108,15 @@ const ASSEMBLER_STATE_TEXT: Record<AssemblerState, (input: string) => string> = 
 
 const KIND_LABEL: Record<BuildKind, string> = { extractor: 'Ext', route: 'Route', upgrade: 'Upg' };
 
-export function shortName(n: Pick<Node, 'id' | 'kind'>): string {
-  return n.kind === 'probe' ? 'Probe' : n.kind === 'heart' ? 'Heart' : n.kind === 'root' ? 'Root' : n.id.toUpperCase();
+/** H7: in a field run the heart is "the hive" (`hive` true). */
+export function shortName(n: Pick<Node, 'id' | 'kind'>, hive = false): string {
+  return n.kind === 'probe' ? 'Probe' : n.kind === 'heart' ? (hive ? 'Hive' : 'Heart') : n.kind === 'root' ? 'Root' : n.id.toUpperCase();
 }
 
-function longName(n: Pick<Node, 'id' | 'kind' | 'prize'>, captured: boolean, rootCut: boolean): string {
+function longName(n: Pick<Node, 'id' | 'kind' | 'prize'>, captured: boolean, rootCut: boolean, hive: boolean): string {
   if (n.kind === 'probe') return 'Probe';
   if (n.kind === 'root') return rootCut ? 'Root (cut)' : 'Root · feeds the Heart';
-  if (n.kind === 'heart') return captured ? 'Heart (yours)' : 'The Bloom heart';
+  if (n.kind === 'heart') return hive ? (captured ? 'Hive (yours)' : 'The hive') : captured ? 'Heart (yours)' : 'The Bloom heart';
   if (n.kind === 'pocket') return `Pocket ${n.id.toUpperCase()}${n.prize ? ` · ${RES_NAME[n.prize]}` : ''}`;
   return `Asteroid ${n.id.toUpperCase()}`;
 }
@@ -136,6 +141,17 @@ export class Sheet {
 
   private get world() {
     return this.host.session.world;
+  }
+
+  private fieldHost(): FieldSheetHost {
+    const host = this.host;
+    return {
+      world: () => host.session.world,
+      data: () => host.session.data,
+      send: (i) => host.send(i),
+      recycle: (node) => host.recycle(node),
+      close: () => host.close(),
+    };
   }
 
   private valid(input: Input): boolean {
@@ -169,17 +185,28 @@ export class Sheet {
     this.ups = [];
     this.root.replaceChildren();
     this.root.hidden = false;
-    this.root.classList.remove('world');
+    this.root.classList.remove('world', 'fp');
     this.root.scrollTop = 0;
+    const field = isField(world);
+
+    // H7: the probe sheet carries its own head (the radar sits beside the title and the close button) and its own rally button.
+    if (field && n.kind === 'probe') {
+      this.root.classList.add('fp');
+      buildProbeSheet(this.root, this.fieldHost(), this.ups);
+      this.sendSection(n);
+      this.update();
+      return;
+    }
 
     const head = h('div', 'sheet-head', '', this.root);
-    const title = h('h2', '', longName(n, isCaptured(world), isRootCut(world)), head);
+    const title = h('h2', '', longName(n, isCaptured(world), isRootCut(world), field), head);
     const closeBtn = btn(head, '✕', () => this.host.close(), 'close');
     closeBtn.el.setAttribute('aria-label', 'Close');
     void title;
 
     if (n.kind === 'probe') this.probeSections();
     else if (isGuarded(world, n.index)) this.guardedSections(n);
+    else if (field) buildRockSheet(this.root, this.fieldHost(), n.index, this.ups);
     else if (n.kind === 'root') this.cutRootSections();
     else this.producerSections(n);
 
@@ -525,7 +552,7 @@ export class Sheet {
       else if (g.prize === null) setText(prize, '-');
       else {
         const u = g.prize === 'ice' || g.prize === 'crystal' ? UNLOCKS[g.prize] : null;
-        const unlock = u ? ` · unlocks ${u.component} → ${SHIP_NAME[u.ship]}` : '';
+        const unlock = u ? (isField(w) ? ` · unlocks ${BUILD_PLURAL[u.ship]}` : ` · unlocks ${u.component} → ${SHIP_NAME[u.ship]}`) : '';
         setText(
           prize,
           isHeart
@@ -626,7 +653,9 @@ export class Sheet {
     recycleIcon(b.el, 22);
     const label = h('span', '', '', b.el);
     this.ups.push(() => {
-      const k = shipCounts(this.world).at[n.index]!;
+      // H7: economy ships parked here count too.
+      const e = econAtByType(this.world, n.index);
+      const k = shipCounts(this.world).at[n.index]! + e.extractor + e.hauler;
       setHidden(sec, k === 0);
       setText(label, `Recycle… · ${k} here`);
     });

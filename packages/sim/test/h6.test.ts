@@ -31,7 +31,7 @@ import {
   type SimTunableKey,
   type World,
 } from '../src/index.ts';
-import { fixtureV10 } from './fixture.ts';
+import { fixtureV10, shippedCampaign } from './fixture.ts';
 import { deepStart } from './h3-world.ts';
 
 /**
@@ -381,7 +381,8 @@ describe('The Deep without the Root (DESIGN.md H6 "Removing the Root")', () => {
   });
 
   it('the shipped data lands The Deep the same way (no Root, fed counts only)', () => {
-    const w = campaignWorld(1, defaultData, deepStart(defaultData));
+    // h7-sim: the shipped data runs the field; its parked campaign is played with run.mode "campaign".
+    const w = campaignWorld(1, shippedCampaign, deepStart(defaultData));
     expect(rootIndex(w)).toBe(-1);
     const g = guardianAt(w, heartIndex(w))!;
     expect([g.fed, g.starvedCounts]).toEqual([true, null]);

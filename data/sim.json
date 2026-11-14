@@ -1,6 +1,7 @@
 {
-  "dataVersion": 11,
+  "dataVersion": 13,
   "tickRate": 30,
+  "run": { "mode": "field" },
   "tunables": {
     "economy.startStock": { "default": 40, "min": 0, "max": 200 },
     "economy.probeOrePerMin": { "default": 12, "min": 0, "max": 60 },
@@ -65,6 +66,30 @@
     "areas.repeatHaulPct": { "default": 50, "min": 0, "max": 100 },
     "overworld.bandLock": { "default": 1, "min": 0, "max": 1 },
     "system.variant": { "default": 0, "min": 0, "max": 3 },
+    "alloc.maxWeight": { "default": 5, "min": 3, "max": 10 },
+    "alloc.start.extractor": { "default": 3, "min": 0, "max": 5 },
+    "alloc.start.hauler": { "default": 2, "min": 0, "max": 5 },
+    "ship.extractor.cost": { "default": 20, "min": 5, "max": 60 },
+    "ship.extractor.buildTicks": { "default": 120, "min": 15, "max": 900 },
+    "ship.extractor.hp": { "default": 6, "min": 1, "max": 40 },
+    "ship.hauler.cost": { "default": 15, "min": 5, "max": 60 },
+    "ship.hauler.buildTicks": { "default": 90, "min": 15, "max": 900 },
+    "ship.hauler.hp": { "default": 6, "min": 1, "max": 40 },
+    "ship.hauler.cargo": { "default": 4, "min": 1, "max": 20 },
+    "ship.hauler.speedSu": { "default": 2, "min": 1, "max": 10 },
+    "ship.lancer.crystal": { "default": 4, "min": 1, "max": 40 },
+    "ship.flak.ice": { "default": 4, "min": 1, "max": 40 },
+    "field.fleetCap": { "default": 30, "min": 0, "max": 80 },
+    "fleet.countsEconomy": { "default": 1, "min": 0, "max": 1 },
+    "raid.enabled": { "default": 1, "min": 0, "max": 1 },
+    "raid.firstAtEcon": { "default": 6, "min": 2, "max": 20 },
+    "raid.econPerRaider": { "default": 2, "min": 1, "max": 10 },
+    "raid.maxSize": { "default": 12, "min": 2, "max": 30 },
+    "raid.gapTicks": { "default": 3600, "min": 900, "max": 9000 },
+    "raid.hiveKeepPct": { "default": 50, "min": 25, "max": 90 },
+    "raid.musterTicks": { "default": 450, "min": 0, "max": 1800 },
+    "raid.speedSu": { "default": 3, "min": 1, "max": 10 },
+    "hive.regrowPct": { "default": 200, "min": 100, "max": 1000 },
     "stats.throughputWindowSec": { "default": 60, "min": 60, "max": 60 },
     "client.autosaveSec": { "default": 5, "min": 2, "max": 60 }
   },
@@ -87,6 +112,17 @@
       { "id": "root", "kind": "root", "x": 500, "y": 450, "r": 45, "slots": 0 },
       { "id": "heart", "kind": "heart", "x": 500, "y": 220, "r": 90, "slots": 4 }
     ],
+    "field": {
+      "nodes": ["probe", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "p1", "p2", "heart"],
+      "mine": ["a1", "a2", "a3", "a4", "a5", "a6", "a7"],
+      "layout": {
+        "pockets": {
+          "p1": { "prize": "ice", "slots": 2, "thorns": 0, "spores": 4 },
+          "p2": { "prize": "crystal", "slots": 2, "thorns": 1, "spores": 2 }
+        },
+        "heart": { "thorns": 12, "spores": 18 }
+      }
+    },
     "layouts": [
       {
         "id": "frost",

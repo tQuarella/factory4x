@@ -7,13 +7,14 @@
  *     log: [{tick, input}...]   the full input log since tick 0,
  *     startTunables: {key: value}  sim tunables the run started with (New system keeps tuning),
  *     start: CampaignStart      only for a constructed start (dev hooks, tests); a real game has none,
+ *     mode: 'campaign'          only for a parked-campaign session (H7: shipped data is field mode; a real game has none),
  *     pending: [input...]       inputs sent but not yet stepped,
  *     history: [ore/min...]     sparkline samples, flags: {...} }
  * The seed and the whole log are saved next to the world, so after a resume
  * `session.replay()` still reproduces the live state hash and a feedback note
  * sent after a resume carries a replay of the entire session.
  */
-import { deserializeWorld, serializeWorld, type CampaignStart, type Input, type ResourceTriple, type SimData } from '@factory4x/sim';
+import { deserializeWorld, runMode, serializeWorld, withRunMode, type CampaignStart, type Input, type ResourceTriple, type SimData } from '@factory4x/sim';
 import { Session, dataWithDefaults, defaultsDiff, type LoggedInput, type RunFlags } from './session.ts';
 
 export const SAVE_KEY = 'fvn.save';
@@ -46,6 +47,7 @@ export function encodeSave(session: Session): string {
     seed: session.seed,
     startTunables: defaultsDiff(session.data),
     start: session.start,
+    ...(runMode(session.data) === 'campaign' ? { mode: 'campaign' } : {}),
     dataVersion: session.world.dataVersion,
     world: serializeWorld(session.world),
     log: session.log,
@@ -73,7 +75,8 @@ function readTriple(v: unknown): ResourceTriple | null {
   return { ore: v.ore, ice: v.ice, crystal: v.crystal };
 }
 
-export function decodeSave(text: string, data: SimData): LoadOutcome {
+export function decodeSave(text: string, shipped: SimData): LoadOutcome {
+  let data = shipped;
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -83,6 +86,7 @@ export function decodeSave(text: string, data: SimData): LoadOutcome {
   if (!isObj(parsed) || parsed.format !== SAVE_FORMAT || typeof parsed.world !== 'string' || !isInt(parsed.seed)) {
     return { kind: 'discarded', reason: 'corrupt', saveDataVersion: null };
   }
+  if (parsed.mode === 'campaign') data = withRunMode(data, 'campaign');
   const loaded = deserializeWorld(parsed.world, data);
   if (!loaded.ok) return { kind: 'discarded', reason: loaded.reason, saveDataVersion: loaded.saveDataVersion };
   const log = readLog(parsed.log);

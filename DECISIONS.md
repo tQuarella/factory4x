@@ -861,6 +861,201 @@ Scope: `git log build-20261108-4..build-20261108-5`, `reviews/h6-*.md`, the "Ite
 **Decision:** (1) The flip to `run.mode: "field"` stays in h7-sim, and the whole stack lands through `merge-task h7-client`. (2) Art is folded into h7-client; a separate art-direction task only if h7-client's Critic finds the new silhouettes unreadable. (3) The H6 campaign bots stay in the code, retired from the gate, and their tests run on a campaign-mode fixture; deleting them goes with cw-root-code-removal once the overworld's fate is known. (4) The field guard counts and `field.fleetCap` 30 are starting values for h7-design-data to calibrate.
 **Why:** the field reference replay and browser cross-engine check run on shipped data, so flipping early keeps them honest. The overworld is parked, not dropped (Q21), so its bots shouldn't be deleted while it might return. Folding art keeps 4 launches spare.
 
+## 2026-11-14 · Core Engineer · h7-sim: field mode architecture, spec readings and test changes
+
+**Architecture (packages/sim):**
+1. **Economy ships live in their own array, `world.field.econ` (`EconShip`), not in `world.ships`.** Ids come from the same `nextId`, so they are unique across both. *Rejected:* widening `ShipType` to five types. `ShipTypeCounts` literals, `SHIP_TYPES` loops and `world.ships` reads appear 86 times in the client and bots, and every H3–H6 path over `world.ships` (combat at guarded nodes, send, rally, ship counts) would have needed an economy filter. Economy ships also carry state warships don't (`target`, `cargo`). With a separate array, every warship path is unchanged and F10 never sees an economy ship by construction.
+2. **All field-mode state sits under one field, `world.field` (`FieldState`, null in a campaign world).** It holds `alloc`, `share`, `allocCur`, the economy `bays`, `econ`, and per-node `mine`, `free` and `rockBuckets`. R1's `world.raid` and `world.nextRaidTick` are top-level, as the spec names them. `isField(world)` is the mode test, so selectors don't need data. The warship bays reuse `world.yards`; their `on` flag is unused in field mode. *Rejected:* a stored `world.mode` next to field state spread across the top level, because that means more fields to strip from the campaign hash views and more to validate in saves.
+3. **`node.extractors` is derived in field mode** as free extractors plus docked extractor ships. `syncExtractors` recomputes it after the inputs (a recycle), after F5 (an unbind, so haulers see it the same tick), after F7 (docking) and at a capture. *Rejected:* incremental counts on dock and undock, because raids (h7-raids) add another way to lose a docked extractor, and a missed decrement would desync silently. The derived count can't drift. The raid hook's doc comment tells h7-raids to call `syncExtractors` after a kill.
+4. **New module `ships.ts`** holds `startTransit` (moved from inputs.ts and re-exported there), `advance` and `newShip` (moved from step.ts), so `field.ts` can use them without an import cycle. `recordDelivery` (field.ts) is now shared by route pods and haulers. `guardPools` and `guardStrike` were extracted from rule 7 and exported for R7. `guardStrike` takes an optional economy list, struck after the warships: haulers, then extractors (`ECON_STRIKE_ORDER`). The campaign rules are unchanged: the H4 golden hashes in `fleet-off.test.ts` (recorded on 078806e) still match.
+5. **Data shape:** `"run": { "mode": "field" }` at the top level, read with `runMode(data)`. `withRunMode(data, mode)` is public, so tests and tools can play the parked campaign on shipped data. `campaignWorld` throws on field data. `FIELD_PARKED_KEYS` is the spec's "kept but unused in field mode" list, for the tuning panel. The 24 H7 keys follow `system.variant` in `TUNABLE_KEYS`. `alloc.start.*` are new-run-only. The H7 divisors (hauler and raid speeds, `raid.econPerRaider`, the economy build ticks, `alloc.maxWeight`) need `min ≥ 1`. The field-mode checks (cargo ≤ buffer cap, probe mining ≥ 1) run at the defaults, as the H6 invariants do. A live value is a dev experiment, and h7-bots' forced softlock needs probe mining 0 through tunables.
+6. **Frozen fixture `fixtures/sim-v12.json`** (the shipped data as h7-sim leaves it). The field rule tests run on it, so h7-design-data's calibration breaks none of them. `data-h7.test.ts` asserts that its `map.field` nodes and Mine marks equal the shipped ones.
+7. **Cost:** field tick p95 is 0.009 ms (p99 0.014 ms) over 54,000 ticks on shipped data, with 62 economy ships and 18 warships. The budget is 2.0 ms. This was measured with a scratch script, because the bots gate can't run field mode until h7-bots, and the full test suite was running at the same time.
+
+**Spec readings:**
+- **F6 "wait until … the node is no longer worked":** I read this as "the node has no working extractor left". Read literally, a node with a buffer of 1 or more is still worked, so a hauler waiting on an unmarked rock with a buffer below one cargo would wait forever. "The partial load when a node stops being worked" is that case.
+- **F6 ratio with 0 working extractors** (a worked node with a buffer only): there is no finite ratio, so it ranks after every node with an extractor, and among such nodes the one with fewer haulers goes first. Plain cross-multiplication makes such a node tie with every other node (0 × e = h × 0).
+- **F6 keep vs F12:** a hauler keeps its node at the probe while the node is worked *and* still Mine-marked. F12 says an unmarked node's haulers "finish their trip and reassign". ~~The reassignment may pick the same node again if it is the only one worked.~~ *Corrected in round 2 (h7-sim review, round 1 defect):* that sentence was wrong. Assignment ignored the mark, so a captured pocket or hive after Stop (still worked by its free extractor) was picked straight back, even with other rocks worked. Assignment now takes Mine-marked worked nodes only. See "h7-sim round 2" below.
+- **F5 re-dispatch "from where they are":** a docked extractor leaves from its node. An extractor unbound in flight finishes its leg, then dispatches from the node it reached (a `Transit` only runs node to node). An unbound extractor with no slot anywhere flies home and idles at the probe. "Nearest the probe" is measured from the probe even when it leaves from elsewhere, as F5 says.
+- **F6 delivery "on arrival"** happens in F7, the tick the hauler reaches the probe. Its next trip starts in the following tick's F6.
+- **F2 live tuning:** weights above `alloc.maxWeight` are clamped at the start of F2 each tick ("lowering it clamps the weights"). A share above its type's cost, after the cost is tuned down, returns the excess to stock, or F3's "share equals its cost" could never hold.
+- **F3** uses `ship.<type>.buildTicks` as is. There is no Fast yards research in field mode, and the ranges' 15-tick floor matches `MIN_BUILD_TICKS`.
+- **F12:** a `setAlloc` or `setMine` that repeats the current value is valid and changes nothing; `allocChanges` counts only changes. A locked type may have a weight above 0 (`allocStatus` state `locked`). `recycleShips` counts take optional `extractor` and `hauler` (`RecycleCounts`) and refund `fleet.recycleRefundPct` of `ship.<type>.cost`, as for warships. `sendShips` keeps its warship-only counts.
+- **`allocStatus` state precedence:** building, off, locked, waitingResource, fleetFull, filling. The bay checks the resource before the limit (F3), and so does the state.
+- **Field-mode win:** `isWon` is `capturedTick !== null`, and the field input table doesn't refuse inputs after the win ("free play continues"). `stats.firstShipTick` still counts warships only.
+
+**Test changes outside the new files (all in packages/sim/test; none loosened):**
+- `fleet-off.test.ts`: `h4View` also strips the H7 tunables, `field`, `raid`, `nextRaidTick` and the six H7 stats, as h5-sim and h6-sim did for theirs. The golden hashes are unchanged and still match.
+- `fleet.test.ts`: the exact `fleetStatus` `toEqual` gains the three new fields with exact values.
+- `data.test.ts`: the map-keys check stays exact for both files. The shipped data now also has `field`.
+- `data-h6.test.ts`: the `dataVersion` pin moved to `data-h7.test.ts` (12).
+- `h6.test.ts` and `min-waves.test.ts`: their shipped-data campaign worlds use `shippedCampaign` (`withRunMode(defaultData, 'campaign')`), with every assertion kept.
+- `reference-replay.test.ts` became `campaign-replay.test.ts`, and the H6 replay script moved from `packages/bots/src/reference-replay.ts` to `packages/sim/test/campaign-replay.ts`. It runs on `shippedCampaign` with all 10 of its tests unchanged. The campaign is parked, not gone, so its coverage stays. The new field replay took the bots file's place.
+
+**Compile-only edits in packages/client and packages/bots:** none were needed. The widened types are additive and typecheck passes.
+
+**Approved out-of-list edit (Director, 2026-11-14): a fail-fast guard in `runCampaign` (`packages/bots/src/runner.ts`).** On field data, `campaign.active` never leaves null, so the runner's play-tick cap (`playTicksNow`) never advanced, and `runner.test.ts`, `npm run bots` and with them `npm test` and `npm run gates` ran forever. `runCampaign` now throws a clear error on field-mode data, so these fail fast (red, as the stack note expects) instead of hanging. Campaign-mode behaviour is unchanged. h7-bots replaces the runner for field mode. Measured after the change: `npx vitest run` finishes in 19 s (41 failed, 628 passed, all failures in bots and client files), and `npm run bots -- --seeds 1` exits 1 in 1 s with that error.
+
+## 2026-11-14 · Core Engineer · h7-sim round 2: Stop releases haulers; only Mine-marked rocks get haulers
+
+**Decision (Director's call on the review's required change 2):** only Mine-marked rocks can be assigned haulers. `isHaulable(node)` means Mine-marked and worked. Both F6 assignment (`haulTarget`) and the at-probe keep rule use it. An unmarked rock's leftover buffer stays on the rock and is collected if the rock is marked again.
+**Why (Director):** Stop must mean stop, because raids target rocks with assigned haulers (R5). *Rejected:* draining an unmarked rock's buffer first. That would keep haulers assigned to a rock the player had just Stopped, and so keep it a raid target.
+
+**The defect it fixes (review round 1):** assignment checked only "worked", and a captured pocket or the hive stays worked after Stop through its free extractor (a free extractor works whether or not the rock is marked). So its haulers dropped it at the probe and `haulTarget` picked it straight back, at ratio 0 ÷ 1.
+
+**One more reading, so Stop takes effect at once:** a hauler waiting at its node now also loads (min(buffer, cargo)) and flies home when the node's mark is off. Before, it loaded only on a full cargo or when the node had no working extractor. Without this, a hauler waiting at a Stopped pocket kept waiting for a full cargo from the free extractor. With it, F12's "finish their trip" means the current leg, then home. The reference replay's hashes are unchanged (final 648970fd), because its one Stop (a1 at tick 600) already ended the wait that tick when a1's extractors left.
+
+**Tests** (`field.test.ts`, F6):
+- Stop on a captured p1 with p1 the only worked rock, and again with a1 and a2 also worked (three haulers).
+- Stop on the hive.
+- An unmarked asteroid's buffer is left alone until the rock is marked again.
+
+All four fail on a511610's `field.ts` (4 of 43) and pass on the fix. The `raid-hook.test.ts` pin (a hauler waiting at a guarded node) now marks the node, since an unmarked node no longer holds a waiting hauler.
+
+**Review notes also done:**
+- `save.ts` validates each economy ship in full: `at` a node index when parked, or null with a node-to-node `transit` and 0 ≤ ticksLeft ≤ totalTicks; `target` a node index or null; cargo 0 with no resource, or more than 0 with a raw resource. It also checks the per-node `mine` (booleans), `free` (≥ 0) and the inner `rockBuckets` rings (non-empty, integers ≥ 0). Each case has a test.
+- The replay's recycle check no longer compares a value with itself: it asserts tick 900, a non-zero count before, one fewer after, and the exact refund.
+- `bayOf` has a `Readonly` overload, so `allocStatus` no longer casts.
+
+## 2026-11-14 · Faction AI · h7-raids: raids R1–R9, the Stop question, readings and edits outside the file list
+
+**The open point from the h7-sim review (decided here): a hauler flying home from a Stopped rock does not make the rock a raid target.** R5's "mined" means Mine-marked, and then a docked extractor or an assigned hauler. `isRaidable(world, node)` (factions/index.ts) requires `field.mine[node]`. The intent is that Stop takes a rock off the raid list at once. A hauler keeps `target` = the rock until it reaches the probe (F6), so without the mark clause a Stopped rock stays raidable for up to a round trip (for a5 about 2 × 430 ÷ 2 = 430 ticks), and a raid that arrives in that window finds no one to fight. *Rejected:* counting only haulers that are not flying home, because it would need a second notion of "assigned", and the mark is already the player's statement of intent. Tests (raids.test.ts, R5): "Stop takes a rock off the raid list even while a hauler still flies home from it" (the hauler is still assigned, `rockStatus.haulers` is 1, `raidRank` is 0, the target is the other rock) and "with only a Stopped rock left ... no raid musters at any economy size" (8 economy ships, 20 ticks of full `step`, 0 musters; marking it again puts it back). Five tests fail with the mark clause removed (those two, the two retarget tests, and "a docked extractor that is not Mine-marked does not count"); I ran it. Free extractors do not count toward R5 (the spec says docked extractor or assigned hauler), so a captured pocket nobody hauls from is never a target.
+
+**Spec readings:**
+- **R7 "player ship":** any ship parked at the target, warship or economy. Economy ships are what an undefended raid kills; the raid leaves only when nothing at all is parked there at the start of a round. Ships in transit don't count and join from the next round once parked.
+- **Outcome precedence (R7 vs R8):** a raid whose last raider dies is `beaten` even if it killed economy ships in the same round (R7: "when no raiders are left, the raid ends as beaten"). `last` still carries the losses (`lostEcon`, `lostShips`), so the toast can say "beaten at A5: 5 killed, 2 lost". Spec question for the Director: the R8 list reads "hit if it killed at least one economy ship, beaten if every raider died"; if hit should win, it is one line in `fight` (test "beaten wins over hit ..." pins today's reading).
+- **When a raid "ends":** a fight that kills every raider ends the raid at once (`beaten`). Otherwise the raid ends when its raiders land at the hive, which classifies it `hit` (killed at least one economy ship) or `turnedBack`. `nextRaidTick = end + raid.gapTicks` is set then, so a raid in flight blocks the next one (R3 needs `world.raid` null). A cancelled muster (R6) or an empty launch sets `nextRaidTick = tick` and counts in `mustered` but has no outcome.
+- **R6 launch cap:** `launchMix` takes the planned mix, each type capped at what is alive, a shortfall made up by the other type, and the total capped at the guards alive above the keep (Spores trimmed first). Only live tuning or test setup can make the hive smaller than planned during a muster, because any battle cancels the muster.
+- **Retarget (R6):** on arrival the raid checks `isRaidable(target)`; if not, it flies from where it is to the current R5 node, once (`retargeted`), else home. A second miss flies home even if another rock exists. "R5 node from where it is" is read as the R5 pick (nearest the hive), with the flight measured from the rock it was at.
+- **Flight:** `ceil(distance ÷ raid.speedSu)` ticks, like ships. The launch call sets the flight and the raid arrives that many calls later; the muster runs `raid.musterTicks` calls counting the call that started it (0 launches in the same call). Warning at defaults for a5: 450 + 144 = 594 ticks from the muster's first call to arrival (the spec's "about 593").
+- **R9 regrowth:** `hiveRegrow` replaces rule 9 for the hive in field mode. Raiders out count against the caps; the period is `floor(guard.<type>.regrowTicks × hive.regrowPct ÷ 100)`, at least 1, applied to the hive always (not only with a raid out). Pockets unchanged. Raiders in the hive's list while mustering count as present (they are).
+- **Withering:** `raidWither` on hive capture ends any raid in any phase, removes its raiders and records `last.outcome = 'withered'`; it does not add to `raids.beaten/hit/turnedBack`. Raids cannot start again because the hive is not alive.
+- **Stats:** raiders killed add to `stats.guardsKilled`, warships a raid kills to `stats.shipsLost`, economy ships to `stats.econLost` (as F14 asks).
+- **`raidRank`:** 1-based position among the raidable nodes (R5's set) by distance to the hive, ties to the lower index; 0 for a rock that is not raidable (including one that is marked but has no docked extractor or hauler yet). Rank 1 is the R5 target by construction. It is a pure function of the world, so it does not follow a raid's already-fixed target.
+- **Raid id** is the `mustered` count after the muster starts, not a `nextId` draw, so a muster never shifts guard or ship ids.
+- **Raid shape:** R1's fields plus `flightTicks`, `from`, `retargeted`, `lostEcon`, `lostShips`, `killed` (what the client needs to draw the flight and the outcome toast), and `world.lastRaid` (`RaidResult`) for `raidStatus().last`. `raidStatus` also has `enabled` (the client hides the chip when `raid.enabled` is 0).
+
+**Edits outside the task's file list (all small, each needed):**
+1. `packages/sim/src/combat.ts` (new): the pure combat arithmetic (`playerDamage`, `guardPools`, `guardStrike`, `counterPct`, the target orders) moved out of `step.ts` unchanged, and `step.ts` re-exports it, so every import of those names still works. Reason: the raid fight reuses it, and `factions/` importing `step.ts` while `step.ts` imports `factions/` is an import cycle. With the cycle, `raid-hook.test.ts`'s `vi.mock('../src/factions/index.ts')` (which calls `importOriginal`) no longer saw its mock: the hook was never called. With the move there is no cycle. `world.ts` no longer imports a value from `factions/` either (the world literal has `raid: null, nextRaidTick: 0, lastRaid: null`).
+2. `world.ts`: `lastRaid: RaidResult | null`. `save.ts`: `raidOk` also checks it (null or an object with an `outcome`); tested by a save round trip with a raid in flight.
+3. `step.ts`: the F8 call site is unchanged; added the hive branch in `regrowth` (`hiveRegrow`) and `raidWither` in the capture branch (the capture hook the backlog names, plus the regrowth line R9 needs).
+4. `selectors.ts`: `rockStatus.raidRank`. `index.ts`: exports for the raid selectors and types.
+5. Tests changed outside `raids*.test.ts`: `fleet-off.test.ts` `h4View` also strips `lastRaid` (as for `raid` and `nextRaidTick`; golden hashes unchanged); `field-selectors.test.ts` expected `raidRank: 0` for a5, now 1 (the only raidable rock), with a1 at 0, nothing else loosened; `reference-replay.test.ts` extended (below).
+
+**Reference replay (`packages/bots/src/reference-replay.ts`), numbers from the final code:** the raids already run on the existing script (from tick 95, econ 6). Raid 1 musters at tick 95 at a1, launches at 544, retargets to p1 (a1 was stopped at 600), and is beaten there by the rally defenders (ends 900). Raid 2 (muster 3600) hits p1 undefended (the ships went to p2) and kills a docked extractor; it ends `hit` at 4565. For the wither I added, at tick 7000, `field.fleetCap` 40, the rally back to the probe and `setAlloc drone 5`, and at 7750 a `sendShips` from the probe to the hive. The hive falls at tick 8010 with raid 3 (muster 7265, at p1 since 7929) out, which withers. Totals: mustered 3, beaten 1, hit 1, turned back 0. `allocChanges` is now 6 and the captures are p1, p2, heart (both asserted in `reference-replay.test.ts`, with four new tests for the raid items). Determinism: 30 checkpoints over 9000 ticks, final df9ea7c5 (was 648970fd); there are no stored hashes to update.
+
+**Raid numbers the bots' flags will need (shipped data, hive 12 Thorns / 24 Spores, keep 18; from `raidSize` and `raidMix` run on `defaultData`):**
+
+| econ | size | mix (Thorn / Spore) |
+| --- | --- | --- |
+| 6 | 2 | 0 / 2 |
+| 12 | 4 | 1 / 3 |
+| 22 | 8 | 2 / 6 |
+| 28 and up | 10 (maxSize) | 3 / 7 |
+
+Flight to each rock at `raid.speedSu` 3 (ticks): a5 144, a6 and a7 178, p1 and p2 215, a3 and a4 245, a1 and a2 272. A raid's size follows `econ`, not the rock's value; the target is the nearest mined rock to the hive, so a5, a6 and a7 (the richest) are hit first.
+
+**Gates on the branch:** typecheck, lint and determinism green; sim tests all pass; the bots gate and 41 tests in the same 7 bots and client files as h7-sim are red, as the stack note expects.
+
+## 2026-11-14 · Engineer · h7-client: parked campaign tests, replay mode, UI choices
+
+**The campaign client stays reachable for tests, through data.** Shipped data is field mode, so the build has no overworld. The H4 to H6 client code stays (no deletion, per the spec). A test or dev hook runs it: `startCampaign` builds a session on `withRunMode(data, 'campaign')`. Because a replay must run on the same data, the client replay carries `mode: 'campaign'` (only for such sessions), the save has `mode` too, and `replayData` and `decodeSave` read it. A field session's replay and save are unchanged in shape.
+
+**Tests moved, none loosened (acceptance 7):**
+- `h4-client`, `h5-client`, `h6-client`, `session` (unit): moved to campaign-mode data (`campaignData = withRunMode(shippedData, 'campaign')`), every assertion kept. Their features (overworld text, research, yards, Recycle) still exist in code.
+- `boot.spec.ts`, `overworld.spec.ts` (smoke): `ready()` now swaps the page into a constructed campaign with the dev hook, which is the state a fresh H6 page opened in. Every assertion kept. The first test is renamed "parked campaign: ...". The three "old save starts fresh" tests now assert the new run is a field run that is running (stronger than "is on the overworld"). `hud-stability` and `buffer-warning` already used `startCampaign` and needed no change.
+- Retired: none.
+- New: `h7-client.test.ts`, `h7-art.test.ts` (with a shared `recorder.ts`), `h7-economy.spec.ts`, `h7-raids.spec.ts`, `h7-art.spec.ts`.
+
+**UI choices:**
+1. **The probe sheet is in flow like the others but taller (62% of the screen)**, with the radar beside the title, money line, Rally and Recycle buttons, then five 48 px rows (icon, name and cost, state line, − weight +). It has no sheet head of its own; the close button is in the side column. It opens with no scrolling at 375x667 under the wide font (smoke asserts it). The first-run hint is dismissed when the probe sheet opens, to give the map its room back.
+2. **The heart reads "Hive" in a field run** (labels, sheets, banner, toasts), "Heart" in the campaign.
+3. **Top bar:** ore/min, ore, ice and crystal chips, the fleet chip (every ship counts when `fleet.countsEconomy` is 1) and the raid chip. The per-type warship chips and lens and plating are hidden in a field run. The raid chip reads "Raids at N ships" until the threshold, then "Next raid m:ss" or "Raids ready", "Raid m:ss" while mustering or flying out, "Raid on" at the target, "Raid leaving" going home. Its width is reserved by a sizer, so nothing shifts.
+4. **Raid banner and battle line share the banner slot** (muster: "Raid gathering: 4 Spores, 1 Thorn → A5 in 15 s"; at the target: "Raid at A5: 3 left"). A tap opens the target's sheet. The out and home phases show on the map (marker, dashed line, seconds) and the chip, not in the banner. End toasts: beaten (killed and lost counts), hit (what was lost), turned back; a toast's tap opens the target.
+5. **Mine toggle labels:** "Stop mining" when marked, "Mine this rock" when not.
+6. **Result panel** shows when the hive falls (`isCaptured`, once per run) from `fieldSummary`; New run asks first. No smoke test plays a real hive capture (too long for a smoke run); the panel is checked with the debug hook, and the trigger shares its path with the campaign's.
+7. **Silhouette check.** The first extractor and hauler shapes overlapped 0.83 at 24 px, so they were redrawn (small spiked extractor, big boxed hauler) until the gallery's mask overlap was under 0.75 against each other, the warships and a rock.
+8. **Test hooks added:** `isField`, `allocStatus`, `rockStatus`, `fieldSummary`, `econShips`, `log`, `setSpeed`, `mapField`, `raidStatus`, `advanceTicks`, `newRun`.
+
+## 2026-11-14 · Engineer · h7-client round 1 fixes: the probe sheet layout, the raid leg
+
+**Probe sheet layout (review finding 1; Director: don't just squeeze it).** The radar is the header (140x104), with the title, the close button and a Rally / Recycle pair of 44 px buttons beside it, side by side, so Recycle showing adds no height. Under it five rows of one name line and one state line, 46 px tall: icon, name and state, then − weight +. Changes from round 0:
+- the money line is gone (the top bar's ore chip and ore/min already say it);
+- the cost moved from the name line to the row's tooltip, and the state line carries what matters ("saving 12/20", "needs 4 crystal");
+- the locked lines are shorter: "needs crystal pocket" and "needs ice pocket" (the spec's "take the crystal pocket" was three lines under the wide font). The pockets are drawn with their prize icons on the map.
+Result at 375x667: no scrolling with Recycle shown and the longest lines, normal and wide font (smoke, both fonts); with the normal font the map keeps 195+ px behind the sheet (smoke asserts it, and that the probe and the hive sit above the sheet). The sheet is still in flow with a 62% cap. During a raid the banner takes 44 px more from the map; that stays a handoff question.
+
+**Raid leg (finding 2).** `drawRaid` draws each leg from `raid.from` to its end (the target going out, the hive going home), progress `1 - ticksLeft / flightTicks`, and the client-side flight guess is gone. The sim already exposes both fields on `world.raid`, but `raidStatus` doesn't. The client reads `world.raid` directly for the map. It would be tidier if `raidStatus` carried `from` and `flightTicks` (Can wait for core). Tested: a retarget (the new leg starts at the old target) and a resume mid-flight (marker at the right point).
+
+**Other tests added:** unit tests for every raid text (`raidChipText` in all states, `raidEndText` for each outcome and loss kind, `raidMixText`, `raidMusterLine`), the rock sheet's raid-rank line (shown on rank 1, absent elsewhere and after Stop), and a real hive capture that opens the result panel once from the real trigger (tuned for a small hive and cheap fast drones; the run is stepped with `advanceTicks`). Removed `ROW_SELECTOR` and `incomeText`; fixed the `buildProbeSheet` comment.
+
+## 2026-11-14 · Engineer · h7-bots: field runner, six strategies, seven flags, campaign bots retired from the gate
+
+- **Campaign bots stay in code, off the gate.** `runner.ts` (runCampaign, H6 flags), `strategies.ts`, `waves.ts` and their tests stay; their tests build worlds with `withRunMode(defaultData, 'campaign')`. The old CLI is `campaign-cli.ts` (runnable by hand, not an npm script); `npm run bots` is the new field suite (`cli.ts`). *Rejected:* deleting them (the H4-H6 tests would be rewritten for nothing; the overworld may return).
+- **New files:** `field-runner.ts` (runField: won / timeout 45 min / softlock 5 min with no bay start and no hauler delivery / crash; raid log from `world.raid` and `stats.raids`), `field-strategies.ts`, `field-estimate.ts` (the min-wave estimate on an inert copy of the field, via the existing `minMix` and `minSingle`; its cache keys include the field layout, after a collision found in testing), `field-flags.ts`, `cli.ts`.
+- **Readings of the spec where it was silent:**
+  - Offence waits on the fleet limit: warships get `fleetCap - economy` slots. Adaptive builds for the hive at its current strength if that fits, else for the hive with a full-size raid away (R4 arithmetic), and attacks the moment the estimate on the guards at home is covered (so a raid out opens the window). It sends all ships at its staging node to the hive.
+  - In offence the economy grows only while `econ + 3 + smallest hive wave <= cap` (the trade in slots; the margin covers ships already paid for). A hauler may still go to the counter's pocket: its first delivery unlocks the counter.
+  - The counter pocket (Spores: ice, Thorns: crystal) is taken at econ 12 or after the first muster, with the pocket's min-wave of drones. Only the majority's pocket, as written, so the other counter is never unlocked.
+  - Warship weights follow the missing ships (need minus alive, per type), so a covered type goes to 0.
+  - Raid response: counter type at max weight until defenders (at or flying to the target) match the planned size; rally and idle warships go to the target; after the raid the standing guard is ceil(planned / 2) at the target. `greedy` is economy only until its first hit, then adaptive (see Round 1 fixes).
+  - `static` best-of: a win, then the earlier hive, then fewer economy ships lost. Sweep (extractor/hauler/drone/lancer/flak): econ-lean 4/3/1/1/1, even 3/2/2/2/2, drone-heavy 3/2/4/1/1, flak-heavy 3/2/1/1/4, lancer-heavy 3/2/1/4/1, war-lean 2/1/3/2/3.
+  - `idle` counts a full share as built, so it holds econ at exactly `raid.firstAtEcon - 1`.
+  - Bots read `world.raid` and `stats.raids` directly (what `raidStatus` reports). They never use Stop (not in the spec).
+- **Round 1 fixes (Critic REJECT, a186071).**
+  - **The Director's decision on the dead end** (a spec addition: "no softlock" outranks a minimal adaptive; Recycle is a player action). When adaptive's hive plan does not fit `fleetCap - economy`, it (a) takes the other pocket if that unlocks a mix that fits (with the economy at its floor), else (b) Recycles economy ships, worst-placed first (idle at the probe, then the rocks nearest the hive, then the lowest yield; haulers before extractors), one order per 15 ticks, until the smallest hive wave fits, and never below `raid.firstAtEcon` economy ships (and not at all if wave + floor exceeds the cap). `greedy` uses the same rules once it has turned adaptive.
+  - Found while testing it, same family (all player inputs): when the fleet is full and the plan still lacks ships, it Recycles one warship the plan cannot use (wounded, hp under half, which the min-wave estimate cannot count, or a type it has more of than needed); a taken pocket always gets one hauler (its deliveries pay for Lancers and Flak); the raid-window plan uses the raid that today's econ would muster (R4: `raidSize`, `raidMix`), not a full-size raid (a full-size raid never comes at econ 14, so waiting for it was a second dead end). Flag 4 still removes a full-size raid, as the spec says.
+  - Every offence branch, the raid response included, ends in the trade in slots (`limitEconomy`).
+  - Every static shape counts for the gate's crash and p95 checks (`gateRuns`), not just the best one.
+  - `greedy` is now economy only (no offence latch, no pocket, no recycle) until its first hit (`fieldSummary.raids.hit`), then a fresh adaptive. The earlier entry's "greedy ignores musters" now matches the code.
+  - Bots read through the selectors (`raidStatus`, `fleetStatus`, `allocStatus`, `rockStatus`, `fieldSummary`, `shipsAtByType`, plus `econAtByType`, `isValidInput`). Still plain reads, each for something no selector gives: `guardianAt(...).wavesSent` and `.battle`, ship `hp` (wounded ships), the node list's kind and prize, and ships in flight (none says where they go). The rally is remembered by the bot.
+- **Flags 1-3 read the run logs; 4-7 the estimate on a fresh field.** Flag 6's "full economy" is the open Mine slots plus `peakHaulers` of the adaptive runs.
+
+## 2026-11-14 · Core Engineer · h7-bots round 3 (deadlock rule): exact pocket waves, recycling for a pocket, no idling
+
+Round 3 was reassigned to the Core Engineer under PROCESS step 2. It answers the round-2 review (488b4f9) on top of a61cba3.
+
+- **Director's decision, extending the recycle rule:** once a pocket is adaptive's plan (the counter pocket in offence, or the other pocket at the dead end), recycling may also free room for that pocket's (raised) wave, down to the same `raid.firstAtEcon` floor. It happens only in offence, with the fleet limit counting economy ships, and only when wave + floor ≤ `field.fleetCap`. Economy ships go worst-placed first, one order per 15 ticks: the same rule as for the hive, now shared as `recycleEconToward`. While it recycles, the economy weights are 0.
+  - *Why:* in round 2's trace a failed p2 wave raised the next wave above the room. Only the hive's wave could open room, so the bot idled for 35 minutes with 2,547 ore. "No softlock" outranks a minimal adaptive, as in the first decision.
+- **A pocket wave sends exactly the sound ships the estimate counted (`exactSend`).**
+  - *The problem:* `sendShips` takes the lowest-id ships of each type, so a wounded low-id drone went in place of a sound one.
+  - *The rule:* per type, walk the ships parked at the stage in id order. Send each run of sound ships, and recycle a wounded ship that would come next (it is then the lowest id left, so `recycleShips {type: 1}` takes exactly it). Wounded ships past the wave stay where they are.
+  - All the sends go out in one tick, so the sim folds them into one wave (rule 1).
+  - The stage is never a living guarded node, so the recycle is always valid.
+  - `static` uses `exactSend` for its pocket waves too. The hive attacks still send everything parked, as before.
+  - *Rejected:* sending everything parked at a pocket. It isn't "exactly" the wave, and it would pull the standing guard off its post.
+- **Found while testing the pocket recycle: a pocket with a wave on the way is committed.** While warships fly to a pocket, or a battle runs there, `pocketAssault` makes no new plan. Before, the wave's own order raised `wavesSent`, so the bot planned a bigger wave and recycled economy ships while the first wave was still in flight. The trace went down to 6 economy ships instead of the 11 the wave needed.
+- **The pocket's own trade in slots:** in offence, while econ + 3 (the margin) + the pocket wave is over the limit, the economy weights are 0. This is the same rule as `limitEconomy` for the hive, so the economy doesn't regrow into the room just freed.
+- **`FieldRunOptions.onTick`:** an optional read-only observer, called after each step. It exists so a test can watch every tick of a whole run (the idle-stretch check), and it changes nothing about a run.
+- **Measured on v12 (`npm run bots`, 3 seeds, every seed identical):**
+  - adaptive wins in 19:00 (8 raids: 6 beaten, 1 hit; 4 economy ships lost).
+  - greedy wins in 19:49 (9 raids: 7 beaten, 1 hit; 6 lost).
+  - adaptive-no-raids now wins in 14:37. In round 2 it timed out with a 35-minute idle stretch.
+  - The bots gate passes.
+
+## 2026-11-14 · Designer · h7-design-data: calibration to data v13
+
+**Decision:** data v13 changes only values: the hive 12 / 24 → 12 / 18; p1 0 / 6 → 0 / 4; p2 4 / 2 → 1 / 3; `raid.econPerRaider` 3 → 2; `raid.maxSize` 10 → 12; `hive.regrowPct` 100 → 200; `raid.gapTicks` 2700 → 3600. The table, the reasons and every target are in DESIGN.md "Calibration result (h7-design-data, data v13)". Reports: `reports/archive/h7-probe-v12.md`, `reports/archive/h7-design-data-v13.md`. Four calls in it:
+1. **Flag 4 is met with raids that happen in play.** Raising `raid.maxSize` alone would have met the flag, which measures a "full-size" raid, while real raids (`ceil(econ ÷ 3)`, 5–8 ships) never came near it. So the raid per economy ship went up (`raid.econPerRaider` 2), and `raid.maxSize` 12 is what a full economy (23) actually musters.
+2. **The pocket target is amended, not met as written** ("each pocket within 6 drones"). Spores regrow every 20 ticks and Thorns repair 2 per round, so any pocket with a Thorn needs at least 8 drones. The amended target: the cheaper pocket within 6 (and not 2), the other within 8 by drones alone or within 6 with the first pocket's counter. Two doors with different costs, not two pure-Spore pockets that both open Flak.
+3. **The raid gap was lengthened to keep `greedy` inside its target with margin** (39:20 against 40 at 90 s; 30:16 at 120 s). Waiting still makes nothing worse: `idle` is never raided (flag 3).
+4. **Out-of-list edit: `packages/bots/src/reference-replay.ts`.** Its own header and test say a calibration that changes the field's guards breaks the script and to regenerate it then. Two of its 14 checks failed on v13. The fix pins the four raid knobs at tick 0 (the values its timings were written for, as it already pins economy knobs) and adds one `sendShips` p1 → p2 at tick 3500, because at v13 one warship was still at p1 when raid 2 arrived (checked: without that input the "undefended" assertion fails with 1 warship). All 14 checks pass; no hash is pinned anywhere.
+
+**Why:** values only, as the spec requires. Each target is measured, and the `min-wave` numbers were rerun in a second order (ships flak-first, raid-away keeping the highest ids) with no change.
+
+**For the Director (not changed here):**
+- **Rule question:** a captured pocket's haulers keep flying into an undefended raid (h7-raids review). A possible rule: a hauler waits at the probe while its node is the target of a raid that's out or fighting.
+- **Bot finding:** `drones-only` ends in the runner's softlock at 28:12 on every seed. After its economy is wiped it sets every weight to 0 and idles. `adaptive` and `greedy` share those rules after a wipe, so this is a latent gate risk.
+
+## 2026-11-14 · Designer · h7-design-data round 1 fixes: pocket target met as written; state-line wording
+
+**Decision:**
+1. **The pocket target is met as originally written, and the amendment is withdrawn.** The amendment logged above (item 2 of "h7-design-data: calibration to data v13") rested on a false claim: "any pocket with a Thorn needs at least 8 drones". The Critic measured on v13 (`fieldSingle`, p2 only): 1/0 → 3, 1/1 → 4, 1/2 → 5, 1/3 → 8, 2/0 → 8. I generalised from three points (1/3, 2/2, 4/2) and skipped the cases that disprove it.
+   - p2 is now 1 / 2: 5 drones, not 2. It keeps a Thorn, so it stays the Lancer door. p1 stays 0 / 4 (6 drones).
+   - The order check is unchanged (p2 5 / 5).
+   - Bots on v13: adaptive 24:54, greedy 30:12, flags 1–7 met.
+   - The reference replay no longer needs its tick-3500 `sendShips`. At p2 1 / 2 no warship is left at p1 when raid 2 arrives, so that input was ignored, and it was removed. The four pinned raid knobs stay.
+2. **The DESIGN.md probe-sheet state line ("needs crystal pocket" / "needs ice pocket")** was changed at the Director's request, to match the text h7-client built and tests in its fix round (3c9f761).
 ## 2026-11-14 · Director · h7-bots round 3 to the core-engineer; recycle rule extended to pocket waves
 
 **Decision:** h7-bots was rejected twice (a wounded drone sent in a pocket wave; a second dead end after a failed pocket wave). Per the deadlock rule, round 3 goes to the core-engineer (resumed from h7-sim, which knows the field code). The Director's recycle rule is extended: once a pocket is the plan, recycling may also free room for that pocket's wave, down to the same `raid.firstAtEcon` floor.

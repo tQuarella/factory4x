@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { defaultData } from '@factory4x/sim';
+import { defaultData as shippedData, withRunMode } from '@factory4x/sim';
+
+// The H6 campaign bots are retired from the gate (h7-bots); their tests run on shipped data in campaign mode.
+const defaultData = withRunMode(shippedData, 'campaign');
 // The frozen v8 fixture: outcome assertions that depend on tuned numbers run here, so a retune of data/sim.json
 // (h5-design-data) never breaks them. Tests on defaultData below keep only what any calibration must keep.
 import { fixtureV8 as fx } from '../../sim/test/fixture.ts';

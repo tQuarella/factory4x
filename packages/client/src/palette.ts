@@ -37,4 +37,6 @@ export const palette = {
   laneClosed: '#707b90',
   laneOpen: '#9fb4d4',
   laneOwned: '#ffd27a',
+  // H7 additions
+  econ: '#f0a83a',
 } as const;

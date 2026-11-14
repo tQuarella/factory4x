@@ -13,7 +13,9 @@ import {
   createWorld,
   defaultData,
   tunableMeta,
+  isField,
   isValidInput,
+  runMode,
   step,
   throughputPerMin,
   type CampaignStart,
@@ -21,6 +23,7 @@ import {
   type Replay,
   type ResourceTriple,
   type SimData,
+  withRunMode,
   type World,
 } from '@factory4x/sim';
 
@@ -47,9 +50,16 @@ export function defaultsDiff(data: SimData): StartTunables {
   return out;
 }
 
-/** The data a replay ran on: shipped data plus its start tunables. */
-export function replayData(replay: Replay & { startTunables?: StartTunables }): SimData {
-  return dataWithDefaults(defaultData, replay.startTunables ?? {});
+/** The client's replay: the sim's, plus the tunables the run started with and (H7) the parked campaign's mode. */
+export type ClientReplay = Replay & { startTunables?: StartTunables; mode?: 'campaign' };
+
+/**
+ * The data a replay ran on: shipped data plus its start tunables. H7: shipped data is field mode; a replay of the parked
+ * campaign (a constructed start in a test or dev hook) says `mode: 'campaign'` and runs on the same data in campaign mode.
+ */
+export function replayData(replay: ClientReplay): SimData {
+  const base = replay.mode === 'campaign' ? withRunMode(defaultData, 'campaign') : defaultData;
+  return dataWithDefaults(base, replay.startTunables ?? {});
 }
 
 export type Speed = 1 | 2 | 4;
@@ -117,9 +127,12 @@ export class Session {
     return 1000 / this.data.tickRate;
   }
 
-  /** On the overworld nothing runs: the client steps only to apply an input (DESIGN.md H4 "Pause on the overworld"). */
+  /**
+   * On the overworld nothing runs: the client steps only to apply an input (DESIGN.md H4 "Pause on the overworld"). A field-mode
+   * run (H7) has no overworld: it lands in the field and runs from the first tick.
+   */
   get onOverworld(): boolean {
-    return this.world.campaign.active === null;
+    return this.world.campaign.active === null && !isField(this.world);
   }
 
   /** 0..1 into the current tick, for interpolation. Frozen while paused. */
@@ -186,13 +199,14 @@ export class Session {
   }
 
   /** Seed + data version + start + input log: reproduces this session's world at `world.tick`. */
-  replay(): Replay & { startTunables?: StartTunables } {
-    const r: Replay & { startTunables?: StartTunables } = {
+  replay(): ClientReplay {
+    const r: ClientReplay = {
       seed: this.seed,
       dataVersion: this.data.dataVersion,
       inputs: this.log.map((l) => ({ tick: l.tick, input: l.input })),
     };
     if (this.start !== undefined) r.start = this.start;
+    if (runMode(this.data) === 'campaign') r.mode = 'campaign';
     const diff = defaultsDiff(this.data);
     if (Object.keys(diff).length > 0) r.startTunables = diff;
     return r;

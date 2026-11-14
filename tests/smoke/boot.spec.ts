@@ -20,10 +20,17 @@ function watchErrors(page: Page): string[] {
 const WIDE_FONT =
   '#sheet *, #research *, #sendpanel *, #result *, #win *, #chips *, #ow-stats *, #controls *, #tuning *, #feedback *, .card *, #banner, #toast, #toast::after, #hint { font-family: serif !important; font-size: 15px !important; letter-spacing: 0.15em !important; line-height: 1.5 !important; }';
 
+/**
+ * H7: the shipped build is a field run, and the overworld, research, landings and withdraws are parked (kept in the code, unreachable
+ * from the build). The tests in this file are about that parked campaign, so `ready` swaps the page into a constructed campaign at its
+ * start (the dev hook), exactly the state a fresh H6 page opened in. The field itself is tested in h7-economy.spec.ts.
+ */
 async function ready(page: Page): Promise<void> {
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
   await page.addStyleTag({ content: WIDE_FONT });
+  await page.evaluate(() => window.__factory4x!.startCampaign({}, {}));
+  await settled(page);
 }
 
 /** Two animation frames: a notice that just appeared has resized the canvas and the map has re-fitted. */
@@ -106,7 +113,7 @@ async function expectHudNoWrap(page: Page, label: string): Promise<void> {
   expect(bad, label).toEqual([]);
 }
 
-test('build loads on the overworld; nothing ticks there; no console errors', async ({ page }) => {
+test('parked campaign: the build loads on the overworld; nothing ticks there; no console errors', async ({ page }) => {
   const errors = watchErrors(page);
   await ready(page);
   await expect(page.locator('canvas#view')).toBeVisible();
@@ -339,7 +346,9 @@ test('an H3 save (data v5) starts fresh with the toast', async ({ page }) => {
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
   await expect(page.locator('#toast')).toContainText(/older game data \(v5; this build is v\d+\), so it was discarded and a new run started/);
-  expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
+  // H7: the new run is a field run, landed and running.
+  expect(await page.evaluate(() => window.__factory4x!.isField())).toBe(true);
+  expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(false);
 });
 
 test('an H5 save (data v9, before the open frontier) starts fresh with the existing toast', async ({ page }) => {
@@ -350,7 +359,9 @@ test('an H5 save (data v9, before the open frontier) starts fresh with the exist
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
   await expect(page.locator('#toast')).toContainText(/older game data \(v9; this build is v\d+\), so it was discarded and a new run started/);
-  expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
+  // H7: the new run is a field run, landed and running.
+  expect(await page.evaluate(() => window.__factory4x!.isField())).toBe(true);
+  expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(false);
 });
 
 test('tapping an asteroid opens its sheet; queuing an extractor changes the queue', async ({ page }) => {
@@ -1131,7 +1142,9 @@ test('H5: a v7 save (before the fleet limit) starts fresh with the toast', async
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
   await expect(page.locator('#toast')).toContainText(/older game data \(v7; this build is v\d+\), so it was discarded and a new run started/);
-  expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(true);
+  // H7: the new run is a field run, landed and running.
+  expect(await page.evaluate(() => window.__factory4x!.isField())).toBe(true);
+  expect(await page.evaluate(() => window.__factory4x!.onOverworld())).toBe(false);
 });
 
 // The chips a mid-visit HUD shows. Unlocks come from deliveries, so the states are set in one synchronous evaluate

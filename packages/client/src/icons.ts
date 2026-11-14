@@ -1,5 +1,5 @@
 /** Small canvas icons for the HUD chips, guard rows, yard rows and the send panel. Drawn once when built. */
-import { drawFleetIcon, drawRecycleIcon, drawResearchIcon, drawResourceIcon, drawShip, drawSpore, drawStockpileIcon, drawThorn, type ResearchIconId, type ResourceKind, type ShipType } from './placeholders.ts';
+import { RADAR_TYPES, drawExtractor, drawFleetIcon, drawHauler, drawRadar, drawMineBadge, drawRecycleIcon, drawResearchIcon, drawResourceIcon, drawShip, drawSpore, drawStockpileIcon, drawThorn, type ResearchIconId, type ResourceKind, type ShipType } from './placeholders.ts';
 import { h } from './dom.ts';
 
 /** Sets a canvas up for a `size` px square icon (crisp on 2x screens), clears it and draws `draw(ctx, r)` centred, r = half the size minus a pixel. */
@@ -40,3 +40,26 @@ export const fleetIcon = (parent: HTMLElement, size: number, full: boolean): HTM
 export const recycleIcon = (parent: HTMLElement, size: number): HTMLCanvasElement => iconCanvas(parent, size, (ctx, r) => drawRecycleIcon(ctx, r));
 
 export const stockpileIcon = (parent: HTMLElement, size: number): HTMLCanvasElement => iconCanvas(parent, size, (ctx, r) => drawStockpileIcon(ctx, r));
+
+/** H7: the icon of one of the five build types: an economy hull (extractor, hauler) or a warship. */
+export const buildIcon = (parent: HTMLElement, size: number, type: (typeof RADAR_TYPES)[number]): HTMLCanvasElement =>
+  iconCanvas(parent, size, (ctx, r) => (type === 'extractor' ? drawExtractor(ctx, r) : type === 'hauler' ? drawHauler(ctx, r) : drawShip(ctx, r, 0, type)));
+
+export const mineBadgeIcon = (parent: HTMLElement, size: number): HTMLCanvasElement => iconCanvas(parent, size, (ctx, r) => drawMineBadge(ctx, r));
+
+/** Sets a canvas up for a `w` by `h` px box (crisp on 2x screens), clears it and draws `draw(ctx, w, h)` centred. */
+export function paintBox(c: HTMLCanvasElement, w: number, hgt: number, draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void): void {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = Math.round(w * dpr);
+  c.height = Math.round(hgt * dpr);
+  c.style.width = `${w}px`;
+  c.style.height = `${hgt}px`;
+  const ctx = c.getContext('2d')!;
+  ctx.setTransform(dpr, 0, 0, dpr, (w * dpr) / 2, (hgt * dpr) / 2);
+  draw(ctx, w, hgt);
+}
+
+/** H7: the radar readout of the five build weights (display only), `w` by `h` px. Repaint with `paintRadar` when a weight changes. */
+export function paintRadar(c: HTMLCanvasElement, w: number, hgt: number, weights: readonly number[], max: number): void {
+  paintBox(c, w, hgt, (ctx) => drawRadar(ctx, w, hgt, weights, max));
+}

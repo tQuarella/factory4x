@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SEND_ALL, createWorld, hashState, isValidInput, step, type Input, type World } from '../src/index.ts';
+import { SEND_ALL, TUNABLE_KEYS, createWorld, hashState, isValidInput, step, type Input, type World } from '../src/index.ts';
 import { N, data, networkStep } from './helpers.ts';
 import { h3World } from './h3-world.ts';
 
@@ -25,11 +25,16 @@ function h4View(w: Readonly<World>): unknown {
     campaign: { research: Record<string, unknown>; areas: Array<Record<string, unknown>> };
     lastBattle: Record<string, unknown> | null;
     guardians: Array<{ battle: Record<string, unknown> | null; lastBattle: Record<string, unknown> | null }>;
-  };
+  } & Record<string, unknown>;
   for (const k of ['fleet.cap', 'fleet.recycleRefundPct', 'research.fleet.step', 'fleet.relayStep', 'areas.repeatHaulPct', 'overworld.bandLock']) delete v.tun[k];
   delete v.stats.shipsRecycled;
   delete v.stats.oreRefunded;
   delete v.stats.haulPaid;
+  // h7-sim: the field-mode state (null / zero in a campaign world), its stats and the H7 tunables, none of which a
+  // campaign rule reads. Everything H4 had is still hashed.
+  for (const k of H7_TUNABLES) delete v.tun[k];
+  for (const k of ['field', 'raid', 'nextRaidTick', 'lastRaid']) delete v[k];
+  for (const k of ['econBuilt', 'econLost', 'econRecycled', 'raids', 'allocChanges', 'peakEcon']) delete v.stats[k];
   delete v.campaign.research.fleet;
   for (const a of v.campaign.areas) {
     delete a.shipsRecycled;
@@ -39,6 +44,9 @@ function h4View(w: Readonly<World>): unknown {
   for (const b of [v.lastBattle, ...v.guardians.flatMap((g) => [g.battle, g.lastBattle])]) if (b !== null) delete b.capAtSend;
   return v;
 }
+
+/** h7-sim: the tunables H7 added (DESIGN.md H7 "Tunables"), every one after system.variant in TUNABLE_KEYS. */
+const H7_TUNABLES = TUNABLE_KEYS.slice(TUNABLE_KEYS.indexOf('system.variant') + 1).filter((k) => !k.startsWith('stats.') && !k.startsWith('client.'));
 
 const EVERY = 600;
 

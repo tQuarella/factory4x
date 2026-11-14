@@ -608,11 +608,11 @@ Frame nodes from the H3 frame (positions unchanged). The heart is the **hive**.
 | `a3`, `a4` | asteroid | 1 each | ore | – | yes | 735 |
 | `a5` | asteroid | 3 | ore | – | yes | 430 |
 | `a6`, `a7` | asteroid | 2 each | ore | – | yes | 534 |
-| `p1` | pocket | 2 | ice | 0 / 6 | after capture | 645 |
-| `p2` | pocket | 2 | crystal | 4 / 2 | after capture | 645 |
-| `heart` | the hive | 4 | ore | 12 / 24 | after capture | 0 |
+| `p1` | pocket | 2 | ice | 0 / 4 | after capture | 645 |
+| `p2` | pocket | 2 | crystal | 1 / 2 | after capture | 645 |
+| `heart` | the hive | 4 | ore | 12 / 18 | after capture | 0 |
 
-The guard counts are starting values for h7-design-data, which calibrates them to "Calibration targets (H7)". Data shape: `map.field = { nodes: [ids], mine: [ids], layout: { pockets: {...}, heart: {thorns, spores} } }`, in the H4 area layout format (no Root, no starved counts). `parseSimData` checks that every id is a frame node, `probe` is first, `heart` is present, `mine` holds asteroids only, and in field mode that `ship.hauler.cargo ≤ node.bufferCap` and `economy.probeOrePerMin ≥ 1` (the softlock floor).
+The guard counts are data v13, calibrated by h7-design-data to "Calibration targets (H7)" (v12 had p1 0 / 6, p2 4 / 2 and the hive 12 / 24; see "Calibration result (h7-design-data, data v13)"). Data shape: `map.field = { nodes: [ids], mine: [ids], layout: { pockets: {...}, heart: {thorns, spores} } }`, in the H4 area layout format (no Root, no starved counts). `parseSimData` checks that every id is a frame node, `probe` is first, `heart` is present, `mine` holds asteroids only, and in field mode that `ship.hauler.cargo ≤ node.bufferCap` and `economy.probeOrePerMin ≥ 1` (the softlock floor).
 
 What this means in play: the far rocks (a5, a6, a7: 7 of the 13 asteroid slots) are the closest to the hive, so the richest economy is also the most exposed. The near rocks (a1–a4, 6 slots) are safe longest.
 
@@ -759,15 +759,15 @@ New keys. The live flag follows the H1 rule (live unless noted).
 | `fleet.countsEconomy` | 1 | 0–1 | 0: the limit counts warships only (H5) / 1: every ship counts (supply) |
 | `raid.enabled` | 1 | 0–1 | 0: no raids, a peaceful field (the in-build A/B) / 1: raids |
 | `raid.firstAtEcon` | 6 | 2–20 | 2: raided almost at once / 20: raids only at a full economy |
-| `raid.econPerRaider` | 3 | 1–10 | 1: every miner needs a guard / 10: raids are a nuisance |
-| `raid.maxSize` | 10 | 2–30 | 2: never a threat / 30: a raid can empty the field |
-| `raid.gapTicks` | 2700 (90 s) | 900–9000 | 900: a siege / 9000: about one raid per run |
+| `raid.econPerRaider` | 2 | 1–10 | 1: every miner needs a guard / 10: raids are a nuisance |
+| `raid.maxSize` | 12 | 2–30 | 2: never a threat / 30: a raid can empty the field |
+| `raid.gapTicks` | 3600 (120 s) | 900–9000 | 900: a siege / 9000: about one raid per run |
 | `raid.hiveKeepPct` | 50 | 25–90 | 25: raids gut the hive, so counter-attacks are easy / 90: raids are tiny and the hive never opens |
 | `raid.musterTicks` | 450 (15 s) | 0–1800 | 0: the flight is the only warning / 1800: raids are telegraphed for a minute |
 | `raid.speedSu` | 3 | 1–10 | 1: you can always intercept / 10: raids land before you react |
-| `hive.regrowPct` | 100 | 100–1000 | 100: dead raiders come back as fast as heart guards / 1000: a beaten raid leaves the hive open for minutes |
+| `hive.regrowPct` | 200 | 100–1000 | 100: dead raiders come back as fast as heart guards / 1000: a beaten raid leaves the hive open for minutes |
 
-Reused with their meaning in field mode: `economy.startStock`, `economy.probeOrePerMin`, `extractor.orePerMin` (per docked extractor), `node.bufferCap`, `pocket.resourcePerMin`, `pocket.freeExtractors`, `heart.orePerMin`, `heart.freeExtractors`, `ship.drone|lancer|flak.*`, `ship.speedSu`, `counter.*`, `guard.*`, `combat.roundTicks`, `fleet.recycleRefundPct`, `system.variant` (unused by the field). The candidates' `fleet.cap` 24 became `field.fleetCap` 30, a new key, so the H5 and H6 tables and their tests stay as they are. 30 is a starting value, and calibration sets it (see the targets).
+Reused with their meaning in field mode: `economy.startStock`, `economy.probeOrePerMin`, `extractor.orePerMin` (per docked extractor), `node.bufferCap`, `pocket.resourcePerMin`, `pocket.freeExtractors`, `heart.orePerMin`, `heart.freeExtractors`, `ship.drone|lancer|flak.*`, `ship.speedSu`, `counter.*`, `guard.*`, `combat.roundTicks`, `fleet.recycleRefundPct`, `system.variant` (unused by the field). The candidates' `fleet.cap` 24 became `field.fleetCap` 30, a new key, so the H5 and H6 tables and their tests stay as they are. Calibration kept 30 at data v13 (see "Calibration result (h7-design-data, data v13)").
 
 #### Save, data version and replay
 
@@ -803,7 +803,7 @@ The H1–H6 rules hold: 375 px portrait, no hover, every target ≥ 44 px, every
 - **Top bar:** ore/min (the headline), stock chips (ore, plus ice and crystal once delivered), "Fleet 18/30" with the fleet icon, and the raid chip (below). Fixed widths, so nothing shifts as numbers change.
 - **Probe sheet:**
   - A **radar readout** of the five weights: a pentagon, one axis per type with its icon, filled to each weight. It's display only, and tapping it does nothing.
-  - Under it, **five rows**: icon, name, `−` weight `+` (44 px buttons), and a state line ("building 40%", "saving 12/20", "fleet full", "needs crystal: take the crystal pocket", "off").
+  - Under it, **five rows**: icon, name, `−` weight `+` (44 px buttons), and a state line ("building 40%", "saving 12/20", "fleet full", "needs crystal pocket" or "needs ice pocket", "off").
   - The rally line, and Recycle (the H5 panel with extractor and hauler rows added).
 - **Rock sheet** (asteroid, or captured pocket or hive):
   - a **Mine / Stop** toggle;
@@ -874,6 +874,42 @@ The seed doesn't change the field. The gate still runs every seed it's given, wh
 - **The hive:** flags 4, 5 and 6 hold. The best mix fits `field.fleetCap − 10` with at least 2 slots to spare.
 - **The pockets:** each falls to drones alone within 6 drones and not within 2 (F13).
 - Calibration changes only values in `data/sim.json` (guard counts, the H7 keys and the reused keys above), never rules. A rule finding goes to the Director.
+
+#### Calibration result (h7-design-data, data v13)
+
+Probe on v12: `reports/archive/h7-probe-v12.md`. Result on v13: `reports/archive/h7-design-data-v13.md` (3 seeds; the field doesn't depend on the seed, and every seed gives the same run). Values only; no rule changed.
+
+**Changes (v12 → v13):**
+
+| Value | v12 | v13 | Why |
+| --- | --- | --- | --- |
+| Hive guards (T / S) | 12 / 24 | 12 / 18 | The best mix was 19 against `field.fleetCap − 10` = 20 (1 spare; the target is 2). Now 16 (4 spare). |
+| `raid.econPerRaider` | 3 | 2 | Flag 4 missed (26%). Realistic raids were too small to open the hive: at econ 12 / 18 / 22 they took 4 / 6 / 8 guards and cut the best wave by 11% / 16% / 21%. Now 6 / 9 / 11 guards. |
+| `raid.maxSize` | 10 | 12 | So a full economy (22–23 ships) reaches the full-size raid flag 4 measures (`ceil(23 ÷ 2)` = 12). Flag 4 is met with a raid that occurs in play, not a size no run reaches. |
+| `hive.regrowPct` | 100 | 200 | A beaten raid leaves the hive open twice as long, and the hive's own regrowth during an attack weighs less, so the raid-out window (11 against 16, 31%) is real for a wave already on its way. |
+| `raid.gapTicks` | 2700 (90 s) | 3600 (120 s) | Bigger raids at a 90 s gap pushed `greedy` to 39:20, 40 s inside its 40-minute target, and `adaptive` to 25:38. At 120 s: 20:02 and 30:16 with p2 at 1 / 3, and 24:54 and 30:12 with the final p2 1 / 2. |
+| p1 (T / S) | 0 / 6 | 0 / 4 | 8 drones → 6. |
+| p2 (T / S) | 4 / 2 | 1 / 2 | 15 drones → 5. It keeps one Thorn, so it stays the crystal (Lancer) door. Smallest drone wave on v13 by p2 layout (Critic's table, round 1): 0/4 6, 0/5 7, 0/6 8, 1/0 3, 1/1 4, 1/2 5, 1/3 8, 2/0 8, 2/1 9. One Thorn's repair is outrun by drones until a third Spore keeps it alive. |
+
+**Targets on v13:**
+
+| Target | v13 | Met |
+| --- | --- | --- |
+| Pace: adaptive 15–30, greedy ≤ 40 | 24:54 / 30:12 (no raids: 10:55) | yes |
+| First raid musters at 2–6 game minutes | 2:53 (tick 5191) | yes |
+| An undefended full-economy raid on a5 kills ≥ 2 economy ships | a raid of 11 (4T 7S, econ 22) kills all 5 there (3 extractors, 2 haulers) | yes |
+| A matched defence no larger than the raid beats it losing ≤ 2 | 3 lancers + 5 flak (8) beat it, 2 lost; 2 + 5 lose 3 | yes |
+| The hive: flags 4–6; the best mix fits `field.fleetCap − 10` with ≥ 2 spare | 16 (7 lancers, 9 flak); 4 spare | yes |
+| Each pocket falls to drones alone within 6, not within 2 | p1 6; p2 5 | yes |
+| Flags 1–7 | all met | yes |
+
+**Order check (designer.md: what the spec inherits).** Every `min-wave` measurement above was rerun in a second arbitrary order: ships placed flak, lancer, drone (the estimate places drone, lancer, flak), and the raid-away hive keeping its highest guard ids (the estimate keeps the lowest), exhaustively over every mix of the best total and one less. Hive 16 / 16, hive with the raid out 11 / 11, p1 6 / 6, p2 5 / 5. Nothing moved.
+
+**What no bot exercises, candidly.**
+- No bot recycles economy ships to make room for the attack, so the slot trade (flag 6) is shown by arithmetic, not by a run.
+- The bots never Stop a rock to dodge a raid. They defend or absorb.
+- Raids on captured pockets: the R5 target is always a5, a6 or a7 while those are mined, so a pocket is raided only once the far rocks are stopped or empty. The h7-raids review noted that a captured pocket's free extractor keeps its buffer filling, so its haulers keep arriving into an undefended raid until the player Stops it or defends. This calibration doesn't tune around that. Whether haulers should hold back from a raided rock is a rule question for the Director.
+- `drones-only` (a control) ends in the runner's softlock on every seed at 28:12. Its economy was wiped by the eighth raid, and its rules then set every weight to 0 and wait with ore piling up. That's bot behaviour, not a sim softlock: probe mining kept running. It's reported for the bots owner, because `greedy` and `adaptive` share those rules after a wipe.
 
 #### Success criteria (H7; the owner, one 20–30 minute phone session; 4x is fine)
 
