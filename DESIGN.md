@@ -678,7 +678,7 @@ Then:
 - Economy ships are struck only in rounds that start with no warship there.
 - At 0, R7 is as in H7: overflow goes on to haulers, then extractors.
 
-**H10. Haulers hold (`raid.haulersHold`).** From launch (phase `out`) until the raid ends, this applies to haulers whose node is the raid's target:
+**H10. Haulers hold (`raid.haulersHold`).** From launch (phase `out`) until the raid's outcome is decided (beaten, hit, turned back or withered; amended by the Director 2026-11-14, previously "until the raid ends"), this applies to haulers whose node is the raid's target:
 - a hauler at the probe stays there and keeps its assignment;
 - a hauler at the node loads `min(buffer, cargo)` and leaves at once, without waiting for a full cargo;
 - a hauler flying out finishes its leg, then does the same.
@@ -761,7 +761,6 @@ The H1–H7 rules hold: 375 px portrait, no hover, targets ≥ 44 px, at most 2 
 - Tapping one shows the fixed banner "Tap where to send 6 ships · Cancel". The next node tap sends `moveShips`; empty space or Cancel cancels.
 - **Both modes are built.** If h8-client's smoke tests can't make the drag reliable (see BACKLOG), the engineer reports it, and the Director decides whether to ship with default 0.
 
-- *Amended (Director, 2026-11-14):* the hold ends on the tick the raid's outcome is decided (beaten, hit, turned back or withered), not when the raiders reach home.
 
 **Hauler count (rock sheet).**
 - The Haulers row reads "2 · Auto", with −, + and Auto buttons (each 44 px).
