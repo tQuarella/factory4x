@@ -1,9 +1,13 @@
 import { performance } from 'node:perf_hooks';
 import {
   BUILD_TYPES,
+  PROBE,
+  allocStatus,
   createWorld,
   fieldSummary,
+  fleetStatus,
   isWon,
+  rockStatus,
   step,
   worldHash,
   type BuildType,
@@ -56,6 +60,17 @@ export interface RaidRecord {
   planned: { thorn: number; spore: number };
 }
 
+/** One trace point: economy alive, warships alive, ore in stock, the weights, and the bays running. */
+export interface TraceRow {
+  minute: number;
+  extractors: number;
+  haulers: number;
+  warships: { drone: number; lancer: number; flak: number };
+  stockOre: number;
+  weights: Record<BuildType, number>;
+  bayRunning: BuildType[];
+}
+
 export interface FieldResult {
   strategy: string;
   /** The sweep shape for `static` (null for the others). */
@@ -75,6 +90,16 @@ export interface FieldResult {
   /** The most haulers alive at once. */
   peakHaulers: number;
   allocChanges: number;
+  /** H8 staffing: haulers idle at the probe (fleetStatus.types.hauler.idle), sampled every tick. */
+  idleHaulers: { peak: number; /** Game minutes with more than 1 idle, outside raids (mustering, out or fighting). */ minutesOver1: number };
+  /** H8 staffing: per rock, game seconds backed up (buffer at node.bufferCap) with its hauler target met, and the longest run of them. Rocks with none are left out. */
+  backedUp: Record<string, { seconds: number; longest: number }>;
+  /** H8 shield: economy ships lost in a tick that began with a warship standing at the raid's target. Must be 0 when raid.shieldEcon is 1. */
+  econLostGuarded: number;
+  /** The longest run, in game minutes, with ore for the dearest unlocked warship in stock, room under the fleet limit and no bay running (what "idles with resources piling up" measures). */
+  idleWithOreMin: number;
+  /** The state at 15, 30 and 45 game minutes (those the run reached). */
+  trace: TraceRow[];
   built: BuildTypeCounts;
   lost: BuildTypeCounts;
   peakPerMin: number;
@@ -117,6 +142,14 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
   let outcome: FieldOutcome = 'timeout';
   let error: string | undefined;
   let peakHaulers = 0;
+  const idleHaulers = { peak: 0, minutesOver1: 0 };
+  let idleTicks = 0;
+  const backedUp: Record<string, { seconds: number; longest: number }> = {};
+  const runs = new Map<string, number>();
+  let econLostGuarded = 0;
+  let idleOreRun = 0;
+  let idleOreLongest = 0;
+  const trace: TraceRow[] = [];
   let lastProgress = 0;
   let prevBay = bayTicks(world);
   let prevDelivered = deliveredTotal(world);
@@ -139,9 +172,51 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
       if (first.length > 0) {
         inputs = [...first.splice(0), ...inputs];
       }
+      // A warship standing at the raid's target as the tick begins (the shield's premise).
+      const raidNode = world.raid === null ? null : world.raid.target;
+      const guardedNow = raidNode !== null && world.ships.some((s) => s.at === raidNode);
+      const lostBefore = econLostTotal(world);
       const t0 = performance.now();
       step(world, data, inputs);
       times.push(performance.now() - t0);
+      if (guardedNow) econLostGuarded += econLostTotal(world) - lostBefore;
+      // No-idle: ore for the dearest unlocked warship in stock while no bay runs (the cheap checks first).
+      const bayNow = bayTicks(world);
+      let noBay = true;
+      for (const t of bayNow) if (t > 0) noBay = false;
+      if (noBay && world.stock.ore >= world.tun['ship.drone.cost']) {
+        const rows = allocStatus(world, data).rows;
+        const dearest = Math.max(0, ...rows.filter((r) => r.type !== 'extractor' && r.type !== 'hauler' && r.unlocked).map((r) => r.cost.ore));
+        if (dearest > 0 && world.stock.ore >= dearest && !fleetStatus(world, data).full) {
+          idleOreRun++;
+          if (idleOreRun > idleOreLongest) idleOreLongest = idleOreRun;
+        } else idleOreRun = 0;
+      } else idleOreRun = 0;
+      // Trace: the state at 15, 30 and 45 game minutes.
+      if (world.tick > 0 && world.tick % (15 * 60 * data.tickRate) === 0) {
+        const f = fleetStatus(world, data);
+        const rows = allocStatus(world, data).rows;
+        const w = Object.fromEntries(rows.map((r) => [r.type, r.weight])) as Record<BuildType, number>;
+        trace.push({ minute: world.tick / data.tickRate / 60, extractors: f.econByType.extractor, haulers: f.econByType.hauler, warships: { ...f.byType }, stockOre: world.stock.ore, weights: w, bayRunning: rows.filter((r) => r.ticksLeft > 0).map((r) => r.type) });
+      }
+      // Staffing: idle haulers at the probe (docked at no node, not in flight), and backed-up rocks whose hauler target is met.
+      let idleH = 0;
+      for (const s of world.field!.econ) if (s.type === 'hauler' && s.at === PROBE && s.transit === null && s.target === null) idleH++;
+      if (idleH > idleHaulers.peak) idleHaulers.peak = idleH;
+      if (idleH > 1 && world.raid === null) idleTicks++;
+      for (const n of world.nodes) {
+        if (n.kind === 'probe') continue;
+        const key = n.id;
+        const r = n.buffer >= world.tun['node.bufferCap'] ? rockStatus(world, n.index) : null;
+        if (r !== null && r.haulerTarget > 0 && r.haulers >= r.haulerTarget) {
+          const run = (runs.get(key) ?? 0) + 1;
+          runs.set(key, run);
+          const b = backedUp[key] ?? { seconds: 0, longest: 0 };
+          b.seconds += 1 / data.tickRate;
+          if (run / data.tickRate > b.longest) b.longest = run / data.tickRate;
+          backedUp[key] = b;
+        } else runs.set(key, 0);
+      }
       opts.onTick?.(world);
       // Progress: a bay started a ship, or a hauler delivered.
       const bay = bayTicks(world);
@@ -188,6 +263,11 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
     peakEcon: s.peakEcon,
     peakHaulers,
     allocChanges: s.allocChanges,
+    idleHaulers: { peak: idleHaulers.peak, minutesOver1: Number((idleTicks / data.tickRate / 60).toFixed(2)) },
+    backedUp,
+    econLostGuarded,
+    idleWithOreMin: Number((idleOreLongest / data.tickRate / 60).toFixed(2)),
+    trace,
     built: s.built,
     lost: s.lost,
     peakPerMin: s.peakPerMin,
