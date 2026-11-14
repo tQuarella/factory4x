@@ -30,7 +30,7 @@ Launches: 9 / 12.
 | 8 | engineer | h8-client | launch | Build, from task/h8-sim (top of stack) |
 | r6 | critic | h8-raids | resume | Review round 1: APPROVE (26a1a76) |
 | r7 | faction-ai | h8-raids | resume | Hold ends at the outcome (def6c5f), determinism cdbdea56 |
-| r8 | critic | h8-raids | resume | Review round 2 |
+| r8 | critic | h8-raids | resume | Review round 2: APPROVE (d45cca3) |
 | 9 | critic | h8-client | launch | Review round 1 on 887155c (smoke 268/268; every node-pair drag lands) |
 
 ## Iteration 7 ledger
