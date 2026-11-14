@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILD_TYPES, createWorld, defaultData, fleetStatus, guardianAt, rockStatus, step, type Input, type World } from '@factory4x/sim';
+import { BUILD_TYPES, createWorld, defaultData, fleetStatus, guardianAt, isGuarded, rockStatus, step, type Input, type World } from '@factory4x/sim';
 import { FIELD_CAP_MIN, runField, type FieldResult } from '../src/field-runner.ts';
 import {
   AdaptiveBot,
@@ -15,9 +15,8 @@ import {
   openSlots,
   STATIC_SHAPES,
   staticStrategy,
-  weightInputs,
 } from '../src/field-strategies.ts';
-import type { FieldBot, Weights } from '../src/field-runner.ts';
+import type { FieldBot, FieldStrategy, Weights } from '../src/field-runner.ts';
 
 /**
  * H8 bot changes (DESIGN.md H8 "Bots (H8)") on the shipped data (`defaultData`, v14). Premises are structure, not
@@ -327,22 +326,69 @@ describe('the no-plan-fits table (cells without a traced run)', () => {
   });
 });
 
+describe('greedy hands its backstops to the adaptive bot it becomes', () => {
+  it('a first hit that takes the economy below 2 ships: greedy then holds Extractor and Hauler at the start weights until econ reaches raid.firstAtEcon - 1', () => {
+    const w = createWorld(1, data);
+    const bot = greedy.make(data);
+    let g = 0;
+    while (econAliveNow(w, data) < 8 && g++ < 20 * MIN) step(w, data, bot.decide(w, data));
+    // The first hit is the tick the stats say so; it wipes the economy at the same time.
+    w.field!.econ = [];
+    w.field!.bays.extractor.ticksLeft = 0;
+    w.field!.bays.hauler.ticksLeft = 0;
+    w.stats.raids.hit = 1;
+    play(w, bot, 1);
+    const resume = w.tun['raid.firstAtEcon'] - 1;
+    let held = 0;
+    while (econAliveNow(w, data) < resume && held++ < 15 * MIN) {
+      expect(w.field!.alloc.extractor).toBe(w.tun['alloc.start.extractor']);
+      expect(w.field!.alloc.hauler).toBe(w.tun['alloc.start.hauler']);
+      play(w, bot, 1);
+    }
+    expect(econAliveNow(w, data)).toBeGreaterThanOrEqual(resume);
+  });
+});
+
 describe('whole runs on the shipped data: the winners never idle with resources piling up', () => {
-  const runs = new Map<string, { r: FieldResult; hauler0WithShortfall: number; peakOre: number; atEnd: number }>();
-  const play1 = (s: typeof adaptive): { r: FieldResult; hauler0WithShortfall: number; peakOre: number; atEnd: number } => {
+  const runs = new Map<string, { r: FieldResult; hauler0WithShortfall: number; peakOre: number; atEnd: number; limitTicks: number; recycleTicks: number }>();
+  const play1 = (s: typeof adaptive): { r: FieldResult; hauler0WithShortfall: number; peakOre: number; atEnd: number; limitTicks: number; recycleTicks: number } => {
     const hit = runs.get(s.name);
     if (hit !== undefined) return hit;
     let hauler0 = 0;
     let peakOre = 0;
     let atEnd = 0;
-    const r = runField(s, 1, data, { capTicks: FIELD_CAP_MIN * MIN, softlockTicks: 5 * MIN, onTick: (w) => {
-      const f = fleetStatus(w, data);
-      // The trade in slots: with the fleet within one ship of its limit the last wave takes the room, and no hauler is built.
-      if (w.field!.alloc.hauler === 0 && haulerShortfall(w) > 0 && f.count + 1 < (f.cap ?? Infinity)) hauler0++;
+    let limitTicks = 0;
+    let recycleTicks = 0;
+    type Probe = { haulerBlock: 'limit' | 'recycling' | null; blockLoad: number };
+    // The amendment to change 1 is checked on the world the bot decided on: Hauler 0 with a shortfall only (a) at the
+    // limit for an asteroid shortfall that the wave being built leaves no room for, (b) while recycling, except a taken pocket with no hauler.
+    const spy: FieldStrategy = {
+      ...s,
+      make: (d) => {
+        const inner = s.make(d);
+        return {
+          decide(w, dd): Input[] {
+            const inputs = inner.decide(w, dd);
+            const set = inputs.find((i) => i.type === 'setAlloc' && i.shipType === 'hauler') as { weight: number } | undefined;
+            const weight = set === undefined ? w.field!.alloc.hauler : set.weight;
+            if (weight === 0 && haulerShortfall(w) > 0) {
+              const p = inner as unknown as Probe;
+              const bare = w.nodes.some((n) => n.kind === 'pocket' && !isGuarded(w, n.index) && rockStatus(w, n.index).haulers === 0);
+              const ok = p.haulerBlock === 'limit' ? haulerShortfall(w, 'pocket') === 0 && p.blockLoad >= w.tun['field.fleetCap'] : p.haulerBlock === 'recycling' ? !bare : false;
+              if (!ok) hauler0++;
+              if (p.haulerBlock === 'limit') limitTicks++;
+              if (p.haulerBlock === 'recycling') recycleTicks++;
+            }
+            return inputs;
+          },
+        };
+      },
+    };
+    const r = runField(spy, 1, data, { capTicks: FIELD_CAP_MIN * MIN, softlockTicks: 5 * MIN, onTick: (w) => {
       peakOre = Math.max(peakOre, w.stock.ore);
       atEnd = w.stock.ore;
     } });
-    const out = { r, hauler0WithShortfall: hauler0, peakOre, atEnd };
+    const out = { r, hauler0WithShortfall: hauler0, peakOre, atEnd, limitTicks, recycleTicks };
     runs.set(s.name, out);
     return out;
   };
@@ -372,11 +418,12 @@ describe('whole runs on the shipped data: the winners never idle with resources 
     });
   }
 
-  it('the hauler weight is not 0 while a rock has a shortfall (under 2 game minutes in a whole run, all of it the slot trade), except at the fleet limit or while economy ships are being recycled toward a wave', () => {
-    const a = play1(adaptive);
-    const g = play1(greedy);
-    expect(a.hauler0WithShortfall).toBeLessThan(120 * TR); // traced: 84 s, all of it the slot trade (economy + the wave being built >= the limit)
-    expect(g.hauler0WithShortfall).toBeLessThan(120 * TR);
+  it('the hauler weight is 0 with a shortfall only in the two cases the amendment allows: exactly zero ticks outside them', () => {
+    for (const s of [adaptive, greedy]) {
+      const x = play1(s);
+      expect(x.hauler0WithShortfall, s.name).toBe(0);
+      if (s.name === 'adaptive') expect(x.limitTicks + x.recycleTicks, 'the exceptions are exercised').toBeGreaterThan(0);
+    }
   });
 
   it('the controls that cannot win do not idle with ore either: drones-only keeps building to the limit, idle is the control for waiting', () => {
@@ -384,10 +431,8 @@ describe('whole runs on the shipped data: the winners never idle with resources 
     expect(r.idleWithOreMin).toBeLessThan(3);
   });
 
-  it('raid.shieldEcon is reported, not asserted here: economy lost under a guard is a number in every run', () => {
-    const { r } = play1(adaptive);
-    expect(typeof r.econLostGuarded).toBe('number');
+  it('the shield holds (raid.shieldEcon 1 ships): no economy ship is lost in a tick that began with a warship at the raid target, in adaptive and greedy', () => {
+    expect(createWorld(1, data).tun['raid.shieldEcon']).toBe(1);
+    for (const s of [adaptive, greedy]) expect(play1(s).r.econLostGuarded, s.name).toBe(0);
   });
 });
-
-void weightInputs;

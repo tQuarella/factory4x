@@ -7,6 +7,7 @@ import {
   fleetCap,
   fleetStatus,
   guardianAt,
+  haulerTarget,
   heartIndex,
   isGuarded,
   isTypeUnlocked,
@@ -132,11 +133,13 @@ const searchMax = (world: Readonly<World>, data: SimData): number => fleetCap(wo
 
 /** Haulers the rocks still lack: the sum over the rocks of `haulerTarget - haulers`, where positive (rockStatus; H8 H1-H4). */
 export function haulerShortfall(world: Readonly<World>, kind: 'any' | 'pocket' = 'any'): number {
+  // The same numbers as rockStatus(...).haulerTarget and .haulers, read without building a whole sheet per rock (this runs every tick).
+  const assigned = world.nodes.map(() => 0);
+  for (const s of world.field!.econ) if (s.type === 'hauler' && s.target !== null) assigned[s.target] = assigned[s.target]! + 1;
   let n = 0;
   for (const node of world.nodes) {
     if (node.kind === 'probe' || (kind === 'pocket' && node.kind !== 'pocket')) continue;
-    const r = rockStatus(world, node.index);
-    n += Math.max(0, r.haulerTarget - r.haulers);
+    n += Math.max(0, haulerTarget(world, node.index) - assigned[node.index]!);
   }
   return n;
 }
@@ -320,10 +323,16 @@ export class AdaptiveBot implements FieldBot {
   private shrinking = false;
   /** The size of the wave this tick builds for (a pocket's or the hive's), 0 with none: the room the economy must leave. */
   private waveTotal = 0;
+  /** The room a wave needs the economy to leave this tick: max(smallest hive wave, the wave being built for), 0 when not in offence at a limit. */
+  private reserve = 0;
+  /** Why this tick's final Hauler weight is 0 while a rock has a shortfall (DESIGN.md H8 change 1 amendment): 'limit' (a), 'recycling' (b), or null. */
+  haulerBlock: 'limit' | 'recycling' | null = null;
+  /** The economy ships plus the reserve while haulerBlock is 'limit' (for tests: (a) says it is at least the fleet limit). */
+  blockLoad = 0;
   private readonly backstops: Backstops;
   respond: boolean;
-  constructor(private readonly opts: AdaptiveOptions) {
-    this.backstops = new Backstops(opts.dronesOnly);
+  constructor(private readonly opts: AdaptiveOptions, backstops?: Backstops) {
+    this.backstops = backstops ?? new Backstops(opts.dronesOnly);
     this.respond = opts.respond;
   }
 
@@ -331,6 +340,8 @@ export class AdaptiveBot implements FieldBot {
     const heart = heartIndex(world);
     this.shrinking = false;
     this.waveTotal = 0;
+    this.reserve = 0;
+    this.haulerBlock = null;
     const rs = raidStatus(world);
     const raid = rs.phase === 'none' ? null : rs;
     const parked = parkedWarships(world);
@@ -363,6 +374,11 @@ export class AdaptiveBot implements FieldBot {
     const finish = (extra: Input[]): Input[] => {
       this.limitEconomy(world, data, w, types, limit);
       this.backstops.apply(world, data, w);
+      if (w.hauler === 0 && haulerShortfall(world) > 0) {
+        this.haulerBlock = this.shrinking ? 'recycling' : 'limit';
+        const e = econCounts(world, data);
+        this.blockLoad = e.extractor + e.hauler + Math.max(this.reserve, this.waveTotal);
+      }
       return [...inputs, ...extra, ...weightInputs(world, data, w)];
     };
 
@@ -574,6 +590,7 @@ export class AdaptiveBot implements FieldBot {
     const withCounter = this.opts.dronesOnly || types.includes(counter.type) ? types : [...types, counter.type];
     const smallest = this.smallestHiveWave(world, data, withCounter, limit);
     const e = econCounts(world, data);
+    this.reserve = smallest ?? 0;
     if (smallest !== null && e.extractor + e.hauler + ECON_MARGIN + smallest <= cap) return;
     w.extractor = 0;
     w.hauler = 0;
@@ -607,8 +624,15 @@ const adaptiveOpts = (over: Partial<AdaptiveOptions> = {}): AdaptiveOptions => (
 class GreedyBot implements FieldBot {
   private inner: AdaptiveBot | null = null;
   private readonly backstops = new Backstops(false);
+  get haulerBlock(): 'limit' | 'recycling' | null {
+    return this.inner === null ? null : this.inner.haulerBlock;
+  }
+  get blockLoad(): number {
+    return this.inner === null ? 0 : this.inner.blockLoad;
+  }
   decide(world: Readonly<World>, data: SimData): Input[] {
-    if (this.inner === null && fieldSummary(world).raids.hit >= 1) this.inner = new AdaptiveBot(adaptiveOpts());
+    // The inner bot takes over greedy's backstops, so a wipe by the first hit is still recovered from.
+    if (this.inner === null && fieldSummary(world).raids.hit >= 1) this.inner = new AdaptiveBot(adaptiveOpts(), this.backstops);
     if (this.inner !== null) return this.inner.decide(world, data);
     const w: Weights = { ...ZERO, ...economyWeights(world, data, false) };
     this.backstops.apply(world, data, w);

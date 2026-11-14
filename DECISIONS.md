@@ -1429,3 +1429,10 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 
 **Decision:** the bot's Hauler weight may be 0 with a shortfall only (a) at the fleet limit, for an asteroid shortfall, when economy plus the wave being built would not fit, and (b) while recycling economy ships toward a wave, except for a taken pocket with no hauler. DESIGN.md bot change 1 amended. The whole-run test must count zero ticks outside these exceptions, not "under 120 s".
 **Why:** the Critic (h8-bots round 1) found the code contradicted the spec's "never". The engineer's guards prevent a build-recycle-build loop at the limit, which is the same slot trade H7's recycle rule makes; that is a sound bot rule, so the spec follows the code, but the exception must be exact.
+
+## 2026-11-14 · Engineer · h8-bots round 1 fixes
+
+- **Change 1 pinned exactly.** `AdaptiveBot` now records why its final Hauler weight is 0 with a shortfall (`haulerBlock`: 'limit' for (a), 'recycling' for (b)). The whole-run test checks every decide on the world the bot saw: zero ticks outside (a) and (b) for adaptive and greedy, with (a) requiring no pocket shortfall and economy + reserve >= the limit, and (b) requiring no taken pocket with 0 haulers. The 8:00 muster window falls under (a). A first version of the check flagged 2 ticks at 9:29 and 10:08 that were a post-step reading: a pocket was captured during the step, so the shortfall appeared after the bot decided. The test now checks the decide-time world.
+- **Greedy handoff.** The inner AdaptiveBot takes greedy's `Backstops`, so a first hit that wipes the economy is still recovered from; tested.
+- **Shield asserted** (0 economy ships lost under a guard, adaptive and greedy, whole runs). Stale report text fixed. Unused import removed.
+- **Bots gate time.** `haulerShortfall` in the bot reads `haulerTarget` and the hauler assignment directly instead of building a `rockStatus` per rock each tick. The bots run takes 96-98 s (86 s before h8-bots; the rest is the per-tick staffing metrics and the backstops' `allocStatus` read).
