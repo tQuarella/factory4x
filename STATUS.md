@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 8 ledger
 
-Launches: 8 / 12.
+Launches: 9 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -29,7 +29,10 @@ Launches: 8 / 12.
 | 7 | engineer | h8-bots | launch | Build, from task/h8-sim |
 | 8 | engineer | h8-client | launch | Build, from task/h8-sim (top of stack) |
 | r6 | critic | h8-raids | resume | Review round 1: APPROVE (26a1a76) |
-| r7 | faction-ai | h8-raids | resume | Director change: hold ends at the outcome, not at home (ec04b17) |
+| r7 | faction-ai | h8-raids | resume | Hold ends at the outcome (def6c5f), determinism cdbdea56 |
+| r8 | critic | h8-raids | resume | Review round 2: APPROVE (d45cca3) |
+| 9 | critic | h8-client | launch | Review round 1: REJECT (76376f9): raids not merged; split ghost; enough text untested; touch-action, badge vs HUD; rock sheet squeezes map to ~160 px; raw colours |
+| r9 | engineer | h8-client | resume | Fix round 1; map keeps 195 px with rock sheet |
 
 ## Iteration 7 ledger
 
