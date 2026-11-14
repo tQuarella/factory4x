@@ -855,3 +855,8 @@ Scope: `git log build-20261108-4..build-20261108-5`, `reviews/h6-*.md`, the "Ite
 6. **The split is one stack, topped by h7-client.** h7-sim flips shipped data to field mode. That breaks bot, client and smoke tests outside its files, which can only be fixed alongside the UI and the strategies. Shipping field mode only behind the client (deferring the flip) would let h7-sim merge alone, but its field-mode reference replay and the browser cross-engine check both run on shipped data, so the flip belongs with the sim. Art is folded into h7-client (two silhouettes, a marker, a radar, a badge) to keep four build tasks.
 
 **Why:** each call keeps the slice testable without rewriting the parked game, and makes the raid warning and the counter-attack window real in play, not only on paper.
+
+## 2026-11-14 · Director · H7 split accepted as written
+
+**Decision:** (1) The flip to `run.mode: "field"` stays in h7-sim, and the whole stack lands through `merge-task h7-client`. (2) Art is folded into h7-client; a separate art-direction task only if h7-client's Critic finds the new silhouettes unreadable. (3) The H6 campaign bots stay in the code, retired from the gate, and their tests run on a campaign-mode fixture; deleting them goes with cw-root-code-removal once the overworld's fate is known. (4) The field guard counts and `field.fleetCap` 30 are starting values for h7-design-data to calibrate.
+**Why:** the field reference replay and browser cross-engine check run on shipped data, so flipping early keeps them honest. The overworld is parked, not dropped (Q21), so its bots shouldn't be deleted while it might return. Folding art keeps 4 launches spare.
