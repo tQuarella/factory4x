@@ -1123,3 +1123,35 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 
 **Decision:** H8 adds option A to B: a hauler count per rock (Auto or −/+), warships at a rock shield its economy ships until they fall, haulers hold at home while their rock is raided, a Mine mode (tap the button, then tap rocks), and each weight row shows its share of income. The spec reconciles the per-rock hauler count with dragging (a hand-moved hauler must not fight the count rule).
 **Why:** owner, in a live session: "Do A at the same time" (QUESTIONS.md Q22). The iteration is larger, about one and a half H7s; the 12-launch budget stays, and if it runs out the Director checkpoints rather than cutting quality.
+
+## 2026-11-14 · Designer · H8 spec (A + B): calls made in the spec
+
+**Decision:**
+1. **A drag carries warships only. Haulers are governed only by the per-rock count, and extractors only by Mine marks** (the Director's lean, kept). There is no A/B for drags that carry haulers.
+2. **Drag is the primary gesture, and tap-Move-tap is a client A/B** (`client.moveGesture`). This replaces my candidates' "tap first" (owner, Q22). Both are built. If the h8-client smoke tests can't make the drag land reliably on every node pair, the Director picks the default.
+3. **There is no pan conflict.** Field mode is fitted, with no pan or zoom, and its canvas has only a click handler. The overworld pan in `worldview.ts` is unused there. The field canvas gets `touch-action: none` as world mode has.
+4. **A long press released without moving is still a tap** (it opens the sheet). Only movement after the long press makes it a split. So a slow tap is never lost, and a split never fires without a drag.
+5. **Split is per type,** `floor(count × move.splitPct ÷ 100)`, with a 1-ship fallback. Splitting per type keeps both groups' counter mix. The fallback keeps a long press on a few mixed ships (one drone and one lancer, say) from doing nothing.
+6. **`moveShips` sends `part`, not counts.** The sim computes the counts on the tick it applies the order, so replays are exact and a stale client count can't send the wrong ships.
+7. **Haulers with no shortfall park idle at the probe**, rather than over-staffing a rock. Idle haulers are visible in the fleet panel and can be recycled there.
+8. **`hauler.rebalance` is folded into `hauler.autoNeed`.** One switch restores all of H7's hauler behaviour for the comparison.
+9. **Haulers hold from launch, not from muster.** The muster is the warning window, and holding then would cost 15 s of income for every raid.
+10. **The hauler repro is the first commit of h8-sim,** not a separate task. It must exist before the rule rewrite, and a separate task would cost a builder launch and a Critic round for two tests.
+11. **Bots fold in `cw-h7-bots-post-wipe-idle`** (change 2) and gain a "nothing to build" rule (change 3), so no winner can idle with ore piling up. This follows the designer.md no-plan-fits rule.
+12. **If `static` gets stronger** because surplus haulers no longer eat its slots, and flag 1 fails, that is reported as a finding about the claim and not tuned around.
+
+**Why:**
+- (1) Two controls on the same haulers would fight. The per-rock count already says what a hand-placed hauler would say, and the owner's drag idea arose from misplaced haulers, which H1–H4 fix at the cause.
+- (2) The owner asked for drag.
+- (4) and (5) keep a phone gesture forgiving.
+- (10) saves a launch.
+- The rest keeps the in-build comparisons to one switch each.
+
+## 2026-11-14 · Director · H8 split accepted; smoke speed-up runs first, in parallel
+
+**Decisions:**
+1. The "A2 got a third hauler, A1 none" repro stays inside h8-sim as its first commit, before any rule change (no separate task).
+2. `cw-smoke-sim-time` is promoted from Can wait and runs now as an engineer task in parallel with h8-sim (it touches only `tests/smoke/**`, before h8-client does). It must merge before h8-client's final round.
+3. If bot flag 1 (static loses) fails under staffing by need, the Designer reports it as a finding about the claim, not a number to tune away; the Director decides then.
+4. Q18 (pillar 1 wording) goes in the H8 handoff, not now.
+**Why:** both CI jobs are past 80% of their limits (retro after build-20261114-1), and h8-client adds smoke tests; the two tasks share no files.

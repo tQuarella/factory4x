@@ -440,7 +440,9 @@ H7 (build-20261114-1, spec below) is the current build. Data `run.mode` `"field"
 
 ## Hypotheses
 
-### H8 candidates (iteration 8): awaiting the owner's pick
+### H8 candidates (iteration 8): A and B picked
+
+*The owner picked B, then added A (QUESTIONS.md Q22). The spec is "H8 (Milestone 2, iteration 8, spec ready): Hold the front" below. Where they differ, the spec wins: drag is the primary gesture, tap-Move-tap is the fallback, and `hauler.rebalance` is folded into `hauler.autoNeed`.*
 
 *Iteration 8, 2026-11-14. The triage is in PLAYTEST_LOG.md (build-20261114-1, 2026-11-14). **H7 is supported**: the owner defended a raid ("That felt pretty good"), endorsed the shared limit ("That's good"), pivoted from economy to offence and took the hive. The friction is the hauler layer and the speed of the controls. QUESTIONS.md Q22 asks for the pick. No spec until then.*
 
@@ -553,6 +555,303 @@ Draft fun questions:
 | B | Stretches "Ships take orders at nodes (attack, guard, escort); no unit micro" for economy ships. Moves between nodes fit the wording, but hand-placed haulers lean toward micro. No edit proposed. If B ships and the owner likes it, the Director may want to confirm the line. |
 | C | Restores the "one long game" fixed decision and brings pillar 5 back into play. No edit. |
 | All | **Q18 (pillar 1 wording) is ripe.** The owner endorsed the shared limit ("That's good"), and Q18's answer was "revisit after play". Its proposed text mentions a limit "raised by research", which field mode doesn't have. Rewording it is the Director's call when bundling. I don't add it to Q22, to keep that question one reply. |
+
+### H8 (Milestone 2, iteration 8, spec ready): Hold the front
+
+The owner picked B (QUESTIONS.md Q22: "B, can we tap and drag to move ships?  Long-tap then drag to move half?"), then added A ("Do A at the same time"). The Director logged both in DECISIONS.md (048156b, 756a237). So H8 is **A and B together, with every ride-along**. The background is "H8 candidates" above. Where they differ, this spec wins, and where this spec and BACKLOG.md differ, the spec wins.
+
+Everything not mentioned here is H7 as built (data v13): field mode, the allocation, extractors and Mine marks, raids R1–R9, the shared fleet limit, combat, and the client.
+
+#### Claim
+
+**When the economy staffs itself and the player commands the front directly, the economy-against-force decision becomes "where do my warships stand, and how many", and it is fun.** Commanding the front means dragging warships between nodes, with warships shielding the economy ships behind them. The player spends attention on that decision, not on correcting haulers.
+
+Secondary: on a phone canvas, a drag between nodes and a long-press drag for half are reliable and fast.
+
+What would disprove it:
+- The owner still talks about haulers in the wrong place, or extra haulers.
+- Drags misfire, going to the wrong node, or a tap becomes a move. Or they go back to the sheets to send ships.
+- Holding a rock with warships feels like a chore, or defence stays trivial: "only need to defend one asteroid", with nothing to decide.
+- They can't say what a weight does.
+
+#### The smallest mechanics that test it
+
+1. **Haulers by need** (ride-alongs 1–3): each worked rock has a hauler target. Haulers go where the shortfall is largest and rebalance when they get home. The probe never builds a hauler that no rock needs.
+2. **A hauler count per rock** (A1): the target is Auto (the need), or a number the player sets on the rock sheet.
+3. **Drag to move warships** (B): a drag from one node to another moves all its warships. A long-press, then a drag, moves half. It is a group order between nodes, never a selection of single ships.
+4. **The military shields the economy** (A2), and **haulers wait at home while their rock is raided** (A3).
+5. **Readability:**
+   - a raid-target badge (ride-along 4);
+   - a fleet panel with Recycle, opened from the Fleet chip (ride-along 5);
+   - a Mine mode (A4);
+   - each weight's share of income (A5).
+
+New inputs: `moveShips`, `setHaulers`, `recycleFleet`. There are no others.
+
+#### Which ships a drag carries: warships only
+
+**A drag carries warships only:** Drone, Lancer and Flak. **Haulers are governed only by the per-rock count**, and extractors only by Mine marks, so the two controls never fight. A hauler moved by hand would either be pulled straight back by the auto rule, or need a pin, and the per-rock count already expresses that pin.
+
+The owner's drag idea came while haulers were misplaced ("three haulers at A2… a drag, from one asteroid to another"). Staffing by need, plus the per-rock count, fixes that at the cause, which leaves the drag free to be the military order.
+
+There is no A/B for this: a mode where the drag also carries haulers would bring back the pin problem. Economy ships stay unsendable by hand (H7 F12). DECISIONS.md logs this.
+
+#### Rules (field mode): changes to H7
+
+`T` = 1800 ticks per game minute. All integer, fixed orders, no RNG. Type order: extractor, hauler, drone, lancer, flak.
+
+**H1. Hauler need and target.** For a **haulable** node `n` (worked and Mine-marked, as H7):
+- `yieldPerMin(n)` = the node's extractors (docked plus free) × its rate per extractor: `extractor.orePerMin` for an asteroid, `pocket.resourcePerMin` for a pocket, `heart.orePerMin` for the hive. This is the rate F4 produces there now.
+- `roundTrip(n)` = 2 × the leg ticks a hauler takes from the probe to `n` at `ship.hauler.speedSu` (the same leg as F7).
+- `need(n) = max(1, ceilDiv(yieldPerMin × roundTrip × hauler.needPct, 100 × T × ship.hauler.cargo))`.
+- `target(n)` = `haulerSet[n]` if the player set a count, else `need(n)`. A node that isn't haulable has a target of 0.
+- The needs at v13 values with `hauler.needPct` 110, computed from the coordinates, are 1 each for a1–a4, 3 for a5, 2 each for a6 and a7, and 1 each for p1 and p2 once taken. h8-sim's test pins them.
+
+**H2. Assignment (replaces F6's pick).**
+- A hauler at the probe with no haulable target picks the haulable node with the largest shortfall above 0, where shortfall = `target − assigned`.
+- Ties go to the node nearest the probe, then to the lower index.
+- If no node has a shortfall, the hauler **parks idle at the probe**.
+- Haulers are processed in id order, and `assigned` is updated after each pick.
+
+**H3. Rebalance at home.**
+- When a hauler arrives at the probe and unloads: if its node's `assigned > target`, it leaves that node (`assigned` −1) and picks again by H2, which may mean parking idle.
+- Otherwise it keeps its node, as in H7.
+- So a lowered count takes effect as each hauler next reaches home, which is about 9–21 s at 1x on the field's rocks (a round trip of 262 to 633 ticks).
+- H7's "keep while haulable, reassign when not" still holds.
+
+**H4. No surplus haulers (allocation eligibility).**
+- `haulerShortfall` = Σ over haulable nodes of `max(0, target − assigned)`, minus idle haulers at the probe, minus haulers in the bay.
+- The Hauler type is **eligible** in F2 only while `haulerShortfall > 0`, on top of the H7 conditions.
+- The hauler weight is now a priority (how fast), not an amount.
+- While the type is ineligible, its share keeps what it holds, and `allocStatus` reports the new state `enough`.
+
+**H5. `hauler.autoNeed` 0 restores H7's F6 exactly:** the ratio pick, haulers that stay on their rock, no rebalance and no H4 condition. The per-rock count is then ignored and its stepper hidden. This is the in-build comparison.
+
+**H6. `moveShips`** (`from`, `to`, `part: 'all' | 'split'`). The sim computes the counts on the tick it applies the input:
+- `all`: every warship of each type parked at `from` (not in transit), as `shipsAtByType` gives them.
+- `split`: per type, `floor(count × move.splitPct ÷ 100)`. If that totals 0 while at least one warship is there, it takes 1 ship of the first type present, in type order.
+
+Then:
+- It is applied exactly as `sendShips` with those counts: the same validity (H5 and H7 rules, warships only) and the same effect (an attack if `to` is guarded, a guard order otherwise).
+- It is invalid if the computed total is 0, or if `from` = `to`.
+- Replays record the input, not the counts, so they replay identically.
+
+**H7. `setHaulers`** (`node`, `count: number | null`):
+- Valid for an asteroid, or a captured pocket or hive. `count` is null (Auto) or 0..`rock.haulerMax`.
+- It sets `haulerSet[node]`. The setting is kept while the rock is unmarked and applies again when it is re-marked.
+- 0 is allowed: the rock is mined, but its ore piles up ("Backed up").
+
+**H8. `recycleFleet`** (`counts` for all five types). It recycles up to that many ships of each type, wherever they are.
+- **Not eligible:** ships at a guarded node in battle, and ships at a raid's target while that raid is in its fight phase.
+- **Order within a type:**
+  1. idle at the probe;
+  2. parked or docked at a node, by node index;
+  3. in transit.
+
+  The lowest id goes first within each group.
+- **Refund:** each ship refunds `fleet.recycleRefundPct` of its ore cost, as `recycleShips` does.
+- **Side effects:**
+  - a recycled hauler's cargo is lost;
+  - a recycled docked extractor frees its slot, and F5 re-dispatches that tick.
+- It is valid if the clamped total is at least 1. `recycleShips` (per node) stays.
+
+**H9. Shield (R7 amendment, `raid.shieldEcon`).**
+- If at least one warship is `at` the target when a raid round starts, the raider pools strike **warships only**, and their overflow is lost.
+- Economy ships are struck only in rounds that start with no warship there.
+- At 0, R7 is as in H7: overflow goes on to haulers, then extractors.
+
+**H10. Haulers hold (`raid.haulersHold`).** From launch (phase `out`) until the raid ends, this applies to haulers whose node is the raid's target:
+- a hauler at the probe stays there and keeps its assignment;
+- a hauler at the node loads `min(buffer, cargo)` and leaves at once, without waiting for a full cargo;
+- a hauler flying out finishes its leg, then does the same.
+
+The target stays mined (its docked extractors stay, and its haulers still count as assigned), so R5 and R6 are unchanged. H10 replaces Can wait `cw-h7-hauler-raid-wait`.
+
+#### Save, data version and replay
+
+- **`dataVersion` 14** (h8-sim): the new keys below, plus `haulerSet` in the field state. Old saves are discarded with the existing toast.
+- **The reference replay** (h8-sim, then h8-raids) adds:
+  - a need-based assignment;
+  - a rebalance after `setHaulers` lowers a count;
+  - the Hauler state `enough`;
+  - `moveShips` all, and split, including the 1-ship fallback;
+  - `recycleFleet` of a hauler in transit and of a docked extractor;
+  - a shielded round: economy ships survive while a warship stands, then die after it falls;
+  - haulers held during a raid, then resuming.
+
+  The determinism hashes are re-baselined.
+
+#### Tunables (H8, data v14, all integers)
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `hauler.autoNeed` | 1 | 0–1 | 0: H7's haulers (per extractor, staying put, built while weighted), the comparison / 1: by need, rebalancing, no surplus |
+| `hauler.needPct` | 110 | 100–200 | 100: just enough, but buffers creep up when trips bunch / 200: double staffing, idle haulers again |
+| `rock.haulerMax` | 6 | 2–10 | the top of the per-rock stepper. 2: little room to over-staff a far rock / 10: a long stepper |
+| `raid.shieldEcon` | 1 | 0–1 | 0: as H7, overflow kills economy ships while defenders stand / 1: the economy is safe while a warship stands |
+| `raid.haulersHold` | 1 | 0–1 | 0: haulers fly into the raid (H7) / 1: they wait at home until it ends |
+| `move.splitPct` | 50 | 25–75 | the long-press share. 25: a quarter peels off / 75: most go, a picket stays |
+| `client.longPressMs` | 450 | 250–900 | client, this device. 250: a slow drag becomes a split by accident / 900: the split feels sluggish |
+| `client.dragSlopPx` | 12 | 6–24 | client. 6: a shaky tap becomes a drag / 24: short drags read as taps |
+| `client.moveGesture` | 1 | 0–1 | client. 1: drag / 0: the tap-Move-tap fallback (see the client section) |
+
+The candidates' `hauler.rebalance` is folded into `hauler.autoNeed`, because rebalancing has nothing to aim at without need targets. The new `client.*` keys follow `client.autosaveSec`: they live in data, show in the tuning panel tagged "this device", are stored in settings, and never reach the sim.
+
+#### Selectors (sim, read-only)
+
+- **`rockStatus`** gains:
+  - `haulerNeed` (H1's need, 0 when not haulable);
+  - `haulerSet` (null, or the count);
+  - `haulerTarget`;
+  - `raidTarget` (true from muster to the raid's end);
+  - `haulersHeld` (true while H10 applies).
+- **`allocStatus`:**
+  - The Hauler state can be `enough`.
+  - Each type gains `incomePct`: its weight × 100 ÷ the sum of the weights of unlocked types with a weight above 0, rounded down; 0 for a type that is off or locked. It is the share of income that weight asks for. The state line says when a type isn't taking ore.
+- **`fleetStatus`**, per type:
+  - `alive`;
+  - `idle` (at the probe: idle economy ships, or warships parked there);
+  - `building`;
+  - `recyclable` (eligible under H8).
+- **`movePreview(world, from, part)`:** the warship counts a `moveShips` would carry now (H6). The client uses it for the drag ghost and to decide whether a drag can start.
+- **`raidStatus`** gains `holding`: the number of haulers H10 is holding.
+
+#### Client: phone UI (H8)
+
+The H1–H7 rules hold: 375 px portrait, no hover, targets ≥ 44 px, at most 2 taps per action from its screen, and nothing in the HUD shifts.
+
+**Drag to move (`client.moveGesture` 1).**
+- **No competing gesture.** Field mode has no pan or zoom: the field is fitted (`fit.ts`), and the canvas has only a `click` handler today. The H6 overworld pan in `worldview.ts` is unused in field mode, so a drag on the field canvas has no other meaning. Set `touch-action: none` on the canvas in field mode, as world mode already does, so the browser doesn't scroll or zoom under a drag.
+- **States**, for the primary pointer only. A second pointer cancels the gesture.
+  1. **Down** on a node (by `hitTest`): remember the node and start the long-press timer.
+  2. **Moved past `client.dragSlopPx` before `client.longPressMs`:** if `movePreview(from, 'all')` is above 0, start an **all-drag**. Otherwise the gesture ends, with no move and no tap.
+  3. **Held within the slop for `client.longPressMs`:** if `movePreview(from, 'split')` is above 0, arm a **split**: the source ring pulses, the ghost shows the half counts, and `navigator.vibrate(10)` runs where it's available. Moving past the slop then starts a **split-drag**. Released without moving, it is a tap.
+  4. **While dragging:**
+     - a dashed line runs from the source to the finger;
+     - the **ghost chip** (type icons and counts) sits 48 px above the finger, so the thumb doesn't hide it;
+     - the **drop target** is `hitTest` at the finger, excluding the source. It gets a bright ring and its name, plus "Attack" and its Strong/Even/Weak tag if it is guarded;
+     - over a sheet, the HUD or empty space there is no target, and the line turns grey.
+  5. **Release** on a target sends `moveShips(from, to, part)`, with a toast: "Moved 6 → A5" or "Sent 6 to attack P2". Release anywhere else (empty space, the source, a sheet, off the canvas) **cancels**: no input and no change of sheet. `pointercancel` also cancels.
+- **A plain tap** opens the node's sheet, as in H7. A tap is a release within the slop, before or after the long-press time. A tap on empty space closes the sheet. The `click` that follows any drag is suppressed, like `worldView.consumeDrag`.
+- **Hit reliability:**
+  - A drop uses the same `hitTest` as a tap: at least 44 px of reach, nearest centre wins.
+  - Rings near the hive overlap (a known H7 issue). The live highlight shows exactly which node will receive the ships, so the player can adjust before lifting.
+- **The sheet's Send panel stays,** as the precise path (counts per type).
+
+**Fallback: tap-Move-tap (`client.moveGesture` 0).**
+- Drags are off. A node sheet with warships shows "Move all" and "Move half" (44 px).
+- Tapping one shows the fixed banner "Tap where to send 6 ships · Cancel". The next node tap sends `moveShips`; empty space or Cancel cancels.
+- **Both modes are built.** If h8-client's smoke tests can't make the drag reliable (see BACKLOG), the engineer reports it, and the Director decides whether to ship with default 0.
+
+**Hauler count (rock sheet).**
+- The Haulers row reads "2 · Auto", with −, + and Auto buttons (each 44 px).
+- Once a count is set, it reads "3 · set (Auto 2)".
+- The row is hidden when `hauler.autoNeed` is 0.
+
+**Mine mode.**
+- **Entering:** a **Mine** button in the bottom bar (44 px, pick icon). Tapping it turns the mode on: the button shows as pressed, and a one-line toast says "Tap rocks to mine or stop. Tap Mine to finish."
+- **In the mode:**
+  - a tap on an asteroid, or a captured pocket or hive, toggles its mark (`setMine`) with a badge pop, and opens no sheet;
+  - taps elsewhere do nothing;
+  - drags are off;
+  - the raid banner still opens its rock.
+- **Leaving:** tap Mine again.
+
+That's one tap per rock, where H7 needed two.
+
+**Weights.**
+- Each probe-sheet row shows `weight · incomePct%`, for example "3 · 30%".
+- One line under the radar reads "Income is split by these weights."
+- In the `enough` state, the Hauler state line reads "enough haulers".
+
+**Raid-target badge.**
+- From muster to the raid's end, the target rock carries the raiders' two-colour ring as a badge (`drawRaidBadge`). It is distinct from the Mine badge and sits on the opposite side.
+- The rock sheet shows "Raid coming: 4 Spores, 1 Thorn", and adds "Haulers waiting at the probe" while H10 holds them.
+
+**Fleet panel.** Tapping the "Fleet 18/30" chip opens it.
+- It has five rows. Each shows the type's icon, name, alive count, "idle N" and a building dot.
+- Each row also has a recycle count with −/+ and a "Recycle N (+X ore)" button that sends `recycleFleet`.
+- It fits 375x667 without scrolling, and every button is at least 44 px.
+
+**Phone checks.**
+- Each of these fits 375x667 without scrolling, including under the wide-font stress: the probe sheet with the % column, the rock sheet with the hauler row and raid lines, and the fleet panel.
+- The badge, the Mine-mode state and the drag highlight shift nothing in the HUD.
+
+#### Art needs (folded into h8-client, within ART_STYLE.md)
+
+- `drawRaidBadge(ctx, r, mix)`: small, reusing the raid marker's ring.
+- The drag line, ghost chip and drop-target highlight, in the panel style, with hot pink for an attack target.
+- The split-armed pulse on the source.
+- The Mine button's pick icon, reusing `drawMineBadge`.
+
+Any new colour gets a palette key and an ART_STYLE.md row.
+
+#### Bots (H8): changes only where the new rules need them
+
+Bots keep H7's strategies and selectors. They don't use the drag (it's a client gesture), `setHaulers` (they stay on Auto), `moveShips` or `recycleFleet`. Sim tests and the replay cover those, and the report says so.
+
+**Changes:**
+1. **Economy weights.** The Hauler weight no longer stops at "one hauler per slot". It stays at its lean or start value while any rock has a shortfall (`rockStatus.haulerTarget > haulers`); H4 makes the sim stop building on its own. The taken-pocket hauler rule becomes "any rock with a shortfall".
+2. **Economy wiped** (this folds in Can wait `cw-h7-bots-post-wipe-idle`). When economy ships alive plus economy ships in the bays fall below 2, every strategy except `idle` and `static` sets Extractor and Hauler back to their `alloc.start.*` weights. It keeps them there until `econ` reaches `raid.firstAtEcon − 1`, then resumes its own rules.
+3. **Nothing to build.** This applies when no bay starts for 2 game minutes, while `stockOre` is at least the ore cost of the dearest unlocked warship and all the strategy's warship weights are 0. Then `adaptive`, `greedy` and `drones-only` set their counter type's weight to 1 (Drone before any pocket is taken).
+   - `idle` is exempt: it is the control for waiting.
+   - `static` can't reach this state, because every one of its shapes weights at least one warship type.
+
+**What each strategy does when no plan fits** (designer.md), walked for H8:
+
+| State | `adaptive` | `greedy` | `static` | `idle` | `drones-only` | `adaptive-no-raids` |
+| --- | --- | --- | --- | --- | --- | --- |
+| The hive wave doesn't fit the limit | recycles economy ships, as in H7 (Director rule, h7-bots r1) | as adaptive, after its first hit | waits (a control; may time out) | n/a (never attacks) | can't fit, by design (flag 5); keeps building drones up to the limit (a control) | as adaptive |
+| The counter is locked | takes the other pocket, as in H7 | as adaptive | n/a | n/a | n/a | as adaptive |
+| A wave failed | H7's rule (recycle for the next wave) | as adaptive | attacks again when the estimate fits | n/a | as adaptive | as adaptive |
+| The economy is wiped | change 2 | change 2 | keeps its shape (the sim rebuilds through it) | holds below the threshold | change 2 | n/a (no raids) |
+| Haulers `enough`, every warship weight 0, ore piling up | change 3 | change 3 | can't happen | allowed (a control) | change 3 | change 3 |
+
+**Inherited assumptions, checked:**
+- **`static` (flag 1) may get stronger.** In H7, static's fixed hauler weight built haulers beyond need, and they ate fleet slots. Under H4 they don't, so static fields more warships. If static now takes the hive while losing less than half its economy, flag 1 fails. **That is a finding about the claim ("set and forget works"), not a number to tune around.** h8-design-data reports it to the Director.
+- **Flag 2** (greedy's first hit kills at least 2 economy ships): under H10, held haulers survive, so the kills must come from docked extractors. Greedy fills a5's 3 slots and has no warships, so a hit should still kill 2 or more. Calibration confirms it.
+- **Flag 6** (the slot trade) uses the number of haulers at adaptive's peak, which under need staffing drops toward 11. Both halves still hold if the best mix stays at v13's 16 (an arithmetic check; calibration reruns it):
+  - 13 Mine slots + 11 haulers + 16 = 40, still more than 30;
+  - 16 + 10 = 26, which fits in 30.
+- **Raid size** (R4) counts economy ships alive. Fewer haulers make raids a little smaller and the first raid a little later, so the "first raid at 2–6 minutes" target is rechecked.
+- **No new order-dependence.** The shield (H9) depends only on which ships are at the node when the round starts, not on any build or id order. The need (H1) depends only on data and positions. Neither adds a measurement that depends on order. The `min-wave` estimate is unchanged.
+
+#### Calibration targets (H8, h8-design-data)
+
+H7's targets carry over with the same values. Two are new:
+- **A token guard isn't enough.** Against the full-economy raid on a5, a defence of half the raid's size (matched types) is beaten, and the raid then kills at least 1 economy ship. H7's "a matched defence no larger than the raid wins, losing at most 2" still holds.
+- **Staffing is right.** On `adaptive`:
+  - no rock's buffer sits at `node.bufferCap` for more than 30 game seconds in a row while its hauler target is met;
+  - outside raids and Stops, at most 1 hauler is idle at the probe.
+
+Flags 1–7 must stay met. A flag that values alone can't meet is a rule finding for the Director. Values only, in `data/sim.json`; `dataVersion` goes to 15 if any value changes.
+
+#### Success criteria (H8; the owner, one 20–30 minute phone session; 4x is fine)
+
+1. They don't mention haulers in the wrong place, or extra haulers sitting around.
+2. They move warships by drag at least three times, including one long-press half move. They don't report a drag going to the wrong node, or a tap turning into a move.
+3. At least one raid is beaten with no economy ship lost (the result panel shows it), and they notice that warships protected the economy.
+4. He marks rocks with Mine mode, or says marking is quick enough.
+5. He checks the fleet panel, or recycles from it.
+6. He can say what a weight of 3 does.
+7. As in H7, he doesn't call raids a timer or a punishment.
+8. The phone checks above hold: the sheets and the fleet panel fit, and nothing in the HUD shifts.
+
+Optional: he tries `client.moveGesture` 0 or `hauler.autoNeed` 0, and says which he prefers.
+
+#### Fun questions for the handoff (H8)
+
+1. When a raid came, did you drag ships to meet it? Did moving ships feel quick, and did you use the long-press half move?
+2. Did keeping warships on a rock feel like holding a front worth the slots, or like a chore?
+3. Did you set any rock's hauler count, or did Auto get it right?
+
+#### Left out of H8 (hard limit)
+
+- Drags that carry economy ships, selecting single ships, drags across several nodes, and drawn paths.
+- Raids at more than one rock, raids that retarget to undefended rocks, and the "wider front" idea (a later hypothesis).
+- The overworld, research and new game+, which stay parked.
+- New ship or guard types.
+- Pan or zoom in field mode.
 
 ### H7 candidates (iteration 7): A picked
 

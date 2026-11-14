@@ -869,11 +869,198 @@ No data value changes. If one is needed, report it rather than making it: h7-des
 7. **Tests:** the old client and smoke tests that depend on the overworld or Landfall are moved to campaign-mode data (if their feature still exists in code) or retired with their feature, each listed in DECISIONS.md. No assertion is loosened.
 8. **The stack:** merge `task/h7-raids` once it is approved, then `task/h7-design-data` once that is approved. Before the final Critic round, merge every lower task's approving review commit. Run the gates and the full smoke on v13 at desktop and phone sizes, with `--repeat-each 5` at the default worker count. Branch CI must be green on the exact commit that `merge-task h7-client` merges.
 
+## Milestone 2, iteration 8: H8 Hold the front (spec in `DESIGN.md` → "H8 (Milestone 2, iteration 8, spec ready): Hold the front")
+
+The owner picked B, then added A (Q22). Where this backlog and the spec differ, the spec wins.
+
+**Four build tasks, plus a Designer calibration resume.** The art is small (a badge, the drag line and ghost, a pulse and an icon), so it is folded into h8-client.
+
+**One stack, topped by `h8-client`.** h8-sim changes how haulers are staffed (H1–H5) on shipped data (v14). Tests outside its files that count haulers on shipped data may go red at that commit:
+- `packages/bots/test/*` and the bots gate are fixed by h8-bots;
+- `packages/client/test/*` and `tests/smoke/h7-*.spec.ts` are fixed by h8-client.
+
+So nothing in the stack merges alone. **`merge-task h8-client` lands the whole stack** once every task in it is approved. Before h8-client's final Critic round, merge the approving review commits of h8-sim, h8-raids, h8-bots and h8-design-data into `task/h8-client` (PROCESS "Gates that wait on calibration").
+
+**Order (at most three builders at once, with no file overlap):**
+1. **Now:** `h8-sim` (core-engineer). Its first commit is the hauler repro (acceptance 1), made before any rule changes.
+2. **After h8-sim has Critic approval, in parallel:**
+   - `h8-raids` (faction-ai), on `packages/sim/src/factions/**`, its tests and the replay's raid items;
+   - `h8-bots` (engineer), on `packages/bots/src/**` except the replay, the bots tests and `reports/`. It merges `task/h8-raids` once that is approved;
+   - `h8-client` (engineer), on `packages/client/**`, `tests/smoke/**` and `ART_STYLE.md`. It builds everything that doesn't need H9 or H10 first, then merges `task/h8-raids` for the hold line.
+3. **After h8-bots has Critic approval:** `h8-design-data` (Designer resume), stacked on `task/h8-bots`.
+4. **Last:** h8-client merges `task/h8-design-data`, which carries everything below it. It re-runs the gates and the full smoke on the final data, gets its final Critic approval, and lands the stack. It is browser-facing, so it needs green branch CI on the exact commit merged, with the Critic's verdict committed before that CI run (PROCESS "Before merging").
+
+`reference-replay.ts` is touched by h8-sim and then by h8-raids. That's sequential within the stack, so nothing overlaps.
+
+**Gate expectations below the top:**
+- On h8-sim and h8-raids, typecheck, lint, the sim tests and determinism must be green.
+- The bots gate may be red on h8-sim and h8-raids, and is judged green on h8-design-data.
+- Client tests and smoke may be red until h8-client.
+
+**CI headroom:** h8-client adds smoke tests while both CI jobs are already past 80% of their limits (Can wait `cw-smoke-sim-time`, marked do-first). Land that task before h8-client's final round, or fold it into h8-client.
+
+**Planned launches (12):**
+- Designer: triage (done). The spec and h8-design-data are resumes.
+- Builders: 4 (core-engineer, faction-ai, engineer ×2).
+- Critics: 2 launches, each resumed across the tasks it reviews.
+- Retrospective: 1.
+
+That's 7 new launches, with 5 spare for rework, `cw-smoke-sim-time`, or a broken `main`.
+
+| Id | Task | Owner | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| h8-sim | Hauler repro first. Then hauler need, target, assignment, rebalance and no surplus (H1–H5); `setHaulers`, `moveShips`, `recycleFleet`; selectors; the H10 hold hook stub; data v14 with every H8 key; replay items | core-engineer | none | Ready |
+| h8-raids | Shield (H9) and haulers hold (H10) in `factions/`; `rockStatus.raidTarget` and `haulersHeld`; `raidStatus.holding`; replay raid items | faction-ai | h8-sim Critic-approved (stacked) | Blocked |
+| h8-bots | Bot changes 1–3 (economy weights by shortfall, wipe recovery, nothing-to-build), the no-plan-fits table, flags and report on v14 | engineer | h8-sim Critic-approved (stacked); merges h8-raids when approved | Blocked |
+| h8-design-data | Probe on v14; calibrate to "Calibration targets (H8)"; v15 if any value changes | designer (resume) | h8-bots Critic-approved (stacked) | Blocked |
+| h8-client | Drag and long-press split, tap-Move-tap fallback, hauler stepper, Mine mode, weight %, raid badge, fleet panel with Recycle, `client.*` keys, art, smoke tests. **Top of the stack** | engineer | h8-sim Critic-approved; merges h8-raids, then h8-design-data | Blocked |
+
+### h8-sim (core-engineer)
+
+**Files:**
+- `packages/sim/**` (tests included), except `packages/sim/src/factions/**`. The one exception is a single stub in `factions/index.ts`: `haulersHeld(world, node): boolean` returning false, plus its call site in `runHaulers`;
+- `data/sim.json`;
+- `packages/bots/src/reference-replay.ts`;
+- **compile-only** edits in `packages/client/src` and `packages/bots/src` if a widened type breaks the build, with no change in behaviour (list them in DECISIONS.md);
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Repro first, as its own commit, before any H8 rule change.** Owner, build-20261114-1: "A2 just got a third hauler. A1 has no haulers." On v13 rules and shipped `map.field`, write:
+   - (a) a rule test: two worked, Mine-marked rocks, one with 0 haulers assigned; the next hauler assigned at the probe must go to the one with 0;
+   - (b) a scripted run of the field opening at the shipped allocation for 6 game minutes, asserting on every tick that no new hauler is assigned to a rock with a higher ratio while a worked, marked rock has 0 haulers.
+
+   If either fails, the commit message and DECISIONS.md name the cause, and the cause is fixed or shown to be gone under H2. If both pass, record the states that can produce the owner's observation (A1 Stopped, or worked but not marked, or no docked extractor with an empty buffer, or a rock-sheet count that lags), and keep both tests: with `hauler.autoNeed` 0 they guard H7's rule.
+2. **Data v14:**
+   - every key in "Tunables (H8 …)" with its default and range. The `client.*` keys are client-scoped like `client.autosaveSec`. `raid.shieldEcon` and `raid.haulersHold` are wired here and used by h8-raids;
+   - `haulerSet` in the field state, saved;
+   - the `dataVersion` pin is 14.
+3. **H1–H5,** each with unit tests on shipped `map.field`:
+   - the need table in the spec (a1–a7, p1, p2), pinned;
+   - `max(1, …)` for a rock with only a buffer;
+   - a set count overrides the need, and Auto restores it;
+   - assignment by largest shortfall, with both tie-breaks;
+   - idle at the probe when there is no shortfall;
+   - rebalance on arrival when a node is over its target (including after `setHaulers` lowers it), and no move when a node is at its target;
+   - H4: Hauler ineligible and in state `enough` while the shortfall ≤ 0; the share is kept; building resumes when a rock is marked or an extractor docks;
+   - `hauler.autoNeed` 0 reproduces H7's F6 behaviour on the frozen v13 fixture (the H7 hauler tests pass unchanged under it).
+4. **Inputs,** each with every invalid case tested:
+   - `moveShips` (all, split, the 1-ship fallback, from = to, an empty source, an attack on a guarded node, economy ships never carried);
+   - `setHaulers` (range, node kinds, kept while unmarked);
+   - `recycleFleet` (the order across idle, parked and in transit; the exclusions; refunds; cargo lost; a recycled docked extractor frees its slot and re-dispatches the same tick).
+5. **Selectors:**
+   - `rockStatus` gains `haulerNeed`, `haulerSet` and `haulerTarget` (`raidTarget` and `haulersHeld` return false here; h8-raids fills them);
+   - `allocStatus` gains `enough` and `incomePct` (tested rounding);
+   - `fleetStatus` gains `alive`, `idle`, `building` and `recyclable`;
+   - `movePreview` is new.
+6. **The reference replay** adds the spec's H8 items up to, but not including, the raid items. The hashes are re-baselined.
+7. **Gates:** typecheck, lint, the sim tests and determinism are green. Name every red test outside your files in your report.
+
+### h8-raids (faction-ai; stacked on `task/h8-sim` after its Critic approval)
+
+**Files:**
+- `packages/sim/src/factions/**`;
+- `packages/sim/test/raids*.test.ts`;
+- the `raidTarget` and `haulersHeld` fields of `rockStatus` and `raidStatus.holding` in `selectors.ts` (only those lines);
+- `packages/bots/src/reference-replay.ts` (the raid items);
+- `DECISIONS.md`.
+
+No data value changes. If one is needed, report it rather than making it.
+
+**Acceptance:**
+1. **H9, the shield,** with tests:
+   - a round that starts with one warship at the target strikes warships only, and its overflow is lost;
+   - the next round, after that warship fell, strikes haulers and then extractors;
+   - a warship that arrives mid-round counts from the next round;
+   - `raid.shieldEcon` 0 is H7's R7 exactly (H7's raid tests pass unchanged under it).
+2. **H10, haulers hold,** implemented behind h8-sim's `haulersHeld` stub, with tests:
+   - from `out` to the end: at the probe, the hauler stays; at the node, it loads what is there and leaves; flying out, it finishes its leg, then loads and leaves;
+   - haulers resume when the raid ends, whatever the outcome (beaten, hit or turned back);
+   - the target stays mined, so R5 and the R6 retarget are unchanged;
+   - the hold doesn't apply during muster;
+   - `raid.haulersHold` 0 is H7.
+3. **Selectors:** `rockStatus.raidTarget` (muster to end), `haulersHeld`, and `raidStatus.holding`, tested at each phase.
+4. **The reference replay** adds the shielded round and the held haulers. The hashes are re-baselined.
+5. **Determinism and gates:** as h8-sim. Report the full-economy raid's size on v14 at the econ `adaptive` peaks at, and whether greedy's first hit still kills 2 or more economy ships under H10 (h8-design-data needs both).
+
+### h8-bots (engineer; stacked on `task/h8-sim` after its Critic approval, then merges `task/h8-raids`)
+
+**Files:**
+- `packages/bots/src/**` except `reference-replay.ts`;
+- `packages/bots/test/**`;
+- `reports/`;
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Bot changes 1–3** from "Bots (H8)", each with a unit test. Change 1 never sets the Hauler weight to 0 while a rock has a shortfall. Change 2 is tested on a wiped world. Change 3 is tested on a world with haulers `enough`, every warship weight 0 and ore piling up.
+2. **The no-plan-fits table:** each cell has a test, or is shown in a traced shipped-data run in the report. No winner (`adaptive`, `greedy`) idles with resources growing over a whole run on shipped data (engineer.md: test no-idle over a whole run).
+3. **The report** adds, per strategy:
+   - idle haulers at the probe (peak, and minutes with more than 1);
+   - backed-up seconds per rock with its target met;
+   - economy ships lost while a warship stood at the target, which must be 0 when `raid.shieldEcon` is 1.
+
+   It lists what no bot exercises: drag, `setHaulers`, `moveShips`, `recycleFleet`, Mine mode.
+4. **The seven flags** are reported as in H7. If flag 1 fails because `static` got stronger (spec: "Inherited assumptions"), report it as a finding for the Director, not something to tune.
+5. **Gates:** the bots gate is judged on the stacked h8-design-data branch, and may be red here on v14. Everything else is green.
+
+### h8-design-data (designer, resume; stacked on `task/h8-bots` after its Critic approval)
+
+**Files:**
+- `data/sim.json` (values only);
+- `DESIGN.md`, `DECISIONS.md`;
+- the `dataVersion` pin test (the version line and title only);
+- `reports/archive/h8-probe-v14.*` and `reports/archive/h8-design-data-v15.*`.
+
+**Acceptance:**
+1. **First,** commit the probe report on v14.
+2. Calibrate to "Calibration targets (H8)", values only. A rule finding goes to the Director, including a failing flag 1 caused by `static`.
+3. If any value changed, bump `dataVersion` to 15. Then update the pin and every H8 table, and recompute every derived claim in the spec (the need table, flag 6's sums, raid sizes).
+4. Check what the spec inherits: rerun the hive and pocket `min-wave` measurements in a second order, and confirm the shield adds no order-dependence.
+5. Re-run the suite and the gates; the bots gate must be green here. Commit the report, and say which flags hold and what no bot exercises.
+6. Merge h8-bots' approving review commit into this branch before the Critic round.
+
+### h8-client (engineer; branched from `task/h8-sim` after its Critic approval; top of the stack)
+
+**Files:**
+- `packages/client/**` (tests included; `placeholders.ts`, `icons.ts`, `gallery.ts` and `palette.ts` for the art);
+- `tests/smoke/**`;
+- `ART_STYLE.md`;
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Drag to move,** as in the spec's state list:
+   - `touch-action: none` on the field canvas;
+   - the all-drag and the split-drag; the ghost 48 px above the finger; the drop-target highlight with the Attack tag on a guarded node;
+   - cancel on empty space, on the source, on a sheet, on `pointercancel` and on a second pointer;
+   - the click after a drag is suppressed;
+   - a plain tap (short or long) opens the sheet;
+   - no drag starts from a node with no warships.
+
+   Smoke tests at 375x667 and on desktop, with synthetic pointer events:
+   - (a) for every pair of field nodes, an all-drag from a node holding warships lands `moveShips` on the intended target, including pairs next to the hive's rings;
+   - (b) a long-press drag sends `split`;
+   - (c) a tap within the slop opens the sheet and sends no input;
+   - (d) each cancel case sends nothing.
+
+   All four must pass with `--repeat-each 5`. **If (a) or (c) can't be made reliable, report it with the failing pairs.** The Director then decides whether `client.moveGesture` ships at 0.
+2. **Tap-Move-tap** (`client.moveGesture` 0): "Move all" and "Move half" on the sheet, the banner with Cancel, and a smoke test of each.
+3. **Hauler stepper** on the rock sheet ("2 · Auto", −, +, Auto; "3 · set (Auto 2)"). It is hidden when `hauler.autoNeed` is 0. A smoke test sets a count and sees the rock's haulers change after their next trip home.
+4. **Mine mode,** as specified, with a smoke test that marks and unmarks two rocks in three taps and opens no sheet.
+5. **Weights:** `weight · incomePct%` on each row, the line under the radar, and "enough haulers".
+6. **Raid badge** from muster to the end, and the rock sheet's "Raid coming…" and "Haulers waiting at the probe" lines. Tested with `raid.firstAtEcon` 2 and `raid.musterTicks` 0, as in H7.
+7. **Fleet panel** from the Fleet chip: the rows, the recycle steppers and the refund label, sending `recycleFleet`. A smoke test recycles an idle hauler.
+8. **Fit and stability:**
+   - the probe sheet, the rock sheet (with the hauler row and both raid lines) and the fleet panel each fit 375x667 without scrolling under the wide-font stress;
+   - the badge, the Mine-mode state and the drag highlight shift nothing in the HUD (measured, as in the H6 bug tests).
+9. **Art:** `drawRaidBadge`, the drag line, ghost and highlight, the split pulse and the Mine button icon, all in the gallery. New palette keys get ART_STYLE.md rows.
+10. **Tuning:** the `client.*` keys show tagged "this device". The H8 sim keys are listed.
+11. **Smoke time:** new smoke tests step the sim with `advanceTicks` and never wait in real time (engineer.md). Report the CI job times. Past 80% of a limit, `cw-smoke-sim-time` goes first.
+12. **The stack:** merge `task/h8-raids` once it is approved, then `task/h8-design-data`. Before the final Critic round, merge every lower task's approving review commit. Run the gates and the full smoke on the final data at desktop and phone sizes with `--repeat-each 5`. Branch CI must be green on the exact commit merged.
+
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-smoke-sim-time** (engineer; added by the Retrospective after build-20261114-1; do this first): both CI jobs that run the smoke suite are past 80% of their limits (gates job 15.5–17.5 of 20 minutes, deploy job with the live smoke 13–14 of 15; runs 43630983499, 43635034312, 43638281605), so the next browser-facing task that adds smoke tests can cancel CI or the production deploy. Replace real-time waits with sim stepping (`advanceTicks` to a predicate with a tick cap, as `stepUntil` in `tests/smoke/h7-economy.spec.ts`): `boot.spec.ts` (`waitForTimeout` and 30 s polls on game state), `overworld.spec.ts` (lines ~398–407), `buffer-warning.spec.ts` (polls of up to 120 s), the remaining `setSpeed(4)` loop in `h7-economy.spec.ts`, and the gallery wait in `h7-art.spec.ts` (up to 100 s per project). Waits for motion to settle (`helpers.ts`) stay as they are. Acceptance: no assertion loosened and no test dropped; full smoke `--repeat-each 5` green; the CI gates job under 14 minutes and the deploy job under 11, with the run ids in the report.
-- **cw-h7-hauler-raid-wait** (designer → core-engineer): a captured pocket's free extractor keeps its haulers flying into an undefended raid until Stop or defence. Possible rule: haulers wait at the probe while their node is the target of a raid that is out or fighting. Only if the owner finds it cheap in play.
-- **cw-h7-bots-post-wipe-idle** (engineer): after raids wipe the economy, drones-only (and potentially adaptive/greedy at other values) sets every weight to 0 and ends in the runner softlock. Rebuild the economy floor after a wipe.
+- **cw-h7-hauler-raid-wait** (folded into H8 as rule H10, task h8-raids; 2026-11-14) (designer → core-engineer): a captured pocket's free extractor keeps its haulers flying into an undefended raid until Stop or defence. Possible rule: haulers wait at the probe while their node is the target of a raid that is out or fighting. Only if the owner finds it cheap in play.
+- **cw-h7-bots-post-wipe-idle** (folded into H8 bot change 2, task h8-bots; 2026-11-14) (engineer): after raids wipe the economy, drones-only (and potentially adaptive/greedy at other values) sets every weight to 0 and ends in the runner softlock. Rebuild the economy floor after a wipe.
 - **cw-h7-raidstatus-leg** (core-engineer): add `from` and `flightTicks` to `raidStatus` so the client stops reading `world.raid` directly.
 
 - **cw-root-code-removal** (core-engineer; from the H6 spec): the Root is out of play through data only (owner, Q19). After H6 ships, and if the owner hasn't asked for it back, delete the dormant Root code: the sim's wilt and starved rules and their fixture tests, the client's vine, Root sheet and wilt toast, the bots' Root targeting, and the `bloom.starved*` tunables. Acceptance: no reference to the Root kind outside the frame data and frozen fixtures; gates pass; determinism hashes are unchanged for shipped data.
