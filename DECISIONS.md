@@ -1160,3 +1160,9 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 
 **Decision:** for hauler staffing, a Mine-marked rock with an extractor bound for it (docked or on its way) counts as needing haulers; see DESIGN.md "H1 amendment". h8-sim implements it before its Critic round.
 **Why:** h8-sim built H1 as written and measured the first hauler at 3:13 on v14 and no ore delivered before minute 4 (H7: first hauler at tick 90, first delivery at tick 1035). The owner's first note on H7 praised starting on mining; a three-minute dead opening would undo that. No data value fixes it, so it is a rule fix, not calibration.
+
+## 2026-11-14 · Director · H8 rulings on h8-sim's amendment report
+
+1. **Committed extractors staff a rock: accepted.** The extractor in the probe's bay, and a full extractor share, count at the rock F5 would send them to (nearest mineable rock with a free slot, then lower index). Without this the amendment as written misses its own acceptance (first hauler at tick 5640). With it, the opening matches H7 to the tick (first hauler 90, first delivery 1035) and delivers more by minute 3 (52 against 40).
+2. **A hauler waits at a staffed rock while an extractor is docked there or on its way: accepted.** It needs no per-rock history, and waiting for a replacement extractor is what a player would expect.
+3. **No surplus extractors (new, added to h8-sim).** With no inputs, H8 builds 25 extractors in 10 minutes against 13 asteroid slots, so 12 idle at the probe taking fleet slots. That is the same complaint the owner made about haulers ("the extra haulers sitting around feel much worse"). The Extractor bay does not start when no Mine-marked rock has a free slot (counting docked, bound and committed extractors); its row shows the `enough` state, and its share is spent elsewhere as the Hauler's is.
