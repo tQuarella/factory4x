@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 7, hypothesis H7 A: One field, live enemy)
-**State:** Iteration 7 in flight. Owner answered Q21 "A, yes" (dda12d7): ship economy, spider-graph allocation, raids; pillars 3 and 4 rewritten; faction-ai activated. Step: Build. Spec and split f2452cf; h7-sim approved (3c846b7). h7-raids, h7-bots and h7-client building in parallel; h7-design-data after h7-bots approval.
+**State:** Iteration 7 in flight. Owner answered Q21 "A, yes" (dda12d7): ship economy, spider-graph allocation, raids; pillars 3 and 4 rewritten; faction-ai activated. Step: Build. Spec and split f2452cf; h7-sim approved (3c846b7). h7-raids approved (c46e2b5). h7-bots and h7-client building, merging h7-raids; h7-design-data after h7-bots approval.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-5 (H6 Open frontier), commit 626307f, live (CI gates and deploy green; site shows 626307f · data v11). Release gates passed locally (192/192 smoke).
@@ -25,6 +25,7 @@ Launches: 6 / 12.
 | 4 | faction-ai | h7-raids | launch | Build, from task/h7-sim |
 | 5 | engineer | h7-bots | launch | Build, from task/h7-sim |
 | 6 | engineer | h7-client | launch | Build, from task/h7-sim (top of stack) |
+| r5 | critic | h7-raids | resume | Review round 1: APPROVE (c46e2b5); bots and client told to merge it |
 
 ## Iteration 6 ledger
 
