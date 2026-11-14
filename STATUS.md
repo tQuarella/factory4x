@@ -2,12 +2,21 @@
 
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
-**Milestone:** 2 — The asteroid field (iteration 7, hypothesis H7 A: One field, live enemy)
-**State:** Awaiting owner feedback on build-20261114-1 (H7 One field, live enemy). Handoff block at the top of QUESTIONS.md. Retro done. Waiting for the owner; on feedback, /resume triages it. Can wait, if worth the usage: cw-smoke-sim-time (do-first, CI jobs past 80% of their limits).
+**Milestone:** 2 — The asteroid field (iteration 8, hypothesis H8 B: Move ships by hand)
+**State:** Iteration 8 in flight. Owner played build-20261114-1 to a win (75b3021), triaged (d594224), and picked B in Q22 with a drag gesture (048156b). Step: Spec and split (Designer).
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261114-1 (H7 One field, live enemy), commit f565c11, live (CI 43638281605 gates and deploy green; site shows f565c11 · data v13). Release gates passed locally (232/232 smoke).
-**Last updated:** 2026-11-14, handoff of build-20261114-1
+**Last updated:** 2026-11-14, iteration 8 start
+
+## Iteration 8 ledger
+
+Launches: 1 / 12.
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | triage build-20261114-1 owner dictation; H8 candidates | launch | Plan (d594224); owner picked B + drag (048156b) |
+| r1 | designer | H8 spec + task split | resume | Spec |
 
 ## Iteration 7 ledger
 
