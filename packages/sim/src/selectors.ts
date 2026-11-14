@@ -35,7 +35,7 @@ import {
   resourceCost,
   type ResourceCost,
 } from './field.ts';
-import { haulersHeld, raidRank } from './factions/index.ts';
+import { haulersHeld, isRaidTargetNode, raidRank } from './factions/index.ts';
 import { isCountedType, isFleetFull } from './fleet.ts';
 import { shipsAtByType } from './inputs.ts';
 import { moveCounts, type MovePart } from './orders.ts';
@@ -934,9 +934,9 @@ export interface RockStatus {
   haulerSet: number | null;
   /** H8 H1: the set count, else the need; 0 when the rock is not haulable. */
   haulerTarget: number;
-  /** H8: true from the raid's muster to its end at this rock. h8-raids fills it; false until then. */
+  /** H8: true from the raid's muster to its end at this rock. */
   raidTarget: boolean;
-  /** H8 H10: true while this rock's haulers hold for a raid (factions `haulersHeld`; false until h8-raids). */
+  /** H8 H10: true while this rock's haulers hold for a raid (factions `haulersHeld`). */
   haulersHeld: boolean;
 }
 
@@ -972,7 +972,7 @@ export function rockStatus(world: Readonly<World>, node: number): RockStatus {
     haulerNeed: haulerNeed(world, node),
     haulerSet: haulerSetOf(world, node),
     haulerTarget: haulerTarget(world, node),
-    raidTarget: false,
+    raidTarget: isRaidTargetNode(world, node),
     haulersHeld: haulersHeld(world, node),
   };
 }
