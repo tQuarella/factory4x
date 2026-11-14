@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 7, hypothesis H7 A: One field, live enemy)
-**State:** Iteration 7 in flight. Owner answered Q21 "A, yes" (dda12d7): ship economy, spider-graph allocation, raids; pillars 3 and 4 rewritten; faction-ai activated. Step: Build. Spec and split f2452cf; h7-sim (core-engineer) building; the rest of the stack waits on its approval.
+**State:** Iteration 7 in flight. Owner answered Q21 "A, yes" (dda12d7): ship economy, spider-graph allocation, raids; pillars 3 and 4 rewritten; faction-ai activated. Step: Build. Spec and split f2452cf; h7-sim (core-engineer) green at e8d9dff, in review; the rest of the stack waits on its approval.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-5 (H6 Open frontier), commit 626307f, live (CI gates and deploy green; site shows 626307f · data v11). Release gates passed locally (192/192 smoke).
@@ -11,13 +11,15 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 7 ledger
 
-Launches: 2 / 12.
+Launches: 3 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | triage build-20261108-5 owner dictation; H7 candidates | launch | Plan (165e829); owner picked A (dda12d7) |
 | r1 | designer | H7 spec + task split | resume | Spec done (f2452cf) |
-| 2 | core-engineer | h7-sim | launch | Build |
+| 2 | core-engineer | h7-sim | launch | Build: a511610; bots runner hung on field data |
+| r2 | core-engineer | h7-sim | resume | Fail-fast guard in runCampaign (e8d9dff) |
+| 3 | critic | h7-sim | launch | Review round 1 |
 
 ## Iteration 6 ledger
 
