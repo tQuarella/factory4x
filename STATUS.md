@@ -11,14 +11,16 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 8 ledger
 
-Launches: 3 / 12.
+Launches: 4 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | triage build-20261114-1 owner dictation; H8 candidates | launch | Plan (d594224); owner picked B + drag (048156b) |
 | r1 | designer | H8 spec + task split (A+B) | resume | Spec and split (0d76117) |
 | 2 | core-engineer | h8-sim | launch | Build; repro of the A1/A2 hauler case first |
-| 3 | engineer | cw-smoke-sim-time | launch | Build, in parallel; CI headroom before h8-client |
+| 3 | engineer | cw-smoke-sim-time | launch | Built c199647: CI gates job 12m03s, deploy 8m34s (run 43645327666) |
+| 4 | critic | cw-smoke-sim-time | launch | Review round 1 |
+| r2 | core-engineer | h8-sim | resume | Built 19f98f6 (repro 0291294 reproduced A1/A2); first hauler 3:13 on v14, so Director amended H1 (8739109); implementing before Critic |
 
 ## Iteration 7 ledger
 
