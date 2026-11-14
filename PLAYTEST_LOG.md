@@ -206,4 +206,62 @@ Dictated while playing; full run, hive destroyed.
 
 > So two haulers ended up at A1 when it looks like only one is needed. Some ability to determine how many haulers should be at an asteroid. But do like the extractors auto deploying to marked asteroids. First raid, which was like, oh man, all right, I guess I could do something to defend him. Notification that raid is gathering. It's kind of unclear how this one to five, like the distribution of order or resources to the ships works. Now three haulers at A2, which needs only one. If it feels a little clunky, I have to click the asteroid and send ships there, like a drag, from one asteroid to another. To send the ships from that asteroid to the other would be cool. Maybe hold the button to split them. I just noticed the next raid timer, that's helpful. So an indication of where the raid will go. I guess you wouldn't really know. Is it fun to not know? A2 just got a third hauler. A1 has no haulers. Hey, we fended off our first raid. That felt pretty good. Hate the economy stuff. Pretty good though. I think it'd be better if it had to fight through the military first. So if the military units are there, they keep the economy units alive. Does the raid always hit A1? I think I should probably hit the things closest to the hive should hit the things closest to it first. You can kind of build a front. The haulers should redistribute once they drop at home. Oh, I see. The nearest mined rock to the hive. Okay, I just started mining A5 and then it got hit. That makes sense. Does make it so you only need to defend one asteroid. Nice to have an easier way to designate a rock to be mined. Oh, gee, like hold a button, click, rather than have to click and then say mine this rock. The fleet's full, so the economy units count towards the fleet cap. That's good. It makes the extra haulers sitting around feel much worse, though. Okay, so I have to be a little more picky about which rocks I'm mining. And I don't even think I have enough of a fleet cap to take the hive. I have to, like, pull economy way back. Yeah, and the extra haulers are rough. Okay. Recycling haulers now, which I guess is fine. You could have an icon designation on the asteroid that's going to be raided. I liked the fleet composition in the sidebar, which isn't here right now. Can't see at a glance how many of which ships I have. I'd also be able to be good to just be able to recycle from that ship comp, the fleet comp sidebar, or the fleet comp window, rather than having to go to the asteroid and recycle from there. All right, we got it.  Destroyed the hive.
 
-**Interpretation:** pending Designer triage.
+**Interpretation (Designer, 2026-11-14, iteration 8 triage; all quotes are the owner's):** **H7 is supported.** The owner finished the run, defended a raid and liked it ("That felt pretty good"), endorsed the shared fleet limit ("That's good"), and made the economy-against-offence pivot the hypothesis is about ("I have to, like, pull economy way back… Recycling haulers now… Destroyed the hive"). Nothing in the dictation calls raids a timer or a punishment. The main friction is the hauler layer: about a third of the dictation is about haulers in the wrong place, in the wrong numbers, or taking fleet slots. That is a logistics rule gap, not a failure of the claim. The second friction is that the controls behind the decisions (the 1–5 weights, Mine marking, moving ships, seeing the fleet) are slower or less clear than the decisions themselves.
+
+*Success criteria (DESIGN.md H7):*
+
+| # | Criterion | Score | Evidence |
+| --- | --- | --- | --- |
+| 1 | First ships are economy ships; no complaint about unwanted drones | **Met** | No drone complaint. "But do like the extractors auto deploying to marked asteroids." |
+| 2 | Allocation changed ≥ 3 times, with a reason named for one | **Partly met** | A change with a reason: "I don't even think I have enough of a fleet cap to take the hive. I have to, like, pull economy way back." The count isn't stated; the result panel's `allocChanges` would show it. The weights also confused them: "It's kind of unclear how this one to five, like the distribution of order or resources to the ships works." |
+| 3 | A raid met by ships built or moved after its warning; can say whether a raid hurt | **Met** | "First raid… oh man, all right, I guess I could do something to defend them." Then "Hey, we fended off our first raid. That felt pretty good." And on a hit: "I just started mining A5 and then it got hit. That makes sense." |
+| 4 | Names a moment of choosing economy or offence | **Met** | "I have to, like, pull economy way back… Recycling haulers now, which I guess is fine." It paid off: "All right, we got it. Destroyed the hive." |
+| 5 | Raids not called a timer, rushed or a punishment; run not described as "max economy then attack" | **Met** | Raid targeting "makes sense" and "You can kind of build a front." The run was economy, then defend, then pivot, not a single max-then-attack. One caution: "Does make it so you only need to defend one asteroid." |
+| 6 | Never asks how to mine or haul | **Met, with a control gap** | They never asked *how*. They asked for *control* over haulers: "Some ability to determine how many haulers should be at an asteroid." |
+| 7 | ≤ 2 taps per action; probe sheet fits; raid UI doesn't shift the HUD | **Not answered** | No layout complaint. Two flows were called slow, though both are within 2 taps: Mine marking ("Nice to have an easier way to designate a rock to be mined") and moving ships ("it feels a little clunky, I have to click the asteroid and send ships there"). |
+| opt. | Tries `raid.enabled` 0 or `fleet.countsEconomy` 0 | **Answered without the toggle** | "The fleet's full, so the economy units count towards the fleet cap. That's good." Keep `fleet.countsEconomy` 1. |
+
+*Fun questions (H7):*
+1. **Did you change the spider graph, and why?** **Answered in part.** Yes, to pivot to offence once the limit was the bottleneck ("pull economy way back"). The weights themselves weren't clear ("kind of unclear how this one to five… works").
+2. **Did raids make you build a little force, or feel like a timer or a nuisance?** **Answered: they made them build force, and it was fun.** "I guess I could do something to defend them" → "we fended off our first raid. That felt pretty good." No timer or nuisance language. They found the next-raid timer helpful ("I just noticed the next raid timer, that's helpful").
+3. **A moment of economy against offence, which way, did it pay off?** **Answered: offence, and yes.** "I have to be a little more picky about which rocks I'm mining… pull economy way back… Recycling haulers now… Destroyed the hive."
+
+*One ambiguous line.* "Hate the economy stuff. Pretty good though." comes straight after the first raid and straight before "it'd be better if it had to fight through the military first… they keep the economy units alive." I read it as dictation of "**ate** (or hit) the economy stuff": the raid killed economy ships even though it was beaten. I don't read it as disliking the economy layer, which they praise elsewhere. Q22 lets them correct this in one line.
+
+*Likes (keep):*
+- Extractors deploying themselves to Mine-marked rocks.
+- The raid-gathering notice and the next-raid timer ("that's helpful").
+- Beating a raid ("That felt pretty good").
+- Raids hitting the mined rock nearest the hive ("That makes sense", "You can kind of build a front").
+- Economy ships counting against the fleet limit ("That's good"). It also made rock choice matter ("I have to be a little more picky about which rocks I'm mining").
+- The fleet composition sidebar from earlier builds ("I liked the fleet composition in the sidebar, which isn't here right now").
+
+*Bugs and rule gaps:*
+1. **Haulers are staffed per extractor, not by need.** "Two haulers ended up at A1 when it looks like only one is needed", "three haulers at A2, which needs only one". They is right by the arithmetic. F6 spreads haulers by haulers ÷ extractors, so a 2-slot rock tends toward 2 haulers. But a1 and a2 sit 262 su from the probe: at 2 extractors × 10/min, cargo 4 and speed 2, one round trip (262 ticks) moves 2.9 ore, so **one hauler covers each of them** (0.73 of a hauler). By the same sum a3 and a4 need 1 each, a6 and a7 need 2 each, and a5 needs 3. That's 11 for the field, against about 13 under the ratio rule.
+2. **Haulers never redistribute.** F6 keeps a hauler on its rock for as long as that rock is worked. "The haulers should redistribute once they drop at home."
+3. **"A2 just got a third hauler. A1 has no haulers."** Under F6 a new hauler goes to the worked rock with the lowest ratio, so A1 at 0 should have won. This can only happen if A1 wasn't haulable at that tick (Stopped, or no docked extractor and an empty buffer). The dictation mentions neither. **Unexplained: a bug candidate for an Engineer to reproduce** with a rule test (two worked, marked rocks, one with 0 haulers assigned: the next hauler must go there) and a replay of the field opening.
+4. **The allocation keeps building haulers nobody needs, and under the shared limit they cost slots.** "It makes the extra haulers sitting around feel much worse… the extra haulers are rough." A hauler weight above 0 builds haulers forever, and the only cure is to recycle them one rock at a time.
+5. **The weights don't explain themselves.** "Kind of unclear how this one to five… works." The rows show weights, not what share of income each type gets.
+6. **Economy ships die even when the raid is beaten.** "I think it'd be better if it had to fight through the military first. So if the military units are there, they keep the economy units alive." The rule already strikes warships first *within a round*, but economy ships still die three ways:
+   - overflow damage in a round where the defenders fall;
+   - defenders that arrive mid-raid only join from the next round;
+   - haulers keep flying into the fight (the known issue, Can wait `cw-h7-hauler-raid-wait`).
+   They sees the result, not the round order.
+7. **One front only.** "Does make it so you only need to defend one asteroid." With a fixed target rule the defence is one rally point. They also liked the front, so this is a watch item, not a fix.
+8. **Fleet composition isn't visible.** "Can't see at a glance how many of which ships I have." The H5/H6 sidebar isn't in field mode, so this reads as a regression of something they liked.
+
+*Feature requests:*
+- **A hauler count per rock:** "Some ability to determine how many haulers should be at an asteroid."
+- **Move ships by dragging from one rock to another, and hold to split:** "a drag, from one asteroid to another… would be cool. Maybe hold the button to split them." Today economy ships can't be sent by hand (F12), and warships are sent from the source sheet.
+- **Faster Mine marking:** "hold a button, click, rather than have to click and then say mine this rock." I read it as a Mine mode: hold, or toggle, a Mine button, then tap rocks.
+- **A raid target icon on the rock:** "So an indication of where the raid will go… You could have an icon designation on the asteroid that's going to be raided." The banner names the rock, but the map doesn't mark it. Their own "Is it fun to not know?" answers itself two sentences later: they want to know.
+- **A fleet composition panel with Recycle:** "be able to recycle from that ship comp… rather than having to go to the asteroid and recycle from there."
+- **Raids fight through the military first** (gap 6, as a rule): while warships stand at the rock, economy ships there are safe.
+
+**Action:** DESIGN.md H7 marked tested. DESIGN.md "H8 candidates (iteration 8)":
+- ride-alongs for any option: haulers by need, haulers rebalancing at the probe, no surplus haulers, the raid target badge, the fleet panel with Recycle, the unexplained-A1 repro;
+- A, "A front worth holding" (recommended): hauler count per rock, military shields the economy, haulers hold back from a raid, Mine mode, clearer weights;
+- B, "Move ships by hand": rock-to-rock moves with split;
+- C, "The map returns": the H6 overworld on top of the H7 loop.
+
+QUESTIONS.md Q22 asks the owner to pick. The H7 handoff's fun questions are marked answered. No spec and no BACKLOG change until the pick.

@@ -17,8 +17,13 @@ Try this: grow the economy until the first raid banner appears (around 3 minutes
 
 Fun questions (the H7 hypothesis):
 1. Did you change the spider graph during the run? What made you change it?
+   **Answered in part (owner's dictation, 2026-11-14):** yes, to pivot: "I have to, like, pull economy way back." The weights themselves weren't clear: "It's kind of unclear how this one to five… works."
 2. Did the raids make you build a little force, or did they feel like a timer or a nuisance?
+   **Answered:** they made them build force, and it was fun: "I guess I could do something to defend them" → "we fended off our first raid. That felt pretty good."
 3. Was there a moment you chose between more economy and more offence? Which way did you go, and did it pay off?
+   **Answered:** offence, and it paid off: "pull economy way back… Recycling haulers now… Destroyed the hive."
+
+Scored against the success criteria in PLAYTEST_LOG.md (build-20261114-1).
 
 Known from the team (not hidden from you):
 - With the probe sheet open, the map is only about 200 px tall on a phone and the rings round the nearest rocks and the hive overlap. Close the sheet to see the field.
@@ -27,6 +32,27 @@ Known from the team (not hidden from you):
 
 Also open: none.
 Protected files changed this build: VISION.md (pillars 3 and 4, approved in Q21).
+
+### Q22. Which fixes and features should the next build (H8) bring? (2026-11-14, Designer)
+
+H7 worked: you defended a raid, liked the shared fleet limit, pivoted to offence and took the hive. **Whatever you pick, these come with it:**
+- haulers staffed by what each rock needs (one at A1 and A2, not two or three);
+- haulers rebalancing when they get home;
+- no extra haulers built;
+- an icon on the rock a raid is heading for;
+- a fleet panel from the Fleet chip, with Recycle.
+
+Then pick one:
+- **A (recommended): a front worth holding.**
+  - A hauler count per rock (Auto, or set it with −/+).
+  - Warships at a rock keep its economy ships alive until they fall.
+  - Haulers wait at home while a raid hits their rock.
+  - A Mine mode: tap the button, then tap rocks to mark them.
+  - Each weight shows its share of income ("3 · 30%").
+- **B: move ships by hand.** Tap a rock, tap Move, tap where to go (drag as an option). Hold Move to split. Any ship type, haulers included.
+- **C: the map returns.** The H6 overworld, with this ship economy and raids in every area. About two builds, and the fixes above would wait one area at a time.
+
+Details: DESIGN.md → "H8 candidates (iteration 8)". Answer like "A", "A, plus B" (about half a build more), or "C". Also, if "Hate the economy stuff" meant you dislike the economy layer itself (I read it as "ate the economy stuff", the raid killing your haulers), say so in a word. Default if unanswered: A.
 
 ## Build build-20261108-5 is ready (2026-11-08): H6, the Open frontier
 

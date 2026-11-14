@@ -1100,3 +1100,15 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 4. **`BACKLOG.md` Can wait:** new `cw-smoke-sim-time`, marked do-first, because both CI jobs are already past 80% of their limits. The Director is told.
 
 **Not changed:** no gate, guardrail or protected file, and nothing in `critic.md`. The workflow's job limits stay. If `cw-smoke-sim-time` can't bring the jobs under 80%, raising a limit is an owner question. I didn't propose extending Q15 to review-only commits on the branch: the new merge order removes the extra run without loosening the rule. The 12-launch budget stays (8 used).
+
+## 2026-11-14 · Designer · H7 triage and H8 candidates
+
+**Decision:**
+1. **H7 is scored as supported.** Criteria 1 and 3–6 are met, 2 is partly met (a reasoned change, count unstated), 7 is not answered. All three fun questions are answered, at least in part.
+2. **"Hate the economy stuff. Pretty good though."** is read as dictation of "ate the economy stuff". Its neighbours are a beaten raid and a request that military protect economy ships, so I don't read it as dislike of the economy layer. Q22 lets the owner correct it in a word.
+3. **The hauler fixes are ride-alongs to every H8 option**, not an option of their own: need-based staffing, rebalancing at the probe, no surplus haulers. They are rule gaps against what the owner plainly expected, and the arithmetic backs them: a1 needs 0.73 of a hauler, where H7's rule gives it 2. So are the raid badge and the fleet panel (a regression of something they liked).
+4. **The proposed hauler weight is a priority, not an amount.** The hauler type is eligible only while some rock is short of haulers. That keeps the radar's five axes while ending surplus haulers. `hauler.autoNeed` 0 is the H7 comparison.
+5. **B's move order is tap-source, Move, tap-destination first, with drag as an in-build A/B.** The known ring overlap near the hive makes drops unreliable on a phone.
+6. **Q18 (pillar 1) isn't folded into Q22**, to keep Q22 a one-word reply. It is flagged to the Director in DESIGN.md "H8 candidates".
+
+**Why:** each choice keeps the owner's next reply to one word, and fixes what they named as wrong without changing what H7 showed works.

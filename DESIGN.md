@@ -430,11 +430,133 @@ H4 (build-20261108-3, spec below) wrapped the field in a campaign:
 
 H5 (build-20261108-4, spec below) added a fleet limit per area (12, raised to 18, 24 and 30 by the Command limit research), the Recycle order and the `fleetFull` yard state, with areas recalibrated so drones alone can't take a medium or The Deep.
 
+H6 (build-20261108-5, spec below) opened the overworld to 10 areas in four bands, with command relays that raise the fleet limit and open the next band, and the combat amendment (guards strike their counter first). The Root was removed.
+
+H7 (build-20261114-1, spec below) is the current build. Data `run.mode` `"field"` parks the overworld, research and relays. A run is one field:
+- Extractor and Hauler ships built at the probe; Mine marks; haulers assigned by haulers ÷ extractors;
+- an allocation of weights 0–5 per type, shown as a radar, in place of the build queue and yards;
+- hive raids paced by your economy ships and aimed at the mined rock nearest the hive;
+- a shared fleet limit of 30 that counts economy ships.
+
 ## Hypotheses
+
+### H8 candidates (iteration 8): awaiting the owner's pick
+
+*Iteration 8, 2026-11-14. The triage is in PLAYTEST_LOG.md (build-20261114-1, 2026-11-14). **H7 is supported**: the owner defended a raid ("That felt pretty good"), endorsed the shared limit ("That's good"), pivoted from economy to offence and took the hive. The friction is the hauler layer and the speed of the controls. QUESTIONS.md Q22 asks for the pick. No spec until then.*
+
+#### Ride-alongs (fixes that ship with A, B or C)
+
+These are the H7 rule gaps and the regression from the triage. Each holds whichever option is picked. Together they are about a third of an iteration.
+
+1. **Haulers by need, not per extractor.** Each worked rock gets a hauler need:
+   - `need = max(1, ceil(yieldPerMin × roundTripTicks × hauler.needPct ÷ (100 × T × cargo)))`, where `roundTripTicks = 2 × distance ÷ ship.hauler.speedSu`. All integer.
+   - At v13 values and 110%, the needs are a1 1, a2 1, a3 1, a4 1, a5 3, a6 2, a7 2, so 11 for the full field. H7's ratio rule tends toward 13, with 2 on a1 and a2 where 0.73 is enough. This answers "Two haulers ended up at A1 when it looks like only one is needed".
+   - Assignment picks the rock with the largest shortfall (need − assigned). Ties go to the rock nearest the probe, then the lower index.
+2. **Haulers rebalance at the probe.** After each delivery, a hauler whose rock has more haulers assigned than its need moves to the rock with the largest shortfall, if one exists. At most one hauler moves per delivery, and only from over-need to under-need, so it can't thrash. This answers "The haulers should redistribute once they drop at home."
+3. **No surplus haulers.** The hauler type is eligible for the allocation only while the field's total shortfall is above 0 (Σ need − haulers alive − haulers in the bay). The hauler weight becomes a priority ("how soon"), not an amount, and its state line reads "enough haulers". This answers "the extra haulers sitting around feel much worse". Extractors don't need this rule: they already stop at the free slots.
+4. **Raid target badge.** From muster to the raid's end, the target rock carries the raiders' two-colour ring as a badge, and the rock's sheet says "Raid coming". This answers "an icon designation on the asteroid that's going to be raided".
+5. **Fleet panel with Recycle.** The top bar's "Fleet 18/30" chip opens a panel:
+   - five rows (icon, count alive, how many idle at the probe), plus Recycle with a −/+ count per type;
+   - Recycle takes idle ships first, then the highest ids, wherever they are; a recycled docked extractor frees its slot; the refund is `fleet.recycleRefundPct` as now;
+   - the panel fits 375x667, and every button is ≥ 44 px.
+
+   This answers "Can't see at a glance how many of which ships I have" and "recycle from… the fleet comp window".
+6. **Reproduce "A2 just got a third hauler. A1 has no haulers."** This is a rule test plus a field-opening replay check (see the triage). It's a bug if A1 was marked and worked at that moment. Ride-alongs 1–3 replace F6's pick, but the cause should still be known first.
+
+Tunables (ride-alongs; all integers):
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `hauler.autoNeed` | 1 | 0–1 | 0: H7's per-extractor ratio, and haulers built while their weight is above 0 (the comparison) / 1: by need, no surplus |
+| `hauler.needPct` | 110 | 100–200 | 100: exactly enough; buffers creep up when trips bunch / 200: double staffing, idle haulers again |
+| `hauler.rebalance` | 1 | 0–1 | 0: H7's sticky haulers / 1: rebalance at the probe after a delivery |
+
+Note for calibration: fewer haulers means fewer economy ships, and R4 sizes raids by economy ships. A full field has about 2 fewer haulers (11 against about 13), so its raids are about one raider smaller, and the first raid (at 6 economy ships) may come a little later. The raid-threat and pace targets need a rerun whichever option ships.
+
+#### A. A front worth holding (recommended)
+
+- **Claim:** when the economy staffs itself and warships visibly protect it, the player's attention moves to where to mine and how much force holds the front, and the economy-against-offence decision becomes the whole game.
+- **What it changes, beyond the ride-alongs:**
+  1. **A hauler count per rock.** The rock sheet gets "Haulers: Auto (2)" with −/+ (44 px), from 0 to `rock.haulerMax`. A set count overrides the need for that rock (ride-along 1), and "Auto" restores it. New input: `setHaulers(node, count | auto)`.
+  2. **The military shields the economy (R7 change).** In a round where at least one warship is at the rock when the round starts, the raiders strike warships only, and their overflow is lost. Economy ships die only in rounds with no warship standing. A token defence buys one round, not safety. (`raid.shieldEcon`)
+  3. **Haulers hold back.** From launch until the raid ends, haulers bound to the target rock wait at the probe, and they resume afterwards. Extractors stay: they are the stake. This promotes Can wait `cw-h7-hauler-raid-wait`. (`raid.haulersHold`)
+  4. **Mine mode.** A Mine button in the bottom bar. While it is on (tap to toggle, or hold it), tapping a rock toggles its mark without opening the sheet. That's one tap per rock instead of two.
+  5. **Clearer weights.** Each probe-sheet row shows its share of income next to the weight ("3 · 30%"). One line under the radar reads "Income is split by these weights."
+- **Why, from the quotes:**
+  - "Some ability to determine how many haulers should be at an asteroid."
+  - "it'd be better if it had to fight through the military first. So if the military units are there, they keep the economy units alive."
+  - "hold a button, click, rather than have to click and then say mine this rock."
+  - "kind of unclear how this one to five… works."
+  - Shielding plus a front the owner already likes ("You can kind of build a front") makes defence a standing commitment of slots, which is the trade H7 wants felt.
+- **Rough size:** one iteration, smaller than H7:
+  - core-engineer: ride-alongs 1–3, `setHaulers`;
+  - faction-ai: shield and hold-back;
+  - engineer: fleet panel, badge, Mine mode, rows;
+  - a recalibration.
+- **Leaves out:** moving ships by drag or hand-moving economy ships (B), raids at more than one rock, and the overworld (C).
+- **Risk:** shielding and hold-back weaken raids against a defended rock. Calibration keeps "a defence no larger than the raid wins, losing ≤ 2" and adds "a defence of half the raid falls, and then the raid hits", so a token guard isn't enough. "Only one asteroid to defend" gets easier still. If the owner says defence became trivial, H9 tests more than one raid target.
+
+Tunables (A, beyond the ride-alongs):
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `rock.haulerMax` | 6 | 2–10 | the top of the per-rock stepper. 2: little room to over-staff a far rock / 10: a long, fiddly stepper |
+| `raid.shieldEcon` | 1 | 0–1 | 0: H7's overflow onto economy ships / 1: the economy is safe while a warship stands |
+| `raid.haulersHold` | 1 | 0–1 | 0: haulers fly into the raid (H7) / 1: they wait at the probe until it ends |
+
+Draft success criteria (one 20–30 minute phone session):
+1. They don't mention haulers in the wrong place, or extra haulers.
+2. They use the hauler stepper at least once, or says Auto was right.
+3. At least one raid is beaten with no economy ships lost, and they notice.
+4. They mark rocks in Mine mode.
+5. They can say what a weight of 3 means.
+
+Draft fun questions:
+1. How much force did you leave on the front, and did that feel like a choice?
+2. Did you set a rock's hauler count, or leave it on Auto?
+3. With the economy running itself, what did you spend your attention on?
+
+#### B. Move ships by hand
+
+- **Claim:** moving ships rock to rock directly (any type, with a split) makes defence and logistics feel responsive enough that the field plays like the "simplified StarCraft" the owner asked for.
+- **What it changes, beyond the ride-alongs:**
+  - **A move order from any node to any node.** The phone-first form is three taps: tap the source rock, tap "Move", tap the destination. Dragging from rock to rock is the same order as an in-build A/B (`input.dragMove`).
+  - **Hold to split.** Pressing and holding Move counts ships up one per `input.holdStepMs`, and the release sends that many.
+  - **Economy ships can be moved by hand**, which reverses F12. A moved hauler is pinned to its rock, and auto staffing skips pinned haulers. A moved extractor binds to the destination if it has a free slot.
+- **Why, from the quotes:** "it feels a little clunky, I have to click the asteroid and send ships there, like a drag, from one asteroid to another… would be cool. Maybe hold the button to split them."
+- **Rough size:** one iteration, mostly client gesture work and smoke tests on both viewports. The sim change is small.
+- **Leaves out:** A's shield, hold-back, hauler stepper and Mine mode. Hauler counts are set by moving haulers instead.
+- **Phone and VISION:**
+  - A rock-to-rock drag isn't precision dragging when every rock is ≥ 44 px. But the known overlap of rings near the hive (H7 handoff) makes drops there unreliable, so the tap form stays primary.
+  - Hand-placing economy ships is the closest the game has come to unit micro. "Ships take orders at nodes; no unit micro" still holds, because a move is an order between nodes, but the auto-staffing and the pins will compete.
+
+#### C. The map returns
+
+- **Claim:** H7's loop holds across a campaign. This is H7 candidate B: the H6 overworld (relays, bands, research) with the ship economy, allocation and raids in every area.
+- **What it changes, beyond the ride-alongs:**
+  - `run.mode` back to campaign, with the field rules in every area;
+  - new meanings for the research tied to the old economy;
+  - all ten areas recalibrated with raids.
+- **Why:** H7's claim held, so the long game ("Each star system is one long game…") can come back on top of it. The owner didn't ask for this in the dictation, so this is the team's roadmap, not their request.
+- **Rough size:** about two iterations.
+- **Leaves out:** A's and B's controls. The hauler and raid friction they named would repeat in ten areas before it's fixed in one.
+
+#### Recommendation
+
+**A, with the ride-alongs.** Six of the owner's requests are hauler staffing, the fleet panel, the raid badge, military first, Mine marking and the weights. A and its ride-alongs answer all six, and the extra haulers were the one thing they called "rough". A keeps the H7 claim intact while removing the friction around it, so the next session tests the decision instead of the babysitting. B answers one request (the move gesture). It is the natural add if the owner wants it ("A, plus B"): about half an iteration more, mostly client work. C should wait until the in-field loop runs without friction.
+
+#### VISION impact (VISION.md is protected; flagged, not edited)
+
+| Option | Impact |
+| --- | --- |
+| A | None. A hauler count is an order at a node, shielding is a combat rule, and raids still never touch the probe ("No fail state"). |
+| B | Stretches "Ships take orders at nodes (attack, guard, escort); no unit micro" for economy ships. Moves between nodes fit the wording, but hand-placed haulers lean toward micro. No edit proposed. If B ships and the owner likes it, the Director may want to confirm the line. |
+| C | Restores the "one long game" fixed decision and brings pillar 5 back into play. No edit. |
+| All | **Q18 (pillar 1 wording) is ripe.** The owner endorsed the shared limit ("That's good"), and Q18's answer was "revisit after play". Its proposed text mentions a limit "raised by research", which field mode doesn't have. Rewording it is the Director's call when bundling. I don't add it to Q22, to keep that question one reply. |
 
 ### H7 candidates (iteration 7): A picked
 
-*The owner picked A and approved the pillar 3 and 4 wording (QUESTIONS.md Q21, "A, yes"). The spec is "H7 (Milestone 2, iteration 7, spec ready): One field, live enemy" below; where they differ, the spec wins.*
+*The owner picked A and approved the pillar 3 and 4 wording (QUESTIONS.md Q21, "A, yes"). The spec is "H7 (Milestone 2, iteration 7, tested on build-20261114-1): One field, live enemy" below; where they differ, the spec wins.*
 
 *Iteration 7, 2026-11-14. Triage in PLAYTEST_LOG.md (build-20261108-5, 2026-11-14). The owner stopped at the start of Frost Shelf and proposed a new direction ("let's try the spider graph idea"). That direction is the baseline here, not one option among equals. QUESTIONS.md Q21 asks the owner to confirm the scope and the pillar wording. No spec until then.*
 
@@ -562,7 +684,9 @@ These come from the same feedback, and each holds whichever slice is picked.
 - **Raids that hit the probe or retake rocks.** They break "No fail state".
 - **Node rigs** (H6 candidate C): still later.
 
-### H7 (Milestone 2, iteration 7, spec ready): One field, live enemy
+### H7 (Milestone 2, iteration 7, tested on build-20261114-1): One field, live enemy
+
+*Tested 2026-11-14: supported, with hauler and control friction. See PLAYTEST_LOG.md (build-20261114-1) and "H8 candidates (iteration 8)" above.*
 
 The owner picked A and approved the pillar 3 and 4 wording (QUESTIONS.md Q21, "A, yes", dda12d7). The Director activated Faction AI for raid behaviour (DECISIONS.md, 2026-11-14). The background is "H7 candidates" above. Where this spec and the candidates differ, the spec wins. Where this spec and BACKLOG.md differ, the spec wins.
 
