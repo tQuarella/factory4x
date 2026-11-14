@@ -1405,3 +1405,7 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 **Numbers the Designer asked for (shipped v14, default `bots` suite, seeds 1-3; the runs are identical across seeds, copied from `runField`):**
 - *Full-economy raid at adaptive's peak:* adaptive's peak economy is 17 (`peakEcon`). `raid.econPerRaider` 2 gives `ceil(17 / 2)` = 9 wanted; the hive's keep caps it, and the largest planned raid in adaptive's runs is 7 (the fifth raid, at tick 23556).
 - *Greedy's first hit under H10:* the first raid (muster 4862, planned 3) is a hit that kills 2 economy ships (2 extractors), on all three seeds. Flag 2 reads "greedy first hit killed 2, won ok" in the bots gate output of this branch.
+## 2026-11-14 · Director · H10 hold ends when the fight ends, not when raiders get home
+
+**Decision:** haulers held by H10 resume as soon as the raid's outcome is decided (beaten, hit, turned back or withered), not when `world.raid` goes null after the raiders fly home. DESIGN.md H10 amended; h8-raids makes the change before it is merged into the stack.
+**Why:** the Critic noted haulers sit at the probe through the raiders' flight home. The rock is no longer under attack then, and idle haulers are exactly what the owner called "rough" in the build-20261114-1 playtest.
