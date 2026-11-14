@@ -471,6 +471,8 @@ describe('H4 no surplus haulers', () => {
     const curve = (auto: number): { firstHauler: number; firstDelivery: number | null; byMinute: number[] } => {
       const w = createWorld(1, D);
       w.tun['hauler.autoNeed'] = auto;
+      // The curves compare the H1 need rule with H7's pick; H10 (haulers hold during a raid, from minute 4) is another rule.
+      w.tun['raid.haulersHold'] = 0;
       let firstHauler = -1;
       const byMinute: number[] = [];
       for (let t = 0; t < 10 * T; t++) {

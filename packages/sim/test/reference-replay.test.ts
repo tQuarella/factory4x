@@ -57,6 +57,14 @@ describe('reference replay (field mode)', () => {
   const extLog: Array<{ tick: number; state: string; weight: number; share: number; bay: number; bayBefore: number; inputs: string[] }> = [];
   const moves: Array<{ tick: number; from: number; to: number; part: string; preview: { drone: number; lancer: number; flak: number }; moved: { drone: number; lancer: number; flak: number }; at: { drone: number; lancer: number; flak: number } }> = [];
   let fleetRecycle: { tick: number; orderHaulers: Array<{ id: number; at: number | null; target: number | null }>; orderExtractors: Array<{ id: number; at: number | null; docked: boolean }>; gone: number[]; slotsBefore: number; slotsAfter: number } | null = null;
+  // h8-raids: the second raid's rounds at p1 (H9), and its haulers (H10).
+  const rounds: Array<{ tick: number; warships: number; lostShips: number; lostEcon: number; extractorsAtP1: number }> = [];
+  const heldDepartures: number[] = [];
+  const departuresAfter: number[] = [];
+  let holdingPeak = 0;
+  let raid2End = -1;
+  let raid2Held = 0;
+  let raid1HeldTicks = 0;
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
     const probe = inputs.length > 0 ? clone(w) : w;
@@ -162,7 +170,28 @@ describe('reference replay (field mode)', () => {
         warshipsAtTarget: rst.target === null ? 0 : w.ships.filter((x) => x.at === rst.target).length,
       });
     }
-    if (inputs.some((i) => i.type === 'recycleShips')) recycle = { tick: t, econBefore, econAfter: f.econ.length, refund: w.stats.oreRefunded - refundBefore };
+    // h8-raids: raid 1's hold at p1 (a beaten raid), raid 2's rounds and hauler departures (H9, H10).
+    const rr = w.raid;
+    const departed = f.econ.filter((s) => s.type === 'hauler' && s.transit !== null && s.transit.from === PROBE && s.transit.to === 8 && s.transit.ticksLeft + 1 === s.transit.totalTicks).length;
+    if (rr !== null && rr.id === 1 && rockStatus(w, 8).haulersHeld) raid1HeldTicks++;
+    if (rr !== null && rr.id === 2 && rr.phase === 'home') {
+      if (raid2End < 0) raid2End = t; // the outcome is decided: the raiders left p1 this tick (the hold ended)
+      if (t <= raid2End + 5) departuresAfter.push(...Array<number>(departed).fill(t));
+    } else if (rr !== null && rr.id === 2 && rr.phase !== 'muster') {
+      heldDepartures.push(...Array<number>(departed).fill(t));
+      holdingPeak = Math.max(holdingPeak, raidStatus(w).holding);
+      raid2Held++;
+      if (rr.phase === 'fight' && t % 30 === 0) {
+        rounds.push({
+          tick: t,
+          warships: w.ships.filter((s) => s.at === 8).length,
+          lostShips: rr.lostShips.drone + rr.lostShips.lancer + rr.lostShips.flak,
+          lostEcon: rr.lostEcon.extractor + rr.lostEcon.hauler,
+          extractorsAtP1: rockStatus(w, 8).docked,
+        });
+      }
+    }
+    if (inputs.some((i) => i.type === 'recycleShips' && i.node === 2)) recycle = { tick: t, econBefore, econAfter: f.econ.length, refund: w.stats.oreRefunded - refundBefore };
   }
   const nodeId = (i: number): string => w.nodes[i]!.id;
   const t = data.tunables;
@@ -251,13 +280,35 @@ describe('reference replay (field mode)', () => {
     expect(end.raids).toEqual({ mustered: 1, beaten: 1, hit: 0, turnedBack: 0 });
   });
 
-  it('the second raid hits p1 undefended: it kills a docked extractor and comes home (hit)', () => {
+  it('the second raid hits p1 defended by one lone Drone (sent at tick 4100): it falls, then the extractor does, and the raid comes home (hit)', () => {
     const fights = raidLog.filter((e) => e.phase === 'fight');
     expect(fights.length).toBeGreaterThanOrEqual(2);
     expect(nodeId(fights[1]!.target!)).toBe('p1');
-    expect(fights[1]!.warshipsAtTarget).toBe(0);
+    expect(fights[1]!.warshipsAtTarget).toBe(1);
     const hit = raidLog.find((e) => e.phase === 'none' && e.raids.hit === 1)!;
     expect(hit.raids).toEqual({ mustered: 2, beaten: 1, hit: 1, turnedBack: 0 });
+  });
+
+  it('H9: raid 2 strikes the Drone alone in its first round (the damage is raised for it at 4250; the overflow is lost), the extractor in the next, with no warship left', () => {
+    expect(rounds.map((r) => r.tick)).toEqual([4290, 4320]);
+    // The state after each round: the Drone fell in the first, the extractor still stands; the extractor fell in the second.
+    expect(rounds[0]).toEqual({ tick: 4290, warships: 0, lostShips: 1, lostEcon: 0, extractorsAtP1: 1 });
+    expect(rounds[1]).toEqual({ tick: 4320, warships: 0, lostShips: 1, lostEcon: 1, extractorsAtP1: 0 });
+  });
+
+  it('H10: from launch to the outcome of raid 2, no hauler leaves the probe for p1 while some wait there (the partial load at the node is in raids-h8.test.ts)', () => {
+    expect(raid2Held).toBeGreaterThan(300);
+    expect(holdingPeak).toBeGreaterThan(0);
+    expect(heldDepartures).toEqual([]);
+    // Raid 1 held p1's haulers too (the target at its fight), then the beaten raid ended.
+    expect(raid1HeldTicks).toBeGreaterThan(0);
+  });
+
+  it('H10: the haulers resume at once when the outcome of raid 2 is decided (it leaves p1 for home, tick 4350, 215 ticks before it lands): they leave the probe within a tick of that', () => {
+    expect(raid2End).toBeGreaterThan(0);
+    expect(raid2End).toBe(4350);
+    expect(departuresAfter.length).toBeGreaterThan(0);
+    expect(Math.min(...departuresAfter)).toBeLessThanOrEqual(raid2End + 1);
   });
 
   it('the hive is captured (tick 8010) with the third raid out at p1: it withers (removed, not counted as an outcome)', () => {

@@ -902,6 +902,7 @@ describe('raidStatus and rockStatus.raidRank at each phase', () => {
       nextRaidAtEcon: 6,
       ticksToNextAllowed: 0,
       last: null,
+      holding: 0,
     });
     w.tun['raid.enabled'] = 0;
     expect(raidStatus(w).enabled).toBe(false);
