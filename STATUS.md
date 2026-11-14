@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 8, hypothesis H8 B: Move ships by hand)
-**State:** Iteration 8 in flight. Owner played build-20261114-1 to a win (75b3021), triaged (d594224), and picked B in Q22 with a drag gesture (048156b). Owner then added A (756a237). Spec and split done (0d76117). Step: Build: h8-sim and cw-smoke-sim-time in parallel; h8-raids, h8-bots, h8-client after h8-sim approval.
+**State:** Iteration 8 in flight. Owner played build-20261114-1 to a win (75b3021), triaged (d594224), and picked B in Q22 with a drag gesture (048156b). Owner then added A (756a237). Spec and split done (0d76117). cw-smoke-sim-time merged (66c9581). h8-sim approved (0b72251). Step: Build: h8-raids, h8-bots, h8-client in parallel; then h8-design-data on h8-bots; h8-client lands the stack.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261114-1 (H7 One field, live enemy), commit f565c11, live (CI 43638281605 gates and deploy green; site shows f565c11 · data v13). Release gates passed locally (232/232 smoke).
@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 8 ledger
 
-Launches: 5 / 12.
+Launches: 8 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -19,10 +19,15 @@ Launches: 5 / 12.
 | r1 | designer | H8 spec + task split (A+B) | resume | Spec and split (0d76117) |
 | 2 | core-engineer | h8-sim | launch | Build; repro of the A1/A2 hauler case first |
 | 3 | engineer | cw-smoke-sim-time | launch | Built c199647: CI gates job 12m03s, deploy 8m34s (run 43645327666) |
-| 4 | critic | cw-smoke-sim-time | launch | Review round 1: APPROVE (96667d4); main merged (86bf159), CI running |
+| 4 | critic | cw-smoke-sim-time | launch | Review round 1: APPROVE (96667d4); CI 43647913292 green on 86bf159; merged 66c9581 |
 | r2 | core-engineer | h8-sim | resume | Built 19f98f6 (repro 0291294 reproduced A1/A2); first hauler 3:13 on v14, so Director amended H1 (8739109); implemented a2f709f (committed extractors staff a rock; opening = H7 to the tick) |
 | r3 | core-engineer | h8-sim | resume | No surplus extractors (0246e00): 19 built in 10 min, 0 idle |
-| 5 | critic | h8-sim | launch | Review round 1 |
+| 5 | critic | h8-sim | launch | Review round 1: REJECT (amendment and no-surplus extractors not in the reference replay) |
+| r4 | core-engineer | h8-sim | resume | Fix round 1 (cb74dbc): replay items, determinism 958a2f1d; haulers wait for committed extractors (Director accepted) |
+| r5 | critic | h8-sim | resume | Review round 2: APPROVE (0b72251) |
+| 6 | faction-ai | h8-raids | launch | Build, from task/h8-sim |
+| 7 | engineer | h8-bots | launch | Build, from task/h8-sim |
+| 8 | engineer | h8-client | launch | Build, from task/h8-sim (top of stack) |
 
 ## Iteration 7 ledger
 
