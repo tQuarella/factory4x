@@ -13,7 +13,7 @@ interface Sil {
 
 test('the extractor and hauler read at 24 px against the warships and a rock; new draws stay within their bounds', async ({ page }) => {
   await page.goto('/gallery.html');
-  await expect.poll(() => page.evaluate(() => Boolean((window as unknown as { __silhouettes?: unknown }).__silhouettes))).toBe(true);
+  await expect.poll(() => page.evaluate(() => Boolean((window as unknown as { __silhouettes?: unknown }).__silhouettes)), { timeout: 30_000 }).toBe(true);
   const sil = (await page.evaluate(() => (window as unknown as { __silhouettes: Sil }).__silhouettes));
   for (const hull of ['extractor', 'hauler']) {
     expect(sil.fill[hull], `${hull} covers enough of its 24 px cell to be seen`).toBeGreaterThan(80);

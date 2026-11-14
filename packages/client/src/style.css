@@ -394,3 +394,8 @@ section.send > .send-btn.all { flex: 1 1 100%; }
   .fp-top { flex-direction: column; align-items: stretch; }
   .fp-radar { align-self: center; }
 }
+
+/* H7 raid chip: fixed room for its longest text, so the chip never changes size as the phase changes. */
+#chips .chip.raid { --num-pad: 'Raids at 00 ships'; border: 1px solid transparent; border-radius: 8px; padding: 0 5px; white-space: nowrap; }
+#chips .chip.raid.active { border-color: var(--bloom); }
+#chips .chip.raid.active b { color: #ffb3cc; }

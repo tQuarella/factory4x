@@ -109,3 +109,84 @@ export function fieldFleetFullNotice(count: number, cap: number, countsEconomy: 
   const who = countsEconomy ? 'Every ship counts.' : 'Warships count.';
   return `Fleet full (${count}/${cap}): the probe stops starting ships. ${who} Recycle ships to change your mix.`;
 }
+
+// ---------------------------------------------------------------------------
+// H7 raids: the muster banner, the battle line, the chip and the end toasts. Numbers come from `raidStatus`.
+
+/** "4 Spores, 1 Thorn" (the larger type first), or "nothing". */
+export function raidMixText(c: Readonly<{ thorn: number; spore: number }>): string {
+  const parts: Array<[number, string]> = [
+    [c.spore, c.spore === 1 ? 'Spore' : 'Spores'],
+    [c.thorn, c.thorn === 1 ? 'Thorn' : 'Thorns'],
+  ];
+  parts.sort((a, b) => b[0] - a[0]);
+  const text = parts.filter((p) => p[0] > 0).map((p) => `${p[0]} ${p[1]}`);
+  return text.length > 0 ? text.join(', ') : 'nothing';
+}
+
+/** Game ticks as whole seconds, rounded up ("15 s"). */
+export function secsText(ticks: number, tickRate: number): string {
+  return `${Math.ceil(ticks / tickRate)} s`;
+}
+
+/** m:ss of ticks, rounded up, for the chip ("0:12"). */
+export function clockText(ticks: number, tickRate: number): string {
+  const s = Math.max(0, Math.ceil(ticks / tickRate));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** The muster banner: "Raid gathering: 4 Spores, 1 Thorn → A5 in 15 s". */
+export function raidMusterLine(planned: Readonly<{ thorn: number; spore: number }>, target: string, ticksToLaunch: number, tickRate: number): string {
+  return `Raid gathering: ${raidMixText(planned)} → ${target} in ${secsText(ticksToLaunch, tickRate)}`;
+}
+
+/** The battle line at the target: "Raid at A5: 3 left". */
+export function raidFightLine(target: string, left: number): string {
+  return `Raid at ${target}: ${left} left`;
+}
+
+interface RaidChipInput {
+  enabled: boolean;
+  phase: 'none' | 'muster' | 'out' | 'fight' | 'home';
+  econ: number;
+  nextRaidAtEcon: number;
+  ticksToLaunch: number;
+  ticksToArrival: number;
+  ticksToNextAllowed: number;
+}
+
+/** The top bar's raid chip text, or null when raids are off. */
+export function raidChipText(r: Readonly<RaidChipInput>, tickRate: number): string | null {
+  if (!r.enabled) return null;
+  if (r.phase === 'muster') return `Raid ${clockText(r.ticksToLaunch, tickRate)}`;
+  if (r.phase === 'out') return `Raid ${clockText(r.ticksToArrival, tickRate)}`;
+  if (r.phase === 'fight') return 'Raid on';
+  if (r.phase === 'home') return 'Raid leaving';
+  if (r.econ < r.nextRaidAtEcon) return `Raids at ${r.nextRaidAtEcon} ships`;
+  return r.ticksToNextAllowed > 0 ? `Next raid ${clockText(r.ticksToNextAllowed, tickRate)}` : 'Raids ready';
+}
+
+interface RaidLastInput {
+  outcome: 'beaten' | 'hit' | 'turnedBack' | 'withered';
+  lostEcon: { extractor: number; hauler: number };
+  lostShips: { drone: number; lancer: number; flak: number };
+  killed: { thorn: number; spore: number };
+}
+
+/** The end toast: "Raid beaten at A5: 5 killed, 0 lost", "Raid hit A5: lost 2 extractors, 1 hauler", "Raid turned back". */
+export function raidEndText(r: Readonly<RaidLastInput>, target: string): string {
+  const killed = r.killed.thorn + r.killed.spore;
+  const ships = r.lostShips.drone + r.lostShips.lancer + r.lostShips.flak;
+  const lostN = r.lostEcon.extractor + r.lostEcon.hauler + ships;
+  if (r.outcome === 'beaten') return `Raid beaten at ${target}: ${killed} killed, ${lostN} lost`;
+  if (r.outcome === 'turnedBack') return 'Raid turned back';
+  if (r.outcome === 'withered') return 'The raid withers with the hive.';
+  const parts: string[] = [];
+  const add = (n: number, one: string, many: string): void => void (n > 0 && parts.push(`${n} ${n === 1 ? one : many}`));
+  add(r.lostEcon.extractor, 'extractor', 'extractors');
+  add(r.lostEcon.hauler, 'hauler', 'haulers');
+  add(r.lostShips.drone, 'drone', 'drones');
+  add(r.lostShips.lancer, 'lancer', 'lancers');
+  add(r.lostShips.flak, 'flak', 'flak');
+  return `Raid hit ${target}: lost ${parts.length > 0 ? parts.join(', ') : 'nothing'}`;
+}

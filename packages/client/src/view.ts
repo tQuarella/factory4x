@@ -12,6 +12,7 @@ import {
   drawGuardRing,
   drawHauler,
   drawMineBadge,
+  drawRaidMarker,
   drawHitFlash,
   drawPocket,
   drawPod,
@@ -111,11 +112,15 @@ export class MapView {
     mine: new Set<number>(),
     haul: new Map<number, number>(),
     econ: { docked: 0, idle: 0, waiting: 0, moving: 0 },
+    /** H7 raids: what the last frame drew (the muster pulse, the dashed line and marker, the rock under raid, the countdown text). */
+    raid: { pulse: false, line: false, marker: false, raided: -1, countdown: '' },
   };
+  /** The flight a raid is on, for the marker's position: the longest `ticksLeft` seen in this phase is its length. */
+  private flight = { id: -1, phase: '', total: 1 };
 
   /** H7 test hook: what the last frame drew for the economy (Mine badges, haul lines, hulls docked, idle at the probe, waiting, moving). */
-  drawnField(): { mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number } } {
-    return { mine: [...this.drawn.mine], haul: [...this.drawn.haul], econ: { ...this.drawn.econ } };
+  drawnField(): { mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number }; raid: { pulse: boolean; line: boolean; marker: boolean; raided: number; countdown: string } } {
+    return { mine: [...this.drawn.mine], haul: [...this.drawn.haul], econ: { ...this.drawn.econ }, raid: { ...this.drawn.raid } };
   }
 
   drawnBackedUp(node: number): { badge: boolean; route: boolean } {
@@ -201,6 +206,7 @@ export class MapView {
     this.drawn.mine.clear();
     this.drawn.haul.clear();
     this.drawn.econ = { docked: 0, idle: 0, waiting: 0, moving: 0 };
+    this.drawn.raid = { pulse: false, line: false, marker: false, raided: -1, countdown: '' };
     ctx.fillStyle = palette.space;
     ctx.fillRect(0, 0, w, h);
     for (const st of this.stars) {
@@ -287,7 +293,9 @@ export class MapView {
       if (n.kind === 'probe') drawProbe(ctx, rr, t);
       else if (n.kind === 'pocket' && isGuarded(world, n.index)) drawPocket(ctx, rr, t, true, n.prize ?? 'ore');
       else if (n.kind === 'asteroid' || n.kind === 'pocket') {
-        drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots);
+        const raided = world.raid !== null && world.raid.phase === 'fight' && world.raid.target === n.index;
+        if (raided) this.drawn.raid.raided = n.index;
+        drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots, raided ? 'raided' : 'normal', t);
         // A captured pocket is a rock that shows its prize.
         if (n.kind === 'pocket') drawResourceIcon(ctx, rr * 0.4, n.prize ?? 'ore');
       }
@@ -404,6 +412,7 @@ export class MapView {
     ctx.restore();
 
     if (field) this.drawEcon(world, alpha);
+    if (field) this.drawRaid(world, t, alpha);
 
     // Ships in transit.
     for (const s of world.ships) {
@@ -465,6 +474,73 @@ export class MapView {
         this.econHull(s, p.x + rr + 8, p.y - 6 + k * 9, 0);
       }
     }
+  }
+
+  /** H7 raid readability: the hive pulses while it musters; the marker rides a dashed line out to the target (and home), with its countdown. */
+  private drawRaid(world: Readonly<World>, t: number, alpha: number): void {
+    const { ctx } = this;
+    const raid = world.raid;
+    if (raid === null) return;
+    const hive = world.nodes.find((n) => n.kind === 'heart');
+    const target = world.nodes[raid.target];
+    if (hive === undefined || target === undefined) return;
+    const hp = this.nodePos(hive.index);
+    if (raid.phase === 'muster') {
+      this.drawn.raid.pulse = true;
+      const rr = this.nodeR(hive);
+      const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+      ctx.save();
+      ctx.strokeStyle = palette.mob;
+      ctx.globalAlpha = 0.35 + 0.5 * pulse;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(hp.x, hp.y, rr * 1.55 + 8 + pulse * 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    const tp = this.nodePos(target.index);
+    // The flight's length: the longest ticksLeft seen since this phase began.
+    if (this.flight.id !== raid.id || this.flight.phase !== raid.phase) this.flight = { id: raid.id, phase: raid.phase, total: Math.max(1, raid.ticksLeft) };
+    else if (raid.ticksLeft > this.flight.total) this.flight.total = raid.ticksLeft;
+    ctx.save();
+    ctx.strokeStyle = palette.mob;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 6]);
+    ctx.beginPath();
+    ctx.moveTo(hp.x, hp.y);
+    ctx.lineTo(tp.x, tp.y);
+    ctx.stroke();
+    ctx.restore();
+    this.drawn.raid.line = true;
+    if (raid.phase === 'fight') return;
+    // Out: hive to target. Home: target to hive. Frac 0 at the start of the leg.
+    const f = progressFrac(raid.ticksLeft, this.flight.total, alpha);
+    const [a, b] = raid.phase === 'out' ? [hp, tp] : [tp, hp];
+    const x = lerp(a.x, b.x, f);
+    const y = lerp(a.y, b.y, f);
+    const mix = { thorn: 0, spore: 0 };
+    for (const g of raid.guards) mix[g.type]++;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.atan2(b.y - a.y, b.x - a.x));
+    drawRaidMarker(ctx, 11, mix);
+    ctx.restore();
+    this.drawn.raid.marker = true;
+    const text = `${Math.ceil(raid.ticksLeft / world.tickRate)}s`;
+    this.drawn.raid.countdown = text;
+    ctx.save();
+    ctx.font = '700 11px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center';
+    const wd = ctx.measureText(text).width + 8;
+    ctx.fillStyle = 'rgba(5, 7, 13, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(x - wd / 2, y + 13, wd, 15, 5);
+    ctx.fill();
+    ctx.fillStyle = palette.bloomHi;
+    ctx.fillText(text, x, y + 24.5);
+    ctx.restore();
   }
 
   private econHull(s: Readonly<EconShip>, x: number, y: number, heading: number): void {

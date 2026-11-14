@@ -67,16 +67,16 @@ export function drawAsteroid(ctx: Ctx, r: number, seed: number, extractors: numb
     const pulse = 0.5 + 0.5 * Math.sin(t * 9);
     ctx.fillStyle = palette.mobGlow;
     ctx.globalAlpha = 0.6 + 0.4 * pulse;
-    disc(ctx, 0, 0, r * 1.1);
+    disc(ctx, 0, 0, r * 1.06);
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.strokeStyle = palette.mob;
     ctx.lineWidth = Math.max(2, r * 0.12);
-    ctx.lineJoin = 'miter';
+    ctx.lineJoin = 'bevel';
     ctx.beginPath();
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
-      const k = i % 2 === 0 ? 1.0 : 0.84;
+      const k = i % 2 === 0 ? 0.98 : 0.84;
       ctx.lineTo(Math.cos(a) * r * k, Math.sin(a) * r * k);
     }
     ctx.closePath();
@@ -1373,26 +1373,26 @@ export function drawExtractor(ctx: Ctx, r: number, heading = 0): void {
   ctx.lineJoin = 'round';
   ctx.fillStyle = palette.econ;
   ctx.beginPath();
-  ctx.moveTo(-r * 0.8, -r * 0.5);
-  ctx.lineTo(r * 0.12, -r * 0.5);
-  ctx.lineTo(r * 0.36, -r * 0.28);
-  ctx.lineTo(r * 0.36, r * 0.28);
-  ctx.lineTo(r * 0.12, r * 0.5);
-  ctx.lineTo(-r * 0.8, r * 0.5);
+  ctx.moveTo(-r * 0.75, -r * 0.34);
+  ctx.lineTo(r * 0.1, -r * 0.34);
+  ctx.lineTo(r * 0.3, -r * 0.2);
+  ctx.lineTo(r * 0.3, r * 0.2);
+  ctx.lineTo(r * 0.1, r * 0.34);
+  ctx.lineTo(-r * 0.75, r * 0.34);
   ctx.closePath();
   ctx.fill();
   // The drill prong: a pale cone to the nose.
   ctx.fillStyle = palette.starBright;
   ctx.beginPath();
-  ctx.moveTo(r, 0);
-  ctx.lineTo(r * 0.34, r * 0.22);
-  ctx.lineTo(r * 0.34, -r * 0.22);
+  ctx.moveTo(r * 0.97, 0);
+  ctx.lineTo(r * 0.28, r * 0.2);
+  ctx.lineTo(r * 0.28, -r * 0.2);
   ctx.closePath();
   ctx.fill();
   // One accent: a dark cab slot on the hull.
   ctx.fillStyle = palette.space;
   ctx.beginPath();
-  ctx.rect(-r * 0.55, -r * 0.13, r * 0.5, r * 0.26);
+  ctx.rect(-r * 0.55, -r * 0.1, r * 0.45, r * 0.2);
   ctx.fill();
   ctx.restore();
 }
@@ -1408,15 +1408,15 @@ export function drawHauler(ctx: Ctx, r: number, heading = 0): void {
   ctx.fillStyle = palette.econ;
   // Cab and chassis, then the pod.
   ctx.beginPath();
-  ctx.rect(-r * 0.1, -r * 0.26, r * 0.95, r * 0.52);
-  ctx.rect(-r * 0.85, -r * 0.5, r * 0.85, r);
+  ctx.rect(-r * 0.1, -r * 0.28, r * 0.95, r * 0.56);
+  ctx.rect(-r * 0.8, -r * 0.56, r * 0.8, r * 1.12);
   ctx.fill();
   ctx.strokeStyle = palette.space;
   ctx.lineWidth = Math.max(1.2, r * 0.12);
-  const x0 = -r * 0.85 + r * 0.15;
+  const x0 = -r * 0.8 + r * 0.15;
   const x1 = -r * 0.15;
-  const y0 = -r * 0.5 + r * 0.15;
-  const y1 = r * 0.5 - r * 0.15;
+  const y0 = -r * 0.56 + r * 0.15;
+  const y1 = r * 0.56 - r * 0.15;
   ctx.beginPath();
   ctx.rect(x0, y0, x1 - x0, y1 - y0);
   ctx.moveTo(x0, y0);
@@ -1446,7 +1446,7 @@ export function drawRaidMarker(ctx: Ctx, r: number, mix: Readonly<RaidMix>): voi
   ctx.save();
   const total = Math.max(1, mix.thorn + mix.spore);
   const w = Math.max(2.5, r * 0.18);
-  const rr = r - w / 2;
+  const rr = r * 0.97 - w / 2;
   ctx.lineWidth = w;
   ctx.lineCap = 'butt';
   let a0 = 0;

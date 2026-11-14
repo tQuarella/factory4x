@@ -112,9 +112,9 @@ describe('H7 art: shape and colour rules (acceptance 6)', () => {
     const h = extent(ha.hits);
     // The extractor's nose reaches r; the hauler's cab ends flat short of it. (The 24 px pixel-scan comparison with the warships and a
     // rock is the gallery's, run by tests/smoke/h7-art.spec.ts.)
-    expect(e.x1).toBeCloseTo(R, 5);
+    expect(e.x1).toBeCloseTo(R * 0.97, 5);
     expect(h.x1).toBeLessThan(e.x1 * 0.9);
-    expect(h.y1 - h.y0).toBeGreaterThanOrEqual((e.y1 - e.y0) * 0.99);
+    expect(h.y1 - h.y0).toBeGreaterThan((e.y1 - e.y0) * 1.4);
   });
   it('the raid marker is the raiders ring (Thorn and Spore arcs) round a hot-pink chevron, and a one-type raid has one arc colour', () => {
     const both = recorder();

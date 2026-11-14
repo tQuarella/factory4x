@@ -20,6 +20,7 @@ import {
   replayHashes,
   RESOURCES,
   SHIP_TYPES,
+  raidStatus,
   rockStatus,
   rootIndex,
   shipCounts,
@@ -40,7 +41,7 @@ import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { shortVersion } from './format.ts';
 import { Hud, OverworldHud } from './hud.ts';
 import { FeedbackPanel, TuningPanel, confirmModal, showAreaResult, showFieldResult, showWin, type PanelHost } from './panels.ts';
-import { FIELD_HINT, fieldFleetFullNotice, fieldUnlockNotice } from './fieldreport.ts';
+import { FIELD_HINT, fieldFleetFullNotice, fieldUnlockNotice, raidEndText, raidFightLine, raidMusterLine } from './fieldreport.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
 import {
   bannerLines,
@@ -58,7 +59,7 @@ import {
 import { RecyclePanel } from './recyclepanel.ts';
 import { SendPanel } from './sendpanel.ts';
 import { Session, dataWithDefaults, replayData, type Speed } from './session.ts';
-import { Sheet } from './sheet.ts';
+import { Sheet, shortName } from './sheet.ts';
 import { MapView } from './view.ts';
 import { AreaSheet, ResearchSheet } from './worldsheets.ts';
 import { WorldView } from './worldview.ts';
@@ -417,6 +418,33 @@ function transitionPending(): boolean {
   return !s.onOverworld && isCaptured(w) && !s.flags.resultShown;
 }
 
+/** H7: the id of the last raid whose end toast was shown, per world (a resumed save doesn't announce an old raid). */
+const raidSeen: { world: unknown; id: number } = { world: null, id: 0 };
+
+/** The banner lines of a raid: the muster ("Raid gathering: ...") and the fight at the target ("Raid at A5: 3 left"). */
+function raidLines(w: World): string[] {
+  const r = raidStatus(w);
+  if (r.target === null) return [];
+  const name = shortName(w.nodes[r.target]!, true);
+  if (r.phase === 'muster') return [raidMusterLine(r.planned, name, r.ticksToLaunch, w.tickRate)];
+  if (r.phase === 'fight') return [raidFightLine(name, r.raiders.thorn + r.raiders.spore)];
+  return [];
+}
+
+/** H7: the end toast of a raid that finished since the last look. */
+function raidToast(w: World): void {
+  const last = raidStatus(w).last;
+  if (raidSeen.world !== w) {
+    raidSeen.world = w;
+    raidSeen.id = last?.id ?? 0;
+    return;
+  }
+  if (last === null || last.id === raidSeen.id) return;
+  raidSeen.id = last.id;
+  const text = raidEndText(last, shortName(w.nodes[last.target]!, true));
+  toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`, () => sheet.open(last.target));
+}
+
 /** Dev hook state: a copy of the world with chosen counts, shown by the in-area HUD instead of the live one (hud-stability.spec.ts). */
 let hudOverride: World | null = null;
 
@@ -449,7 +477,7 @@ function refreshUi(): void {
   }
   setHidden(el.paused, onWorld || !s.paused);
 
-  const lines = onWorld ? [] : bannerLines(w);
+  const lines = onWorld ? [] : [...(field ? raidLines(w) : []), ...bannerLines(w)];
   const showBanner = lines.length > 0 || forceBanner;
   setHidden(el.banner, !showBanner);
   if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'P4 · 6 Thorn 4 Spore · strip 0.8/s · 2 lost');
@@ -467,6 +495,7 @@ function refreshUi(): void {
       s.flags.seenBattleEnd = ended[ended.length - 1]!.endTick;
       toast.show(ended.map((r) => battleReport(w, r, sd())).join('\n\n'));
     }
+    if (field) raidToast(w);
     // The first delivery that unlocks Lancers or Flak: say what their yard is doing; one tap opens the Probe.
     if (unlockSeen.world !== w) {
       unlockSeen.world = w;
@@ -522,6 +551,15 @@ function refreshUi(): void {
 }
 
 el.banner.addEventListener('click', () => {
+  const w0 = app.session.world;
+  // H7: a raid banner opens its target's sheet.
+  if (isField(w0)) {
+    const r = raidStatus(w0);
+    if (r.target !== null && (r.phase === 'muster' || r.phase === 'fight')) {
+      sheet.open(r.target);
+      return;
+    }
+  }
   const first = activeBattles(app.session.world)[0];
   const node = first ? first.node : app.session.world.nodes.findIndex((n) => n.kind === 'heart');
   if (node >= 0) sheet.open(node);
@@ -677,6 +715,13 @@ window.__factory4x = {
   rockStatus: (node) => JSON.stringify(rockStatus(app.session.world, node)),
   fieldSummary: () => JSON.stringify(fieldSummary(app.session.world)),
   econShips: () => JSON.stringify((app.session.world.field?.econ ?? []).map((e) => ({ id: e.id, type: e.type, at: e.at, target: e.target, moving: e.transit !== null }))),
+  raidStatus: () => JSON.stringify(raidStatus(app.session.world)),
+  advanceTicks: (n) => {
+    // Test hook: pauses, then steps exactly n ticks (so a raid's short phases can be looked at one by one).
+    app.session.paused = true;
+    for (let i = 0; i < n; i++) app.session.stepOnce();
+    refreshUi();
+  },
   log: () => JSON.stringify(app.session.log.map((l) => l.input)),
   setSpeed: (v) => {
     app.session.speed = v;

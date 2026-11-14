@@ -92,6 +92,10 @@ interface Window {
     fieldSummary(): string;
     /** The economy ships, as JSON text: [{id, type, at, target, moving}]. */
     econShips(): string;
+    /** raidStatus as JSON text (field mode). */
+    raidStatus(): string;
+    /** Pauses and steps exactly n ticks, then refreshes the screen (tests). */
+    advanceTicks(n: number): void;
     /** The session's input log (inputs only), as JSON text. */
     log(): string;
     setSpeed(speed: 1 | 2 | 4): void;

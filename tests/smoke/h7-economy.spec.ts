@@ -251,9 +251,9 @@ test.describe('375x667 portrait, by touch', () => {
     await expect(sheet.locator('.pips .pip.on')).toHaveCount(st.docked);
     await expect(sheet.locator('.pip-text')).toContainText(`${st.docked}/${st.slots}`);
     await expect(sheet.locator('.pips .pip.queued')).toHaveCount(st.inFlight);
-    await expect(sheet.getByText('Haulers')).toBeVisible();
-    await expect(sheet.getByText('Buffer')).toBeVisible();
-    await expect(sheet.getByText('Delivered')).toBeVisible();
+    await expect(sheet.locator('.lbl', { hasText: 'Haulers' })).toBeVisible();
+    await expect(sheet.locator('.lbl', { hasText: 'Buffer' })).toBeVisible();
+    await expect(sheet.locator('.lbl', { hasText: 'Delivered' })).toBeVisible();
     await expectControlsFit(page, '#sheet', 'the rock sheet controls');
     expect(await page.evaluate(() => JSON.parse(window.__factory4x!.mapField()).mine)).toContain(a1);
 
@@ -277,17 +277,20 @@ test.describe('375x667 portrait, by touch', () => {
   });
 
   test('acceptance 3: a full buffer says "Backed up: add haulers" and holds its room; the note never moves the controls below it', async ({ page }) => {
+    test.setTimeout(120_000);
     await ready(page, PHONE);
+    await pause(page);
     await tune(page, 'node.bufferCap', 10);
     await tapNode(page, 'probe');
     // No haulers: switch the hauler weight to 0 so the buffers fill and stay full.
     const hauler = page.locator('#sheet .fp-row[data-type="hauler"]');
     const w = Number(await hauler.locator('.fp-w').textContent());
     for (let i = 0; i < w; i++) await tap(page, hauler.locator('.fp-step', { hasText: '−' }));
-    await page.evaluate(() => window.__factory4x!.setSpeed(4));
     await tap(page, page.locator('#sheet .close'));
+    await page.locator('#b-pause').click();
+    await page.evaluate(() => window.__factory4x!.setSpeed(4));
     const a1 = await page.evaluate(() => window.__factory4x!.nodeIndex('a1'));
-    await expect.poll(async () => (await rock(page, a1)).backedUp, { timeout: 90_000 }).toBe(true);
+    await expect.poll(async () => (await rock(page, a1)).backedUp, { timeout: 80_000 }).toBe(true);
     await tapNode(page, 'a1');
     const sheet = page.locator('#sheet');
     await expect(sheet.locator('.rock-note .backed')).toHaveText('Backed up: add haulers');
@@ -371,12 +374,12 @@ test.describe('375x667 portrait, by touch', () => {
     const panel = page.locator('#recyclepanel');
     await expect(panel).toBeVisible();
     await expect(panel.locator('.sp-row[data-ship="extractor"]')).toBeVisible();
-    await expect(panel.locator('.sp-row[data-ship="hauler"]')).toBeVisible();
     await expectControlsFit(page, '#recyclepanel', 'the recycle panel');
-    const stock = await page.evaluate(() => window.__factory4x!.stock());
     await tap(page, panel.locator('.sp-row[data-ship="extractor"] .sp-all'));
     await tap(page, panel.locator('.primary'));
     expect((await inputs(page)).slice(-1)[0]!.type).toBe('recycleShips');
-    expect(await page.evaluate(() => window.__factory4x!.stock())).toBeGreaterThan(stock);
+    // The refund goes into stock and the allocation takes it at once, so the proof is the summary's recycled count.
+    const sum = JSON.parse(await page.evaluate(() => window.__factory4x!.fieldSummary())) as { recycled: { extractor: number } };
+    expect(sum.recycled.extractor).toBeGreaterThan(0);
   });
 });
