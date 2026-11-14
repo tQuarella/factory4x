@@ -24,8 +24,8 @@ export const BUILD_PLURAL: Record<BuildType, string> = {
 
 /** What a locked type needs, as the state line says it. */
 const LOCK_TEXT: Partial<Record<BuildType, string>> = {
-  lancer: 'needs crystal: take the crystal pocket',
-  flak: 'needs ice: take the ice pocket',
+  lancer: 'needs crystal pocket',
+  flak: 'needs ice pocket',
 };
 
 /** One row's state line on the probe sheet ("building 40%", "saving 12/20", "fleet full", "off"). */
@@ -50,11 +50,6 @@ export function allocStateText(row: Readonly<AllocRow>): string {
 export function allocCostText(row: Readonly<AllocRow>): string {
   const r = row.cost.resource;
   return r ? `${row.cost.ore} ore + ${r.amount} ${r.res}` : `${row.cost.ore} ore`;
-}
-
-/** The probe sheet's money line, "Ore 14 unassigned · +36/min". */
-export function incomeText(stockOre: number, incomePerMin: number): string {
-  return `${stockOre} ore spare · +${incomePerMin}/min`;
 }
 
 /** The radar's accessible label: "Allocation: Extractor 3, Hauler 2, Drone 0, Lancer 0, Flak 0". */

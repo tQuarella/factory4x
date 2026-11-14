@@ -80,6 +80,7 @@ interface Rock {
   buffer: number;
   backedUp: boolean;
   slots: number;
+  raidRank: number;
 }
 const rock = async (page: Page, node: number): Promise<Rock> => JSON.parse(await page.evaluate((n) => window.__factory4x!.rockStatus(n), node)) as Rock;
 const inputs = async (page: Page): Promise<Array<Record<string, unknown>>> => JSON.parse(await page.evaluate(() => window.__factory4x!.log())) as Array<Record<string, unknown>>;
@@ -153,6 +154,61 @@ test('acceptance 1: the result panel shows the run and offers New run', async ({
   expect(await page.evaluate(() => window.__factory4x!.tick())).toBeLessThan(60);
 });
 
+test('acceptance 1: taking the hive opens the result panel once, from the real trigger, and New run starts a fresh field', async ({ page }) => {
+  test.setTimeout(120_000);
+  await ready(page, PHONE, false);
+  // A small hive and a rich start, so a drone wave can take it: guards at the least the tuning allows, no raids, room for a big fleet.
+  await tune(page, 'economy.startStock', 200);
+  await tune(page, 'guard.capPct', 25);
+  await tune(page, 'field.fleetCap', 80);
+  await tune(page, 'raid.enabled', 0);
+  await tune(page, 'ship.drone.cost', 5);
+  await tune(page, 'ship.drone.buildTicks', 15);
+  await page.locator('#b-tune').click();
+  await page.locator('#tuning button', { hasText: 'New run…' }).click();
+  await page.locator('.modal .card button', { hasText: 'Yes, new run' }).click();
+  await pause(page);
+  await tapNode(page, 'probe');
+  const sheet = page.locator('#sheet');
+  for (const type of ['extractor', 'hauler']) {
+    const w = Number(await sheet.locator(`.fp-row[data-type="${type}"] .fp-w`).textContent());
+    for (let i = 0; i < w; i++) await tap(page, sheet.locator(`.fp-row[data-type="${type}"] .fp-step`, { hasText: '−' }));
+  }
+  for (let i = 0; i < 5; i++) await tap(page, sheet.locator('.fp-row[data-type="drone"] .fp-step', { hasText: '+' }));
+  await tap(page, sheet.locator('.close'));
+  const captured = async (): Promise<number | null> => (JSON.parse(await page.evaluate(() => window.__factory4x!.fieldSummary())) as { capturedTick: number | null }).capturedTick;
+  await expect(page.locator('#result')).toBeHidden();
+  for (let wave = 0; wave < 8 && (await captured()) === null; wave++) {
+    // Build up drones at the probe, then send them all at the hive.
+    for (let i = 0; i < 60 && (await page.evaluate(() => window.__factory4x!.shipsAt(0))) < 20; i++) await page.evaluate(() => window.__factory4x!.advanceTicks(90));
+    await tapNode(page, 'heart');
+    await tap(page, page.locator('#sheet .send-btn', { hasText: 'Attack with all from Probe' }));
+    await tap(page, page.locator('#sheet .close'));
+    for (let i = 0; i < 80 && (await captured()) === null; i++) await page.evaluate(() => window.__factory4x!.advanceTicks(60));
+  }
+  expect(await captured(), 'the hive fell').not.toBeNull();
+  // The real trigger (refreshUi seeing the capture) opened the panel.
+  const card = page.locator('#result .card');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('The hive has fallen');
+  await expect(card.locator('button', { hasText: 'New run' })).toBeVisible();
+  // Keep playing closes it, and it does not come back while the run goes on.
+  await tap(page, card.locator('button', { hasText: 'Keep playing' }));
+  await expect(page.locator('#result')).toBeHidden();
+  for (let i = 0; i < 5; i++) await page.evaluate(() => window.__factory4x!.advanceTicks(60));
+  await settled(page);
+  await expect(page.locator('#result')).toBeHidden();
+  // The win does not show the campaign's win panel.
+  await expect(page.locator('#win')).toBeHidden();
+  // A new run from the panel's own button: shown again on demand, New run asks, then the field restarts.
+  await page.evaluate(() => window.__factory4x!.debugShowResult());
+  await tap(page, page.locator('#result .card button', { hasText: 'New run' }));
+  await tap(page, page.locator('.modal .card button', { hasText: 'Yes, new run' }));
+  await expect(page.locator('#result')).toBeHidden();
+  expect(await captured()).toBeNull();
+  expect(await page.evaluate(() => window.__factory4x!.tick())).toBeLessThan(60);
+});
+
 test.describe('375x667 portrait, by touch', () => {
   test.use({ viewport: PHONE });
 
@@ -182,6 +238,7 @@ test.describe('375x667 portrait, by touch', () => {
       expect(h).toBeGreaterThanOrEqual(43.5);
     }
     const radarBox = await sheet.locator('canvas.fp-radar').boundingBox();
+    expect(radarBox!.height, 'the radar is the header: its box is no taller than 110 px').toBeLessThanOrEqual(110);
     expect(radarBox!.x).toBeGreaterThanOrEqual(0);
     expect(radarBox!.x + radarBox!.width).toBeLessThanOrEqual(PHONE.width);
     // The radar is display only: a tap on it does nothing.
@@ -212,6 +269,41 @@ test.describe('375x667 portrait, by touch', () => {
     expect(await inputs(page)).toHaveLength(before.length + 2 + max);
   });
 
+  for (const wide of [true, false]) {
+    test(`acceptance 2: with ships parked at the probe, Recycle shown and the longest state lines, the probe sheet never scrolls and the map keeps its room (${wide ? 'wide font' : 'normal font'})`, async ({ page }) => {
+      await ready(page, PHONE, wide);
+      await pause(page);
+      await tapNode(page, 'probe');
+      const sheet = page.locator('#sheet');
+      const plus = (type: string) => sheet.locator(`.fp-row[data-type="${type}"] .fp-step`, { hasText: '+' });
+      // Drones at full weight, Lancer and Flak raised before their pockets are taken: the longest state lines.
+      for (let i = 0; i < 5; i++) await tap(page, plus('drone'));
+      await tap(page, plus('lancer'));
+      await tap(page, plus('flak'));
+      await expect(sheet.locator('.fp-row[data-type="lancer"] .fp-state')).toHaveText('needs crystal pocket');
+      await expect(sheet.locator('.fp-row[data-type="flak"] .fp-state')).toHaveText('needs ice pocket');
+      // Run until warships and economy ships are parked at the probe (the rally point), so Recycle shows.
+      for (let i = 0; i < 40 && !(await sheet.locator('.recycle-btn').isVisible()); i++) await page.evaluate(() => window.__factory4x!.advanceTicks(60));
+      await expect(sheet.locator('.recycle-btn')).toBeVisible();
+      await settled(page);
+      const fit = await page.evaluate(() => {
+        const e = document.getElementById('sheet')!;
+        return { scroll: e.scrollHeight, client: e.clientHeight, stage: document.getElementById('stage')!.clientHeight };
+      });
+      expect(fit.scroll, 'no scrolling in the probe sheet').toBeLessThanOrEqual(fit.client + 1);
+      await expectControlsFit(page, '#sheet', 'the probe sheet controls');
+      if (!wide) expect(fit.stage, 'the map keeps about 200 px behind the probe sheet').toBeGreaterThanOrEqual(195);
+      // The probe and the hive are both on the map, and nothing of the sheet covers them.
+      for (const id of ['probe', 'heart']) {
+        const node = await page.evaluate((i) => window.__factory4x!.nodeIndex(i), id);
+        const p = await page.evaluate((i) => window.__factory4x!.nodeScreenPos(i), node);
+        const sheetTop = await page.evaluate(() => document.getElementById('sheet')!.getBoundingClientRect().top);
+        expect(p.y, `${id} is above the sheet`).toBeLessThan(sheetTop);
+        expect(p.y, `${id} is on the screen`).toBeGreaterThan(0);
+      }
+    });
+  }
+
   test('acceptance 2: each row states what it is doing: off, saving, building, needs crystal, fleet full', async ({ page }) => {
     await ready(page, PHONE);
     await tapNode(page, 'probe');
@@ -221,9 +313,9 @@ test.describe('375x667 portrait, by touch', () => {
     await expect(state('extractor')).toHaveText(/^(saving \d+\/20|building \d+%)$/);
     // A Lancer with a weight but no crystal yet says what it needs.
     await tap(page, sheet.locator('.fp-row[data-type="lancer"] .fp-step', { hasText: '+' }));
-    await expect(state('lancer')).toHaveText('needs crystal: take the crystal pocket');
+    await expect(state('lancer')).toHaveText('needs crystal pocket');
     await tap(page, sheet.locator('.fp-row[data-type="flak"] .fp-step', { hasText: '+' }));
-    await expect(state('flak')).toHaveText('needs ice: take the ice pocket');
+    await expect(state('flak')).toHaveText('needs ice pocket');
     await expect(state('flak')).toHaveCSS('color', 'rgb(255, 210, 122)');
     // The extractor bay builds: its line reads building N% at some point in the first minute.
     await page.evaluate(() => window.__factory4x!.setSpeed(4));
@@ -303,6 +395,40 @@ test.describe('375x667 portrait, by touch', () => {
     expect((await rock(page, a7)).backedUp).toBe(false);
     await tapNode(page, 'a7');
     expect(await sheet.locator('section.rock').evaluate((e) => e.getBoundingClientRect().height)).toBeCloseTo(rec, 0);
+  });
+
+  test('acceptance 3: the raid-rank line shows on the mined rock nearest the hive, not on the others, and not on a Stopped rock', async ({ page }) => {
+    test.setTimeout(120_000);
+    await ready(page, PHONE);
+    await page.evaluate(() => window.__factory4x!.setSpeed(4));
+    const ids = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'];
+    const nodes = await page.evaluate((l) => l.map((i) => window.__factory4x!.nodeIndex(i)), ids);
+    // Raids target a mined rock with an extractor or hauler: wait until two rocks have one.
+    await expect
+      .poll(async () => {
+        let n = 0;
+        for (const i of nodes) if ((await rock(page, i)).raidRank > 0) n++;
+        return n;
+      }, { timeout: 90_000 })
+      .toBeGreaterThanOrEqual(2);
+    await pause(page);
+    const ranks = await Promise.all(nodes.map(async (i) => (await rock(page, i)).raidRank));
+    const first = ids[ranks.indexOf(1)]!;
+    const other = ids[ranks.findIndex((r) => r > 1)]!;
+    expect(first, 'one rock is the first target').toBeDefined();
+    const note = page.locator('#sheet .rock-note');
+    await tapNode(page, first);
+    await expect(note.locator('.rank')).toHaveText('Nearest mined rock to the hive: raids hit here first.');
+    await expect(note).not.toHaveClass(/idle/);
+    await tap(page, page.locator('#sheet .close'));
+    await tapNode(page, other);
+    await expect(note.locator('.rank')).toHaveText('');
+    await tap(page, page.locator('#sheet .close'));
+    // Stop the first rock: it is no longer raidable, so the line goes, and another rock takes rank 1.
+    await tapNode(page, first);
+    await tap(page, page.locator('#sheet .mine-btn'));
+    expect((await rock(page, nodes[ids.indexOf(first)]!)).raidRank).toBe(0);
+    await expect(note.locator('.rank')).toHaveText('');
   });
 
   test('acceptance 5: the map draws the economy: docked extractors, haul lines, idle ships at the probe, and the Mine badge', async ({ page }) => {

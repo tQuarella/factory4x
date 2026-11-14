@@ -3,7 +3,7 @@
  * haulers, buffer, delivered, raid rank). Built once when a node is selected; `update()` refreshes text, bars and enabled states in
  * place, as the other sheets do. Every number comes from `allocStatus` and `rockStatus`.
  */
-import { BUILD_TYPES, allocStatus, econAtByType, fleetStatus, isValidInput, rockStatus, shipCounts, type BuildType, type Input, type SimData, type World } from '@factory4x/sim';
+import { BUILD_TYPES, allocStatus, econAtByType, isValidInput, rockStatus, shipCounts, type BuildType, type Input, type SimData, type World } from '@factory4x/sim';
 import { bar, btn, h, setHidden, setText, toggleClass } from './dom.ts';
 import {
   BACKED_UP_TEXT,
@@ -12,7 +12,6 @@ import {
   allocCostText,
   allocStateText,
   deliveredText,
-  incomeText,
   pipText,
   radarLabel,
 } from './fieldreport.ts';
@@ -27,14 +26,11 @@ export interface FieldSheetHost {
   close(): void;
 }
 
-/** The radar's box, CSS px. Display only. */
-export const RADAR_W = 148;
-export const RADAR_H = 124;
+/** The radar's box, CSS px. Display only. It is the sheet's header, so it is as short as the Rally and Close buttons beside it. */
+export const RADAR_W = 140;
+export const RADAR_H = 104;
 
-/** The five state lines the probe sheet can show, for a test that has to reach each one. */
-export const ROW_SELECTOR = '.fp-row';
-
-/** Probe sheet: returns its per-refresh updaters. */
+/** Probe sheet: builds the radar header and the five weight rows into `root` and pushes its per-refresh updater onto `ups`. */
 export function buildProbeSheet(root: HTMLElement, host: FieldSheetHost, ups: Array<() => void>): void {
   const top = h('div', 'fp-top', '', root);
   const radar = h('canvas', 'fp-radar', '', top);
@@ -44,9 +40,10 @@ export function buildProbeSheet(root: HTMLElement, host: FieldSheetHost, ups: Ar
   h('h2', '', 'Probe', head);
   const closeBtn = btn(head, '✕', () => host.close(), 'close');
   closeBtn.el.setAttribute('aria-label', 'Close');
-  const money = h('div', 'fp-money', '', side);
-  const rally = btn(side, '', () => host.send({ type: 'setRally', node: 0 }), 'rally');
-  const recycle = btn(side, '', () => host.recycle(0), 'recycle-btn');
+  // Rally and Recycle sit side by side under the title, so the header is no taller than the radar. Recycle shows only with ships parked.
+  const actions = h('div', 'fp-actions', '', side);
+  const rally = btn(actions, '', () => host.send({ type: 'setRally', node: 0 }), 'rally');
+  const recycle = btn(actions, '', () => host.recycle(0), 'recycle-btn');
   recycleIcon(recycle.el, 20);
   const recycleLabel = h('span', '', '', recycle.el);
 
@@ -55,8 +52,7 @@ export function buildProbeSheet(root: HTMLElement, host: FieldSheetHost, ups: Ar
     wrap.dataset.type = type;
     buildIcon(wrap, 26, type);
     const text = h('div', 'fp-text', '', wrap);
-    const name = h('b', 'fp-name', BUILD_NAME[type], text);
-    const cost = h('small', 'fp-cost', '', name);
+    h('b', 'fp-name', BUILD_NAME[type], text);
     const state = h('div', 'fp-state', '', text);
     const minus = btn(wrap, '−', () => step(type, -1), 'fp-step');
     minus.el.setAttribute('aria-label', `Less ${BUILD_NAME[type]}`);
@@ -64,7 +60,7 @@ export function buildProbeSheet(root: HTMLElement, host: FieldSheetHost, ups: Ar
     weight.setAttribute('aria-label', `${BUILD_NAME[type]} weight`);
     const plus = btn(wrap, '+', () => step(type, 1), 'fp-step');
     plus.el.setAttribute('aria-label', `More ${BUILD_NAME[type]}`);
-    return { type, wrap, cost, state, minus, weight, plus };
+    return { type, wrap, state, minus, weight, plus };
   });
 
   // Reads the weight when tapped, so a stale tap never overshoots.
@@ -83,7 +79,6 @@ export function buildProbeSheet(root: HTMLElement, host: FieldSheetHost, ups: Ar
       paintRadar(radar, RADAR_W, RADAR_H, st.rows.map((r) => r.weight), st.maxWeight);
       radar.setAttribute('aria-label', radarLabel(st.rows));
     }
-    setText(money, incomeText(st.stockOre, st.incomePerMin));
     const here = w.rally === 0;
     rally.set(here ? 'Rally set' : 'Rally here', !here);
     toggleClass(rally.el, 'on', here);
@@ -92,7 +87,7 @@ export function buildProbeSheet(root: HTMLElement, host: FieldSheetHost, ups: Ar
     setText(recycleLabel, `Recycle… ${parked}`);
     for (const r of rows) {
       const row = st.rows.find((x) => x.type === r.type)!;
-      setText(r.cost, ` ${allocCostText(row)}`);
+      r.wrap.title = `${BUILD_NAME[r.type]}: ${allocCostText(row)}`;
       setText(r.state, allocStateText(row));
       toggleClass(r.state, 'bad', row.state === 'locked' || row.state === 'waitingResource' || row.state === 'fleetFull');
       toggleClass(r.state, 'building', row.state === 'building');
@@ -101,9 +96,6 @@ export function buildProbeSheet(root: HTMLElement, host: FieldSheetHost, ups: Ar
       r.plus.set('+', row.weight < st.maxWeight);
       toggleClass(r.wrap, 'off', row.weight === 0);
     }
-    // The fleet line rides in the money line's tooltip, so the chip and the sheet agree.
-    const f = fleetStatus(w, host.data());
-    money.title = f.cap === null ? '' : `Fleet ${f.count}/${f.cap}`;
   });
 }
 

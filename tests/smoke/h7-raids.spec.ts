@@ -24,7 +24,7 @@ interface Raid {
   last: { outcome: string; lostEcon: { extractor: number; hauler: number } } | null;
 }
 const raid = async (page: Page): Promise<Raid> => JSON.parse(await page.evaluate(() => window.__factory4x!.raidStatus())) as Raid;
-const map = async (page: Page): Promise<{ raid: { pulse: boolean; line: boolean; marker: boolean; raided: number; countdown: string } }> => JSON.parse(await page.evaluate(() => window.__factory4x!.mapField()));
+const map = async (page: Page): Promise<{ raid: { pulse: boolean; line: boolean; marker: boolean; raided: number; countdown: string; from: number; to: number; frac: number } }> => JSON.parse(await page.evaluate(() => window.__factory4x!.mapField()));
 
 /** The boxes that make up the HUD: they must not move or resize when a raid notice, chip state or toast changes. */
 async function hudBoxes(page: Page): Promise<string> {
@@ -137,5 +137,86 @@ test.describe('375x667 portrait, by touch', () => {
     await expect(page.locator('#chip-raid')).toBeVisible();
     await tune(page, 'raid.enabled', 0);
     await expect(page.locator('#chip-raid')).toBeHidden();
+  });
+
+  interface Flight { phase: string; from: number; target: number; ticksLeft: number; flightTicks: number }
+  const flight = async (page: Page): Promise<Flight | null> => JSON.parse(await page.evaluate(() => window.__factory4x!.raidFlight())) as Flight | null;
+  const hiveOf = (page: Page): Promise<number> => page.evaluate(() => window.__factory4x!.nodeIndex('heart'));
+
+  async function openGame(page: Page): Promise<void> {
+    await page.setViewportSize(PHONE);
+    await page.goto('/');
+    await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
+    await page.addStyleTag({ content: WIDE_FONT });
+    await tune(page, 'raid.firstAtEcon', 2);
+    await tune(page, 'raid.musterTicks', 300);
+  }
+
+  test('acceptance 4: a retarget redraws the leg from the rock the raid was flying to, with the progress of the new flight', async ({ page }) => {
+    await openGame(page);
+    const hive = await hiveOf(page);
+    await stepUntil(page, (r) => r.phase === 'out', 5);
+    await page.evaluate(() => window.__factory4x!.advanceTicks(20));
+    await settled(page);
+    const first = (await flight(page))!;
+    expect(first.from, 'the first leg starts at the hive').toBe(hive);
+    const m1 = (await map(page)).raid;
+    expect([m1.from, m1.to], 'the first leg is drawn hive to target').toEqual([hive, first.target]);
+    expect(m1.frac).toBeCloseTo(1 - first.ticksLeft / first.flightTicks, 1);
+    // Stop the rock the raid is flying to (the counterplay the banner invites), through its sheet.
+    const ids = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'];
+    let targetId = '';
+    for (const id of ids) if ((await page.evaluate((i) => window.__factory4x!.nodeIndex(i), id)) === first.target) targetId = id;
+    expect(targetId, 'the target is an asteroid').not.toBe('');
+    const node = first.target;
+    await settled(page);
+    const p = await page.evaluate((i) => window.__factory4x!.nodeScreenPos(i), node);
+    if (test.info().project.name === 'phone') await page.touchscreen.tap(p.x, p.y);
+    else await page.mouse.click(p.x, p.y);
+    expect(await page.evaluate(() => window.__factory4x!.selected())).toBe(node);
+    await page.locator('#sheet .mine-btn').click();
+    await page.locator('#sheet .close').click();
+    // The raid arrives, finds the rock unmarked and flies on from it: the new leg starts at the old target.
+    for (let t = 0; t < 600; t += 3) {
+      const f = await flight(page);
+      if (f === null || f.from !== hive) break;
+      await page.evaluate(() => window.__factory4x!.advanceTicks(3));
+    }
+    const second = await flight(page);
+    expect(second, 'the raid is still on').not.toBeNull();
+    expect(second!.from, 'the new leg starts at the rock it was flying to').toBe(first.target);
+    await page.evaluate(() => window.__factory4x!.advanceTicks(4));
+    await settled(page);
+    const f2 = (await flight(page))!;
+    const m2 = (await map(page)).raid;
+    expect(m2.from).toBe(first.target);
+    expect(m2.to).toBe(f2.phase === 'home' ? hive : f2.target);
+    expect(f2.target === first.target ? true : f2.phase === 'out' || f2.phase === 'home').toBe(true);
+    expect(m2.marker).toBe(true);
+    expect(m2.frac, 'progress comes from the new flight').toBeCloseTo(1 - f2.ticksLeft / f2.flightTicks, 1);
+    expect(m2.frac).toBeLessThan(0.6);
+  });
+
+  test('acceptance 4: a run resumed mid-flight draws the marker where the raid is, not at the hive', async ({ page }) => {
+    await openGame(page);
+    await stepUntil(page, (r) => r.phase === 'out', 5);
+    let f = (await flight(page))!;
+    while (f.ticksLeft > f.flightTicks / 2) {
+      await page.evaluate(() => window.__factory4x!.advanceTicks(5));
+      f = (await flight(page))!;
+    }
+    expect(f.phase).toBe('out');
+    expect(await page.evaluate(() => window.__factory4x!.saveNow())).toBe(true);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
+    await page.evaluate(() => window.__factory4x!.advanceTicks(0));
+    await settled(page);
+    const g = (await flight(page))!;
+    expect(g.ticksLeft).toBe(f.ticksLeft);
+    const m = (await map(page)).raid;
+    expect(m.marker).toBe(true);
+    expect(m.frac, 'half way along its leg').toBeGreaterThan(0.45);
+    expect(m.frac).toBeCloseTo(1 - g.ticksLeft / g.flightTicks, 1);
+    expect(m.from).toBe(g.from);
   });
 });

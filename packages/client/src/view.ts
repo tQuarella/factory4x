@@ -113,13 +113,11 @@ export class MapView {
     haul: new Map<number, number>(),
     econ: { docked: 0, idle: 0, waiting: 0, moving: 0 },
     /** H7 raids: what the last frame drew (the muster pulse, the dashed line and marker, the rock under raid, the countdown text). */
-    raid: { pulse: false, line: false, marker: false, raided: -1, countdown: '' },
+    raid: { pulse: false, line: false, marker: false, raided: -1, countdown: '', from: -1, to: -1, frac: -1 },
   };
-  /** The flight a raid is on, for the marker's position: the longest `ticksLeft` seen in this phase is its length. */
-  private flight = { id: -1, phase: '', total: 1 };
 
   /** H7 test hook: what the last frame drew for the economy (Mine badges, haul lines, hulls docked, idle at the probe, waiting, moving). */
-  drawnField(): { mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number }; raid: { pulse: boolean; line: boolean; marker: boolean; raided: number; countdown: string } } {
+  drawnField(): { mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number }; raid: { pulse: boolean; line: boolean; marker: boolean; raided: number; countdown: string; from: number; to: number; frac: number } } {
     return { mine: [...this.drawn.mine], haul: [...this.drawn.haul], econ: { ...this.drawn.econ }, raid: { ...this.drawn.raid } };
   }
 
@@ -206,7 +204,7 @@ export class MapView {
     this.drawn.mine.clear();
     this.drawn.haul.clear();
     this.drawn.econ = { docked: 0, idle: 0, waiting: 0, moving: 0 };
-    this.drawn.raid = { pulse: false, line: false, marker: false, raided: -1, countdown: '' };
+    this.drawn.raid = { pulse: false, line: false, marker: false, raided: -1, countdown: '', from: -1, to: -1, frac: -1 };
     ctx.fillStyle = palette.space;
     ctx.fillRect(0, 0, w, h);
     for (const st of this.stars) {
@@ -499,25 +497,30 @@ export class MapView {
       ctx.restore();
       return;
     }
+    // Each leg runs from `raid.from` to its end (the target going out, the hive going home); progress is 1 - ticksLeft / flightTicks.
+    const origin = world.nodes[raid.from] ?? hive;
+    const [fromNode, toNode] = raid.phase === 'home' ? [origin, hive] : [origin, target];
+    const a = this.nodePos(fromNode.index);
+    const b = this.nodePos(toNode.index);
     const tp = this.nodePos(target.index);
-    // The flight's length: the longest ticksLeft seen since this phase began.
-    if (this.flight.id !== raid.id || this.flight.phase !== raid.phase) this.flight = { id: raid.id, phase: raid.phase, total: Math.max(1, raid.ticksLeft) };
-    else if (raid.ticksLeft > this.flight.total) this.flight.total = raid.ticksLeft;
     ctx.save();
     ctx.strokeStyle = palette.mob;
     ctx.globalAlpha = 0.75;
     ctx.lineWidth = 2;
     ctx.setLineDash([7, 6]);
     ctx.beginPath();
-    ctx.moveTo(hp.x, hp.y);
-    ctx.lineTo(tp.x, tp.y);
+    // The dashed line is the leg being flown; at the target it joins the hive to the rock.
+    const [l0, l1] = raid.phase === 'fight' ? [hp, tp] : [a, b];
+    ctx.moveTo(l0.x, l0.y);
+    ctx.lineTo(l1.x, l1.y);
     ctx.stroke();
     ctx.restore();
     this.drawn.raid.line = true;
+    this.drawn.raid.from = l0 === hp ? hive.index : fromNode.index;
+    this.drawn.raid.to = raid.phase === 'fight' ? target.index : toNode.index;
     if (raid.phase === 'fight') return;
-    // Out: hive to target. Home: target to hive. Frac 0 at the start of the leg.
-    const f = progressFrac(raid.ticksLeft, this.flight.total, alpha);
-    const [a, b] = raid.phase === 'out' ? [hp, tp] : [tp, hp];
+    const f = progressFrac(raid.ticksLeft, Math.max(1, raid.flightTicks), alpha);
+    this.drawn.raid.frac = Math.round(f * 1000) / 1000;
     const x = lerp(a.x, b.x, f);
     const y = lerp(a.y, b.y, f);
     const mix = { thorn: 0, spore: 0 };

@@ -94,6 +94,8 @@ interface Window {
     econShips(): string;
     /** raidStatus as JSON text (field mode). */
     raidStatus(): string;
+    /** The raid's flight state as JSON text ({phase, from, target, ticksLeft, flightTicks}), or "null" (tests). */
+    raidFlight(): string;
     /** Pauses and steps exactly n ticks, then refreshes the screen (tests). */
     advanceTicks(n: number): void;
     /** The session's input log (inputs only), as JSON text. */

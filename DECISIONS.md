@@ -977,3 +977,15 @@ Flight to each rock at `raid.speedSu` 3 (ticks): a5 144, a6 and a7 178, p1 and p
 7. **Silhouette check.** The first extractor and hauler shapes overlapped 0.83 at 24 px, so they were redrawn (small spiked extractor, big boxed hauler) until the gallery's mask overlap was under 0.75 against each other, the warships and a rock.
 8. **Test hooks added:** `isField`, `allocStatus`, `rockStatus`, `fieldSummary`, `econShips`, `log`, `setSpeed`, `mapField`, `raidStatus`, `advanceTicks`, `newRun`.
 
+## 2026-11-14 · Engineer · h7-client round 1 fixes: the probe sheet layout, the raid leg
+
+**Probe sheet layout (review finding 1; Director: don't just squeeze it).** The radar is the header (140x104), with the title, the close button and a Rally / Recycle pair of 44 px buttons beside it, side by side, so Recycle showing adds no height. Under it five rows of one name line and one state line, 46 px tall: icon, name and state, then − weight +. Changes from round 0:
+- the money line is gone (the top bar's ore chip and ore/min already say it);
+- the cost moved from the name line to the row's tooltip, and the state line carries what matters ("saving 12/20", "needs 4 crystal");
+- the locked lines are shorter: "needs crystal pocket" and "needs ice pocket" (the spec's "take the crystal pocket" was three lines under the wide font). The pockets are drawn with their prize icons on the map.
+Result at 375x667: no scrolling with Recycle shown and the longest lines, normal and wide font (smoke, both fonts); with the normal font the map keeps 195+ px behind the sheet (smoke asserts it, and that the probe and the hive sit above the sheet). The sheet is still in flow with a 62% cap. During a raid the banner takes 44 px more from the map; that stays a handoff question.
+
+**Raid leg (finding 2).** `drawRaid` draws each leg from `raid.from` to its end (the target going out, the hive going home), progress `1 - ticksLeft / flightTicks`, and the client-side flight guess is gone. The sim already exposes both fields on `world.raid`, but `raidStatus` doesn't. The client reads `world.raid` directly for the map. It would be tidier if `raidStatus` carried `from` and `flightTicks` (Can wait for core). Tested: a retarget (the new leg starts at the old target) and a resume mid-flight (marker at the right point).
+
+**Other tests added:** unit tests for every raid text (`raidChipText` in all states, `raidEndText` for each outcome and loss kind, `raidMixText`, `raidMusterLine`), the rock sheet's raid-rank line (shown on rank 1, absent elsewhere and after Stop), and a real hive capture that opens the result panel once from the real trigger (tuned for a small hive and cheap fast drones; the run is stepped with `advanceTicks`). Removed `ROW_SELECTOR` and `incomeText`; fixed the `buildProbeSheet` comment.
+

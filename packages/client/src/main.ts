@@ -716,6 +716,10 @@ window.__factory4x = {
   fieldSummary: () => JSON.stringify(fieldSummary(app.session.world)),
   econShips: () => JSON.stringify((app.session.world.field?.econ ?? []).map((e) => ({ id: e.id, type: e.type, at: e.at, target: e.target, moving: e.transit !== null }))),
   raidStatus: () => JSON.stringify(raidStatus(app.session.world)),
+  raidFlight: () => {
+    const r = app.session.world.raid;
+    return JSON.stringify(r === null ? null : { phase: r.phase, from: r.from, target: r.target, ticksLeft: r.ticksLeft, flightTicks: r.flightTicks });
+  },
   advanceTicks: (n) => {
     // Test hook: pauses, then steps exactly n ticks (so a raid's short phases can be looked at one by one).
     app.session.paused = true;

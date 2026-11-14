@@ -28,9 +28,15 @@ import {
   fieldFleetFullNotice,
   fieldUnlockNotice,
   hiveTimeText,
-  incomeText,
   pipText,
   radarLabel,
+  raidChipText,
+  raidEndText,
+  raidFightLine,
+  raidMixText,
+  raidMusterLine,
+  clockText,
+  secsText,
   raidsText,
   typesText,
 } from '../src/fieldreport.ts';
@@ -145,8 +151,8 @@ describe('acceptance 2: the probe sheet text, one line for each allocStatus stat
     expect(allocStateText(row({ state: 'filling', share: 12 }))).toBe('saving 12/20');
     expect(allocStateText(row({ state: 'fleetFull' }))).toBe('fleet full');
     expect(allocStateText(row({ state: 'off', weight: 0 }))).toBe('off');
-    expect(allocStateText(row({ type: 'lancer', state: 'locked' }))).toBe('needs crystal: take the crystal pocket');
-    expect(allocStateText(row({ type: 'flak', state: 'locked' }))).toBe('needs ice: take the ice pocket');
+    expect(allocStateText(row({ type: 'lancer', state: 'locked' }))).toBe('needs crystal pocket');
+    expect(allocStateText(row({ type: 'flak', state: 'locked' }))).toBe('needs ice pocket');
     expect(allocStateText(row({ type: 'lancer', state: 'waitingResource', cost: { ore: 18, resource: { res: 'crystal', amount: 4 } } }))).toBe('needs 4 crystal');
   });
   it('the text covers every state the sim can report', () => {
@@ -172,11 +178,10 @@ describe('acceptance 2: the probe sheet text, one line for each allocStatus stat
     expect(allocCostText(lancer)).toBe(`${w.tun['ship.lancer.cost']} ore + ${w.tun['ship.lancer.crystal']} crystal`);
     expect(allocCostText(allocStatus(w, data).rows[0]!)).toBe(`${w.tun['ship.extractor.cost']} ore`);
   });
-  it('the radar label and the money line come from the status', () => {
+  it('the radar label comes from the status', () => {
     const w = createWorld(1, data);
     const st = allocStatus(w, data);
     expect(radarLabel(st.rows)).toBe('Allocation: Extractor 3, Hauler 2, Drone 0, Lancer 0, Flak 0');
-    expect(incomeText(st.stockOre, st.incomePerMin)).toBe(`${st.stockOre} ore spare · +${st.incomePerMin}/min`);
   });
   it('names: every build type has a name', () => {
     for (const t of BUILD_TYPES) expect(BUILD_NAME[t].length).toBeGreaterThan(0);
@@ -240,5 +245,62 @@ describe('notices in a field run', () => {
   });
   it('a recycle notice names economy ships', () => {
     expect(recycleNotice({ drone: 1, lancer: 0, flak: 0, extractor: 2, hauler: 1 }, 40)).toBe('Recycled 1 drone, 2 extractors, 1 hauler: +40 ore.');
+  });
+});
+
+describe('acceptance 4: raid text (the chip in each state, the muster line, the three end toasts and the withered one)', () => {
+  const chip = {
+    enabled: true,
+    phase: 'none' as 'none' | 'muster' | 'out' | 'fight' | 'home',
+    econ: 3,
+    nextRaidAtEcon: 6,
+    ticksToLaunch: 0,
+    ticksToArrival: 0,
+    ticksToNextAllowed: 0,
+  };
+  it('the chip: off is null, then each state reads its own text', () => {
+    expect(raidChipText({ ...chip, enabled: false }, 30)).toBeNull();
+    expect(raidChipText({ ...chip, enabled: false, phase: 'out' }, 30)).toBeNull();
+    expect(raidChipText(chip, 30)).toBe('Raids at 6 ships');
+    expect(raidChipText({ ...chip, econ: 8, ticksToNextAllowed: 1350 }, 30)).toBe('Next raid 0:45');
+    expect(raidChipText({ ...chip, econ: 8 }, 30)).toBe('Raids ready');
+    expect(raidChipText({ ...chip, econ: 8, phase: 'muster', ticksToLaunch: 450 }, 30)).toBe('Raid 0:15');
+    expect(raidChipText({ ...chip, econ: 8, phase: 'out', ticksToArrival: 143 }, 30)).toBe('Raid 0:05');
+    expect(raidChipText({ ...chip, econ: 8, phase: 'fight' }, 30)).toBe('Raid on');
+    expect(raidChipText({ ...chip, econ: 8, phase: 'home', ticksToArrival: 100 }, 30)).toBe('Raid leaving');
+  });
+  it('the clocks round up and carry minutes', () => {
+    expect(clockText(1, 30)).toBe('0:01');
+    expect(clockText(1800, 30)).toBe('1:00');
+    expect(clockText(1861, 30)).toBe('1:03');
+    expect(secsText(450, 30)).toBe('15 s');
+    expect(secsText(451, 30)).toBe('16 s');
+  });
+  it('the mix puts the larger type first, with singular and plural', () => {
+    expect(raidMixText({ thorn: 1, spore: 4 })).toBe('4 Spores, 1 Thorn');
+    expect(raidMixText({ thorn: 3, spore: 1 })).toBe('3 Thorns, 1 Spore');
+    expect(raidMixText({ thorn: 1, spore: 1 })).toBe('1 Spore, 1 Thorn');
+    expect(raidMixText({ thorn: 0, spore: 2 })).toBe('2 Spores');
+    expect(raidMixText({ thorn: 1, spore: 0 })).toBe('1 Thorn');
+    expect(raidMixText({ thorn: 0, spore: 0 })).toBe('nothing');
+  });
+  it('the muster and fight lines', () => {
+    expect(raidMusterLine({ thorn: 1, spore: 4 }, 'A5', 450, 30)).toBe('Raid gathering: 4 Spores, 1 Thorn → A5 in 15 s');
+    expect(raidFightLine('A5', 3)).toBe('Raid at A5: 3 left');
+  });
+  const none = { lostEcon: { extractor: 0, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 } };
+  it('beaten: kills and losses, whatever was lost (a raid whose last raider dies is beaten)', () => {
+    expect(raidEndText({ ...none, outcome: 'beaten', killed: { thorn: 2, spore: 3 } }, 'A5')).toBe('Raid beaten at A5: 5 killed, 0 lost');
+    expect(raidEndText({ ...none, outcome: 'beaten', killed: { thorn: 1, spore: 1 }, lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 2, lancer: 0, flak: 0 } }, 'A1')).toBe('Raid beaten at A1: 2 killed, 3 lost');
+  });
+  it('hit: each loss kind, singular and plural, in a fixed order', () => {
+    expect(raidEndText({ ...none, outcome: 'hit', lostEcon: { extractor: 2, hauler: 1 } }, 'A5')).toBe('Raid hit A5: lost 2 extractors, 1 hauler');
+    expect(raidEndText({ ...none, outcome: 'hit', lostEcon: { extractor: 1, hauler: 3 } }, 'A5')).toBe('Raid hit A5: lost 1 extractor, 3 haulers');
+    expect(raidEndText({ ...none, outcome: 'hit', lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 1, lancer: 2, flak: 1 } }, 'P2')).toBe('Raid hit P2: lost 1 extractor, 1 drone, 2 lancers, 1 flak');
+    expect(raidEndText({ ...none, outcome: 'hit', lostShips: { drone: 4, lancer: 0, flak: 0 } }, 'A3')).toBe('Raid hit A3: lost 4 drones');
+  });
+  it('turned back and withered', () => {
+    expect(raidEndText({ ...none, outcome: 'turnedBack' }, 'A5')).toBe('Raid turned back');
+    expect(raidEndText({ ...none, outcome: 'withered' }, 'A5')).toBe('The raid withers with the hive.');
   });
 });
