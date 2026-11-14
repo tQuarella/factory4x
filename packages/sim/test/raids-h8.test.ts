@@ -243,10 +243,10 @@ describe('H10: haulers hold', () => {
     return { w, h };
   }
 
-  it('at the probe, the hauler stays and keeps its assignment while the raid is out, fighting and flying home', () => {
+  it('at the probe, the hauler stays and keeps its assignment while the raid is out and fighting', () => {
     const { w, h } = holdWorld(1, 3);
     const r = forceRaid(w, { thorn: 0, spore: 2 }, F.a5, 'out');
-    for (const phase of ['out', 'fight', 'home'] as const) {
+    for (const phase of ['out', 'fight'] as const) {
       r.phase = phase;
       steps(w, 3);
       expect(h.at).toBe(PROBE);
@@ -327,15 +327,23 @@ describe('H10: haulers hold', () => {
     expect(h.transit).toMatchObject({ from: F.a5, to: PROBE });
   });
 
-  it('haulers resume when the raid ends, whatever the outcome (beaten, hit, turned back), and when it withers', () => {
+  it('the hold ends on the tick the outcome is decided: beaten and withered (the raid ends), hit and turned back (the raiders leave the target, still flying home)', () => {
     const cases: Array<[string, (w: World) => void]> = [
-      ['turnedBack', (w) => forceRaid(w, { thorn: 0, spore: 2 }, F.a5, 'home').ticksLeft = 1],
+      [
+        'turnedBack',
+        (w) => {
+          // Nothing of the player's is left at a5 when the round comes: the raiders leave for home with no kill.
+          w.field!.econ = w.field!.econ.filter((s) => s.type === 'hauler');
+          syncExtractors(w);
+          forceRaid(w, { thorn: 0, spore: 2 }, F.a5, 'fight');
+        },
+      ],
       [
         'hit',
         (w) => {
-          const r = forceRaid(w, { thorn: 0, spore: 2 }, F.a5, 'home');
-          r.ticksLeft = 1;
-          r.lostEcon.hauler = 1;
+          w.field!.econ = w.field!.econ.filter((s) => s.type === 'hauler');
+          syncExtractors(w);
+          forceRaid(w, { thorn: 0, spore: 2 }, F.a5, 'fight').lostEcon.extractor = 1;
         },
       ],
       [
@@ -345,7 +353,6 @@ describe('H10: haulers hold', () => {
           w.tun['ship.drone.damage'] = 20;
           w.tun['guard.spore.damage'] = 0;
           forceRaid(w, { thorn: 0, spore: 1 }, F.a5, 'fight');
-          w.tick = Math.ceil(w.tick / 30) * 30;
         },
       ],
       ['withered', (w) => forceRaid(w, { thorn: 0, spore: 2 }, F.a5, 'out')],
@@ -353,17 +360,45 @@ describe('H10: haulers hold', () => {
     for (const [outcome, setup] of cases) {
       const { w, h } = holdWorld(1, 3);
       setup(w);
-      steps(w, 1);
+      const leaving = outcome === 'turnedBack' || outcome === 'hit';
       if (outcome === 'withered') {
+        steps(w, 1);
         expect(haulersHeld(w, F.a5)).toBe(true);
         raidWither(w);
+      } else {
+        // Held until the round that decides the outcome, then not: stepped one tick at a time.
+        let n = 0;
+        while (haulersHeld(w, F.a5)) {
+          expect(n++, outcome).toBeLessThan(60);
+          steps(w, 1);
+        }
       }
-      expect(w.raid, outcome).toBeNull();
-      if (outcome !== 'withered') expect(w.lastRaid?.outcome, outcome).toBe(outcome);
       expect(haulersHeld(w, F.a5), outcome).toBe(false);
-      steps(w, 1);
-      expect(h.transit, outcome).toMatchObject({ from: PROBE, to: F.a5 });
+      if (leaving) {
+        expect(w.raid?.phase, outcome).toBe('home'); // the raiders are still flying: the hold did not wait for them
+        expect(w.lastRaid, outcome).toBeNull();
+      } else {
+        expect(w.raid, outcome).toBeNull();
+        if (outcome === 'beaten') expect(w.lastRaid?.outcome).toBe('beaten');
+      }
+      if (!leaving) {
+        steps(w, 1);
+        expect(h.transit, outcome).toMatchObject({ from: PROBE, to: F.a5 });
+      }
     }
+  });
+
+  it('flying home, the raiders no longer hold anything: a hauler at the probe leaves for the target the tick after the raid turns for home', () => {
+    const { w, h } = holdWorld(1, 3);
+    const r = forceRaid(w, { thorn: 0, spore: 2 }, F.a5, 'fight');
+    r.phase = 'home';
+    r.ticksLeft = 50;
+    expect(haulersHeld(w, F.a5)).toBe(false);
+    expect(rockStatus(w, F.a5)).toMatchObject({ raidTarget: true, haulersHeld: false });
+    expect(raidStatus(w).holding).toBe(0);
+    steps(w, 1);
+    expect(h.transit).toMatchObject({ from: PROBE, to: F.a5 });
+    expect(w.raid).toBe(r);
   });
 
   it('the target stays mined: its extractor stays docked, its haulers stay assigned, and the raid target is unchanged during the hold', () => {
@@ -435,7 +470,7 @@ describe('rockStatus.raidTarget, rockStatus.haulersHeld and raidStatus.holding a
     expect(raidStatus(w).holding).toBe(0);
   });
 
-  it('out, fight and home: flagged and held; holding counts the haulers waiting at the probe for the target (not others, not those flying)', () => {
+  it('out and fight: flagged and held; home: flagged only; holding counts the haulers waiting at the probe for the target (not others, not those flying)', () => {
     const w = world(1, 1);
     addEcon(w, 'hauler', PROBE, F.a5);
     addEcon(w, 'hauler', PROBE, F.a5);
@@ -443,12 +478,15 @@ describe('rockStatus.raidTarget, rockStatus.haulersHeld and raidStatus.holding a
     const flying = addEcon(w, 'hauler', PROBE, F.a5);
     startTransit(w, flying, F.a5, w.tun['ship.hauler.speedSu']);
     const r = forceRaid(w, { thorn: 0, spore: 2 }, F.a5, 'out');
-    for (const phase of ['out', 'fight', 'home'] as const) {
+    for (const phase of ['out', 'fight'] as const) {
       r.phase = phase;
       expect(rockStatus(w, F.a5), phase).toMatchObject({ raidTarget: true, haulersHeld: true });
       expect(rockStatus(w, F.a3), phase).toMatchObject({ raidTarget: false, haulersHeld: false });
       expect(raidStatus(w).holding, phase).toBe(2);
     }
+    r.phase = 'home';
+    expect(rockStatus(w, F.a5)).toMatchObject({ raidTarget: true, haulersHeld: false });
+    expect(raidStatus(w).holding).toBe(0);
   });
 
   it('after the raid ends: all false and holding 0; with raid.haulersHold 0: flagged but never held', () => {

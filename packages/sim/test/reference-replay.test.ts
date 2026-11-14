@@ -174,7 +174,10 @@ describe('reference replay (field mode)', () => {
     const rr = w.raid;
     const departed = f.econ.filter((s) => s.type === 'hauler' && s.transit !== null && s.transit.from === PROBE && s.transit.to === 8 && s.transit.ticksLeft + 1 === s.transit.totalTicks).length;
     if (rr !== null && rr.id === 1 && rockStatus(w, 8).haulersHeld) raid1HeldTicks++;
-    if (rr !== null && rr.id === 2 && rr.phase !== 'muster') {
+    if (rr !== null && rr.id === 2 && rr.phase === 'home') {
+      if (raid2End < 0) raid2End = t; // the outcome is decided: the raiders left p1 this tick (the hold ended)
+      if (t <= raid2End + 5) departuresAfter.push(...Array<number>(departed).fill(t));
+    } else if (rr !== null && rr.id === 2 && rr.phase !== 'muster') {
       heldDepartures.push(...Array<number>(departed).fill(t));
       holdingPeak = Math.max(holdingPeak, raidStatus(w).holding);
       raid2Held++;
@@ -187,9 +190,6 @@ describe('reference replay (field mode)', () => {
           extractorsAtP1: rockStatus(w, 8).docked,
         });
       }
-    } else if (rr === null && w.lastRaid !== null && w.lastRaid.id === 2) {
-      if (raid2End < 0) raid2End = t;
-      if (t <= raid2End + 5) departuresAfter.push(...Array<number>(departed).fill(t));
     }
     if (inputs.some((i) => i.type === 'recycleShips' && i.node === 2)) recycle = { tick: t, econBefore, econAfter: f.econ.length, refund: w.stats.oreRefunded - refundBefore };
   }
@@ -296,7 +296,7 @@ describe('reference replay (field mode)', () => {
     expect(rounds[1]).toEqual({ tick: 4320, warships: 0, lostShips: 1, lostEcon: 1, extractorsAtP1: 0 });
   });
 
-  it('H10: from launch to the end of raid 2, no hauler leaves the probe for p1 while some wait there (the partial load at the node is in raids-h8.test.ts)', () => {
+  it('H10: from launch to the outcome of raid 2, no hauler leaves the probe for p1 while some wait there (the partial load at the node is in raids-h8.test.ts)', () => {
     expect(raid2Held).toBeGreaterThan(300);
     expect(holdingPeak).toBeGreaterThan(0);
     expect(heldDepartures).toEqual([]);
@@ -304,9 +304,9 @@ describe('reference replay (field mode)', () => {
     expect(raid1HeldTicks).toBeGreaterThan(0);
   });
 
-  it('H10: the haulers resume at once when raid 2 ends (hit): they leave the probe within a tick of the end', () => {
+  it('H10: the haulers resume at once when the outcome of raid 2 is decided (it leaves p1 for home, tick 4350, 215 ticks before it lands): they leave the probe within a tick of that', () => {
     expect(raid2End).toBeGreaterThan(0);
-    expect(w.lastRaid).not.toBeNull();
+    expect(raid2End).toBe(4350);
     expect(departuresAfter.length).toBeGreaterThan(0);
     expect(Math.min(...departuresAfter)).toBeLessThanOrEqual(raid2End + 1);
   });
@@ -394,7 +394,7 @@ describe('reference replay (field mode)', () => {
     const atA4 = picks.filter((p) => nodeId(p.to) === 'a4');
     expect(atA4.length).toBeGreaterThan(0);
     const first = atA4[0]!;
-    expect([first.tick, first.staffed, first.haulable]).toEqual([8750, true, false]);
+    expect([first.tick, first.staffed, first.haulable]).toEqual([8720, true, false]);
     const dock = firstDockAt[4]!;
     expect(dock).toBeGreaterThan(first.tick);
     const waited = waits.filter((x) => x.id === first.id && nodeId(x.node) === 'a4');
@@ -402,8 +402,7 @@ describe('reference replay (field mode)', () => {
     // It waited the whole time from its arrival to the dock, without leaving.
     expect(waited[waited.length - 1]!.tick).toBe(dock - 1);
     expect(waited.length).toBe(dock - waited[0]!.tick);
-    // The first load at a4 is by whichever waiting hauler F6 reaches first (id order), not necessarily the first one picked.
-    const load = loads.find((l) => nodeId(l.node) === 'a4')!;
+    const load = loads.find((l) => l.id === first.id && nodeId(l.node) === 'a4')!;
     expect(load.tick).toBeGreaterThan(dock);
     expect(load.cargo).toBe(2);
   });

@@ -1409,3 +1409,10 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 
 **Decision:** haulers held by H10 resume as soon as the raid's outcome is decided (beaten, hit, turned back or withered), not when `world.raid` goes null after the raiders fly home. DESIGN.md H10 amended; h8-raids makes the change before it is merged into the stack.
 **Why:** the Critic noted haulers sit at the probe through the raiders' flight home. The rock is no longer under attack then, and idle haulers are exactly what the owner called "rough" in the build-20261114-1 playtest.
+
+## 2026-11-14 · Faction AI · h8-raids: the hold ends at the outcome (Director's change)
+
+**What changed:** `haulersHeld` is true only in raid phases `out` and `fight`. It ends on the tick the outcome is decided: beaten (the last raider dies), hit or turned back (the raiders leave the target for home, `goHome`), or withered. The raiders' flight home no longer holds anyone. This replaces call 1 of the h8-raids entry above ("the hold lasts through `home`"), and `raidStatus.holding` and `rockStatus.haulersHeld` are 0 and false in `home`. `rockStatus.raidTarget` is unchanged (true until the raid ends).
+**Tests:** `raids-h8.test.ts` (hold ends at the decision for each outcome with the raiders still flying home for hit and turned back; a hauler leaves the tick after the raid turns for home; selectors in `home`). Replay: raid 2's outcome is decided at tick 4350 (it leaves p1 for home; it lands at 4565), and p1's haulers leave the probe within a tick of 4350.
+**Replay re-baseline:** with the shorter hold the first hauler pick for a4 is back at 8720 and the first picked hauler loads first, so h8-sim's two original assertions are restored exactly (call 6's 8750 and the "first load by any hauler" edit are reverted). The 8440 Flak recycle stays.
+**Determinism:** `Determinism PASS: 30 checkpoints over 9000 ticks, final cdbdea56` (was f9325835). Gates all green; flag 2 still "greedy first hit killed 2" on three seeds.

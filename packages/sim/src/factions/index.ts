@@ -406,12 +406,12 @@ export function raidWither(world: World): void {
  * hauler at its node (true: it loads min(buffer, cargo) and leaves at once); a hauler flying out finishes its leg
  * and is then asked at the node. `rockStatus.haulersHeld` reads it too.
  *
- * True from launch (phase `out`) through the fight and the flight home, for the raid's current target (R6's retarget
- * moves it), when raid.haulersHold is 1. Not during the muster, and false once the raid ends, whatever the outcome.
+ * True from launch (phase `out`) through the fight, for the raid's current target (R6's retarget
+ * moves it), when raid.haulersHold is 1. Not during the muster, and false from the tick the outcome is decided (the raid leaves the target for home, or ends), whatever the outcome.
  */
 export function haulersHeld(world: Readonly<World>, node: number): boolean {
   const r = world.raid;
-  return r !== null && r.phase !== 'muster' && r.target === node && world.tun['raid.haulersHold'] === 1;
+  return r !== null && (r.phase === 'out' || r.phase === 'fight') && r.target === node && world.tun['raid.haulersHold'] === 1;
 }
 
 /** `rockStatus.raidTarget`: true from the raid's muster to its end, for the node it targets (R5/R6). */

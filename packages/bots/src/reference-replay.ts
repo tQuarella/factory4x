@@ -54,8 +54,8 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - 4100: one Drone goes from p2 to p1 (arrives 4169), a lone defender for raid 2. 4250: the raiders' damage is raised
  *     to 6 each (back to 1 at 4330), so their first round (4290) kills the Drone with overflow to spare. The shield
  *     (H9) loses the overflow: p1's docked extractor survives round 1 and dies in round 2 (4320), when no warship stands.
- *   - Raid 2's haulers are held (H10) from its launch (4049) to its end (4565): the ones assigned to p1 wait at the probe
- *     and leave the tick after it ends. Raid 1 held them at p1 too.
+ *   - Raid 2's haulers are held (H10) from its launch (4049) to the tick its outcome is decided (4350, when it leaves p1 for home;
+ *     it lands at 4565): the ones assigned to p1 wait at the probe and leave the tick after. Raid 1 held them at p1 too.
  *   - 8440: recycleShips of one Flak at p1. The Drone's fall at 4290 freed a place in the fleet limit that the Flak weight
  *     filled, so p1 held two Flak by 8450 and the 1-ship fallback below would not have been exercised.
  *
