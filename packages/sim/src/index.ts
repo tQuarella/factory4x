@@ -225,7 +225,11 @@
  *                                   node and picks again. H4: the Hauler is eligible in F2 (and its bay starts) only while
  *                                   haulerShortfall > 0 (Σ max(0, target − assigned) − idle haulers − a hauler in the bay).
  *                                   hauler.autoNeed 0 is H7's F6 exactly.
- *   haulerNeed / haulerTarget / isHaulable(world, node), haulerShortfall(world)   the H1–H4 numbers.
+ *   H1 amendment                    the need, target, shortfall, pick and bay use STAFFED nodes: Mine-marked and haulable,
+ *                                   or with an extractor counted by staffCounts (ships bound there, docked or flying in,
+ *                                   plus the committed ones: the bay's and a full share's, at F5's next pick). yieldPerMin
+ *                                   counts them plus free extractors. A hauler at a staffed node not yet worked waits.
+ *   haulerNeed / haulerTarget / isHaulable / isStaffed(world, node), haulerShortfall(world)   the H1–H4 numbers.
  *   haulersHeld(world, node)        H10 hook in src/factions (h8-raids implements it; false until then): runHaulers keeps
  *                                   a held node's haulers at the probe and sends one at the node home with what is there.
  *   Inputs (field, H8)              moveShips{from, to, part: 'all' | 'split'}: the warships at `from` (all, or per type
@@ -293,6 +297,7 @@ export {
   haulerShortfall,
   haulerTarget,
   isHaulable,
+  isStaffed,
   isMarkable,
   isMineable,
   isTypeUnlocked,

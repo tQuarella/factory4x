@@ -135,3 +135,26 @@ describe('haulerSet in the field state (saved)', () => {
     expect(deserializeWorld(serializeWorld(w), fixtureV14)).toMatchObject({ ok: false, reason: 'dataVersion' });
   });
 });
+
+describe('the opening on shipped data (H1 amendment): what any calibration must keep', () => {
+  it('with no inputs, staffing by need builds the first hauler no later than H7 plus a build, delivers first no later than H7, and delivers at least as much by minutes 1, 2 and 3', () => {
+    const run = (auto: number): { firstHauler: number; firstDelivery: number; byMinute: number[] } => {
+      const w = createWorld(1, defaultData);
+      w.tun['hauler.autoNeed'] = auto;
+      let firstHauler = -1;
+      const byMinute: number[] = [];
+      for (let t = 0; t < 3 * 1800; t++) {
+        step(w, defaultData, []);
+        if (firstHauler < 0 && w.stats.econBuilt.hauler > 0) firstHauler = t;
+        if ((t + 1) % 1800 === 0) byMinute.push(w.stats.delivered.ore);
+      }
+      return { firstHauler, firstDelivery: w.stats.firstDeliveredTick.ore ?? Infinity, byMinute };
+    };
+    const h8 = run(1);
+    const h7 = run(0);
+    expect(h8.firstHauler).toBeGreaterThanOrEqual(0);
+    expect(h8.firstHauler).toBeLessThanOrEqual(h7.firstHauler + defaultData.tunables['ship.hauler.buildTicks'].default);
+    expect(h8.firstDelivery).toBeLessThanOrEqual(h7.firstDelivery);
+    for (let m = 0; m < 3; m++) expect(h8.byMinute[m], `minute ${m + 1}`).toBeGreaterThanOrEqual(h7.byMinute[m]!);
+  });
+});

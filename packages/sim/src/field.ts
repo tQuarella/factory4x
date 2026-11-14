@@ -89,7 +89,7 @@ export function allocate(world: World): void {
     }
   }
   // H8 H4: nothing inside F2 changes the shortfall (no bay starts, no hauler moves), so it is read once.
-  const wanted = haulersWanted(world);
+  let wanted = haulersWanted(world);
   const eligible: BuildType[] = [];
   for (;;) {
     eligible.length = 0;
@@ -109,6 +109,8 @@ export function allocate(world: World): void {
     f.allocCur[pick] -= sum;
     f.share[pick] += 1;
     world.stock.ore -= 1;
+    // H1 amendment (extended): a full extractor share is a committed extractor, which can open a hauler shortfall.
+    if (pick === 'extractor' && f.share.extractor === oreCost(world, 'extractor')) wanted = haulersWanted(world);
   }
 }
 
@@ -272,8 +274,8 @@ export function isHaulable(world: Readonly<World>, node: number): boolean {
  * The pick for a hauler at the probe with no haulable target, or null (it parks idle). H7 F6 (hauler.autoNeed 0):
  * the best worked, Mine-marked node by betterHaulTarget. H8 H2 (autoNeed 1): needPick.
  */
-export function haulTarget(world: Readonly<World>, assigned: readonly number[]): number | null {
-  if (isAutoNeed(world)) return needPick(world, assigned);
+export function haulTarget(world: Readonly<World>, assigned: readonly number[], staff?: readonly number[]): number | null {
+  if (isAutoNeed(world)) return needPick(world, assigned, staff);
   let best: number | null = null;
   for (const n of world.nodes) {
     if (!isHaulable(world, n.index)) continue;
@@ -292,20 +294,59 @@ export function haulRoundTrip(world: Readonly<World>, node: number): number {
   return 2 * ceilDiv(nodeDistance(world, PROBE, node), world.tun['ship.hauler.speedSu']);
 }
 
-/** H8 H1: what `node` yields per game minute now: its extractors (docked plus free) × its kind's rate per extractor (F4). */
-export function yieldPerMin(world: Readonly<World>, node: number): number {
-  const n = world.nodes[node]!;
-  return n.extractors * perExtractorPerMin(world.tun, n.kind);
+/**
+ * Per node, the extractors staffing counts (H1 amendment, with h8-sim's extension): the extractor ships bound there
+ * (docked or on their way), plus the committed extractors, at the node F5 would send them to now. Committed means
+ * the one in the probe's bay and a full extractor share (it starts in F3 as soon as the bay is free). They fill the
+ * mineable nodes nearest the probe with a free slot, ties to the lower index, as F5 dispatches; with no free slot
+ * they count nowhere. Without them, the landing's first 40 ore all go to extractor shares before any extractor
+ * launches (tick 120), and the first hauler waits for probe mining (h8-sim, DECISIONS.md).
+ */
+export function staffCounts(world: Readonly<World>): number[] {
+  const f = fieldOf(world);
+  const out = boundCounts(world);
+  let pending = (f.bays.extractor.ticksLeft > 0 ? 1 : 0) + (f.alloc.extractor > 0 && f.share.extractor >= oreCost(world, 'extractor') ? 1 : 0);
+  if (pending === 0) return out;
+  for (const n of byProbeDistance(world)) {
+    if (!isMineable(world, n)) continue;
+    const slots = world.nodes[n]!.slots;
+    while (pending > 0 && out[n]! + f.free[n]! < slots) {
+      out[n] = out[n]! + 1;
+      pending -= 1;
+    }
+    if (pending === 0) break;
+  }
+  return out;
+}
+
+
+/**
+ * H8 H1 amendment (Director, 2026-11-14): a node is staffed if it is Mine-marked and either haulable (as H7) or has
+ * at least one extractor ship bound for it, docked or on its way. H1's need and target, H2's pick and H4's
+ * shortfall and bay work from staffed nodes, so a rock's need is known when its first extractor launches.
+ */
+export function isStaffed(world: Readonly<World>, node: number, staff: readonly number[] = staffCounts(world)): boolean {
+  if (fieldOf(world).mine[node] !== true) return false;
+  return isHaulable(world, node) || staff[node]! > 0;
 }
 
 /**
- * H8 H1, the need: for a haulable node, max(1, ceilDiv(yieldPerMin × roundTrip × hauler.needPct, 100 × T ×
- * ship.hauler.cargo)), T = ticks per game minute. So a rock with only a buffer (no working extractor) needs 1.
- * 0 for a node that isn't haulable.
+ * H8 H1 (amended): what `node` will yield per game minute: its bound extractor ships (docked plus on their way)
+ * plus its free extractors, × its kind's rate per extractor (F4).
  */
-export function haulerNeed(world: Readonly<World>, node: number): number {
-  if (!isHaulable(world, node)) return 0;
-  const num = yieldPerMin(world, node) * haulRoundTrip(world, node) * world.tun['hauler.needPct'];
+export function yieldPerMin(world: Readonly<World>, node: number, staff: readonly number[] = staffCounts(world)): number {
+  const n = world.nodes[node]!;
+  return (staff[node]! + fieldOf(world).free[node]!) * perExtractorPerMin(world.tun, n.kind);
+}
+
+/**
+ * H8 H1, the need: for a staffed node, max(1, ceilDiv(yieldPerMin × roundTrip × hauler.needPct, 100 × T ×
+ * ship.hauler.cargo)), T = ticks per game minute. So a rock with only a buffer (no extractor bound) needs 1.
+ * 0 for a node that isn't staffed.
+ */
+export function haulerNeed(world: Readonly<World>, node: number, staff: readonly number[] = staffCounts(world)): number {
+  if (!isStaffed(world, node, staff)) return 0;
+  const num = yieldPerMin(world, node, staff) * haulRoundTrip(world, node) * world.tun['hauler.needPct'];
   const den = 100 * ticksPerMin(world) * world.tun['ship.hauler.cargo'];
   return Math.max(1, ceilDiv(num, den));
 }
@@ -319,22 +360,22 @@ export function haulerSetOf(world: Readonly<World>, node: number): number | null
   return set === null ? null : Math.min(set, world.tun['rock.haulerMax']);
 }
 
-/** H8 H1: the target: the set count if there is one, else the need; 0 for a node that isn't haulable. */
-export function haulerTarget(world: Readonly<World>, node: number): number {
-  if (!isHaulable(world, node)) return 0;
-  return haulerSetOf(world, node) ?? haulerNeed(world, node);
+/** H8 H1: the target: the set count if there is one, else the need; 0 for a node that isn't staffed. */
+export function haulerTarget(world: Readonly<World>, node: number, staff: readonly number[] = staffCounts(world)): number {
+  if (!isStaffed(world, node, staff)) return 0;
+  return haulerSetOf(world, node) ?? haulerNeed(world, node, staff);
 }
 
 /**
- * H8 H2: the haulable node with the largest shortfall (target − assigned) above 0; ties to the node nearest the
+ * H8 H2: the staffed node (H1 amendment) with the largest shortfall (target − assigned) above 0; ties to the node nearest the
  * probe, then the lower index. Null if no node is short (the hauler parks idle at the probe).
  */
-export function needPick(world: Readonly<World>, assigned: readonly number[]): number | null {
+export function needPick(world: Readonly<World>, assigned: readonly number[], staff: readonly number[] = staffCounts(world)): number | null {
   let best: number | null = null;
   let bestShort = 0;
   let bestDist = 0;
   for (const n of world.nodes) {
-    const short = haulerTarget(world, n.index) - assigned[n.index]!;
+    const short = haulerTarget(world, n.index, staff) - assigned[n.index]!;
     if (short <= 0) continue;
     const d = nodeDistance(world, PROBE, n.index);
     // Nodes are visited in index order, so the strict comparisons keep the lower index on a full tie.
@@ -353,14 +394,15 @@ export function isIdleHauler(s: Readonly<EconShip>): boolean {
 }
 
 /**
- * H8 H4: haulerShortfall = Σ over haulable nodes of max(0, target − assigned), minus the idle haulers at the probe,
+ * H8 H4: haulerShortfall = Σ over staffed nodes (H1 amendment) of max(0, target − assigned), minus the idle haulers at the probe,
  * minus a hauler in the bay.
  */
 export function haulerShortfall(world: Readonly<World>): number {
   const f = fieldOf(world);
   const assigned = assignedHaulers(world);
+  const staff = staffCounts(world);
   let short = 0;
-  for (const n of world.nodes) short += Math.max(0, haulerTarget(world, n.index) - assigned[n.index]!);
+  for (const n of world.nodes) short += Math.max(0, haulerTarget(world, n.index, staff) - assigned[n.index]!);
   for (const s of f.econ) if (isIdleHauler(s)) short -= 1;
   if (f.bays.hauler.ticksLeft > 0) short -= 1;
   return short;
@@ -428,22 +470,27 @@ export function runHaulers(world: World): void {
   const cargoCap = world.tun['ship.hauler.cargo'];
   const speed = world.tun['ship.hauler.speedSu'];
   const auto = isAutoNeed(world);
+  // Nothing in F6 binds or commits an extractor, so the staffing counts hold for the whole pass.
+  const staff = auto ? staffCounts(world) : [];
+  const bound = boundCounts(world);
   for (const s of f.econ) {
     if (s.type !== 'hauler' || s.transit !== null || s.at === null) continue;
     if (s.at === PROBE) {
       // A hauler placed at the probe with cargo (never in play: it unloads on arrival) unloads here.
       unload(world, s);
-      if (s.target !== null && !isHaulable(world, s.target)) {
+      // H7 keeps the node while it is haulable; H8 (amended) while it is staffed, so a hauler sent to a rock whose
+      // extractors are still flying in keeps it.
+      if (s.target !== null && !(auto ? isStaffed(world, s.target, staff) : isHaulable(world, s.target))) {
         assigned[s.target] = assigned[s.target]! - 1;
         s.target = null;
       }
       if (s.target !== null && haulersHeld(world, s.target)) continue;
-      if (s.target !== null && auto && assigned[s.target]! > haulerTarget(world, s.target)) {
+      if (s.target !== null && auto && assigned[s.target]! > haulerTarget(world, s.target, staff)) {
         assigned[s.target] = assigned[s.target]! - 1;
         s.target = null;
       }
       if (s.target === null) {
-        const n = haulTarget(world, assigned);
+        const n = haulTarget(world, assigned, auto ? staff : undefined);
         if (n === null) continue;
         s.target = n;
         assigned[n] = assigned[n]! + 1;
@@ -452,7 +499,10 @@ export function runHaulers(world: World): void {
       startTransit(world, s, s.target, speed);
     } else if (s.at === s.target) {
       const node = world.nodes[s.at]!;
-      if (node.buffer < cargoCap && node.extractors > 0 && f.mine[s.at] === true && !haulersHeld(world, s.at)) continue;
+      // H7: wait for a full cargo while an extractor works the node. H8 (amended): also while one is on its way, so
+      // a hauler at a rock that isn't worked yet waits for its first extractor instead of leaving empty.
+      const working = node.extractors > 0 || (auto && bound[s.at]! > 0);
+      if (node.buffer < cargoCap && working && f.mine[s.at] === true && !haulersHeld(world, s.at)) continue;
       const load = Math.min(node.buffer, cargoCap);
       node.buffer -= load;
       s.cargo = load;

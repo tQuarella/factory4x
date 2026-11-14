@@ -14,6 +14,7 @@ import {
   type Input,
   type World,
 } from '../src/index.ts';
+import { staffCounts } from '../src/field.ts';
 import { fixtureV14 } from './fixture.ts';
 import { addShips, setGuards } from './helpers.ts';
 import { F, addEcon, quietField } from './field-helpers.ts';
@@ -155,6 +156,64 @@ describe('H1 the need', () => {
     expect([haulerTarget(w, F.a5), rockStatus(w, F.a5).haulerSet, w.field!.haulerSet[F.a5]]).toEqual([4, 4, 6]);
     tick(w, { type: 'setTunable', key: 'rock.haulerMax', value: 6 });
     expect(haulerTarget(w, F.a5)).toBe(6);
+  });
+});
+
+describe('H1 amendment: staffed rocks', () => {
+  /** a1 marked with one extractor on its way (bound, 100 ticks out) and nothing docked or buffered. */
+  function inbound(): { w: World; e: EconShip } {
+    const w = marked(F.a1);
+    const e = addEcon(w, 'extractor', F.a1, F.a1);
+    e.at = null;
+    e.transit = { from: PROBE, to: F.a1, ticksLeft: 100, totalTicks: 100 };
+    return { w, e };
+  }
+
+  it('a marked rock with an extractor on its way is staffed: its need counts the inbound extractor, and a hauler at the probe is sent there', () => {
+    const { w } = inbound();
+    expect(w.nodes[F.a1]!.extractors).toBe(0);
+    expect([haulerNeed(w, F.a1), haulerTarget(w, F.a1)]).toEqual([1, 1]);
+    const h = addEcon(w, 'hauler', PROBE);
+    tick(w);
+    expect([h.target, h.transit?.to]).toEqual([F.a1, F.a1]);
+  });
+
+  it('a hauler at a staffed rock that is not worked yet waits there; it leaves (empty) once no extractor is bound any more, or on Stop', () => {
+    for (const end of ['lost', 'stop'] as const) {
+      const { w, e } = inbound();
+      const h = addEcon(w, 'hauler', F.a1, F.a1);
+      tick(w);
+      tick(w);
+      expect([h.at, h.transit], end).toEqual([F.a1, null]);
+      if (end === 'lost') w.field!.econ = w.field!.econ.filter((s) => s !== e);
+      tick(w, ...(end === 'stop' ? [{ type: 'setMine' as const, node: F.a1, on: false }] : []));
+      expect([h.cargo, h.transit?.to], end).toEqual([0, PROBE]);
+    }
+  });
+
+  it('hauler.autoNeed 0 (H7): the same hauler leaves at once, because the rock is not worked', () => {
+    const { w } = inbound();
+    w.tun['hauler.autoNeed'] = 0;
+    const h = addEcon(w, 'hauler', F.a1, F.a1);
+    tick(w);
+    expect(h.transit?.to).toBe(PROBE);
+  });
+
+  it('committed extractors staff the nearest mineable rocks with a free slot: a full share and one in the bay staff a1 twice; with a1 full they go to a2; an unweighted share does not count', () => {
+    const w = marked(F.a1, F.a2);
+    w.field!.alloc.extractor = 3;
+    w.field!.share.extractor = w.tun['ship.extractor.cost'];
+    w.field!.bays.extractor.ticksLeft = 50;
+    expect([staffCounts(w)[F.a1], staffCounts(w)[F.a2]]).toEqual([2, 0]);
+    expect([haulerTarget(w, F.a1), haulerTarget(w, F.a2)]).toEqual([1, 0]);
+    addEcon(w, 'extractor', F.a1, F.a1);
+    addEcon(w, 'extractor', F.a1, F.a1);
+    expect([staffCounts(w)[F.a1], staffCounts(w)[F.a2]]).toEqual([2, 2]);
+    expect(haulerTarget(w, F.a2)).toBe(1);
+    w.field!.alloc.extractor = 0;
+    expect(staffCounts(w)[F.a2]).toBe(1);
+    w.field!.bays.extractor.ticksLeft = 0;
+    expect([staffCounts(w)[F.a2], haulerTarget(w, F.a2)]).toEqual([0, 0]);
   });
 });
 
@@ -381,18 +440,19 @@ describe('H4 no surplus haulers', () => {
     expect(allocStatus(w, D).rows.find((r) => r.type === 'hauler')!.state).not.toBe('enough');
   });
 
-  it('the v14 landing played for 6 game minutes (no inputs): every Hauler bay start has a shortfall, and with none the state is enough or building', () => {
+  it('the v14 landing played for 6 game minutes (no inputs): every Hauler started fits the staffed targets (no surplus), and with no shortfall the state is enough or building', () => {
     const v = createWorld(1, D);
     let started = 0;
     let enough = 0;
     for (let t = 0; t < 6 * T; t++) {
       const before = v.field!.bays.hauler.ticksLeft;
-      // No inputs, and F2 and F3's finish leave the shortfall as it is, so this is the shortfall F3 sees.
-      const short = haulerShortfall(v);
       tick(v);
       if (before <= 1 && v.field!.bays.hauler.ticksLeft === v.tun['ship.hauler.buildTicks']) {
         started++;
-        expect(short, `tick ${t}`).toBeGreaterThan(0);
+        // The new hauler (in the bay) plus every hauler alive fit within Σ of the staffed targets.
+        const haulers = v.field!.econ.filter((s) => s.type === 'hauler').length + 1;
+        const targets = v.nodes.reduce((n, x) => n + haulerTarget(v, x.index), 0);
+        expect(haulers, `tick ${t}`).toBeLessThanOrEqual(targets);
       }
       const state = allocStatus(v, D).rows.find((r) => r.type === 'hauler')!.state;
       if (haulerShortfall(v) <= 0) {
@@ -403,4 +463,35 @@ describe('H4 no surplus haulers', () => {
     expect(started).toBeGreaterThan(0);
     expect(enough).toBeGreaterThan(0);
   });
+
+  it('H1 amendment: the opening on the frozen v14 fixture (no inputs, seed 1) matches or beats H7: first hauler at tick 90, first delivery at 1035, and the delivery curve pinned', () => {
+    const curve = (auto: number): { firstHauler: number; firstDelivery: number | null; byMinute: number[] } => {
+      const w = createWorld(1, D);
+      w.tun['hauler.autoNeed'] = auto;
+      let firstHauler = -1;
+      const byMinute: number[] = [];
+      for (let t = 0; t < 10 * T; t++) {
+        tick(w);
+        if (firstHauler < 0 && w.stats.econBuilt.hauler > 0) firstHauler = t;
+        if ((t + 1) % T === 0) byMinute.push(w.stats.delivered.ore);
+      }
+      return { firstHauler, firstDelivery: w.stats.firstDeliveredTick.ore, byMinute };
+    };
+    const h8 = curve(1);
+    const h7 = curve(0);
+    expect(h7).toEqual({ firstHauler: 90, firstDelivery: 1035, byMinute: [8, 20, 40, 60, 88, 124, 153, 189, 241, 297] });
+    expect(h8).toEqual({ firstHauler: 90, firstDelivery: 1035, byMinute: [8, 24, 52, 80, 112, 172, 248, 344, 464, 592] });
+  });
+
+  it('H1 amendment, the landing: before any extractor launches, the committed extractor (a full share, then the bay) staffs a1, so the Hauler takes ore at tick 0', () => {
+    const w = createWorld(1, D);
+    tick(w);
+    // Tick 0: the extractor share filled (20) and its bay started; the Hauler share filled too and its bay started.
+    expect([w.field!.bays.extractor.ticksLeft > 0, w.field!.bays.hauler.ticksLeft > 0]).toEqual([true, true]);
+    expect(w.field!.econ).toHaveLength(0);
+    expect([rockStatus(w, F.a1).haulerTarget, rockStatus(w, F.a2).haulerTarget]).toEqual([1, 0]);
+    // Literal amendment (bound ships only) would leave every target 0 here: no ship exists yet.
+    expect(w.field!.econ.some((s) => s.type === 'extractor')).toBe(false);
+  });
+
 });

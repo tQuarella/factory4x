@@ -1250,3 +1250,46 @@ These numbers are from a scratch run of this branch's code. No value fixes it, b
 
 **Decision:** for hauler staffing, a Mine-marked rock with an extractor bound for it (docked or on its way) counts as needing haulers; see DESIGN.md "H1 amendment". h8-sim implements it before its Critic round.
 **Why:** h8-sim built H1 as written and measured the first hauler at 3:13 on v14 and no ore delivered before minute 4 (H7: first hauler at tick 90, first delivery at tick 1035). The owner's first note on H7 praised starting on mining; a three-minute dead opening would undo that. No data value fixes it, so it is a rule fix, not calibration.
+
+## 2026-11-14 · Core Engineer · h8-sim: the H1 amendment (staffed rocks)
+
+**What the amendment says (DESIGN.md, Director, 8739109), built as written:**
+- A rock is **staffed** if it is Mine-marked and either haulable or has an extractor ship bound for it. Bound means docked there or flying in.
+- Need, target, shortfall, the pick and the Hauler bay all use staffed rocks.
+- `yieldPerMin` counts bound extractors plus free extractors.
+- A hauler at a staffed rock that isn't worked yet waits there.
+
+**A call the amendment doesn't make: committed extractors count as staffing.**
+- *As written it doesn't meet its own acceptance.* At the landing no extractor ship exists until the first bay finishes (tick 120). By then the 40 opening ore have all gone to extractor shares, because no rock is staffed at tick 0. On v14, seed 1, no inputs: first hauler at tick 5640, first delivery at tick 5901, ore by minutes 1–10 of 0, 0, 0, 20, 68, 136, 212, 292, 400, 528 (scratch run of the amendment exactly as written).
+- *What I added.* `staffCounts` also counts the committed extractors: the one in the probe's bay, and a full extractor share (which starts in F3 as soon as the bay is free). Each counts at the rock F5 would send it to now: the mineable rock nearest the probe with a free slot, ties to the lower index. With no free slot, it counts nowhere. An extractor share with weight 0 doesn't count.
+- *F2 rereads the shortfall* when the extractor share fills, so the tick-0 split is 20 ore to the extractor and 15 to the Hauler. That is what H7 did.
+- *Rejected:* staffing every Mine-marked rock at the landing. That gives a need of 1 at each of seven rocks while only two extractors are coming, and builds haulers no extractor will feed.
+- *Rejected:* counting the extractor share at any fill level. A part-filled share is not yet an extractor.
+
+**Second call: when a hauler at an unworked rock is released.** It waits while an extractor is docked there or bound for it, as long as the rock is marked and not held. It leaves with what is there once no extractor is docked or inbound (every bound extractor lost), or on Stop. The amendment says the "no longer worked" release applies once the rock *has been* worked. I read "an extractor docked or inbound" as standing in for that, so no per-rock history needs saving. The two readings differ in one case only: a rock that was worked, lost its extractors, and has a replacement flying in. My version waits for the replacement; the literal one leaves with what is in the buffer. Under `hauler.autoNeed` 0 the H7 rule is unchanged (tested).
+
+**Opening, v14, seed 1, no inputs (final code; pinned in `h8-haulers.test.ts` on the frozen v14 fixture):**
+
+| | First hauler built | First delivery | Ore delivered by minute 1–10 |
+| --- | --- | --- | --- |
+| `hauler.autoNeed` 1 | tick 90 | tick 1035 | 8, 24, 52, 80, 112, 172, 248, 344, 464, 592 |
+| `hauler.autoNeed` 0 | tick 90 | tick 1035 | 8, 20, 40, 60, 88, 124, 153, 189, 241, 297 |
+
+`data-h8.test.ts` checks the relative version on shipped data, which any calibration must keep:
+- the first hauler comes no later than H7's plus one build;
+- the first delivery comes no later than H7's;
+- ore by minutes 1–3 is at least H7's.
+
+"No surplus" is checked in `h8-haulers.test.ts` over 6 game minutes: every Hauler bay start keeps haulers alive plus the new one within Σ of the staffed targets.
+
+**Seen, not acted on:** in 10 minutes with no inputs, H8 builds 25 extractors where H7 builds 13. There are 13 asteroid slots, so the rest idle at the probe. Fewer haulers leave more ore for the extractor weight, and extractor eligibility has no slot cap, in H7 or here. This is a calibration or rule question for h8-design-data, not part of the amendment.
+
+**Smoke `h7-economy.spec.ts:286` still fails, on both projects and both fonts, and it belongs to h8-client.**
+- *What the test needs.* It raises Drone to 5 and Lancer and Flak to 1, then waits up to 2400 ticks for something parked at the probe.
+- *Why it passed under H7.* In node, with 7 ticks of play before the weight change, the probe never builds a warship within 2400 ticks under either mode: the drone share reaches 12 of 18 (H7) and 15 of 18 (H8). What H7 parks at the probe at tick 120 is the first hauler. It idles there because a1's extractor is still flying in.
+- *Why it fails under H8.* With the amendment, that hauler goes straight to the staffed a1, which is the behaviour the amendment asks for. Nothing is ever parked at the probe, so Recycle never shows.
+- *What h8-client should do.* Build the test's premise explicitly.
+
+**Cost:** `staffCounts` is computed once per shortfall, pick and F6 pass. The bots gate reports a tick p95 of at most 0.0131 ms against the 2.0 ms budget, and 78.1 s for the suite (final gates run).
+
+**Files:** the logic is in field.ts (`staffCounts`, `isStaffed`, and `yieldPerMin`, `haulerNeed` and `haulerTarget`, `needPick`, `haulerShortfall`, `allocate`, `runHaulers`), plus the index.ts header and exports. Tests are in `h8-haulers.test.ts` (staffed rocks, the opening pins, no surplus) and `data-h8.test.ts` (the shipped-data check). `field-selectors.test.ts`'s exact `rockStatus` now has need and target 2 for a5. Bound extractors count there: one docked and one flying in, 20 × 530 × 110 = 1166000 → 2. The value was recomputed, not loosened.
