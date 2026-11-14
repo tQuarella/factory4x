@@ -39,6 +39,10 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - 8488: recycleFleet of 1 extractor and 4 haulers: the docked extractor at a2 (no extractor idles), and the
  *     haulers in order: the idle one, those parked at a3 and at the heart, then the lowest id in transit.
  *   - 8650: moveShips all from p2 to a3 (the split group, arrived, plus the Flak there).
+ *   - 8660 (round 2): p2 and the hive unmarked, the Extractor weight 3: the bay builds for a2's free slot and the share
+ *     refills (p1 has a slot). 8670: p1 unmarked; every marked slot is taken, so the Extractor is `enough` from 8690
+ *     with its full share kept. 8720: a4 marked (the fleet limit to 45, hauler cargo to 2): the bay restarts, haulers
+ *     are picked for a4 while it is staffed but not haulable, wait there empty, and load after the extractor docks.
  *
  * The raids (DESIGN.md H7 R1-R9) run on their own from tick 95, when the economy reaches 6 ships, and the script
  * leaves them alone: raid 1 musters at a1 and, a1 being stopped at 600, retargets to the captured p1, where the rally
@@ -108,5 +112,8 @@ export const referenceReplay: Replay = {
     ...at(8450, { type: 'moveShips', from: 10, to: 9, part: 'split' }, { type: 'moveShips', from: 8, to: 2, part: 'split' }),
     ...at(8488, { type: 'recycleFleet', counts: { extractor: 1, hauler: 4, drone: 0, lancer: 0, flak: 0 } }),
     ...at(8650, { type: 'moveShips', from: 9, to: 3, part: 'all' }),
+    ...at(8660, mine(9, false), mine(10, false), alloc('extractor', 3)),
+    ...at(8670, mine(8, false)),
+    ...at(8720, mine(4, true), tun('field.fleetCap', 45), tun('ship.hauler.cargo', 2)),
   ],
 };

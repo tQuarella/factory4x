@@ -483,7 +483,7 @@ describe('H4 no surplus haulers', () => {
     const h8 = curve(1);
     const h7 = curve(0);
     expect(h7).toEqual({ firstHauler: 90, firstDelivery: 1035, byMinute: [8, 20, 40, 60, 88, 124, 153, 189, 241, 297] });
-    expect(h8).toEqual({ firstHauler: 90, firstDelivery: 1035, byMinute: [8, 24, 52, 80, 112, 172, 248, 344, 465, 593] });
+    expect(h8).toEqual({ firstHauler: 90, firstDelivery: 1035, byMinute: [8, 24, 52, 80, 112, 172, 248, 344, 468, 592] });
   });
 
   it('H1 amendment, the landing: before any extractor launches, the committed extractor (a full share, then the bay) staffs a1, so the Hauler takes ore at tick 0', () => {

@@ -62,13 +62,15 @@ export function bayOf(world: Readonly<World>, type: BuildType): Readonly<Yard> {
 
 /**
  * F2: a type is eligible for the next ore if its weight is above 0, it is unlocked, and its share is below its cost.
- * H8 H4: with hauler.autoNeed 1, the Hauler is eligible only while some rock is short of haulers (haulersWanted).
+ * H8 H4: with hauler.autoNeed 1, the Hauler is eligible only while some rock is short of haulers (`wanted`, from
+ * haulersWanted), and the Extractor only while a marked rock has a free slot (`extractorsOk`, from extractorsWanted).
+ * The caller reads both: they cost a pass over the economy ships each.
  */
 export function isEligible(
   world: Readonly<World>,
   type: BuildType,
-  wanted: boolean = haulersWanted(world),
-  extractorsOk: boolean = extractorsWanted(world),
+  wanted: boolean,
+  extractorsOk: boolean,
 ): boolean {
   const f = fieldOf(world);
   if (type === 'hauler' && !wanted) return false;
@@ -316,6 +318,9 @@ export function haulRoundTrip(world: Readonly<World>, node: number): number {
 export function staffCounts(world: Readonly<World>): number[] {
   const f = fieldOf(world);
   const out = boundCounts(world);
+  // Unbound extractor ships (idle at the probe or flying home) are not placed first, although F5 dispatches them
+  // before the bay's: under no surplus extractors they count against the free slots, so the bay rarely builds while
+  // one exists, and placing them would only move a committed extractor to the next rock (Critic, h8-sim round 1).
   let pending = (f.bays.extractor.ticksLeft > 0 ? 1 : 0) + (f.alloc.extractor > 0 && f.share.extractor >= oreCost(world, 'extractor') ? 1 : 0);
   if (pending === 0) return out;
   for (const n of byProbeDistance(world)) {
@@ -507,7 +512,6 @@ export function runHaulers(world: World): void {
   const auto = isAutoNeed(world);
   // Nothing in F6 binds or commits an extractor, so the staffing counts hold for the whole pass.
   const staff = auto ? staffCounts(world) : [];
-  const bound = boundCounts(world);
   for (const s of f.econ) {
     if (s.type !== 'hauler' || s.transit !== null || s.at === null) continue;
     if (s.at === PROBE) {
@@ -536,7 +540,9 @@ export function runHaulers(world: World): void {
       const node = world.nodes[s.at]!;
       // H7: wait for a full cargo while an extractor works the node. H8 (amended): also while one is on its way, so
       // a hauler at a rock that isn't worked yet waits for its first extractor instead of leaving empty.
-      const working = node.extractors > 0 || (auto && bound[s.at]! > 0);
+      // The extractors counted are staffCounts': bound ships and committed ones (the bay's, a full share), so a hauler
+      // sent for a committed extractor waits for it rather than flying home empty and back (h8-sim round 2).
+      const working = node.extractors > 0 || (auto && staff[s.at]! > 0);
       if (node.buffer < cargoCap && working && f.mine[s.at] === true && !haulersHeld(world, s.at)) continue;
       const load = Math.min(node.buffer, cargoCap);
       node.buffer -= load;

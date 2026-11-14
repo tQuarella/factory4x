@@ -6,6 +6,8 @@ import {
   defaultData as data,
   fleetStatus,
   isValidInput,
+  isHaulable,
+  isStaffed,
   movePreview,
   raidStatus,
   recycleOrder,
@@ -44,9 +46,15 @@ describe('reference replay (field mode)', () => {
   const raidLog: Array<{ tick: number; phase: string; target: number | null; raids: World['stats']['raids']; econ: number; warshipsAtTarget: number }> = [];
   let raidPhase = 'none:null';
   // h8-sim: the H8 items (from tick 8100).
-  const picks: Array<{ tick: number; id: number; to: number; short: number; maxShort: number }> = [];
+  const picks: Array<{ tick: number; id: number; to: number; short: number; maxShort: number; staffed: boolean; haulable: boolean }> = [];
   const leaves: Array<{ tick: number; id: number; from: number; to: number | null }> = [];
   let enoughTicks = 0;
+  // h8-sim round 2: the staffed-rock wait and the Extractor's enough.
+  let p1Captured: ReturnType<typeof rockStatus> | null = null;
+  const waits: Array<{ tick: number; id: number; node: number }> = [];
+  const loads: Array<{ tick: number; id: number; node: number; cargo: number }> = [];
+  const firstDockAt: Record<number, number> = {};
+  const extLog: Array<{ tick: number; state: string; weight: number; share: number; bay: number; bayBefore: number; inputs: string[] }> = [];
   const moves: Array<{ tick: number; from: number; to: number; part: string; preview: { drone: number; lancer: number; flak: number }; moved: { drone: number; lancer: number; flak: number }; at: { drone: number; lancer: number; flak: number } }> = [];
   let fleetRecycle: { tick: number; orderHaulers: Array<{ id: number; at: number | null; target: number | null }>; orderExtractors: Array<{ id: number; at: number | null; docked: boolean }>; gone: number[]; slotsBefore: number; slotsAfter: number } | null = null;
   for (let t = 0; t < 9000; t++) {
@@ -65,8 +73,6 @@ describe('reference replay (field mode)', () => {
     const boundThere = unmark ? f.econ.filter((s) => s.type === 'extractor' && s.target === unmark.node).map((s) => s.id) : [];
     const econBefore = f.econ.length;
     const refundBefore = w.stats.oreRefunded;
-    // h8-sim: each hauler pick against the shortfalls after this tick's inputs (rockStatus on the input-applied copy).
-    const shortBefore = t >= 8100 ? probe.nodes.map((n) => rockStatus(probe, n.index).haulerTarget - rockStatus(probe, n.index).haulers) : [];
     const targetBefore = new Map(probe.field!.econ.filter((s) => s.type === 'hauler').map((s) => [s.id, s.target]));
     const moveInputs = inputs.filter((i): i is Extract<Input, { type: 'moveShips' }> => i.type === 'moveShips');
     const moveBefore = moveInputs.map((i) => ({ i, preview: movePreview(w, i.from, i.part), ids: w.ships.filter((s) => s.at === i.from).map((s) => s.id) }));
@@ -78,9 +84,16 @@ describe('reference replay (field mode)', () => {
           slots: rockStatus(w, 2).bound,
         }
       : null;
+    const extBefore = { bay: f.bays.extractor.ticksLeft, share: f.share.extractor };
     step(w, data, inputs);
+    if (p1Captured === null && w.stats.captures.length > 0) p1Captured = rockStatus(w, 8);
     if (t >= 8100) {
-      const short = shortBefore;
+      // Each hauler pick against the shortfalls F6 saw: the targets after the tick (nothing after F6 changes them:
+      // F2 can, when an extractor share fills, so the tick's start is not the right baseline) minus the haulers
+      // assigned before F6 (after this tick's inputs), then leaves and picks in id order, as F6 makes them.
+      const assignedPre = w.nodes.map(() => 0);
+      for (const [, tg] of targetBefore) if (tg !== null) assignedPre[tg] = assignedPre[tg]! + 1;
+      const short = w.nodes.map((n) => rockStatus(w, n.index).haulerTarget - assignedPre[n.index]!);
       for (const s of f.econ) {
         if (s.type !== 'hauler') continue;
         const was = targetBefore.get(s.id) ?? null;
@@ -90,11 +103,24 @@ describe('reference replay (field mode)', () => {
           leaves.push({ tick: t, id: s.id, from: was, to: s.target });
         }
         if (s.target !== null) {
-          picks.push({ tick: t, id: s.id, to: s.target, short: short[s.target]!, maxShort: Math.max(...short) });
+          picks.push({ tick: t, id: s.id, to: s.target, short: short[s.target]!, maxShort: Math.max(...short), staffed: isStaffed(w, s.target), haulable: isHaulable(w, s.target) });
           short[s.target] = short[s.target]! - 1;
         }
       }
       if (allocStatus(w, data).rows.find((r) => r.type === 'hauler')!.state === 'enough') enoughTicks++;
+      // Haulers waiting (parked, empty) at a rock no extractor works yet.
+      for (const s of f.econ) {
+        if (s.type === 'hauler' && s.transit === null && s.at !== null && s.at !== PROBE && s.at === s.target && w.nodes[s.at]!.extractors === 0) {
+          waits.push({ tick: t, id: s.id, node: s.at });
+        }
+        // A hauler that loaded and left a rock this tick.
+        if (s.type === 'hauler' && s.cargo > 0 && s.transit !== null && s.transit.totalTicks === s.transit.ticksLeft + 1 && s.transit.to === PROBE) {
+          loads.push({ tick: t, id: s.id, node: s.transit.from, cargo: s.cargo });
+        }
+      }
+      for (const n of w.nodes) if (n.kind === 'asteroid' && firstDockAt[n.index] === undefined && rockStatus(w, n.index).docked > 0 && t > 8700) firstDockAt[n.index] = t;
+      const ex = allocStatus(w, data).rows.find((r) => r.type === 'extractor')!;
+      extLog.push({ tick: t, state: ex.state, weight: ex.weight, share: ex.share, bay: f.bays.extractor.ticksLeft, bayBefore: extBefore.bay, inputs: inputs.map((i) => i.type) });
     }
     for (const m of moveBefore) {
       const moved = { drone: 0, lancer: 0, flak: 0 };
@@ -150,7 +176,7 @@ describe('reference replay (field mode)', () => {
   });
 
   it('changes the allocation nine times; the setAlloc to 0 at tick 280 returns the extractor share to stock', () => {
-    expect(w.stats.allocChanges).toBe(9); // 450 x2, 280 x2, 850, drone 5 at tick 7000, and h8-sim's three at 8100
+    expect(w.stats.allocChanges).toBe(10); // 450 x2, 280 x2, 850, drone 5 at tick 7000, h8-sim's three at 8100 and extractor 3 at 8660
     expect(shareReturned).not.toBeNull();
     expect(shareReturned!.tick).toBe(280);
     expect(shareReturned!.share).toBeGreaterThan(0);
@@ -182,7 +208,8 @@ describe('reference replay (field mode)', () => {
     const p1 = w.stats.captures[0]!.tick;
     expect(w.stats.firstDeliveredTick.ice).toBeGreaterThan(p1);
     expect(w.stats.shipsBuilt.flak).toBeGreaterThanOrEqual(1);
-    expect(rockStatus(w, 8)).toMatchObject({ mine: true, freeExtractors: 1 });
+    // At its capture (the script unmarks p1 at 8670, for the H8 items).
+    expect(p1Captured).toMatchObject({ mine: true, freeExtractors: 1 });
   });
 
   it('a bay is held by the fleet limit (fleetFull) for part of the run', () => {
@@ -310,6 +337,45 @@ describe('reference replay (field mode)', () => {
     expect(four[3]!.id).toBe(Math.min(...transitIds));
     for (const h of four) expect(r.gone).toContain(h.id);
     expect(r.gone).toHaveLength(5);
+  });
+
+  it('H1 amendment (round 2): a hauler is picked for a4 while it is staffed but not haulable (its extractor still coming), waits there empty, and loads only after the extractor docks', () => {
+    const atA4 = picks.filter((p) => nodeId(p.to) === 'a4');
+    expect(atA4.length).toBeGreaterThan(0);
+    const first = atA4[0]!;
+    expect([first.tick, first.staffed, first.haulable]).toEqual([8720, true, false]);
+    const dock = firstDockAt[4]!;
+    expect(dock).toBeGreaterThan(first.tick);
+    const waited = waits.filter((x) => x.id === first.id && nodeId(x.node) === 'a4');
+    expect(waited.length).toBeGreaterThan(0);
+    // It waited the whole time from its arrival to the dock, without leaving.
+    expect(waited[waited.length - 1]!.tick).toBe(dock - 1);
+    expect(waited.length).toBe(dock - waited[0]!.tick);
+    const load = loads.find((l) => l.id === first.id && nodeId(l.node) === 'a4')!;
+    expect(load.tick).toBeGreaterThan(dock);
+    expect(load.cargo).toBe(2);
+  });
+
+  it('no surplus extractors (round 2): with weight 3 and every marked slot taken, the Extractor is enough: its bay stays idle and its full share is kept', () => {
+    const enough = extLog.filter((e) => e.state === 'enough');
+    expect(enough.length).toBeGreaterThan(0);
+    for (const e of enough) {
+      expect(e.weight, `tick ${e.tick}`).toBe(3);
+      expect(e.bay, `tick ${e.tick}`).toBe(0);
+    }
+    // The share kept while enough: full (ship.extractor.cost is tuned to 5) and unchanged.
+    const kept = enough.filter((e) => e.tick < 8720);
+    expect(kept.length).toBeGreaterThan(0);
+    expect(new Set(kept.map((e) => e.share))).toEqual(new Set([5]));
+  });
+
+  it('no surplus extractors (round 2): the bay starts again on the tick a4 is marked (a slot opens)', () => {
+    const restart = extLog.find((e) => e.tick > 8690 && e.bayBefore === 0 && e.bay > 0)!;
+    expect(restart.tick).toBe(8720);
+    expect(restart.inputs).toContain('setMine');
+    expect(extLog.find((e) => e.tick === 8719)!.state).toBe('enough');
+    // The full share went into the bay.
+    expect(restart.share).toBe(0);
   });
 
   it('uses every field input type it needs, with no input ignored', () => {

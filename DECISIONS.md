@@ -1332,3 +1332,45 @@ These numbers are from a scratch run of this branch's code. No value fixes it, b
 
 - cw-smoke-sim-time merged (66c9581) after green CI 43647913292 on 86bf159; main had moved by DECISIONS.md and STATUS.md only (docs-only exception). The h7-art gallery wait was left in real time: it waits on canvas drawing in the dev gallery, not on sim time, so `advanceTicks` can't replace it (Critic note). Folding `h7-economy.spec.ts`'s local `stepUntil` into `stepSimUntil` is a small Can wait cleanup.
 - DESIGN.md H8 now carries the committed-extractor and waiting-hauler rulings and "H4b. No surplus extractors", replacing "Extractors don't need this rule", so h8-client and h8-design-data build from the spec (h8-sim Critic note).
+
+## 2026-11-14 · Core Engineer · h8-sim round 2: the replay exercises staffed rocks and the Extractor's enough
+
+**Required change (reviews/h8-sim.md, round 1): the reference replay's new items.** All run with `hauler.autoNeed` 1, after the existing H8 items:
+- **8660:** p2 and the hive are unmarked, and the Extractor weight goes to 3.
+  - The bay builds for a2's free slot (a2 lost an extractor to the 8488 recycle).
+  - The share refills to 5 (full), because p1 still has a free slot.
+- **8670:** p1 is unmarked.
+  - Every marked slot is now docked, bound or in the bay.
+  - From 8690 the Extractor is `enough`: weight 3, bay idle, share kept at 5.
+- **8720:** a4 is marked, `field.fleetCap` goes to 45, and `ship.hauler.cargo` to 2.
+  - The bay starts again that tick, using the full share.
+  - Haulers are picked for a4 while it is staffed (committed, then bound) but not haulable. They wait there empty.
+  - The extractor docks at 8875. The first hauler picked loads 2 and leaves at 8965.
+  - The fleet cap rise keeps the bay off the fleet limit. The cargo change gets the first load in before tick 9000.
+
+`reference-replay.test.ts` asserts each of these, in three new tests:
+- **(a)** The first pick at a4 is at tick 8720, with `isStaffed` true and `isHaulable` false. Its hauler waits at a4 on every tick from its arrival to the tick before the dock. It loads 2 after the dock.
+- **(b)** Every `enough` tick has weight 3 and an idle bay. Before 8720 the share is 5 on every such tick.
+- **(c)** The bay restarts at 8720, on the `setMine`, after `enough` at 8719, and the share goes into it.
+
+The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not haulable, 125 hauler-ticks waiting at an unworked rock, 280 ticks with the Extractor `enough`.
+
+**Determinism:** 30 checkpoints over 9000 ticks, final **958a2f1d** (was b8d34d88).
+
+**Existing replay assertions, kept as strong as before:**
+- `allocChanges` is 10 (9 before, plus the extractor weight at 8660).
+- p1's "Mine-marked with its free extractor" is now checked at its capture, because the script unmarks it at 8670.
+- The H2 pick check now takes its baseline from the targets F6 saw: the targets after the tick, minus the haulers assigned before F6. The old baseline was the start of the tick, and F2 can raise a target within the tick when an extractor share fills, which made a correct pick at 8661 look short of 0. The assertion itself is unchanged: every pick takes the largest shortfall, above 0.
+
+**A rule change found by the replay (logged for the Director):** a hauler at a staffed, unworked rock now waits while any extractor counted by `staffCounts` is there. That includes committed extractors, the one in the bay and a full share, not only ships docked or on their way.
+- *Why:* with the bay held by the fleet limit, the haulers sent for a4's committed extractor flew there, found no ship bound, and flew home empty, over and over.
+- *Consistency:* the accepted committed-extractors ruling already lets a committed extractor staff a rock, so the wait now follows the same count.
+- *Release:* unchanged. A hauler still leaves on Stop, or once nothing is docked, bound or committed there.
+- *Opening, v14 fixture, seed 1, no inputs:* first hauler at tick 90 and first delivery at tick 1035, unchanged. Ore by minutes 1–10 is 8, 24, 52, 80, 112, 172, 248, 344, 468, 592; before this change minutes 9 and 10 were 465 and 593. Minute 10 is 1 ore lower, and minutes 1–3 are unchanged. The pinned curve is updated.
+- *10 minutes, `hauler.autoNeed` 1, same run:* 19 extractors built, 13 alive, 0 idle; 13 haulers built, 0 idle.
+
+**Optional notes, both taken:**
+- `isEligible`'s two extra parameters are now required. Its only caller, F2, reads them once.
+- `staffCounts` has a comment on why unbound extractors aren't placed before committed ones.
+
+**Gates:** all green. The bots gate's tick p95 is at most 0.0133 ms, and the suite runs in 79.3 s. The smoke suite (main's sped-up version) has 228 passed and the 4 known failures at `h7-economy.spec.ts:286`, which belong to h8-client.
