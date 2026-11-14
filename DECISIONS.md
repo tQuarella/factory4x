@@ -1065,3 +1065,38 @@ Round 3 was reassigned to the Core Engineer under PROCESS step 2. It answers the
 
 **Decision:** (1) The Designer's edit to `packages/bots/src/reference-replay.ts` is accepted: the replay's header says to regenerate it when calibration changes the field's guards. (2) Haulers flying into an undefended raid on a Stop-able pocket: no rule change in H7. The raid banner names the target, and Stop is exactly the counterplay H7 tests. If the owner finds it cheap in play, the proposed rule (haulers wait at the probe while their node is a raid target) is ready. Logged as Can wait `cw-h7-hauler-raid-wait`. (3) drones-only ending in the runner's softlock after a wipe: it is a control and can't fail the gate. The same post-wipe idle could reach adaptive or greedy at other values, so it is Can wait `cw-h7-bots-post-wipe-idle`.
 **Why:** each of these is either the very decision H7 asks the player to make, or a control-bot path that doesn't affect the build. Spending launches on them now would delay the owner's playtest without changing what it tests.
+
+## 2026-11-14 · Retrospective · build-20261114-1 (M2 H7, One field, live enemy)
+
+Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Iteration 7 ledger" in `STATUS.md`, `BACKLOG.md` (iteration 7), `PROCESS.md`, `.claude/agents/*.md`, the entries above since the last retro, and the CI job times (`gh run view`).
+
+**Went well**
+- **The five-task stack landed in one green merge (f565c11), as the split planned.** Naming the top of the stack (last retro) held: every lower task was reviewed on its own, its approving review was merged into `task/h7-client` before the final round, and nothing was merged alone. No task was parked.
+- **Budget:** 7 launches plus this retro (8 of 12), against a plan of 4 builders and 2 Critics. The Critics were resumed across tasks, and the h7-sim core-engineer was resumed for h7-bots round 3. 17 resumes, each ending in a fix or a verdict.
+- **The Critic measured instead of trusting, and each catch protected the hypothesis.** h7-sim r1: Stop didn't release haulers, which would have broken the very counterplay to raids. h7-bots r1 traced shipped-data runs and showed the red gate came from bot defects, so h7-design-data didn't calibrate the field around bot bugs. h7-design-data r1 disproved "any pocket with a Thorn needs at least 8 drones" with a 9-layout table. h7-client r1 measured the probe sheet in the state players see (Recycle shown), not the empty landing.
+- **First faction-ai task passed round 1** (h7-raids), with its readings of R1–R9 logged and tested both ways.
+- **The team decided instead of asking.** The buffer rule, both dead-end rules and the hauler-into-raid question were Director calls with entries. The owner was asked only Q21 (vision text), which was theirs.
+
+**Didn't go well**
+- **h7-bots took three rounds.** Root causes:
+  - The spec gave adaptive no rule for "no plan fits", so the Director wrote one after round 1 and extended it after round 2.
+  - Round 1 treated "every run times out at 45:00 on v12" as calibration, which the stack note allowed, without tracing why.
+  - Round 2's dead-end tests passed on constructed worlds while the shipped-data run still idled for 35 minutes.
+- **CI cost about 70 extra minutes on h7-client.** Its smoke tests waited for game time in real time, so the gates job hit the 20-minute limit twice (43626715175, 43628680450, cancelled). The resume smoke test compared exact ticks across a reload that kept running (5802b2b widened it to a range and lowered a bound from 0.45 to 0.4; the Critic accepted it). Then the Critic's review commit 003021c, made after the green run 43630983499, needed a second full run (43635034312, 29 minutes).
+- **CI headroom is nearly gone.** After the fix the gates job takes 15.5–17.5 of its 20 minutes (smoke about 12) and the deploy job with the live smoke 13–14 of 15. `PROCESS.md` still said a CI wait was "about 4 minutes".
+- **The round-1 self-check didn't reach h7-client.** Three acceptance clauses had no test (raid texts, raid-rank line, the real result-panel trigger). The engineer's entry gave the reason for one: a real hive capture was "too long for a smoke run", which is real-time waiting again. With `advanceTicks` stepping, round 2 tested it cheaply.
+- **h7-design-data generalised from three points** ("any pocket with a Thorn needs 8"), and changed a spec line at the Director's request without a DECISIONS line from either. `designer.md` already covers derived claims and logging; not changed again. For the Director: when you ask an agent to change spec text, log the request yourself.
+- **The ledger isn't in run order** (rows 7 and r10 sit after r17).
+
+**Changes made**
+1. **`.claude/agents/engineer.md`** (also used by core-engineer, art-direction and faction-ai):
+   - Build: smoke tests never wait for game time in real time; they step the sim with `advanceTicks` to a predicate with a tick cap. Values compared across a reload or resume are read paused, or the tolerance is derived and commented. Evidence: the two cancelled runs, 9d022f9, 5802b2b.
+   - Finish, step 1: a gate the stack lets stay red still needs its cause shown. For a bots gate, trace the winners' runs on shipped data, check for idle stretches, and test no-idle over a whole run on the fixture or shipped data. Evidence: h7-bots r1 and r2.
+2. **`.claude/agents/designer.md`:** a bot strategy's spec says what it does when no plan fits (wave too big for the limit, counter locked, failed wave, economy wiped). A strategy that can idle with resources growing is a spec gap. Evidence: the two Director rules (ed97343 and the round-1 entry) and h7-bots' three rounds.
+3. **`PROCESS.md` "Before merging":**
+   - New rule: for a browser-facing task's final round, the Critic reviews and commits on the head that will merge, and the Director pushes and waits for CI after that, so the merge run already carries the verdict. CI is still required green on the exact commit merged; only the order changes. Evidence: 003021c and run 43635034312.
+   - New "Watch CI headroom": read job times after each browser-facing run; past 80% of a limit, speeding up the smoke suite goes first in Can wait; raising a limit is an owner question.
+   - The stale "about 4 minutes" now gives the H7 figure (about 30 minutes).
+4. **`BACKLOG.md` Can wait:** new `cw-smoke-sim-time`, marked do-first, because both CI jobs are already past 80% of their limits. The Director is told.
+
+**Not changed:** no gate, guardrail or protected file, and nothing in `critic.md`. The workflow's job limits stay. If `cw-smoke-sim-time` can't bring the jobs under 80%, raising a limit is an owner question. I didn't propose extending Q15 to review-only commits on the branch: the new merge order removes the extra run without loosening the rule. The 12-launch budget stays (8 used).
