@@ -95,3 +95,67 @@ I also probed a long tap with real CDP touch events (`Input.dispatchTouchEvent`,
     - report the CI gates and deploy job times with run ids, and have branch CI green on the exact commit to merge.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-14
+
+Reviewed `task/h8-client` at af0a91d: the fix commits 6ef946b and af0a91d, on top of the merge of `task/h8-raids` (bf44bad, which brings in h8-raids' approved d45cca3) and a main merge (b2861d8). I re-read the spec's client section and every round 1 item against the code.
+
+**Stack state:**
+- `task/h8-raids` is in.
+- `task/h8-bots` is not (its round 1 was REJECT, a068a4c).
+- `task/h8-design-data` doesn't exist yet.
+
+**Gates (run by me on af0a91d, `npm run gates -- --base main`): all PASS.**
+- typecheck, lint;
+- test: 1045 tests;
+- determinism: cdbdea56, h8-raids' baseline;
+- bots: flags 1–7 MET;
+- protected-files: none touched.
+
+**Smoke, run by me** on a fresh build: `h8-client.spec.ts` and `h7-economy.spec.ts` with `--repeat-each 5`, desktop and phone, **360/360 passed** in 1.3 min. That includes (a)–(d) five times each on both projects. The rock-sheet test logs the map behind the sheet with the raid out and the hold shown: 210 px at the normal font and 185 px at the wide font, every repeat.
+
+**Round 1 items:**
+1. **Done.**
+   - h8-raids is merged.
+   - The raid-badge smoke test now walks muster, out (asserting `haulersHeld` and "Haulers waiting at the probe" on the target's sheet), fight, and the end (hold false, line empty).
+   - `raidBadgeMix` and the rock sheet's `raidOn` read `rockStatus.raidTarget` only; the fallbacks are gone.
+   - `raidTarget` also holds while the raiders fly home, so the sheet now reads "Raid leaving: …" in `home`. That's a small, truthful addition within "from muster to the raid's end", and it's logged and unit-tested.
+2. **Done.** `drawGesture` draws the ghost while armed. Smoke (b) asserts the armed ghost shows `[{drone, 2}]` before the finger moves.
+3. **Done.**
+   - A unit test covers `allocStateText` for `enough` on both rows.
+   - A new smoke test checks the `enough` premise in `allocStatus` first, then asserts the exact text "enough haulers".
+4. **Done.** `#view` has `touch-action: none` (computed) in field mode.
+5. **Done.** HUD boxes, the Mine button included, are compared at muster, fight and end against the frame before the raid.
+6. **Done.**
+   - The rock sheet is now compacted: Rally moved into the head as "Rally here" / "Rally set", and Buffer and Delivered share a line.
+   - The fit test runs at both fonts in the tallest state (raid out, hold shown) and asserts the map keeps at least 195 px at the normal font. It holds 210.
+   - Keeping the hauler stepper on its own line, so the buttons don't move when the value text grows, is the right call.
+   - The new screenshot reads well.
+7. **Done.**
+   - `ghostFill` and `attackFill` are palette keys, with ART_STYLE.md Palette rows and palette-sync roles.
+   - The H8 section's sentence now says so.
+8. **Done (bound restated).**
+   - ART_STYLE.md now says the bound is r + 7 px, and gives the 1.32 r figure at the smallest reach the game passes.
+   - The art test checks reaches 22, 30 and 50, and the gallery line matches.
+   - The test now has a stray blank line where the old assertion was. That's cosmetic.
+9. **Done.**
+10. **Not done, and can't be yet.** The final-round items in acceptance 11 and 12 depend on tasks that aren't approved:
+    - merge h8-bots and h8-design-data;
+    - run the gates and the full smoke at x5 on the final data;
+    - report the CI job times with run ids;
+    - get branch CI green on the exact commit to merge.
+
+**Judgement.** The client work itself is now complete and of good quality. I have no remaining code or test changes to ask for on what is built.
+
+I am not approving, because acceptance 11 and 12 belong to this task, and BACKLOG says h8-client "gets its final Critic approval, and lands the stack" only after h8-design-data is merged. An APPROVE line here would let `merge-task h8-client` land h8-sim, h8-raids and the client on main without h8-bots' fixes or calibrated data.
+
+**Round count.** This is round 2, so the next round would be the third. The only open items are waiting on other tasks, not on rework here. The Director should log in DECISIONS.md how PROCESS's third-rejection rule applies, so this task isn't parked for waiting on its stack. I recommend that the next round be the final, stack-merged one.
+
+**Required changes (final round only):**
+- Merge `task/h8-bots` once it is approved, then `task/h8-design-data`, plus every lower task's approving review commit.
+- Re-run `npm run gates -- --base main` and the full smoke at desktop and phone with `--repeat-each 5` on the final data. Report the counts.
+- If the final data changes anything a client test or screenshot depends on (hauler counts, raid sizes or timing, the probe-sheet map room), update the premise, not the assertion, and refresh the `reports/h8-client/` shots.
+- Report the CI gates-job and deploy-job times with run ids (acceptance 11), and have branch CI green on the exact commit to merge, with this verdict committed before that run.
+- Make no client changes beyond those, or say what changed and why.
+
+VERDICT: REJECT
