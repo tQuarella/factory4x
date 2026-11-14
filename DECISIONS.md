@@ -1246,3 +1246,7 @@ These numbers are from a scratch run of this branch's code. No value fixes it, b
 **Edits outside the file list:**
 - `packages/client/src/fieldreport.ts` (compile-only): `allocStateText` switches over every `AllocState`, so it needs a case for the new `enough`. The case returns the spec's "enough haulers" and is reachable only in that state.
 - `packages/client/test/h7-client.test.ts` (compile-only): the test's `AllocRow` and `RockStatus` literals gain the new required fields: `incomePct: 0`, and `haulerNeed: 0, haulerSet: null, haulerTarget: 0, raidTarget: false, haulersHeld: false`. This test file is outside the backlog's list. Without the change the typecheck gate is red, and acceptance 7 needs it green. Every assertion is unchanged.
+## 2026-11-14 · Director · H8 H1 amendment: rocks with extractors on their way are staffed
+
+**Decision:** for hauler staffing, a Mine-marked rock with an extractor bound for it (docked or on its way) counts as needing haulers; see DESIGN.md "H1 amendment". h8-sim implements it before its Critic round.
+**Why:** h8-sim built H1 as written and measured the first hauler at 3:13 on v14 and no ore delivered before minute 4 (H7: first hauler at tick 90, first delivery at tick 1035). The owner's first note on H7 praised starting on mining; a three-minute dead opening would undo that. No data value fixes it, so it is a rule fix, not calibration.

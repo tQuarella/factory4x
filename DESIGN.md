@@ -607,6 +607,12 @@ There is no A/B for this: a mode where the drag also carries haulers would bring
 - `target(n)` = `haulerSet[n]` if the player set a count, else `need(n)`. A node that isn't haulable has a target of 0.
 - The needs at v13 values with `hauler.needPct` 110, computed from the coordinates, are 1 each for a1–a4, 3 for a5, 2 each for a6 and a7, and 1 each for p1 and p2 once taken. h8-sim's test pins them.
 
+**H1 amendment (Director, 2026-11-14, from h8-sim's report).** As first written, H1 left every target at 0 at the landing, because no rock is worked until its extractors dock. The Hauler bay couldn't take ore, all 40 opening ore went to extractors, and the first hauler came at 3:13 on v14 (H7: tick 90), with no ore delivered until minute 4. That breaks H7 criterion 1 and the "first minute is about mining" claim. So, for staffing only:
+- A node is **staffed** if it is Mine-marked and either haulable (as H7) or has at least one extractor ship bound for it (docked or on its way).
+- H1's need, target and shortfall, H2's pick and H4's bay use staffed nodes. `yieldPerMin` counts bound extractors (docked plus on their way) plus free ones, so a rock's need is known when its first extractor launches.
+- A hauler assigned to a staffed node that isn't worked yet flies there and waits for cargo as in F6. The "no longer worked" release in F6 applies only once the node has been worked, or when it stops being staffed (Stop, or every bound extractor lost).
+- Acceptance: on v14 with no inputs, the first hauler is built no later than H7's (tick 90 ± the build time), the first delivery is no later than H7's tick 1035, and ore delivered by minutes 1, 2 and 3 is at least H7's (8, 20, 40). The opening never builds a hauler beyond the staffed targets.
+
 **H2. Assignment (replaces F6's pick).**
 - A hauler at the probe with no haulable target picks the haulable node with the largest shortfall above 0, where shortfall = `target − assigned`.
 - Ties go to the node nearest the probe, then to the lower index.
