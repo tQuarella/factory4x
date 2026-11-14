@@ -118,7 +118,7 @@
       "layout": {
         "pockets": {
           "p1": { "prize": "ice", "slots": 2, "thorns": 0, "spores": 4 },
-          "p2": { "prize": "crystal", "slots": 2, "thorns": 1, "spores": 3 }
+          "p2": { "prize": "crystal", "slots": 2, "thorns": 1, "spores": 2 }
         },
         "heart": { "thorns": 12, "spores": 18 }
       }

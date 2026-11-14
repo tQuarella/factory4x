@@ -22,8 +22,6 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - 850: setAlloc drone 0 returns the drone share. 900: recycleShips of a docked extractor at a2 frees its slot
  *     (the idle extractor takes it) and a place in the fleet, which the Flak bay takes, paying its ice.
  *   - 2400: the drones and the Flak take the crystal pocket p2 (sendShips).
- *   - 3500 (h7-design-data, data v13): sendShips from p1 to p2 again, so the warships built since 2400 leave p1 and
- *     raid 2 finds it undefended (with the v13 field guards, one would otherwise still be there).
  *   - 7000 (h7-raids): the fleet limit rises to 40, the rally goes back to the probe and drones get all the ore, so the
  *     new warships wait at the probe. 7750: sendShips from the probe to the hive. It falls at tick 8010.
  *
@@ -86,7 +84,6 @@ export const referenceReplay: Replay = {
     ...at(850, alloc('drone', 0)),
     ...at(900, { type: 'recycleShips', node: 2, counts: { drone: 0, lancer: 0, flak: 0, extractor: 1 } }),
     ...at(2400, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
-    ...at(3500, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
     ...at(7000, tun('field.fleetCap', 40), { type: 'setRally', node: 0 }, alloc('drone', 5)),
     ...at(7750, { type: 'sendShips', from: 0, to: 10, counts: SEND_ALL }),
   ],

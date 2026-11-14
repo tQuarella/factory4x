@@ -609,7 +609,7 @@ Frame nodes from the H3 frame (positions unchanged). The heart is the **hive**.
 | `a5` | asteroid | 3 | ore | – | yes | 430 |
 | `a6`, `a7` | asteroid | 2 each | ore | – | yes | 534 |
 | `p1` | pocket | 2 | ice | 0 / 4 | after capture | 645 |
-| `p2` | pocket | 2 | crystal | 1 / 3 | after capture | 645 |
+| `p2` | pocket | 2 | crystal | 1 / 2 | after capture | 645 |
 | `heart` | the hive | 4 | ore | 12 / 18 | after capture | 0 |
 
 The guard counts are data v13, calibrated by h7-design-data to "Calibration targets (H7)" (v12 had p1 0 / 6, p2 4 / 2 and the hive 12 / 24; see "Calibration result (h7-design-data, data v13)"). Data shape: `map.field = { nodes: [ids], mine: [ids], layout: { pockets: {...}, heart: {thorns, spores} } }`, in the H4 area layout format (no Root, no starved counts). `parseSimData` checks that every id is a frame node, `probe` is first, `heart` is present, `mine` holds asteroids only, and in field mode that `ship.hauler.cargo ≤ node.bufferCap` and `economy.probeOrePerMin ≥ 1` (the softlock floor).
@@ -872,7 +872,7 @@ The seed doesn't change the field. The gate still runs every seed it's given, wh
 - **The first raid** musters between 2 and 6 game minutes into an `adaptive` run.
 - **Raid threat:** an undefended full-economy raid on a5 kills at least 2 economy ships. A defence of matched warships at the target, no larger than the raid, beats it while losing at most 2 ships, so defending is cheaper than being raided.
 - **The hive:** flags 4, 5 and 6 hold. The best mix fits `field.fleetCap − 10` with at least 2 slots to spare.
-- **The pockets** (amended by h7-design-data, 2026-11-14; was "each falls to drones alone within 6 drones and not within 2"): the cheaper pocket falls to drones alone within 6 and not within 2 (F13). The other falls to drones alone within 8, or within 6 to drones plus the counter the first pocket unlocks. Why: Spores regrow every 20 ticks (1.5 per round) and Thorns repair 2 per round, so any pocket with a Thorn needs at least 8 drones (measured on v12 values: 1 / 3 needs 8, 2 / 2 needs 11, 4 / 2 needs 15). Only a pure-Spore pocket fits 6, and two pure-Spore pockets would make Flak the only counter either door opens.
+- **The pockets:** each falls to drones alone within 6 drones and not within 2 (F13).
 - Calibration changes only values in `data/sim.json` (guard counts, the H7 keys and the reused keys above), never rules. A rule finding goes to the Director.
 
 #### Calibration result (h7-design-data, data v13)
@@ -887,23 +887,23 @@ Probe on v12: `reports/archive/h7-probe-v12.md`. Result on v13: `reports/archive
 | `raid.econPerRaider` | 3 | 2 | Flag 4 missed (26%). Realistic raids were too small to open the hive: at econ 12 / 18 / 22 they took 4 / 6 / 8 guards and cut the best wave by 11% / 16% / 21%. Now 6 / 9 / 11 guards. |
 | `raid.maxSize` | 10 | 12 | So a full economy (22–23 ships) reaches the full-size raid flag 4 measures (`ceil(23 ÷ 2)` = 12). Flag 4 is met with a raid that occurs in play, not a size no run reaches. |
 | `hive.regrowPct` | 100 | 200 | A beaten raid leaves the hive open twice as long, and the hive's own regrowth during an attack weighs less, so the raid-out window (11 against 16, 31%) is real for a wave already on its way. |
-| `raid.gapTicks` | 2700 (90 s) | 3600 (120 s) | Bigger raids at a 90 s gap pushed `greedy` to 39:20, 40 s inside its 40-minute target, and `adaptive` to 25:38. At 120 s: 20:02 and 30:16. |
-| p1 (T / S) | 0 / 6 | 0 / 4 | 8 drones → 6: the cheaper first door (amended pocket target). |
-| p2 (T / S) | 4 / 2 | 1 / 3 | 15 drones → 8, or 5 with Flak (2 drones, 3 Flak): the second door, cheaper with the first pocket's counter. |
+| `raid.gapTicks` | 2700 (90 s) | 3600 (120 s) | Bigger raids at a 90 s gap pushed `greedy` to 39:20, 40 s inside its 40-minute target, and `adaptive` to 25:38. At 120 s: 20:02 and 30:16 with p2 at 1 / 3, and 24:54 and 30:12 with the final p2 1 / 2. |
+| p1 (T / S) | 0 / 6 | 0 / 4 | 8 drones → 6. |
+| p2 (T / S) | 4 / 2 | 1 / 2 | 15 drones → 5. It keeps one Thorn, so it stays the crystal (Lancer) door. Smallest drone wave on v13 by p2 layout (Critic's table, round 1): 0/4 6, 0/5 7, 0/6 8, 1/0 3, 1/1 4, 1/2 5, 1/3 8, 2/0 8, 2/1 9. One Thorn's repair is outrun by drones until a third Spore keeps it alive. |
 
 **Targets on v13:**
 
 | Target | v13 | Met |
 | --- | --- | --- |
-| Pace: adaptive 15–30, greedy ≤ 40 | 20:02 / 30:16 (no raids: 11:10) | yes |
+| Pace: adaptive 15–30, greedy ≤ 40 | 24:54 / 30:12 (no raids: 10:55) | yes |
 | First raid musters at 2–6 game minutes | 2:53 (tick 5191) | yes |
 | An undefended full-economy raid on a5 kills ≥ 2 economy ships | a raid of 11 (4T 7S, econ 22) kills all 5 there (3 extractors, 2 haulers) | yes |
 | A matched defence no larger than the raid beats it losing ≤ 2 | 3 lancers + 5 flak (8) beat it, 2 lost; 2 + 5 lose 3 | yes |
 | The hive: flags 4–6; the best mix fits `field.fleetCap − 10` with ≥ 2 spare | 16 (7 lancers, 9 flak); 4 spare | yes |
-| The pockets (amended) | p1 6 drones (not 2); p2 8 drones, or 5 with Flak | yes |
+| Each pocket falls to drones alone within 6, not within 2 | p1 6; p2 5 | yes |
 | Flags 1–7 | all met | yes |
 
-**Order check (designer.md: what the spec inherits).** Every `min-wave` measurement above was rerun in a second arbitrary order: ships placed flak, lancer, drone (the estimate places drone, lancer, flak), and the raid-away hive keeping its highest guard ids (the estimate keeps the lowest), exhaustively over every mix of the best total and one less. Hive 16 / 16, hive with the raid out 11 / 11, p1 6 / 6, p2 8 / 8. Nothing moved.
+**Order check (designer.md: what the spec inherits).** Every `min-wave` measurement above was rerun in a second arbitrary order: ships placed flak, lancer, drone (the estimate places drone, lancer, flak), and the raid-away hive keeping its highest guard ids (the estimate keeps the lowest), exhaustively over every mix of the best total and one less. Hive 16 / 16, hive with the raid out 11 / 11, p1 6 / 6, p2 5 / 5. Nothing moved.
 
 **What no bot exercises, candidly.**
 - No bot recycles economy ships to make room for the attack, so the slot trade (flag 6) is shown by arithmetic, not by a run.

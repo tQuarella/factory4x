@@ -1014,3 +1014,13 @@ Round 3 was reassigned to the Core Engineer under PROCESS step 2. It answers the
 **For the Director (not changed here):**
 - **Rule question:** a captured pocket's haulers keep flying into an undefended raid (h7-raids review). A possible rule: a hauler waits at the probe while its node is the target of a raid that's out or fighting.
 - **Bot finding:** `drones-only` ends in the runner's softlock at 28:12 on every seed. After its economy is wiped it sets every weight to 0 and idles. `adaptive` and `greedy` share those rules after a wipe, so this is a latent gate risk.
+
+## 2026-11-14 · Designer · h7-design-data round 1 fixes: pocket target met as written; state-line wording
+
+**Decision:**
+1. **The pocket target is met as originally written, and the amendment is withdrawn.** The amendment logged above (item 2 of "h7-design-data: calibration to data v13") rested on a false claim: "any pocket with a Thorn needs at least 8 drones". The Critic measured on v13 (`fieldSingle`, p2 only): 1/0 → 3, 1/1 → 4, 1/2 → 5, 1/3 → 8, 2/0 → 8. I generalised from three points (1/3, 2/2, 4/2) and skipped the cases that disprove it.
+   - p2 is now 1 / 2: 5 drones, not 2. It keeps a Thorn, so it stays the Lancer door. p1 stays 0 / 4 (6 drones).
+   - The order check is unchanged (p2 5 / 5).
+   - Bots on v13: adaptive 24:54, greedy 30:12, flags 1–7 met.
+   - The reference replay no longer needs its tick-3500 `sendShips`. At p2 1 / 2 no warship is left at p1 when raid 2 arrives, so that input was ignored, and it was removed. The four pinned raid knobs stay.
+2. **The DESIGN.md probe-sheet state line ("needs crystal pocket" / "needs ice pocket")** was changed at the Director's request, to match the text h7-client built and tests in its fix round (3c9f761).
