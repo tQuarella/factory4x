@@ -22,6 +22,8 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - 850: setAlloc drone 0 returns the drone share. 900: recycleShips of a docked extractor at a2 frees its slot
  *     (the idle extractor takes it) and a place in the fleet, which the Flak bay takes, paying its ice.
  *   - 2400: the drones and the Flak take the crystal pocket p2 (sendShips).
+ *   - 3500 (h7-design-data, data v13): sendShips from p1 to p2 again, so the warships built since 2400 leave p1 and
+ *     raid 2 finds it undefended (with the v13 field guards, one would otherwise still be there).
  *   - 7000 (h7-raids): the fleet limit rises to 40, the rally goes back to the probe and drones get all the ore, so the
  *     new warships wait at the probe. 7750: sendShips from the probe to the hive. It falls at tick 8010.
  *
@@ -33,7 +35,8 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  * Node indices are the field's nodes in frame order: 0 probe, 1-7 a1-a7, 8 p1 (ice), 9 p2 (crystal), 10 heart.
  * It runs on the shipped data, so a calibration that changes the field's guards can break the script
  * (packages/sim/test/reference-replay.test.ts says so); the tunables it depends on are set at tick 0 to keep that
- * rare.
+ * rare. h7-design-data (data v13) added the four raid knobs it calibrated (raid.econPerRaider 3, raid.maxSize 10,
+ * raid.gapTicks 2700, hive.regrowPct 100: the values the raid timings below were written for).
  */
 const at = (tick: number, ...inputs: Input[]) => inputs.map((input) => ({ tick, input }));
 const tun = (key: Extract<Input, { type: 'setTunable' }>['key'], value: number): Input => ({ type: 'setTunable', key, value });
@@ -65,6 +68,10 @@ export const referenceReplay: Replay = {
       tun('guard.thorn.regrowTicks', 600),
       tun('guard.spore.regrowTicks', 600),
       tun('field.fleetCap', 12),
+      tun('raid.econPerRaider', 3),
+      tun('raid.maxSize', 10),
+      tun('raid.gapTicks', 2700),
+      tun('hive.regrowPct', 100),
       mine(3, false),
       mine(4, false),
       mine(5, false),
@@ -79,6 +86,7 @@ export const referenceReplay: Replay = {
     ...at(850, alloc('drone', 0)),
     ...at(900, { type: 'recycleShips', node: 2, counts: { drone: 0, lancer: 0, flak: 0, extractor: 1 } }),
     ...at(2400, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
+    ...at(3500, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
     ...at(7000, tun('field.fleetCap', 40), { type: 'setRally', node: 0 }, alloc('drone', 5)),
     ...at(7750, { type: 'sendShips', from: 0, to: 10, counts: SEND_ALL }),
   ],
