@@ -105,7 +105,7 @@ describe('allocStatus', () => {
 });
 
 describe('rockStatus', () => {
-  it('mine, mineable, docked, bound (with in-flight), slots, haulers, buffer, delivered per minute, raidRank 0', () => {
+  it('mine, mineable, docked, bound (with in-flight), slots, haulers, buffer, delivered per minute, raidRank (h7-raids)', () => {
     const w = quietField();
     w.field!.mine[F.a5] = true;
     addEcon(w, 'extractor', F.a5, F.a5);
@@ -130,9 +130,10 @@ describe('rockStatus', () => {
       bufferCap: 40,
       backedUp: false,
       deliveredPerMin: 0,
-      raidRank: 0,
+      // The only raidable rock (Mine-marked, a docked extractor and an assigned hauler): rank 1.
+      raidRank: 1,
     });
-    expect(rockStatus(w, F.a1)).toMatchObject({ mine: false, mineable: false, docked: 0, bound: 0, haulers: 0 });
+    expect(rockStatus(w, F.a1)).toMatchObject({ mine: false, mineable: false, docked: 0, bound: 0, haulers: 0, raidRank: 0 });
   });
 
   it('backedUp exactly when the buffer is at node.bufferCap', () => {

@@ -190,7 +190,7 @@
  *                                   node; hauler: assigned node), cargo, cargoRes}. Economy ships are NOT in world.ships
  *                                   (warships only), so every H3–H6 path over world.ships is unchanged. Node.extractors
  *                                   is derived in field mode: free + docked extractor ships.
- *   world.raid, world.nextRaidTick  R1 (DESIGN.md H7 "Raids"): null / 0 here; h7-raids fills them in src/factions/.
+ *   world.raid, world.nextRaidTick  R1 (DESIGN.md H7 "Raids"): null / 0 at the landing; src/factions/ (h7-raids) runs them, and world.lastRaid is the last raid result.
  *   stats                           H7 adds econBuilt, econLost, econRecycled ({extractor, hauler}), raids {mustered,
  *                                   beaten, hit, turnedBack}, allocChanges, peakEcon (zero in a campaign).
  *   Per tick (field): F1 inputs, F2 allocation (smooth weighted round robin, 1 ore at a time), F3 bays (finish, then
@@ -207,7 +207,7 @@
  *                                   0–100, ticksLeft, totalTicks, state: off | locked | filling | waitingResource |
  *                                   fleetFull | building}, maxWeight, stockOre, incomePerMin.
  *   rockStatus(world, node)         rock sheet: mine, mineable, docked, bound, inFlight, slots, freeExtractors, haulers,
- *                                   buffer, bufferCap, backedUp, deliveredPerMin (60 s), raidRank (0 until h7-raids).
+ *                                   buffer, bufferCap, backedUp, deliveredPerMin (60 s), raidRank (h7-raids).
  *   fieldSummary(world)             result panel: capturedTick, timeToHiveSec, peakPerMin, built/lost/recycled per
  *                                   BUILD_TYPES type, raids, econLostToRaids, allocChanges, peakEcon.
  *   guardPools(tun, guards), guardStrike(pools, warships, econ?)   rule 7's guard damage (H6 amendment), shared by F10
@@ -258,7 +258,8 @@ export {
   worstHauls,
 } from './data.ts';
 export type { BuildType, EconType, FieldMap, RunMode } from './data.ts';
-export type { Raid, RaidPhase } from './factions/index.ts';
+export { isRaidable, launchMix, raidKeep, raidMix, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
+export type { Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
 export {
   econAlive,
   econAtByType,

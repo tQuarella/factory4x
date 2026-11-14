@@ -119,8 +119,12 @@ function econShipOk(s: unknown, nodes: number): boolean {
 }
 
 /** H7 R1: `world.raid` null or an object with a phase, and `nextRaidTick` an integer. */
-function raidOk(raid: unknown, next: unknown): boolean {
-  return isInt(next) && (raid === null || (isObj(raid) && typeof raid.phase === 'string' && Array.isArray(raid.guards)));
+function raidOk(raid: unknown, next: unknown, last: unknown): boolean {
+  return (
+    isInt(next) &&
+    (raid === null || (isObj(raid) && typeof raid.phase === 'string' && Array.isArray(raid.guards))) &&
+    (last === null || (isObj(last) && typeof last.outcome === 'string'))
+  );
 }
 
 /** H7 F14: the stats additions. */
@@ -162,7 +166,7 @@ export function deserializeWorld(text: string, data: SimData): LoadResult {
   const ids = fieldIds ?? (area === null ? [] : area.nodes);
   const nodeCount = ids.length;
   const guarded = data.map.nodes.filter((n) => ids.includes(n.id) && (n.kind === 'pocket' || n.kind === 'root' || n.kind === 'heart')).length;
-  if (!fieldOk(w.field, fieldIds === null ? null : nodeCount) || !raidOk(w.raid, w.nextRaidTick) || !h7StatsOk(w.stats)) {
+  if (!fieldOk(w.field, fieldIds === null ? null : nodeCount) || !raidOk(w.raid, w.nextRaidTick, w.lastRaid) || !h7StatsOk(w.stats)) {
     return { ok: false, reason: 'corrupt', saveDataVersion };
   }
   const wellFormed =

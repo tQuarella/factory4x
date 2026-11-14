@@ -22,6 +22,13 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - 850: setAlloc drone 0 returns the drone share. 900: recycleShips of a docked extractor at a2 frees its slot
  *     (the idle extractor takes it) and a place in the fleet, which the Flak bay takes, paying its ice.
  *   - 2400: the drones and the Flak take the crystal pocket p2 (sendShips).
+ *   - 7000 (h7-raids): the fleet limit rises to 40, the rally goes back to the probe and drones get all the ore, so the
+ *     new warships wait at the probe. 7750: sendShips from the probe to the hive. It falls at tick 8010.
+ *
+ * The raids (DESIGN.md H7 R1-R9) run on their own from tick 95, when the economy reaches 6 ships, and the script
+ * leaves them alone: raid 1 musters at a1 and, a1 being stopped at 600, retargets to the captured p1, where the rally
+ * defenders beat it (tick 900). Raid 2 (muster 3600) hits p1 after the ships went to p2: undefended, it kills a docked
+ * extractor and comes home. Raid 3 (muster 7265) is at p1 when the hive falls at 8010, and withers.
  *
  * Node indices are the field's nodes in frame order: 0 probe, 1-7 a1-a7, 8 p1 (ice), 9 p2 (crystal), 10 heart.
  * It runs on the shipped data, so a calibration that changes the field's guards can break the script
@@ -72,5 +79,7 @@ export const referenceReplay: Replay = {
     ...at(850, alloc('drone', 0)),
     ...at(900, { type: 'recycleShips', node: 2, counts: { drone: 0, lancer: 0, flak: 0, extractor: 1 } }),
     ...at(2400, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
+    ...at(7000, tun('field.fleetCap', 40), { type: 'setRally', node: 0 }, alloc('drone', 5)),
+    ...at(7750, { type: 'sendShips', from: 0, to: 10, counts: SEND_ALL }),
   ],
 };
