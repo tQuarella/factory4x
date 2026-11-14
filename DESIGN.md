@@ -761,6 +761,8 @@ The H1–H7 rules hold: 375 px portrait, no hover, targets ≥ 44 px, at most 2 
 - Tapping one shows the fixed banner "Tap where to send 6 ships · Cancel". The next node tap sends `moveShips`; empty space or Cancel cancels.
 - **Both modes are built.** If h8-client's smoke tests can't make the drag reliable (see BACKLOG), the engineer reports it, and the Director decides whether to ship with default 0.
 
+- *Amended (Director, 2026-11-14):* the hold ends on the tick the raid's outcome is decided (beaten, hit, turned back or withered), not when the raiders reach home.
+
 **Hauler count (rock sheet).**
 - The Haulers row reads "2 · Auto", with −, + and Auto buttons (each 44 px).
 - Once a count is set, it reads "3 · set (Auto 2)".
