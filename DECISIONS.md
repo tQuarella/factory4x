@@ -1194,7 +1194,7 @@ These numbers are from a scratch run of this branch's code. No value fixes it, b
    - at the node: held means load what is there and leave.
 
    This makes an import cycle between field.ts and factions, which the backlog's placement forces. It is safe, because neither module calls the other while loading. *Rejected:* a callback passed from step.ts, which would move the call site out of `runHaulers`, against the backlog.
-4. **Cost:** the bots gate on this branch (18 runs, 45 game minutes cap) reports a tick p95 of at most 0.0094 ms, against the 2.0 ms budget. `haulersWanted` is read once per F2 call, not once per ore moved.
+4. **Cost:** the bots gate on this branch (18 runs, 45 game minutes cap) reports a tick p95 of at most 0.0109 ms (final run; 0.0094 ms on the run before), against the 2.0 ms budget. `haulersWanted` is read once per F2 call, not once per ore moved.
 
 **Spec readings (calls the spec doesn't make):**
 - **H4 also gates the bay start, not only F2 eligibility.** Otherwise a full Hauler share, filled while a rock was short, would start a hauler after the shortfall closed, which breaks "the probe never builds a hauler that no rock needs". The share is kept, as the spec says.
