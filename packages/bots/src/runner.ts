@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import {
   RAW_RESOURCES,
+  runMode,
   campaignSummary,
   campaignWorld,
   createWorld,
@@ -143,6 +144,11 @@ const sumTriple = (t: ResourceTriple): number => RAW_RESOURCES.reduce((n, r) => 
  * one area, or an overworld with nothing to buy and nothing open, is a softlock.
  */
 export function runCampaign(strategy: CampaignStrategy, seed: number, data: SimData, opts: RunOptions): CampaignResult {
+  // h7-sim (Director-approved): a field-mode world never enters an area, so the play-tick cap below would never
+  // advance and the loop would run forever. Fail fast instead; h7-bots replaces this runner for field mode.
+  if (runMode(data) === 'field') {
+    throw new Error("runCampaign plays the H6 campaign and can't run field-mode data (run.mode \"field\"); pass withRunMode(data, 'campaign')");
+  }
   const world = opts.start ? campaignWorld(seed, data, opts.start) : createWorld(seed, data);
   const camp = world.campaign;
   const times: number[] = [];
