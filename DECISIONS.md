@@ -1056,3 +1056,12 @@ Round 3 was reassigned to the Core Engineer under PROCESS step 2. It answers the
    - Bots on v13: adaptive 24:54, greedy 30:12, flags 1–7 met.
    - The reference replay no longer needs its tick-3500 `sendShips`. At p2 1 / 2 no warship is left at p1 when raid 2 arrives, so that input was ignored, and it was removed. The four pinned raid knobs stay.
 2. **The DESIGN.md probe-sheet state line ("needs crystal pocket" / "needs ice pocket")** was changed at the Director's request, to match the text h7-client built and tests in its fix round (3c9f761).
+## 2026-11-14 · Director · h7-bots round 3 to the core-engineer; recycle rule extended to pocket waves
+
+**Decision:** h7-bots was rejected twice (a wounded drone sent in a pocket wave; a second dead end after a failed pocket wave). Per the deadlock rule, round 3 goes to the core-engineer (resumed from h7-sim, which knows the field code). The Director's recycle rule is extended: once a pocket is the plan, recycling may also free room for that pocket's wave, down to the same `raid.firstAtEcon` floor.
+**Why:** the second dead end sits in the rule as first written (it freed room only for the hive wave). Recycle is a player action, and the no-idle requirement outranks keeping the bot minimal. adaptive-no-raids is the in-build A/B for `raid.enabled`, so it must not falsely report that the field can't be won without raids.
+
+## 2026-11-14 · Director · h7-design-data follow-ups
+
+**Decision:** (1) The Designer's edit to `packages/bots/src/reference-replay.ts` is accepted: the replay's header says to regenerate it when calibration changes the field's guards. (2) Haulers flying into an undefended raid on a Stop-able pocket: no rule change in H7. The raid banner names the target, and Stop is exactly the counterplay H7 tests. If the owner finds it cheap in play, the proposed rule (haulers wait at the probe while their node is a raid target) is ready. Logged as Can wait `cw-h7-hauler-raid-wait`. (3) drones-only ending in the runner's softlock after a wipe: it is a control and can't fail the gate. The same post-wipe idle could reach adaptive or greedy at other values, so it is Can wait `cw-h7-bots-post-wipe-idle`.
+**Why:** each of these is either the very decision H7 asks the player to make, or a control-bot path that doesn't affect the build. Spending launches on them now would delay the owner's playtest without changing what it tests.
