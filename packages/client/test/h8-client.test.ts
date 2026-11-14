@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { defaultData, raidStatus, rockStatus, tunableMeta, type RockStatus } from '@factory4x/sim';
+import { defaultData, raidStatus, rockStatus, tunableMeta, type AllocRow, type RockStatus } from '@factory4x/sim';
 import { MoveGesture, type GestureDeps } from '../src/gesture.ts';
-import { MINE_MODE_TOAST, RADAR_NOTE, haulerRowText, moveBannerText, movedText, pctText, raidRockText, recycleFleetText } from '../src/fieldreport.ts';
+import { MINE_MODE_TOAST, RADAR_NOTE, allocStateText, haulerRowText, moveBannerText, movedText, pctText, raidRockText, recycleFleetText } from '../src/fieldreport.ts';
 import { CLIENT_SETTING_KEYS, defaultSettings, loadSettings, type StorageLike } from '../src/persist.ts';
 import { Session } from '../src/session.ts';
 import { raidBadgeMix } from '../src/view.ts';
@@ -159,7 +159,13 @@ describe('acceptance 2 to 7: the H8 texts', () => {
     expect(recycleFleetText(0, 0)).toBe('Recycle');
     expect(recycleFleetText(3, 24)).toBe('Recycle 3 (+24 ore)');
   });
-  it('the rock sheet names what is coming, then what is here', () => {
+  it('the `enough` state reads "enough haulers" on the Hauler row and "enough extractors" on the Extractor row', () => {
+    const row = (type: 'extractor' | 'hauler'): AllocRow => ({ type, weight: 2, share: 0, cost: { ore: 15, resource: null }, unlocked: true, building: 0, ticksLeft: 0, totalTicks: 90, state: 'enough', incomePct: 40 });
+    expect(allocStateText(row('hauler'))).toBe('enough haulers');
+    expect(allocStateText(row('extractor'))).toBe('enough extractors');
+  });
+  it('the rock sheet names what is coming, then what is here, then that it is leaving', () => {
+    expect(raidRockText('home', { thorn: 1, spore: 0 })).toBe('Raid leaving: 1 Thorn');
     expect(raidRockText('muster', { thorn: 1, spore: 4 })).toBe('Raid coming: 4 Spores, 1 Thorn');
     expect(raidRockText('out', { thorn: 2, spore: 0 })).toBe('Raid coming: 2 Thorns');
     expect(raidRockText('fight', { thorn: 0, spore: 1 })).toBe('Raid here: 1 Spore');
@@ -202,7 +208,7 @@ describe('acceptance 6: the raid badge', () => {
     const r = raidStatus(s.world);
     expect(r.phase).not.toBe('none');
     const target = r.target!;
-    const mixes = s.world.nodes.map((n) => raidBadgeMix(s.world, n.index, n.kind === 'probe' ? false : rockStatus(s.world, n.index).raidTarget));
+    const mixes = s.world.nodes.map((n) => raidBadgeMix(s.world, n.kind === 'probe' ? false : rockStatus(s.world, n.index).raidTarget));
     s.world.nodes.forEach((n, i) => {
       if (n.index === target) expect(mixes[i]).not.toBeNull();
       else expect(mixes[i], `node ${n.id}`).toBeNull();
@@ -211,6 +217,6 @@ describe('acceptance 6: the raid badge', () => {
     expect(mix.thorn + mix.spore).toBeGreaterThan(0);
     // To the end: the badge goes when the raid has finished.
     for (let i = 0; i < 12000 && !(raidStatus(s.world).phase === 'none' && raidStatus(s.world).last !== null); i++) s.stepOnce();
-    expect(raidBadgeMix(s.world, target, false)).toBeNull();
+    expect(raidBadgeMix(s.world, rockStatus(s.world, target).raidTarget)).toBeNull();
   });
 });

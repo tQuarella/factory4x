@@ -1430,3 +1430,11 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 **Tests:** `raids-h8.test.ts` (hold ends at the decision for each outcome with the raiders still flying home for hit and turned back; a hauler leaves the tick after the raid turns for home; selectors in `home`). Replay: raid 2's outcome is decided at tick 4350 (it leaves p1 for home; it lands at 4565), and p1's haulers leave the probe within a tick of 4350.
 **Replay re-baseline:** with the shorter hold the first hauler pick for a4 is back at 8720 and the first picked hauler loads first, so h8-sim's two original assertions are restored exactly (call 6's 8750 and the "first load by any hauler" edit are reverted). The 8440 Flak recycle stays.
 **Determinism:** `Determinism PASS: 30 checkpoints over 9000 ticks, final cdbdea56` (was f9325835). Gates all green; flag 2 still "greedy first hit killed 2" on three seeds.
+
+## 2026-11-14 · Engineer · h8-client round 1 fixes
+
+- **Rock sheet compacted to keep the map's room (H7 rule).** With the raid out and the hold shown (the tallest state) the map was 135 px at the normal font. Changes: the Rally button moves into the sheet head beside the title as "Rally here" / "Rally set" (as the probe sheet does), and Buffer and Delivered share one line. The map is now **210 px at the normal font and 185 px at the wide font** (sheet 297 and 322 px), against 135 and 110 before. The probe sheet is unchanged (its H7 check, 195 px, still passes). The hauler row and its stepper stay on two lines on purpose: one line would wrap when the value reads "3 · set (Auto 2)", moving the buttons under a finger.
+- **The raid badge and the rock sheet read `rockStatus.raidTarget` only** (h8-raids merged; the `raidStatus` phase fallbacks are gone). `raidTarget` also holds during the raiders' flight home, so the sheet reads "Raid leaving: ..." then.
+- **Two palette keys after all:** `ghostFill` and `attackFill` replace the raw `rgba(...)` fills; both have Palette rows in ART_STYLE.md, and the H8 section no longer says "no new keys".
+- **Drop highlight bound restated, not redrawn:** within r + 7 px (an 8 px halo stroke at r + 3), which is 1.32 r at the smallest reach the game passes (22 px) and 1.14 r at 50. Tested at 22, 30 and 50.
+- **An armed split draws its ghost** with the half counts, as the spec's state 3 says.

@@ -686,7 +686,7 @@ boundLines.push(`raid marker: ${(measure((c, r) => drawRaidMarker(c, r, { thorn:
 boundLines.push(`mine badge: ${(measure((c, r) => drawMineBadge(c, r)) / 50).toFixed(3)} r`);
 boundLines.push(`raid badge: ${(measure((c, r) => drawRaidBadge(c, r, { thorn: 3, spore: 2 })) / 50).toFixed(3)} r`);
 boundLines.push(`split pulse: ${(measure((c, r) => drawSplitPulse(c, r, 0)) / 50).toFixed(3)} r (limit 1.500 r)`);
-boundLines.push(`drop highlight: ${(measure((c, r) => drawDropHighlight(c, r, true, 0)) / 50).toFixed(3)} r (limit 1.200 r)`);
+boundLines.push(`drop highlight: ${(measure((c, r) => drawDropHighlight(c, r, true, 0)) / 50).toFixed(3)} r (limit r + 7 px = 1.140 r at r = 50)`);
 boundLines.push(`raided rock (rim and glow, no pips): ${(measure((c, r) => drawAsteroid(c, r, 3, 0, 0, 'raided', 0.3)) / 50).toFixed(3)} r (limit 1.100 r)`);
 
 for (const key of Object.keys(silhouettes.iou)) {

@@ -213,7 +213,7 @@ export const RAID_HELD_TEXT = 'Haulers waiting at the probe';
 
 /** "Raid coming: 4 Spores, 1 Thorn" while it musters or flies out; "Raid here: ..." once it fights at the rock. */
 export function raidRockText(phase: 'muster' | 'out' | 'fight' | 'home' | 'none', mix: Readonly<{ thorn: number; spore: number }>): string {
-  return `${phase === 'fight' ? 'Raid here' : 'Raid coming'}: ${raidMixText(mix)}`;
+  return `${phase === 'fight' ? 'Raid here' : phase === 'home' ? 'Raid leaving' : 'Raid coming'}: ${raidMixText(mix)}`;
 }
 
 /** The tap-Move-tap banner: "Tap where to send 6 ships". */

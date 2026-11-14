@@ -40,10 +40,15 @@ describe('H8 art: the raid badge, the highlight and the pulse', () => {
     drawMineBadge(ctx, 12);
     expect(styles).toContain(palette.asteroidOre);
   });
-  it('the drop highlight stays within 1.2 r and is pink for an attack, bright white-blue for a move', () => {
+  it('the drop highlight stays within r + 7 px at every reach the game passes (22 px up), pink for an attack, white-blue for a move', () => {
+    for (const reach of [22, 30, R]) {
+      const { ctx, hits } = recorder();
+      drawDropHighlight(ctx, reach, true, 0.3);
+      expect(maxRadius(hits)).toBeLessThanOrEqual(reach + 7 + 0.0001);
+    }
     const a = recorder();
     drawDropHighlight(a.ctx, R, true, 0.3);
-    expect(maxRadius(a.hits)).toBeLessThanOrEqual(R * 1.2);
+
     expect(a.styles).toContain(palette.bloom);
     expect(a.styles).not.toContain(palette.starBright);
     const m = recorder();

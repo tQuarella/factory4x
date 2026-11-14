@@ -208,6 +208,9 @@ export class Sheet {
 
     const head = h('div', 'sheet-head', '', this.root);
     const title = h('h2', '', longName(n, isCaptured(world), isRootCut(world), field), head);
+    // H8: a rock's sheet keeps its Rally button in the head, beside the title (the map keeps its room), as the probe sheet does.
+    const rk = this.root.classList.contains('rk');
+    if (rk) this.rallyButton(head, n, true);
     const closeBtn = btn(head, '✕', () => this.host.close(), 'close');
     closeBtn.el.setAttribute('aria-label', 'Close');
     void title;
@@ -221,7 +224,7 @@ export class Sheet {
     this.sendSection(n);
     if (field && !isGuarded(world, n.index)) this.moveSection(n);
     if (!isGuarded(world, n.index)) this.recycleSection(n);
-    this.rallySection(n);
+    if (!rk) this.rallySection(n);
     this.update();
   }
 
@@ -692,11 +695,15 @@ export class Sheet {
   }
 
   private rallySection(n: Node): void {
-    const sec = h('section', '', '', this.root);
-    const b = btn(sec, '', () => this.host.send({ type: 'setRally', node: n.index }), 'rally');
+    this.rallyButton(h('section', '', '', this.root), n, false);
+  }
+
+  /** The rally button: full width in its own section, or a short one ("Rally here" / "Rally set") in a rock sheet's head. */
+  private rallyButton(parent: HTMLElement, n: Node, short: boolean): void {
+    const b = btn(parent, '', () => this.host.send({ type: 'setRally', node: n.index }), short ? 'rally head-rally' : 'rally');
     this.ups.push(() => {
       const here = this.world.rally === n.index;
-      b.set(here ? 'New ships gather here (rally set)' : 'New ships gather here', !here);
+      b.set(short ? (here ? 'Rally set' : 'Rally here') : here ? 'New ships gather here (rally set)' : 'New ships gather here', !here);
       toggleClass(b.el, 'on', here);
     });
   }

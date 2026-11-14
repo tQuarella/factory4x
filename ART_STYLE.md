@@ -50,6 +50,8 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Open lane | `#9fb4d4` |
 | Owned lane | `#ffd27a` |
 | Economy ship hull | `#f0a83a` |
+| Drag chip and tag panel | `rgba(11, 22, 38, 0.94)` |
+| Attack tag panel | `rgba(70, 12, 36, 0.95)` |
 
 Contrast check: every entity color must read against `#05070d` at 4.5:1 or better.
 
@@ -214,7 +216,7 @@ Rules:
 
 ## H8 entities
 
-Hold the front: the raid-target badge, the drag (line, ghost chip, drop highlight and tag), the split-armed pulse and the Mine button. Draw functions are in `packages/client/src/placeholders.ts`, shown in the gallery (a 24 px strip in colour and greyscale, then each at three sizes), and bounded in `packages/client/test/h8-art.test.ts` (recording context) and the gallery's pixel scan. **No new palette keys**: every H8 draw reuses an existing one (`thorn`, `spore`, `bloom`, `bloomHi`, `ship`, `starBright`, `laneClosed`, `asteroidOre`), so the palette table is unchanged.
+Hold the front: the raid-target badge, the drag (line, ghost chip, drop highlight and tag), the split-armed pulse and the Mine button. Draw functions are in `packages/client/src/placeholders.ts`, shown in the gallery (a 24 px strip in colour and greyscale, then each at three sizes), and bounded in `packages/client/test/h8-art.test.ts` (recording context) and the gallery's pixel scan. **Two new palette keys**, `ghostFill` (the dark panel of the ghost chip and the name tag) and `attackFill` (the dark pink panel of the attack tag); both are in the Palette table. Everything else reuses existing keys (`thorn`, `spore`, `bloom`, `bloomHi`, `ship`, `starBright`, `laneClosed`, `asteroidOre`).
 
 | Entity | Draw | Look | 24 px read |
 | --- | --- | --- | --- |
@@ -227,6 +229,6 @@ Hold the front: the raid-target badge, the drag (line, ghost chip, drop highligh
 | Mine button | `drawMineBadge(ctx, r)` | the H7 mine badge, unchanged, drawn 24 px in the control bar's button | round teal pick |
 
 Rules:
-- **Bounds.** The raid badge stays within r (like the marker and the mine badge); the drop highlight within 1.2 r, the split pulse within 1.5 r (tested, and measured in the gallery).
+- **Bounds.** The raid badge stays within r (like the marker and the mine badge); the drop highlight within r + 7 px (its halo is a 8 px stroke at r + 3; that is 1.32 r at the smallest reach the game passes, 22 px, and under 1.15 r from 50 px up), the split pulse within 1.5 r (tested, and measured in the gallery).
 - **Told apart.** The raid badge is a ring with an X, so it isn't the marker (a chevron that rides the line), the "!" (an amber pill) or the mine badge (a teal pick); the Raid badge and the Mine badge sit on opposite sides of a rock (lower left and lower right). The attack colour is `bloom` on the line, the highlight and the tag, so a pink line always ends on a pink ring.
 - **Callers.** The badge is `max(8, 0.4 r)` px, from the muster to the raid's end. During a drag the highlight sits on the node the release would hit (the same hit test as a tap), the ghost chip 48 px above the finger (clamped inside the canvas), the tag above the target or below it near the top edge. The pulse sits 8 px outside the source rock while a split is armed.

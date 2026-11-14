@@ -140,11 +140,13 @@ export function buildRockSheet(root: HTMLElement, host: FieldSheetHost, node: nu
   more.el.setAttribute('aria-label', 'More haulers');
   const auto = btn(stepper, 'Auto', () => setCount(null), 'h-auto');
   auto.el.setAttribute('aria-label', 'Haulers: Auto');
-  const bufRow = h('div', 'row', '', sec);
+  // The buffer and what was delivered share one line (H8: the rock sheet keeps the map its room); a wide font wraps them, steadily.
+  const stats = h('div', 'stats2', '', sec);
+  const bufRow = h('div', 'row buf-row', '', stats);
   h('span', 'lbl', 'Buffer', bufRow);
   const buf = bar(bufRow, 'buf');
   const bufText = h('span', 'val', '', bufRow);
-  const delivered = h('div', 'row', '', sec);
+  const delivered = h('div', 'row deliv-row', '', stats);
   h('span', 'lbl', 'Delivered', delivered);
   const deliveredVal = h('span', 'val', '', delivered);
   // The warnings' room is always reserved (a hidden sizer holds the longest text), so showing one moves nothing below it.
@@ -185,7 +187,7 @@ export function buildRockSheet(root: HTMLElement, host: FieldSheetHost, node: nu
     setText(deliveredVal, deliveredText(st));
     const backedMsg = st.backedUp && st.mine ? BACKED_UP_TEXT : '';
     const rs = raidStatus(w);
-    const raidOn = st.raidTarget || (rs.target === node && (rs.phase === 'muster' || rs.phase === 'out' || rs.phase === 'fight'));
+    const raidOn = st.raidTarget;
     const raidMix = rs.phase === 'muster' ? rs.planned : rs.raiders.thorn + rs.raiders.spore > 0 ? rs.raiders : rs.planned;
     const raidMsg = raidOn ? raidRockText(rs.phase, raidMix) : '';
     const rankMsg = st.raidRank === 1 && st.mine && !raidOn ? RAID_RANK_TEXT : '';

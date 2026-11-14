@@ -41,6 +41,17 @@ async function pause(page: Page): Promise<void> {
   expect(await page.evaluate(() => window.__factory4x!.paused())).toBe(true);
 }
 
+/** The boxes that make up the HUD: nothing may move or resize when a badge, a mode or a drag changes. */
+const hudBoxes = (page: Page): Promise<string> =>
+  page.evaluate(() =>
+    ['bars', 'stats', 'chips', 'chip-ore', 'chip-fleet', 'chip-raid', 'controls', 'b-mine']
+      .map((id) => {
+        const b = document.getElementById(id)!.getBoundingClientRect();
+        return `${id}:${Math.round(b.left)},${Math.round(b.top)},${Math.round(b.width)},${Math.round(b.height)}`;
+      })
+      .join('|'),
+  );
+
 const nodeOf = (page: Page, id: string): Promise<number> => page.evaluate((i) => window.__factory4x!.nodeIndex(i), id);
 const inputs = async (page: Page): Promise<Array<Record<string, unknown>>> => JSON.parse(await page.evaluate(() => window.__factory4x!.log())) as Array<Record<string, unknown>>;
 const selected = (page: Page): Promise<number | null> => page.evaluate(() => window.__factory4x!.selected());
@@ -231,6 +242,7 @@ test.describe('375x667 portrait, drag and its edges', () => {
     expect((await gesture(page)).arms).toBe(1);
     await settled(page);
     expect((await dragState(page))!.armed, 'the armed source pulses').toBe(true);
+    expect((await dragState(page))!.ghost!.counts, 'the armed split already shows its half counts').toEqual([{ type: 'drone', count: 2 }]);
     await page.screenshot({ path: 'test-results/h8-split-armed.png' });
     await ptr(page, 'pointermove', (from.x + to.x) / 2, (from.y + to.y) / 2);
     await ptr(page, 'pointermove', to.x, to.y);
@@ -593,8 +605,24 @@ test.describe('375x667 portrait, weights and the hauler count', () => {
     });
     expect(fit.scroll, 'the probe sheet with the % column does not scroll').toBeLessThanOrEqual(fit.client + 1);
     await page.screenshot({ path: 'test-results/h8-probe-sheet.png' });
-    const state = sheet.locator('.fp-row[data-type="hauler"] .fp-state');
-    await expect(state).toHaveText(/^(enough haulers|saving \d+\/\d+|building \d+%)$/);
+  });
+
+  test('the Hauler row reads exactly "enough haulers" while no rock is short of haulers', async ({ page }) => {
+    await ready(page);
+    await pause(page);
+    // The premise, checked in the sim first: the Hauler row is in the `enough` state (the opening has no rock short of a hauler).
+    const haulerState = async (): Promise<string> =>
+      (JSON.parse(await page.evaluate(() => window.__factory4x!.allocStatus())) as { rows: Array<{ type: string; state: string }> }).rows.find((r) => r.type === 'hauler')!.state;
+    await stepSimUntil(page, async () => (await haulerState()) === 'enough', 3000, 'the Hauler row in the enough state', false);
+    expect(await haulerState()).toBe('enough');
+    const p = await nodePt(page, 'probe');
+    await tapAt(page, p.x, p.y);
+    await expect(page.locator('#sheet .fp-row[data-type="hauler"] .fp-state')).toHaveText('enough haulers');
+  });
+
+  test('touch-action is none on the field canvas, so a drag never scrolls or zooms the page', async ({ page }) => {
+    await ready(page, PHONE, false);
+    await expect(page.locator('#view')).toHaveCSS('touch-action', 'none');
   });
 
   test('the rock sheet shows the hauler count; − and + set it, Auto clears it; it is hidden with hauler.autoNeed 0', async ({ page }) => {
@@ -636,27 +664,34 @@ test.describe('375x667 portrait, weights and the hauler count', () => {
     await expect(sheet.locator('.haulers-row .val')).toHaveText(/^\d+$/);
   });
 
-  test('the rock sheet, with the hauler row and the raid lines, fits 375x667 without scrolling under a wide font', async ({ page }) => {
-    await ready(page);
-    await pause(page);
-    await tune(page, 'raid.firstAtEcon', 2);
-    await tune(page, 'raid.musterTicks', 600);
-    const raid = async (): Promise<{ phase: string; target: number | null }> => JSON.parse(await page.evaluate(() => window.__factory4x!.raidStatus())) as { phase: string; target: number | null };
-    await stepSimUntil(page, async () => (await raid()).phase === 'muster', 12_000, 'the raid mustering', false);
-    const target = (await raid()).target!;
-    const p = await nodePt(page, target);
-    await tapAt(page, p.x, p.y);
-    const sheet = page.locator('#sheet');
-    await expect(sheet.locator('.rock-note .raid')).toHaveText(/^Raid coming: (\d+ (Spores?|Thorns?)(, )?)+$/);
-    await settled(page);
-    const fit = await page.evaluate(() => {
-      const e = document.getElementById('sheet')!;
-      return { scroll: e.scrollHeight, client: e.clientHeight, stage: document.getElementById('stage')!.clientHeight };
+  for (const wide of [true, false]) {
+    test(`the rock sheet, with the hauler row and both raid lines, fits 375x667 without scrolling and the map keeps its room (${wide ? 'wide font' : 'normal font'})`, async ({ page }) => {
+      await ready(page, PHONE, wide);
+      await pause(page);
+      await tune(page, 'raid.firstAtEcon', 2);
+      await tune(page, 'raid.musterTicks', 0);
+      const raid = async (): Promise<{ phase: string; target: number | null }> => JSON.parse(await page.evaluate(() => window.__factory4x!.raidStatus())) as { phase: string; target: number | null };
+      // The tallest state: the raid is out (the banner is up), the target's haulers are held, so the raid line and the held line show.
+      await stepSimUntil(page, async () => (await raid()).phase === 'out', 12_000, 'the raid flying out', false);
+      const target = (await raid()).target!;
+      expect((await rock(page, target)).haulersHeld, 'the hold applies, so both raid lines show').toBe(true);
+      const p = await nodePt(page, target);
+      await tapAt(page, p.x, p.y);
+      const sheet = page.locator('#sheet');
+      await expect(sheet.locator('.rock-note .raid')).toHaveText(/^Raid coming: (\d+ (Spores?|Thorns?)(, )?)+$/);
+      await expect(sheet.locator('.rock-note .held')).toHaveText('Haulers waiting at the probe');
+      await settled(page);
+      const fit = await page.evaluate(() => {
+        const e = document.getElementById('sheet')!;
+        return { scroll: e.scrollHeight, client: e.clientHeight, stage: document.getElementById('stage')!.clientHeight };
+      });
+      console.log(`rock sheet open, raid out, ${wide ? 'wide' : 'normal'} font: map (stage) ${fit.stage} px, sheet ${fit.client} px`);
+      await page.screenshot({ path: wide ? 'test-results/h8-rock-sheet-raid.png' : 'test-results/h8-rock-sheet-raid-normal.png' });
+      expect(fit.scroll, 'no scrolling in the rock sheet').toBeLessThanOrEqual(fit.client + 1);
+      await expectControlsFit(page, '#sheet', 'the rock sheet controls');
+      if (!wide) expect(fit.stage, 'the map keeps about 200 px behind the rock sheet (H7 rule)').toBeGreaterThanOrEqual(195);
     });
-    await page.screenshot({ path: 'test-results/h8-rock-sheet-raid.png' });
-    expect(fit.scroll, 'no scrolling in the rock sheet').toBeLessThanOrEqual(fit.client + 1);
-    await expectControlsFit(page, '#sheet', 'the rock sheet controls');
-  });
+  }
 });
 
 test.describe('375x667 portrait, the raid badge', () => {
@@ -669,23 +704,40 @@ test.describe('375x667 portrait, the raid badge', () => {
     await tune(page, 'raid.musterTicks', 0);
     const raid = async (): Promise<{ phase: string; target: number | null; last: unknown }> => JSON.parse(await page.evaluate(() => window.__factory4x!.raidStatus())) as { phase: string; target: number | null; last: unknown };
     expect(await page.evaluate(() => window.__factory4x!.raidBadge()), 'no badge before a raid').toBe(-1);
+    const hud0 = await hudBoxes(page);
     await stepSimUntil(page, async () => (await raid()).phase !== 'none', 12_000, 'a raid', false);
     const target = (await raid()).target!;
     await settled(page);
     expect(await page.evaluate(() => window.__factory4x!.raidBadge()), 'the badge is on the target at the muster').toBe(target);
+    expect(await hudBoxes(page), 'the HUD did not move when the badge appeared').toBe(hud0);
     await page.screenshot({ path: 'test-results/h8-raid-badge.png' });
-    // Out and fighting: still there.
+    // Out: the target's haulers wait at the probe (H10), and the rock sheet says so.
+    await stepSimUntil(page, async () => (await raid()).phase === 'out', 3000, 'the raid flying out', false);
+    await settled(page);
+    expect((await rock(page, target)).haulersHeld, 'the hold applies to the target rock').toBe(true);
+    let p = await nodePt(page, target);
+    await tapAt(page, p.x, p.y);
+    await expect(page.locator('#sheet .rock-note .held')).toHaveText('Haulers waiting at the probe');
+    await expect(page.locator('#sheet .rock-note .raid')).toHaveText(/^Raid coming: /);
+    await page.locator('#sheet .close').click();
+    // Fighting: still there.
     await stepSimUntil(page, async () => (await raid()).phase === 'fight', 3000, 'the fight', false);
     await settled(page);
     expect(await page.evaluate(() => window.__factory4x!.raidBadge())).toBe(target);
-    const p = await nodePt(page, target);
+    expect(await hudBoxes(page), 'the HUD did not move in the fight').toBe(hud0);
+    p = await nodePt(page, target);
     await tapAt(page, p.x, p.y);
     await expect(page.locator('#sheet .rock-note .raid')).toHaveText(/^Raid here: /);
     await page.locator('#sheet .close').click();
-    // The end: gone.
+    // The end: the badge and the hold are gone.
     await stepSimUntil(page, async () => (await raid()).phase === 'none' && (await raid()).last !== null, 6000, 'the raid ending', false);
     await settled(page);
     expect(await page.evaluate(() => window.__factory4x!.raidBadge()), 'no badge after the raid').toBe(-1);
+    expect(await hudBoxes(page), 'the HUD did not move at the end').toBe(hud0);
+    expect((await rock(page, target)).haulersHeld, 'the hold ended with the raid').toBe(false);
+    p = await nodePt(page, target);
+    await tapAt(page, p.x, p.y);
+    await expect(page.locator('#sheet .rock-note .held')).toHaveText('');
   });
 });
 

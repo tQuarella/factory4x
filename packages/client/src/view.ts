@@ -103,13 +103,12 @@ const TAG_WORD = { strong: 'Strong', even: 'Even', weak: 'Weak' } as const;
 const nodeName = shortName;
 
 /**
- * The raiders on the badge, or null when `node` is not a raid's target: from the muster to the raid's end (the rock's `raidTarget`,
- * and the raid's own phase as a fallback). The ring shows the planned mix while it musters, then who is out.
+ * The raiders on the badge, or null when the rock is not a raid's target. `flag` is `rockStatus.raidTarget`: true from the muster to
+ * the raid's end. The ring shows the planned mix while it musters, then who is out.
  */
-export function raidBadgeMix(world: Readonly<World>, node: number, flag: boolean): { thorn: number; spore: number } | null {
+export function raidBadgeMix(world: Readonly<World>, flag: boolean): { thorn: number; spore: number } | null {
+  if (!flag) return null;
   const r = raidStatus(world);
-  const on = flag || (r.target === node && (r.phase === 'muster' || r.phase === 'out' || r.phase === 'fight'));
-  if (!on) return null;
   const out = r.raiders.thorn + r.raiders.spore;
   return out > 0 && r.phase !== 'muster' ? { ...r.raiders } : { ...r.planned };
 }
@@ -461,7 +460,7 @@ export class MapView {
           ctx.restore();
         }
         // H8: the raid-target badge, lower left (the Mine badge is lower right), from the muster to the raid's end.
-        const raidMix = rs === undefined ? null : raidBadgeMix(world, n.index, rs.raidTarget);
+        const raidMix = rs === undefined ? null : raidBadgeMix(world, rs.raidTarget);
         if (raidMix !== null) {
           this.drawnNew.raidBadge = n.index;
           ctx.save();
@@ -564,7 +563,8 @@ export class MapView {
       }
     }
     let ghost: DragDrawn['ghost'] = null;
-    if (g.phase === 'dragging' && entries.length > 0) {
+    // Armed or dragging: the ghost shows what a release would carry (the half counts once a split is armed).
+    if (entries.length > 0) {
       ctx.save();
       // Measure first (the width centres the clamp), then draw 48 px above the finger.
       const w = ghostWidth(ctx, entries);

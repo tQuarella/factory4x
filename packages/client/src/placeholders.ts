@@ -1568,7 +1568,7 @@ export function drawMineBadge(ctx: Ctx, r: number): void {
 /**
  * Raid-target badge: the raiders' two-colour ring (Thorn arc then Spore arc, as `drawRaidMarker`) round a dark disc with two crossed
  * `bloom` blades. It carries no chevron (the marker's arrow rides the line) and no "!" (the backed-up pill), and it sits on the rock's
- * upper left, opposite the Mine badge. Within r.
+ * lower left, opposite the Mine badge. Within r.
  */
 export function drawRaidBadge(ctx: Ctx, r: number, mix: Readonly<RaidMix>): void {
   ctx.save();
@@ -1661,7 +1661,7 @@ export function drawDragGhost(ctx: Ctx, entries: readonly GhostEntry[], aim: Dra
   const cells = entries.map((e) => ({ e, tw: ctx.measureText(String(e.count)).width }));
   const iconW = GHOST_ICON_W;
   const w = ghostWidth(ctx, entries);
-  ctx.fillStyle = 'rgba(11, 22, 38, 0.94)';
+  ctx.fillStyle = palette.ghostFill;
   ctx.strokeStyle = AIM_COLOUR[aim];
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -1707,7 +1707,7 @@ export function drawDropTag(ctx: Ctx, name: string, attackText: string | null): 
   ctx.font = '700 12px ui-monospace, Menlo, Consolas, monospace';
   const text = attackText === null ? name : `${name} · ${attackText}`;
   const w = ctx.measureText(text).width + 14;
-  ctx.fillStyle = attackText === null ? 'rgba(11, 22, 38, 0.94)' : 'rgba(70, 12, 36, 0.95)';
+  ctx.fillStyle = attackText === null ? palette.ghostFill : palette.attackFill;
   ctx.strokeStyle = attackText === null ? palette.starBright : palette.bloom;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
