@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defaultData, guardianStatus, type World } from '../src/index.ts';
+import { guardianStatus, type World } from '../src/index.ts';
+import { shippedCampaign as defaultData } from './fixture.ts';
 import { L, N, data } from './helpers.ts';
 import { baseWorld, minSingle, minWaves, waveWins, type MinWaves } from './min-wave.ts';
 

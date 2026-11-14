@@ -16,7 +16,8 @@
 import raw from './fixtures/sim-v4.json' with { type: 'json' };
 import rawV8 from './fixtures/sim-v8.json' with { type: 'json' };
 import rawV10 from './fixtures/sim-v10.json' with { type: 'json' };
-import { parseSimData, type SimData } from '../src/index.ts';
+import rawV12 from './fixtures/sim-v12.json' with { type: 'json' };
+import { defaultData, parseSimData, withRunMode, type SimData } from '../src/index.ts';
 
 export const fixtureData: SimData = parseSimData(raw);
 
@@ -43,3 +44,17 @@ export const fixtureV8: SimData = parseSimData(rawV8);
  * tests run on it, so h6-design-data's calibration changes none of them.
  */
 export const fixtureV10: SimData = parseSimData(rawV10);
+
+/**
+ * h7-sim: data/sim.json as it shipped at dataVersion 12 (h7-sim: field mode, `map.field` and the H7 tunables at
+ * the spec's starting values), frozen in fixtures/sim-v12.json and never retuned. The H7 field rule tests run on
+ * it, so h7-design-data's calibration changes none of them. Its `map.field` nodes and Mine marks equal the shipped
+ * ones (data-h7.test.ts checks that; calibration changes only guard counts and values).
+ */
+export const fixtureV12: SimData = parseSimData(rawV12);
+
+/**
+ * h7-sim: the shipped data with `run.mode` "campaign" (DESIGN.md H7 "What is parked, and how"). Tests that built
+ * campaign worlds from the shipped data keep doing so through this, with every assertion as it was.
+ */
+export const shippedCampaign: SimData = withRunMode(defaultData, 'campaign');

@@ -173,6 +173,48 @@
  *   setTunable inputs change world.tun from that tick on; they are in the replay log, so replays reproduce tuned sessions.
  *   client.* tunables are client settings (scope 'client'): setTunable ignores them.
  *
+ * Field mode (H7 "One field, live enemy"; the h7-sim changes are logged under "h7-sim")
+ *   data.run.mode                   'field' | 'campaign' (absent: campaign). runMode(data) reads it; withRunMode(data, mode)
+ *                                   returns a copy with it set (tests and tools play the parked campaign on shipped data
+ *                                   with withRunMode(defaultData, 'campaign')). campaignWorld throws on field data.
+ *   data.map.field                  {nodes, mine, layout}: the field's frame node ids, the asteroids Mine-marked at the
+ *                                   landing, and its guards (area layout format, no Root). parseSimData checks it, and in
+ *                                   field mode ship.hauler.cargo ≤ node.bufferCap and economy.probeOrePerMin ≥ 1 (defaults).
+ *   createWorld(seed, fieldData)    lands straight in the field (F13): the area fields hold it, campaign.active stays null,
+ *                                   world.field is set (isField(world)); stock economy.startStock; weights alloc.start.*,
+ *                                   warships 0; rally the probe. isWon(world) is true once the hive (the heart) falls;
+ *                                   free play continues and inputs stay valid.
+ *   world.field                     {alloc, share, allocCur (per BUILD_TYPES type), bays (extractor, hauler; the warship
+ *                                   bays are world.yards, `on` unused), econ (EconShip[], id order), mine, free and
+ *                                   rockBuckets (per node)}. EconShip {id, type, hp, at, transit, target (extractor: bound
+ *                                   node; hauler: assigned node), cargo, cargoRes}. Economy ships are NOT in world.ships
+ *                                   (warships only), so every H3–H6 path over world.ships is unchanged. Node.extractors
+ *                                   is derived in field mode: free + docked extractor ships.
+ *   world.raid, world.nextRaidTick  R1 (DESIGN.md H7 "Raids"): null / 0 here; h7-raids fills them in src/factions/.
+ *   stats                           H7 adds econBuilt, econLost, econRecycled ({extractor, hauler}), raids {mustered,
+ *                                   beaten, hit, turnedBack}, allocChanges, peakEcon (zero in a campaign).
+ *   Per tick (field): F1 inputs, F2 allocation (smooth weighted round robin, 1 ore at a time), F3 bays (finish, then
+ *   start; F9 limit), F4 extraction, F5 extractor dispatch, F6 haulers, F7 movement, F8 raid hook, F10 combat,
+ *   F11 capture (Mine-marks the node, free extractors; the hive sets capturedTick), regrowth, stats.
+ *   Inputs (field)                  setAlloc{shipType: BuildType, weight 0..alloc.maxWeight} (at 0 the share returns to
+ *                                   stock), setMine{node, on} (an asteroid, or a captured pocket or hive), sendShips
+ *                                   (warships only), recycleShips{node, counts: RecycleCounts} (optional extractor and
+ *                                   hauler counts), setRally, setTunable. Every campaign input is invalid in field mode.
+ *   fleetCap / fleetCount / isFleetFull   field: field.fleetCap (0 = no limit); counted ships alive + counted bays
+ *                                   building; every type counts when fleet.countsEconomy is 1, warships only when 0
+ *                                   (isCountedType). fleetStatus adds countsEconomy, econByType, econBuildingByType.
+ *   allocStatus(world, data)        probe sheet: rows per type {weight, share, cost {ore, resource}, unlocked, building
+ *                                   0–100, ticksLeft, totalTicks, state: off | locked | filling | waitingResource |
+ *                                   fleetFull | building}, maxWeight, stockOre, incomePerMin.
+ *   rockStatus(world, node)         rock sheet: mine, mineable, docked, bound, inFlight, slots, freeExtractors, haulers,
+ *                                   buffer, bufferCap, backedUp, deliveredPerMin (60 s), raidRank (0 until h7-raids).
+ *   fieldSummary(world)             result panel: capturedTick, timeToHiveSec, peakPerMin, built/lost/recycled per
+ *                                   BUILD_TYPES type, raids, econLostToRaids, allocChanges, peakEcon.
+ *   guardPools(tun, guards), guardStrike(pools, warships, econ?)   rule 7's guard damage (H6 amendment), shared by F10
+ *                                   and the raid fight (R7): warships in GUARD_TARGET_ORDER, then haulers, then extractors.
+ *   oreCost, resourceCost, isTypeUnlocked, isMineable, isMarkable, isWorked, econAtByType, econAlive   field helpers.
+ *   FIELD_PARKED_KEYS               the tunables unused in field mode (the tuning panel hides them).
+ *
  * Reading `World` fields directly is fine (it is plain data); never mutate it outside `step`.
  * Time: `world.tickRate` ticks per game second (30). Ships in transit: interpolate from
  * `ship.transit.{from,to,ticksLeft,totalTicks}`; pods from `route.pods[].ticksLeft` and
@@ -184,9 +226,12 @@ import type { ShipTypeCounts } from './world.ts';
 
 export {
   AREA_SIDES,
+  BUILD_TYPES,
   COMBAT_ORDER,
   COMPONENTS,
   COMPONENT_INPUT,
+  ECON_TYPES,
+  FIELD_PARKED_KEYS,
   GUARD_CAP_MAX,
   GUARD_TYPES,
   OVERWORLD_FRAME,
@@ -196,6 +241,7 @@ export {
   RESEARCH_IDS,
   RESOURCES,
   RIG_NODES,
+  RUN_MODES,
   SHIP_COMPONENT,
   SHIP_TYPES,
   TUNABLE_KEYS,
@@ -205,10 +251,33 @@ export {
   decayedHaul,
   isTierRequirement,
   parseSimData,
+  runMode,
   sameHaulGroup,
   tunableMeta,
+  withRunMode,
   worstHauls,
 } from './data.ts';
+export type { BuildType, EconType, FieldMap, RunMode } from './data.ts';
+export type { Raid, RaidPhase } from './factions/index.ts';
+export {
+  econAlive,
+  econAtByType,
+  isMarkable,
+  isMineable,
+  isTypeUnlocked,
+  isWorked,
+  oreCost,
+  resourceCost,
+} from './field.ts';
+export type { ResourceCost } from './field.ts';
+export { isCountedType } from './fleet.ts';
+export { ECON_STRIKE_ORDER, guardPools, guardStrike } from './step.ts';
+export type { StrikeKills } from './step.ts';
+export { allocStatus, fieldSummary, rockStatus } from './selectors.ts';
+export type { AllocRow, AllocState, AllocStatus, BuildTypeCounts, FieldSummary, RockStatus } from './selectors.ts';
+export type { RecycleCounts } from './inputs.ts';
+export { isField } from './world.ts';
+export type { EconShip, EconTypeCounts, FieldState, RaidStats } from './world.ts';
 export type {
   AreaHeart,
   AreaSide,

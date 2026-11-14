@@ -1,9 +1,11 @@
 import {
+  BUILD_TYPES,
   COMPONENTS,
   COMPONENT_INPUT,
   GUARD_TYPES,
   SHIP_COMPONENT,
   SHIP_TYPES,
+  type BuildType,
   type Component,
   type GuardType,
   type NodeKind,
@@ -16,7 +18,8 @@ import {
   type Tunables,
 } from './data.ts';
 import { designResearched, extractPct, yardBuildTicks } from './campaign.ts';
-import { isFleetFull } from './fleet.ts';
+import { bayOf, boundCounts, assignedHaulers, isDocked, isEconType, isMineable, isTypeUnlocked, oreCost, resourceCost, type ResourceCost } from './field.ts';
+import { isCountedType, isFleetFull } from './fleet.ts';
 import { shipsAtByType } from './inputs.ts';
 import { counterPct, deliveredInWindow, perExtractorPerMin, prizeInWindow, reservedOre } from './step.ts';
 import {
@@ -803,4 +806,173 @@ export function runSummary(world: Readonly<World>): RunSummary {
     rootShipsLost: root === null ? 0 : root.shipsLost,
     haulPaid: st.haulPaid === null ? null : { ...st.haulPaid },
   };
+}
+
+/**
+ * H7 `allocStatus` row state (DESIGN.md H7 "Selectors"), the probe sheet's state line: 'building' (the bay is
+ * building; "building 40%"), else 'off' (weight 0), 'locked' (needs crystal or ice first delivered), and with a full
+ * share 'waitingResource' (the stock lacks the crystal or ice) or 'fleetFull' (a counted type at the limit), else
+ * 'filling' ("saving 12/20"). The bay checks the resource before the limit (F3), and so does the state.
+ */
+export type AllocState = 'off' | 'locked' | 'filling' | 'waitingResource' | 'fleetFull' | 'building';
+
+export interface AllocRow {
+  type: BuildType;
+  weight: number;
+  /** Ore set aside, 0..cost.ore. */
+  share: number;
+  cost: { ore: number; resource: ResourceCost | null };
+  unlocked: boolean;
+  /** Build progress of the bay, 0–100 (0 when idle): floor(done × 100 / total). */
+  building: number;
+  ticksLeft: number;
+  /** The build's length: max(ticksLeft, ship.<type>.buildTicks). */
+  totalTicks: number;
+  state: AllocState;
+}
+
+export interface AllocStatus {
+  /** One row per type, in BUILD_TYPES order (extractor, hauler, drone, lancer, flak). */
+  rows: AllocRow[];
+  maxWeight: number;
+  /** Unallocated ore (world.stock.ore). */
+  stockOre: number;
+  /** Ore income per minute: hauler deliveries over the last 60 s plus probe mining (incomePerMin). */
+  incomePerMin: number;
+}
+
+/** H7: the probe sheet's radar and rows. Field mode only (throws in a campaign world). */
+export function allocStatus(world: Readonly<World>, data: SimData): AllocStatus {
+  const f = fieldOrThrow(world);
+  const full = isFleetFull(world, data);
+  const rows = BUILD_TYPES.map((type): AllocRow => {
+    const bay = bayOf(world as World, type);
+    const ore = oreCost(world, type);
+    const resource = resourceCost(world, type);
+    const unlocked = isTypeUnlocked(world, type);
+    const totalTicks = Math.max(bay.ticksLeft, world.tun[`ship.${type}.buildTicks`]);
+    const building = bay.ticksLeft > 0 ? Math.floor(((totalTicks - bay.ticksLeft) * 100) / totalTicks) : 0;
+    let state: AllocState;
+    if (bay.ticksLeft > 0) state = 'building';
+    else if (f.alloc[type] === 0) state = 'off';
+    else if (!unlocked) state = 'locked';
+    else if (f.share[type] >= ore && resource !== null && world.stock[resource.res] < resource.amount) state = 'waitingResource';
+    else if (f.share[type] >= ore && isCountedType(world, type) && full) state = 'fleetFull';
+    else state = 'filling';
+    return { type, weight: f.alloc[type], share: f.share[type], cost: { ore, resource }, unlocked, building, ticksLeft: bay.ticksLeft, totalTicks, state };
+  });
+  return { rows, maxWeight: world.tun['alloc.maxWeight'], stockOre: world.stock.ore, incomePerMin: incomePerMin(world) };
+}
+
+/** H7: a rock's sheet (an asteroid, or a captured pocket or hive). */
+export interface RockStatus {
+  node: number;
+  id: string;
+  kind: NodeKind;
+  prize: RawResource | null;
+  /** Mine-marked. */
+  mine: boolean;
+  /** Mine-marked and not guarded (F5). */
+  mineable: boolean;
+  /** Extractor ships docked here (not counting free extractors). */
+  docked: number;
+  /** Extractor ships bound here, docked or in flight; inFlight = bound − docked (the hollow pips). */
+  bound: number;
+  inFlight: number;
+  slots: number;
+  /** Free extractors from a capture (not ships). */
+  freeExtractors: number;
+  /** Haulers assigned here, anywhere on their trip. */
+  haulers: number;
+  buffer: number;
+  bufferCap: number;
+  /** The buffer is at node.bufferCap ("Backed up: add haulers"). */
+  backedUp: boolean;
+  /** Units delivered from here by haulers over the last 60 game seconds. */
+  deliveredPerMin: number;
+  /**
+   * 1 if this is the current raid target (R5), else its position by distance to the hive among mined nodes.
+   * h7-sim: always 0 (h7-raids fills it).
+   */
+  raidRank: number;
+}
+
+/** H7: one rock's sheet. Field mode only (throws in a campaign world). */
+export function rockStatus(world: Readonly<World>, node: number): RockStatus {
+  const f = fieldOrThrow(world);
+  const n = world.nodes[node];
+  if (n === undefined) throw new Error(`no node ${node}`);
+  let docked = 0;
+  for (const s of f.econ) if (isDocked(s) && s.at === node) docked++;
+  const bound = boundCounts(world)[node]!;
+  const cap = world.tun['node.bufferCap'];
+  let delivered = 0;
+  for (const v of f.rockBuckets[node]!) delivered += v;
+  return {
+    node,
+    id: n.id,
+    kind: n.kind,
+    prize: n.prize,
+    mine: f.mine[node] === true,
+    mineable: isMineable(world, node),
+    docked,
+    bound,
+    inFlight: bound - docked,
+    slots: n.slots,
+    freeExtractors: f.free[node]!,
+    haulers: assignedHaulers(world)[node]!,
+    buffer: n.buffer,
+    bufferCap: cap,
+    backedUp: n.buffer >= cap,
+    deliveredPerMin: delivered,
+    raidRank: 0,
+  };
+}
+
+/** A count per build type (BUILD_TYPES keys). */
+export type BuildTypeCounts = Record<BuildType, number>;
+
+/** H7: the result panel (and the bots' report). */
+export interface FieldSummary {
+  /** Tick the hive fell, or null; whole game seconds from the landing (tick 0) to it. */
+  capturedTick: number | null;
+  timeToHiveSec: number | null;
+  peakPerMin: number;
+  built: BuildTypeCounts;
+  lost: BuildTypeCounts;
+  recycled: BuildTypeCounts;
+  /** Raids by outcome (R8). */
+  raids: { mustered: number; beaten: number; hit: number; turnedBack: number };
+  /** Economy ships lost to raids (the only thing that kills them). */
+  econLostToRaids: number;
+  allocChanges: number;
+  peakEcon: number;
+}
+
+/** H7: the field result panel. Field mode only (throws in a campaign world). */
+export function fieldSummary(world: Readonly<World>): FieldSummary {
+  fieldOrThrow(world);
+  const st = world.stats;
+  const by = (econ: { extractor: number; hauler: number }, war: ShipTypeCounts): BuildTypeCounts => {
+    const out = {} as BuildTypeCounts;
+    for (const t of BUILD_TYPES) out[t] = isEconType(t) ? econ[t] : war[t];
+    return out;
+  };
+  return {
+    capturedTick: world.capturedTick,
+    timeToHiveSec: world.capturedTick === null ? null : Math.floor(world.capturedTick / world.tickRate),
+    peakPerMin: st.peakPerMin,
+    built: by(st.econBuilt, st.shipsBuilt),
+    lost: by(st.econLost, st.shipsLost),
+    recycled: by(st.econRecycled, st.shipsRecycled),
+    raids: { ...st.raids },
+    econLostToRaids: st.econLost.extractor + st.econLost.hauler,
+    allocChanges: st.allocChanges,
+    peakEcon: st.peakEcon,
+  };
+}
+
+function fieldOrThrow(world: Readonly<World>): NonNullable<World['field']> {
+  if (world.field === null) throw new Error('not a field-mode world');
+  return world.field;
 }

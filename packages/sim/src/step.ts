@@ -7,15 +7,17 @@ import {
   YARD_ORDER,
   YARD_ROTATION,
   type GuardType,
-  type RawResource,
   type ShipType,
   type SimData,
   type Tunables,
 } from './data.ts';
 import { designResearched, extractPct, reclaimActive, shipments, yardBuildTicks } from './campaign.ts';
+import { allocate, captureField, fieldStats, moveEcon, recordDelivery, runBays, runExtractors, runHaulers, syncExtractors } from './field.ts';
+import { raidStep } from './factions/index.ts';
 import { fleetCap, isFleetFull } from './fleet.ts';
-import { applyInput, startTransit, type Input } from './inputs.ts';
+import { applyInput, type Input } from './inputs.ts';
 import { ceilDiv } from './math.ts';
+import { advance, newShip } from './ships.ts';
 import {
   PROBE,
   addGuard,
@@ -31,6 +33,7 @@ import {
   type Battle,
   type BattleOutcome,
   type BattleResult,
+  type EconShip,
   type Guard,
   type Guardian,
   type Ship,
@@ -126,16 +129,9 @@ function extraction(world: World): void {
   }
 }
 
-/** The per-second delivery ring buffer for a resource. */
-function bucketsOf(world: World, res: RawResource): number[] {
-  return res === 'ore' ? world.stats.deliveredBuckets : world.stats.prizeBuckets[res];
-}
-
 /** Rule 4. */
 function routes(world: World): void {
   const t = world.tun;
-  const st = world.stats;
-  const bucket = Math.floor(world.tick / world.tickRate) % st.deliveredBuckets.length;
   for (const route of world.routes) {
     if (route.cooldown > 0) route.cooldown -= 1;
     const src = world.nodes[route.from]!;
@@ -149,11 +145,7 @@ function routes(world: World): void {
     for (const pod of route.pods) {
       pod.ticksLeft -= 1;
       if (pod.ticksLeft <= 0) {
-        world.stock[pod.res] += pod.amount;
-        st.delivered[pod.res] += pod.amount;
-        if (st.firstDeliveredTick[pod.res] === null) st.firstDeliveredTick[pod.res] = world.tick;
-        const b = bucketsOf(world, pod.res);
-        b[bucket] = b[bucket]! + pod.amount;
+        recordDelivery(world, pod.res, pod.amount);
         delivered = true;
       }
     }
@@ -192,15 +184,6 @@ function assemblers(world: World): void {
       a.ticksLeft = t['component.buildTicks'];
     }
   }
-}
-
-function newShip(world: World, type: ShipType): Ship {
-  const ship: Ship = { id: world.nextId++, type, hp: world.tun[`ship.${type}.hp`], at: PROBE, transit: null, engagedIn: -1 };
-  world.ships.push(ship);
-  world.stats.shipsBuilt[type] += 1;
-  if (world.stats.firstShipTick === null) world.stats.firstShipTick = world.tick;
-  if (world.rally !== PROBE) startTransit(world, ship, world.rally);
-  return ship;
 }
 
 /**
@@ -252,15 +235,7 @@ function yards(world: World, data: SimData): void {
 
 /** Rule 6. */
 function movement(world: World): void {
-  for (const s of world.ships) {
-    const tr = s.transit;
-    if (tr === null) continue;
-    tr.ticksLeft -= 1;
-    if (tr.ticksLeft <= 0) {
-      s.at = tr.to;
-      s.transit = null;
-    }
-  }
+  for (const s of world.ships) advance(s);
 }
 
 /** Ships parked at `node`, in id order. */
@@ -338,6 +313,51 @@ export function playerDamage(t: Readonly<Tunables>, guards: Guard[], present: Re
   }
 }
 
+/** Rule 7: each guard type's damage pool for one round, from the living guards at the start of the round. */
+export function guardPools(t: Readonly<Tunables>, guards: readonly Guard[]): Record<GuardType, number> {
+  const pools: Record<GuardType, number> = { thorn: 0, spore: 0 };
+  for (const gd of guards) pools[gd.type] += t[`guard.${gd.type}.damage`];
+  return pools;
+}
+
+/** H7 R7: after the warships, a raid's pools strike haulers, then extractors. */
+export const ECON_STRIKE_ORDER: readonly EconShip['type'][] = ['hauler', 'extractor'];
+
+/** The units a guardStrike brought to hp ≤ 0, each list in the order they fell. */
+export interface StrikeKills {
+  ships: Ship[];
+  econ: EconShip[];
+}
+
+function strikeType<T extends Ship | EconShip>(list: readonly T[], type: T['type'], pool: number, killed: T[]): number {
+  for (const s of list) {
+    if (pool <= 0) break;
+    if (s.type !== type || s.hp <= 0) continue;
+    const hit = Math.min(pool, s.hp);
+    s.hp -= hit;
+    pool -= hit;
+    if (s.hp <= 0) killed.push(s);
+  }
+  return pool;
+}
+
+/**
+ * Rule 7 guard damage (DESIGN.md H6 "Combat amendment"), used by F10 at guarded nodes and exported for the H7
+ * raid fight (R7). Each guard type's pool, Thorns then Spores, strikes the warships in GUARD_TARGET_ORDER (the
+ * type it counters first), within a type in id order, with overflow to the next ship and the next type; for a raid
+ * it then goes on to `econ`: haulers, then extractors (ECON_STRIKE_ORDER), in id order. Ships already at hp ≤ 0
+ * are skipped. Mutates hp in place; the caller removes the dead and keeps the books.
+ */
+export function guardStrike(pools: Readonly<Record<GuardType, number>>, warships: readonly Ship[], econ: readonly EconShip[] = []): StrikeKills {
+  const kills: StrikeKills = { ships: [], econ: [] };
+  for (const gt of GUARD_TYPES) {
+    let pool = pools[gt];
+    for (const type of GUARD_TARGET_ORDER[gt]) pool = strikeType(warships, type, pool, kills.ships);
+    for (const type of ECON_STRIKE_ORDER) pool = strikeType(econ, type, pool, kills.econ);
+  }
+  return kills;
+}
+
 function newBattle(world: World, data: SimData, g: Guardian): Battle {
   return {
     id: world.nextId++,
@@ -374,28 +394,13 @@ function combat(world: World, data: SimData, g: Guardian): void {
       }
       // Both sides' damage comes from the state at the start of the round: the guard pools are sized before
       // the ships strike, so a guard that dies this round still hits.
-      const pools: Record<GuardType, number> = { thorn: 0, spore: 0 };
-      for (const gd of g.guards) pools[gd.type] += t[`guard.${gd.type}.damage`];
+      const pools = guardPools(t, g.guards);
       playerDamage(t, g.guards, byType);
       let shipsKilled = 0;
-      // H6 combat amendment: each guard pool strikes the ship type it counters first (GUARD_TARGET_ORDER), within
-      // a type in id order, with overflow to the next ship and the next type. Thorns, then spores on the ships left.
-      for (const gt of GUARD_TYPES) {
-        let pool = pools[gt];
-        for (const type of GUARD_TARGET_ORDER[gt]) {
-          for (const s of present) {
-            if (pool <= 0) break;
-            if (s.type !== type || s.hp <= 0) continue;
-            const hit = Math.min(pool, s.hp);
-            s.hp -= hit;
-            pool -= hit;
-            if (s.hp <= 0) {
-              shipsKilled++;
-              battle.lostByType[s.type] += 1;
-              world.stats.shipsLost[s.type] += 1;
-            }
-          }
-        }
+      for (const s of guardStrike(pools, present).ships) {
+        shipsKilled++;
+        battle.lostByType[s.type] += 1;
+        world.stats.shipsLost[s.type] += 1;
       }
       let guardsKilled = 0;
       for (const gd of g.guards) {
@@ -488,7 +493,11 @@ function capture(world: World, data: SimData, g: Guardian): void {
     endBattle(world, g, 'captured', wilt(world));
     return;
   }
-  if (node.kind === 'pocket') {
+  if (world.field !== null) {
+    // H7 F11: Mine-marked with its free extractor; capturing the hive wins the run (free play continues).
+    captureField(world, g.node);
+    if (node.kind === 'heart') world.capturedTick = world.tick;
+  } else if (node.kind === 'pocket') {
     node.extractors = Math.min(world.tun['pocket.freeExtractors'], node.slots);
   } else {
     node.extractors = Math.min(world.tun['heart.freeExtractors'], node.slots);
@@ -546,6 +555,35 @@ function stats(world: World): void {
   }
 }
 
+/**
+ * H7 field mode, one tick after F1 (the inputs), in DESIGN.md H7's order: F2 allocation, F3 bays, F4 extraction,
+ * F5 extractors, F6 haulers, F7 movement (warships, then economy ships, then docking), F8 the raid hook, F10
+ * combat, F11 capture and regrowth (each over every guardian in node order), then stats. F9 (the fleet limit) is
+ * checked inside F3. The campaign rules 2, 4, 5 and 10 (construction, routes, assemblers and yards, shipments)
+ * never run in field mode.
+ */
+function fieldStep(world: World, data: SimData): void {
+  const gs = world.guardians;
+  // A recycle among the inputs may have removed a docked extractor.
+  syncExtractors(world);
+  allocate(world);
+  runBays(world, data);
+  extraction(world);
+  runExtractors(world);
+  // An extractor unbound in F5 no longer works its node: haulers there see it this tick.
+  syncExtractors(world);
+  runHaulers(world);
+  movement(world);
+  moveEcon(world);
+  syncExtractors(world);
+  raidStep(world, data);
+  for (const g of gs) if (g.alive) combat(world, data, g);
+  for (const g of gs) if (g.alive) capture(world, data, g);
+  for (const g of gs) if (g.alive) regrowth(world, g);
+  stats(world);
+  fieldStats(world);
+}
+
 /** Advances the world by one tick, applying `inputs` first (rule 1). Throws if `data` is for a different data version. */
 export function step(world: World, data: SimData, inputs: readonly Input[]): void {
   if (world.dataVersion !== data.dataVersion) {
@@ -568,6 +606,11 @@ export function step(world: World, data: SimData, inputs: readonly Input[]): voi
       }
     }
     world.stats.wavesSent -= extra;
+  }
+  if (world.field !== null) {
+    fieldStep(world, data);
+    world.tick += 1;
+    return;
   }
   // The overworld is paused: rule 1 only.
   if (world.campaign.active === null) {

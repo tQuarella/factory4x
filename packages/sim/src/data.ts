@@ -9,9 +9,24 @@
  * fails loudly at load time rather than as a desync later.
  */
 
-/** Ship types, in display order. The sim iterates them only in the fixed orders below. */
+/** Ship types, in display order. The sim iterates them only in the fixed orders below. These are the warships: H7's economy ships are ECON_TYPES. */
 export const SHIP_TYPES = ['drone', 'lancer', 'flak'] as const;
 export type ShipType = (typeof SHIP_TYPES)[number];
+
+/** H7 economy ships (DESIGN.md H7 "Ship types"): built by the probe, never sent by hand, 0 damage. */
+export const ECON_TYPES = ['extractor', 'hauler'] as const;
+export type EconType = (typeof ECON_TYPES)[number];
+
+/**
+ * H7: every type the probe builds in field mode, in the spec's type order ("Type order everywhere: extractor,
+ * hauler, drone, lancer, flak"). The allocation, the bays and their starts and finishes all walk this order.
+ */
+export const BUILD_TYPES = ['extractor', 'hauler', 'drone', 'lancer', 'flak'] as const;
+export type BuildType = (typeof BUILD_TYPES)[number];
+
+/** H7: how a new run starts (DESIGN.md H7 "What is parked, and how"). Data without `run` is a campaign. */
+export const RUN_MODES = ['campaign', 'field'] as const;
+export type RunMode = (typeof RUN_MODES)[number];
 
 /**
  * Rule 5b: finished ships spawn in this order. Starts: the component yards
@@ -113,6 +128,30 @@ export const TUNABLE_KEYS = [
   'areas.repeatHaulPct',
   'overworld.bandLock',
   'system.variant',
+  'alloc.maxWeight',
+  'alloc.start.extractor',
+  'alloc.start.hauler',
+  'ship.extractor.cost',
+  'ship.extractor.buildTicks',
+  'ship.extractor.hp',
+  'ship.hauler.cost',
+  'ship.hauler.buildTicks',
+  'ship.hauler.hp',
+  'ship.hauler.cargo',
+  'ship.hauler.speedSu',
+  'ship.lancer.crystal',
+  'ship.flak.ice',
+  'field.fleetCap',
+  'fleet.countsEconomy',
+  'raid.enabled',
+  'raid.firstAtEcon',
+  'raid.econPerRaider',
+  'raid.maxSize',
+  'raid.gapTicks',
+  'raid.hiveKeepPct',
+  'raid.musterTicks',
+  'raid.speedSu',
+  'hive.regrowPct',
   'stats.throughputWindowSec',
   'client.autosaveSec',
 ] as const;
@@ -283,13 +322,55 @@ export interface ResearchItem {
 /** Seed rigs (H4): rig level L gives the first L of these nodes a free extractor and route at landing. */
 export const RIG_NODES: readonly string[] = ['a1', 'a2'];
 
+/**
+ * H7: the one field a field-mode run plays (DESIGN.md H7 "The field"). Frame node ids (probe first, the heart
+ * present, no Root), the asteroids Mine-marked at the landing, and its guards in the H4 area layout format
+ * (no Root, no starved counts).
+ */
+export interface FieldMap {
+  nodes: string[];
+  mine: string[];
+  layout: AreaLayout;
+}
+
 export interface SimData {
   dataVersion: number;
   tickRate: number;
+  /** H7: absent means `{ mode: 'campaign' }` (the frozen fixtures and the H1–H6 rules). Read it with runMode(data). */
+  run?: { mode: RunMode };
   tunables: Record<TunableKey, TunableSpec>;
-  map: { nodes: MapNode[]; layouts: MapLayout[]; areas: MapArea[]; lanes: MapLane[] };
+  /** H7: `field` is required when run.mode is 'field'. */
+  map: { nodes: MapNode[]; layouts: MapLayout[]; areas: MapArea[]; lanes: MapLane[]; field?: FieldMap };
   research: ResearchItem[];
 }
+
+/** H7: the data's run mode ('campaign' when `run` is absent). */
+export function runMode(data: SimData): RunMode {
+  return data.run?.mode ?? 'campaign';
+}
+
+/**
+ * H7: the same data with `run.mode` set (a shallow copy; everything else is shared, and the copy is not
+ * re-validated: switching to 'field' needs `map.field`). Tests and tools use it to play the parked campaign on the
+ * shipped data (`withRunMode(defaultData, 'campaign')`).
+ */
+export function withRunMode(data: SimData, mode: RunMode): SimData {
+  if (mode === 'field' && data.map.field === undefined) throw new Error('withRunMode: field mode needs map.field');
+  return { ...data, run: { mode } };
+}
+
+/**
+ * H7 "What is parked, and how": the tunables kept in data and code but unused in field mode (the tuning panel
+ * hides them there). `route.*`, `component.*`, `research.*` and `bloom.starved*` are every key with that prefix.
+ */
+export const FIELD_PARKED_KEYS: readonly TunableKey[] = TUNABLE_KEYS.filter(
+  (k) =>
+    k.startsWith('route.') ||
+    k.startsWith('component.') ||
+    k.startsWith('research.') ||
+    k.startsWith('bloom.starved') ||
+    ['extractor.cost', 'extractor.buildTicks', 'build.queueMax', 'shipments.pct', 'areas.repeatHaulPct', 'overworld.bandLock', 'fleet.relayStep', 'fleet.cap'].includes(k),
+);
 
 /** Tunable metadata for the tuning panel. */
 export interface TunableMeta {
@@ -308,7 +389,7 @@ export interface TunableMeta {
 }
 
 /** Keys that are read only by `createWorld`. (H4: economy.startStock is read at every landing, so it is live.) */
-const NEW_RUN_ONLY: ReadonlySet<string> = new Set(['system.variant']);
+const NEW_RUN_ONLY: ReadonlySet<string> = new Set(['system.variant', 'alloc.start.extractor', 'alloc.start.hauler']);
 
 /** capEff never exceeds this many guards of one type (DESIGN.md H3 "Effective caps"). */
 export const GUARD_CAP_MAX = 60;
@@ -352,7 +433,21 @@ export function parseSimData(raw: unknown): SimData {
     if (min > max || d < min || d > max) fail(`tunable ${k} default ${d} outside ${min}..${max}`);
   }
   // The combat conversion divides by both counter percentages and the regrow period by its ticks.
-  for (const k of ['counter.strongPct', 'counter.weakPct', 'guard.thorn.regrowTicks', 'guard.spore.regrowTicks', 'bloom.starvedRegrowMul', 'combat.roundTicks'] as const) {
+  // H7: the hauler and raid speeds, raid.econPerRaider, the bays' build ticks and alloc.maxWeight are divisors too.
+  for (const k of [
+    'counter.strongPct',
+    'counter.weakPct',
+    'guard.thorn.regrowTicks',
+    'guard.spore.regrowTicks',
+    'bloom.starvedRegrowMul',
+    'combat.roundTicks',
+    'ship.hauler.speedSu',
+    'raid.speedSu',
+    'raid.econPerRaider',
+    'ship.extractor.buildTicks',
+    'ship.hauler.buildTicks',
+    'alloc.maxWeight',
+  ] as const) {
     if ((tunRec[k] as unknown as TunableSpec).min < 1) fail(`tunable ${k} must have min >= 1`);
   }
 
@@ -432,7 +527,74 @@ export function parseSimData(raw: unknown): SimData {
       }
     }
   }
+  parseRun(r.run, map.field, nodes as MapNode[], tunRec as Record<string, TunableSpec>);
   return raw as unknown as SimData;
+}
+
+/**
+ * H7: `run` (optional; absent is a campaign) and `map.field` (required in field mode, checked whenever present):
+ * every id a frame node, listed once, the probe first, the heart present, no Root; `mine` asteroids of the field
+ * only; the layout in the area format with one entry per pocket present and no Root or starved counts. In field
+ * mode, at the defaults: ship.hauler.cargo ≤ node.bufferCap (a full buffer always fills a hauler) and
+ * economy.probeOrePerMin ≥ 1 (the softlock floor).
+ */
+function parseRun(run: unknown, field: unknown, frame: readonly MapNode[], tun: Record<string, TunableSpec>): void {
+  let mode: RunMode = 'campaign';
+  if (run !== undefined) {
+    if (!isObj(run) || !(RUN_MODES as readonly unknown[]).includes(run.mode)) fail(`run.mode must be one of ${RUN_MODES.join(', ')}`);
+    for (const k of Object.keys(run)) if (k !== 'mode') fail(`run.${k} is not a run setting`);
+    mode = run.mode as RunMode;
+  }
+  if (field === undefined) {
+    if (mode === 'field') fail('run.mode is "field" but map.field is missing');
+    return;
+  }
+  const at = 'map.field';
+  if (!isObj(field)) fail(`${at} must be an object`);
+  const kindOf = new Map(frame.map((n) => [n.id, n.kind]));
+  if (!Array.isArray(field.nodes) || field.nodes.length < 1) fail(`${at}.nodes missing`);
+  const present: string[] = [];
+  for (const id of field.nodes as unknown[]) {
+    if (typeof id !== 'string' || !kindOf.has(id)) fail(`${at}.nodes: ${String(id)} is not a frame node id`);
+    if (present.includes(id)) fail(`${at}.nodes: ${id} is listed twice`);
+    if (kindOf.get(id) === 'root') fail(`${at}.nodes: the field has no Root (${id})`);
+    present.push(id);
+  }
+  if (present[0] !== frame[0]!.id) fail(`${at}.nodes must start with the probe`);
+  if (!present.some((id) => kindOf.get(id) === 'heart')) fail(`${at}.nodes must include the heart (the hive)`);
+  if (!Array.isArray(field.mine)) fail(`${at}.mine missing`);
+  const mine: string[] = [];
+  for (const id of field.mine as unknown[]) {
+    if (typeof id !== 'string' || !present.includes(id)) fail(`${at}.mine: ${String(id)} is not a node of the field`);
+    if (kindOf.get(id) !== 'asteroid') fail(`${at}.mine: ${id} is not an asteroid (pockets and the hive are marked at capture)`);
+    if (mine.includes(id)) fail(`${at}.mine: ${id} is listed twice`);
+    mine.push(id);
+  }
+  const l = field.layout;
+  if (!isObj(l)) fail(`${at}.layout missing`);
+  if (!isObj(l.pockets)) fail(`${at}.layout.pockets missing`);
+  const pocketsHere = present.filter((id) => kindOf.get(id) === 'pocket');
+  for (const k of Object.keys(l.pockets)) if (!pocketsHere.includes(k)) fail(`${at}.layout.pockets.${k} is not a pocket node of the field`);
+  for (const id of pocketsHere) {
+    const p = l.pockets[id];
+    if (!isObj(p)) fail(`${at}.layout.pockets.${id} missing`);
+    if (p.prize !== 'ice' && p.prize !== 'crystal') fail(`${at}.layout.pockets.${id}.prize must be ice or crystal`);
+    if (!isInt(p.slots) || p.slots < 0) fail(`${at}.layout.pockets.${id}.slots must be a non-negative integer`);
+    checkCount(p.thorns, `${at}.layout.pockets.${id}.thorns`);
+    checkCount(p.spores, `${at}.layout.pockets.${id}.spores`);
+  }
+  if (l.root !== undefined) fail(`${at}.layout.root given, but the field has no Root`);
+  if (!isObj(l.heart)) fail(`${at}.layout.heart missing`);
+  checkCount(l.heart.thorns, `${at}.layout.heart.thorns`);
+  checkCount(l.heart.spores, `${at}.layout.heart.spores`);
+  for (const f of ['starvedThorns', 'starvedSpores'] as const) {
+    if (l.heart[f] !== undefined) fail(`${at}.layout.heart.${f} given, but the field has no Root to starve it`);
+  }
+  if (mode !== 'field') return;
+  const cargo = tun['ship.hauler.cargo']!.default;
+  const cap = tun['node.bufferCap']!.default;
+  if (cargo > cap) fail(`field mode: ship.hauler.cargo ${cargo} is above node.bufferCap ${cap}, so a full buffer could never fill a hauler`);
+  if (tun['economy.probeOrePerMin']!.default < 1) fail('field mode: economy.probeOrePerMin must be at least 1 (the softlock floor)');
 }
 
 /** True if two areas share a repeat-haul group: the same tier (band) and the same side, which isn't `none`. */

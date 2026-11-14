@@ -23,7 +23,7 @@ import rawV10 from './fixtures/sim-v10.json' with { type: 'json' };
  * against the DESIGN.md H6 tables ("Areas", "Area guards", "Research",
  * "Tunables (H6 …)"), the 16 lanes and the frame, so a retune edits data and
  * DESIGN.md together and no test. Nothing here pins a tuned number of its own.
- * The dataVersion pin lives here. Validation is tested on the frozen v10
+ * The dataVersion pin lived here until h7-sim (now data-h7.test.ts). Validation is tested on the frozen v10
  * fixture (fixtures/sim-v10.json), which is the shipped data as h6-sim left it.
  */
 
@@ -99,9 +99,8 @@ function guardRows(d: SimData): string[][] {
 const sum = (d: SimData, res: keyof ResourceTriple): number => d.research.reduce((s, it) => s + it.levels.reduce((x, lv) => x + lv[res], 0), 0);
 
 describe('data/sim.json (shipped) at H6', () => {
-  it('is data version 11', () => {
-    expect(defaultData.dataVersion).toBe(11);
-  });
+  // h7-sim: the dataVersion pin moved to data-h7.test.ts (v12). The H6 tables below still describe the shipped,
+  // parked campaign data.
 
   it('matches the H6 "Areas" table (ten areas with side and relay)', () => {
     const rows = tableAfter(h6At, '#### Areas (H6, data `map.areas`)').map((r) => r.map(strip));

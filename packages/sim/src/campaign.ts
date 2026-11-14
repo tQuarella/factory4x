@@ -5,6 +5,7 @@ import {
   appliesAtLevel,
   decayedHaul,
   isTierRequirement,
+  runMode,
   sameHaulGroup,
   type ResearchId,
   type ResearchItem,
@@ -127,8 +128,12 @@ export function haulIfReclaimedNow(world: Readonly<World>, data: SimData, a: num
   return repeatOf(world, data, a) === null ? { ...haul } : decayedHaul(haul, world.tun['areas.repeatHaulPct']);
 }
 
-/** True after the probe core is bought: every input but setTunable is refused. */
+/**
+ * True after the probe core is bought: every input but setTunable is refused. H7 field mode: true once the hive
+ * is captured (F11); free play continues there, so field inputs stay valid after the win.
+ */
 export function isWon(world: Readonly<World>): boolean {
+  if (world.field !== null) return world.capturedTick !== null;
   return world.campaign.wonTick !== null;
 }
 
@@ -369,6 +374,7 @@ export interface CampaignStart {
  * lane-open (band locks are not checked: see CampaignStart.land).
  */
 export function campaignWorld(seed: number, data: SimData, start: Readonly<CampaignStart> = {}): World {
+  if (runMode(data) !== 'campaign') throw new Error("campaignWorld needs campaign data: pass withRunMode(data, 'campaign')");
   const world = createWorld(seed, data);
   const camp = world.campaign;
   for (const id of start.reclaimed ?? []) {

@@ -240,6 +240,10 @@ describe('yardStatus fleetFull and fleetStatus', () => {
       maxCommandedBands: 0,
       level: 0,
       maxLevel: 0,
+      // h7-sim: the field-mode additions, at the v8 fixture's fleet.countsEconomy 1 and with no economy ships in a campaign.
+      countsEconomy: true,
+      econByType: { extractor: 0, hauler: 0 },
+      econBuildingByType: { extractor: 0, hauler: 0 },
     });
     const overworld = campaignWorld(1, D);
     expect(fleetStatus(overworld, D)).toMatchObject({ cap: D.tunables['fleet.cap'].default, count: 0, full: false, commandedBands: 0, level: 0, maxLevel: 0 });

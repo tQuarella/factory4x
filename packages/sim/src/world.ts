@@ -1,9 +1,13 @@
 import {
+  BUILD_TYPES,
   GUARD_CAP_MAX,
   GUARD_TYPES,
   RIG_NODES,
   SIM_TUNABLE_KEYS,
+  runMode,
   type AreaHeart,
+  type BuildType,
+  type EconType,
   type AreaLayout,
   type Component,
   type GuardType,
@@ -17,6 +21,7 @@ import {
   type SimData,
   type Tunables,
 } from './data.ts';
+import { initialRaidState, type Raid } from './factions/index.ts';
 import { isqrt } from './math.ts';
 
 /**
@@ -101,6 +106,64 @@ export interface Ship {
   transit: Transit | null;
   /** Id of the last battle this ship fought a round in, or -1. Used to count distinct ships engaged. */
   engagedIn: number;
+}
+
+/**
+ * H7: an economy ship (extractor or hauler). Kept apart from `world.ships` (the warships) in `world.field.econ`,
+ * in id order; ids come from the same `nextId` counter, so ids are unique across both arrays.
+ */
+export interface EconShip {
+  id: number;
+  type: EconType;
+  hp: number;
+  /** Node index when parked; null while in transit. */
+  at: number | null;
+  transit: Transit | null;
+  /**
+   * Extractor: the node it is bound to (F5: from dispatch on, so its slot is reserved in flight), or null when
+   * unbound (idle at the probe, or flying home). Hauler: its assigned node (F6), or null when idle.
+   */
+  target: number | null;
+  /** Hauler: units carried (0 for extractors) and what they are (null when empty). */
+  cargo: number;
+  cargoRes: RawResource | null;
+}
+
+/** A count per economy ship type. */
+export interface EconTypeCounts {
+  extractor: number;
+  hauler: number;
+}
+
+/** H7 R8 / F14: raids by outcome. `mustered` counts every raid that entered its muster. */
+export interface RaidStats {
+  mustered: number;
+  beaten: number;
+  hit: number;
+  turnedBack: number;
+}
+
+/**
+ * H7 field-mode state (DESIGN.md H7 F2–F6). Null in a campaign world. Per-type records use BUILD_TYPES keys
+ * and per-node arrays are indexed by node index.
+ */
+export interface FieldState {
+  /** F2: the weight per type, 0..alloc.maxWeight. */
+  alloc: Record<BuildType, number>;
+  /** F2: ore set aside per type, 0..the type's ore cost. */
+  share: Record<BuildType, number>;
+  /** F2: the smooth weighted round-robin counters (0 while the type isn't eligible). */
+  allocCur: Record<BuildType, number>;
+  /** F3: the economy bays (the warship bays are `world.yards`; their `on` flag is unused in field mode). */
+  bays: Record<EconType, Yard>;
+  /** The economy ships, in id order. */
+  econ: EconShip[];
+  /** Per node: Mine-marked. */
+  mine: boolean[];
+  /** Per node: free extractors from a capture (F4: not ships, can't be killed). */
+  free: number[];
+  /** Per node: units delivered by haulers per game second, the same ring as stats.deliveredBuckets (rockStatus). */
+  rockBuckets: number[][];
 }
 
 export interface Guard {
@@ -237,6 +300,16 @@ export interface Stats {
   captures: Capture[];
   /** H6: the haul this visit's reclaim paid into the stockpile (decayed for a repeat), or null before the reclaim. */
   haulPaid: ResourceTriple | null;
+  /** H7 (field mode; always zero in a campaign): economy ships built, lost (F14 `econLost`) and recycled, by type. */
+  econBuilt: EconTypeCounts;
+  econLost: EconTypeCounts;
+  econRecycled: EconTypeCounts;
+  /** H7 F14: raids by outcome (R8; h7-raids counts them). */
+  raids: RaidStats;
+  /** H7 F14: setAlloc inputs that changed a weight. */
+  allocChanges: number;
+  /** H7 F14: most economy ships alive at once. */
+  peakEcon: number;
 }
 
 export interface Yard {
@@ -351,6 +424,26 @@ export interface World {
    * guardians, ships or routes; zero stock).
    */
   campaign: Campaign;
+  /**
+   * H7: the field-mode state, or null in a campaign world. A field-mode world (`createWorld` on data with
+   * run.mode 'field') holds the field in the area fields above with `campaign.active` null, and this is set.
+   */
+  field: FieldState | null;
+  /** H7 R1: the raid in progress, or null. Always null in a campaign world. */
+  raid: Raid | null;
+  /** H7 R1: no raid musters before this tick (R8 sets it from the end of a raid). */
+  nextRaidTick: number;
+}
+
+/** H7: true for a field-mode world. */
+export function isField(world: Readonly<World>): boolean {
+  return world.field !== null;
+}
+
+/** H7: the field state; throws in a campaign world. */
+export function fieldOf(world: Readonly<World>): FieldState {
+  if (world.field === null) throw new Error('not a field-mode world');
+  return world.field;
 }
 
 /** The probe is always node 0 (enforced by parseSimData). */
@@ -481,6 +574,7 @@ function guardianFor(layout: MapLayout | AreaLayout, n: Node, hasRoot: boolean):
 
 const zeroShips = (): ShipTypeCounts => ({ drone: 0, lancer: 0, flak: 0 });
 const zeroTriple = (): ResourceTriple => ({ ore: 0, ice: 0, crystal: 0 });
+const zeroEcon = (): EconTypeCounts => ({ extractor: 0, hauler: 0 });
 
 /** Fresh area statistics (every visit starts its own). */
 function freshStats(data: SimData): Stats {
@@ -507,6 +601,12 @@ function freshStats(data: SimData): Stats {
     rootCutTick: null,
     captures: [],
     haulPaid: null,
+    econBuilt: zeroEcon(),
+    econLost: zeroEcon(),
+    econRecycled: zeroEcon(),
+    raids: { mustered: 0, beaten: 0, hit: 0, turnedBack: 0 },
+    allocChanges: 0,
+    peakEcon: 0,
   };
 }
 
@@ -573,8 +673,37 @@ export function landArea(world: World, data: SimData, a: number): void {
   const t = world.tun;
   const layout: MapLayout | AreaLayout = area.layout === 'seed' ? data.map.layouts[camp.deepLayout]! : area.layout;
   Object.assign(world, emptyAreaFields(data));
+  // 1-2. Nodes and full guardians.
+  placeNodes(world, data, area.nodes, layout);
+  // 3. Opening stock: economy.startStock (read now, so it is live) plus the Opening ore research.
+  world.stock.ore = t['economy.startStock'] + researchLevel(world, 'opening') * t['research.opening.step'];
+  // 4. Yards: drones on (the first ship early matters); a researched design's yard starts on and waits for its component.
+  world.yards.drone.on = true;
+  world.yards.lancer.on = researchLevel(world, 'lancer') >= 1;
+  world.yards.flak.on = researchLevel(world, 'flak') >= 1;
+  // 5. Seed rigs: the first L of a1, a2 start owned, each with one extractor and a level-1 route to the probe, free.
+  const rigs = Math.min(researchLevel(world, 'rigs'), RIG_NODES.length);
+  for (let k = 0; k < rigs; k++) {
+    const node = world.nodes.find((n) => n.id === RIG_NODES[k]);
+    if (node === undefined) continue;
+    node.owned = true;
+    node.extractors = 1;
+    world.routes.push({ id: world.nextId++, from: node.index, to: PROBE, length: nodeDistance(world, node.index, PROBE), level: 1, cooldown: 0, pods: [] });
+  }
+  // 6. The visit starts.
+  camp.active = a;
+  camp.areaStartTick = world.tick;
+  camp.areas[a]!.entries += 1;
+}
+
+/**
+ * Landing steps 1-2, shared by landArea and the H7 field: the frame nodes listed in `ids`, in frame order (so the
+ * probe is index 0), and one full guardian per guarded node, in node order (ids in guardian order, Thorns before
+ * Spores).
+ */
+function placeNodes(world: World, data: SimData, ids: readonly string[], layout: MapLayout | AreaLayout): void {
   // 1. Nodes: the frame nodes present, in frame order (so the probe is index 0).
-  const frame = data.map.nodes.filter((n) => area.nodes.includes(n.id));
+  const frame = data.map.nodes.filter((n) => ids.includes(n.id));
   world.nodes = frame.map((n, index) => {
     const pocket = n.kind === 'pocket' ? layout.pockets[n.id]! : null;
     return {
@@ -613,29 +742,60 @@ export function landArea(world: World, data: SimData, a: number): void {
     const caps = guardCaps(world, g);
     for (const type of GUARD_TYPES) for (let i = 0; i < caps[type]; i++) addGuard(world, g, type);
   }
-  // 3. Opening stock: economy.startStock (read now, so it is live) plus the Opening ore research.
-  world.stock.ore = t['economy.startStock'] + researchLevel(world, 'opening') * t['research.opening.step'];
-  // 4. Yards: drones on (the first ship early matters); a researched design's yard starts on and waits for its component.
-  world.yards.drone.on = true;
-  world.yards.lancer.on = researchLevel(world, 'lancer') >= 1;
-  world.yards.flak.on = researchLevel(world, 'flak') >= 1;
-  // 5. Seed rigs: the first L of a1, a2 start owned, each with one extractor and a level-1 route to the probe, free.
-  const rigs = Math.min(researchLevel(world, 'rigs'), RIG_NODES.length);
-  for (let k = 0; k < rigs; k++) {
-    const node = world.nodes.find((n) => n.id === RIG_NODES[k]);
-    if (node === undefined) continue;
-    node.owned = true;
-    node.extractors = 1;
-    world.routes.push({ id: world.nextId++, from: node.index, to: PROBE, length: nodeDistance(world, node.index, PROBE), level: 1, cooldown: 0, pods: [] });
-  }
-  // 6. The visit starts.
-  camp.active = a;
-  camp.areaStartTick = world.tick;
-  camp.areas[a]!.entries += 1;
 }
 
-/** A fresh campaign at tick 0 (DESIGN.md H4): on the overworld, nothing reclaimed or researched, Landfall open. */
+/** H7: a fresh per-type record (BUILD_TYPES keys). */
+function perBuildType(f: (t: BuildType) => number): Record<BuildType, number> {
+  const r = {} as Record<BuildType, number>;
+  for (const t of BUILD_TYPES) r[t] = f(t);
+  return r;
+}
+
+/**
+ * H7 F13, the landing of a field-mode run (DESIGN.md H7 "The field"): the nodes of `map.field` with its guards,
+ * `economy.startStock` ore, the allocation at alloc.start.extractor / alloc.start.hauler with every warship at 0
+ * (clamped to alloc.maxWeight), the Mine marks of `map.field.mine`, and the rally at the probe. No area is active
+ * (`campaign.active` stays null): the overworld, research and stockpile are never used.
+ */
+function landField(world: World, data: SimData): void {
+  const fm = data.map.field;
+  if (fm === undefined) throw new Error('field mode needs map.field');
+  const t = world.tun;
+  Object.assign(world, emptyAreaFields(data));
+  placeNodes(world, data, fm.nodes, fm.layout);
+  world.stock.ore = t['economy.startStock'];
+  const max = t['alloc.maxWeight'];
+  const start = (type: BuildType): number => {
+    if (type === 'extractor') return Math.min(t['alloc.start.extractor'], max);
+    if (type === 'hauler') return Math.min(t['alloc.start.hauler'], max);
+    return 0;
+  };
+  const window = data.tunables['stats.throughputWindowSec'].default;
+  world.field = {
+    alloc: perBuildType(start),
+    share: perBuildType(() => 0),
+    allocCur: perBuildType(() => 0),
+    bays: { extractor: { on: false, ticksLeft: 0 }, hauler: { on: false, ticksLeft: 0 } },
+    econ: [],
+    mine: world.nodes.map((n) => fm.mine.includes(n.id)),
+    free: world.nodes.map(() => 0),
+    rockBuckets: world.nodes.map(() => new Array<number>(window).fill(0)),
+  };
+  world.rally = PROBE;
+}
+
+/**
+ * A fresh world at tick 0. Campaign data (DESIGN.md H4): on the overworld, nothing reclaimed or researched,
+ * Landfall open. H7 field data (run.mode 'field'): the campaign state is created as well, but the world lands
+ * straight in the field (F13) and `world.field` is set.
+ */
 export function createWorld(seed: number, data: SimData): World {
+  const world = createCampaignWorld(seed, data);
+  if (runMode(data) === 'field') landField(world, data);
+  return world;
+}
+
+function createCampaignWorld(seed: number, data: SimData): World {
   const tun = {} as Tunables;
   for (const k of SIM_TUNABLE_KEYS) tun[k] = data.tunables[k].default;
   const variant = chooseVariant(seed, tun['system.variant'], data.map.layouts.length);
@@ -675,5 +835,7 @@ export function createWorld(seed: number, data: SimData): World {
       totals: { hauled: zeroTriple(), shipped: zeroTriple() },
       wonTick: null,
     },
+    field: null,
+    ...initialRaidState(),
   };
 }

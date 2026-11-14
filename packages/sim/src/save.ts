@@ -1,4 +1,4 @@
-import { RAW_RESOURCES, RESOURCES, SHIP_TYPES, SIM_TUNABLE_KEYS, YARD_ROTATION, type SimData } from './data.ts';
+import { BUILD_TYPES, ECON_TYPES, RAW_RESOURCES, RESOURCES, SHIP_TYPES, SIM_TUNABLE_KEYS, YARD_ROTATION, runMode, type SimData } from './data.ts';
 import type { World } from './world.ts';
 
 /**
@@ -68,6 +68,44 @@ function campaignOk(c: unknown, data: SimData): c is Record<string, unknown> {
   );
 }
 
+const isIntRecord = (v: unknown, keys: readonly string[]): boolean => isObj(v) && keys.every((k) => isInt(v[k]));
+
+/** H7: `world.field` is null in a campaign save (nodes === null), else the field state with per-node arrays of that length. */
+function fieldOk(f: unknown, nodes: number | null): boolean {
+  if (nodes === null) return f === null;
+  if (!isObj(f)) return false;
+  const perNode = (v: unknown): boolean => Array.isArray(v) && v.length === nodes;
+  const bays = f.bays;
+  return (
+    isIntRecord(f.alloc, BUILD_TYPES) &&
+    isIntRecord(f.share, BUILD_TYPES) &&
+    isIntRecord(f.allocCur, BUILD_TYPES) &&
+    isObj(bays) &&
+    ECON_TYPES.every((t) => isObj(bays[t]) && isInt(bays[t].ticksLeft)) &&
+    Array.isArray(f.econ) &&
+    f.econ.every((s: unknown) => isObj(s) && isInt(s.id) && (s.type === 'extractor' || s.type === 'hauler') && isInt(s.hp) && isIntOrNull(s.target) && isInt(s.cargo)) &&
+    perNode(f.mine) &&
+    perNode(f.free) &&
+    perNode(f.rockBuckets)
+  );
+}
+
+/** H7 R1: `world.raid` null or an object with a phase, and `nextRaidTick` an integer. */
+function raidOk(raid: unknown, next: unknown): boolean {
+  return isInt(next) && (raid === null || (isObj(raid) && typeof raid.phase === 'string' && Array.isArray(raid.guards)));
+}
+
+/** H7 F14: the stats additions. */
+function h7StatsOk(stats: unknown): boolean {
+  if (!isObj(stats)) return false;
+  return (
+    ['econBuilt', 'econLost', 'econRecycled'].every((k) => isIntRecord(stats[k], ECON_TYPES)) &&
+    isIntRecord(stats.raids, ['mustered', 'beaten', 'hit', 'turnedBack']) &&
+    isInt(stats.allocChanges) &&
+    isInt(stats.peakEcon)
+  );
+}
+
 /** Restores a save made by `serializeWorld`. Refuses a save whose dataVersion differs from `data`, or one that isn't a well-formed save. */
 export function deserializeWorld(text: string, data: SimData): LoadResult {
   let parsed: unknown;
@@ -88,10 +126,17 @@ export function deserializeWorld(text: string, data: SimData): LoadResult {
   const yards = w.yards as Record<string, unknown> | null;
   const camp = w.campaign;
   if (!campaignOk(camp, data)) return { ok: false, reason: 'corrupt', saveDataVersion };
-  // The area fields hold the active area's nodes and guardians, or nothing on the overworld.
+  // The area fields hold the active area's nodes and guardians, or nothing on the overworld. H7: a field-mode save
+  // (the data's run mode) holds the field's nodes, with no area active.
+  const fieldIds = runMode(data) === 'field' ? data.map.field!.nodes : null;
+  if (fieldIds !== null && camp.active !== null) return { ok: false, reason: 'corrupt', saveDataVersion };
   const area = camp.active === null ? null : data.map.areas[camp.active as number]!;
-  const nodeCount = area === null ? 0 : area.nodes.length;
-  const guarded = area === null ? 0 : data.map.nodes.filter((n) => area.nodes.includes(n.id) && (n.kind === 'pocket' || n.kind === 'root' || n.kind === 'heart')).length;
+  const ids = fieldIds ?? (area === null ? [] : area.nodes);
+  const nodeCount = ids.length;
+  const guarded = data.map.nodes.filter((n) => ids.includes(n.id) && (n.kind === 'pocket' || n.kind === 'root' || n.kind === 'heart')).length;
+  if (!fieldOk(w.field, fieldIds === null ? null : nodeCount) || !raidOk(w.raid, w.nextRaidTick) || !h7StatsOk(w.stats)) {
+    return { ok: false, reason: 'corrupt', saveDataVersion };
+  }
   const wellFormed =
     w.dataVersion === data.dataVersion &&
     isInt(w.tick) &&
