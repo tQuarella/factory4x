@@ -31,7 +31,9 @@ Launches: 9 / 12.
 | r6 | critic | h8-raids | resume | Review round 1: APPROVE (26a1a76) |
 | r7 | faction-ai | h8-raids | resume | Hold ends at the outcome (def6c5f), determinism cdbdea56 |
 | r8 | critic | h8-raids | resume | Review round 2: APPROVE (d45cca3) |
-| 9 | critic | h8-client | launch | Review round 1 on 887155c (smoke 268/268; every node-pair drag lands) |
+| 9 | critic | h8-client | launch | Review round 1: REJECT (76376f9): raids not merged; split ghost; enough text untested; touch-action, badge vs HUD; rock sheet squeezes map to ~160 px; raw colours |
+| r9 | engineer | h8-client | resume | Fix round 1; map keeps 195 px with rock sheet |
+| r10 | critic | h8-bots | resume | Review round 1 on 8157c0a (adaptive 15:53, greedy 15:45, flags 1-7 met; bots gate slower, 115-215 s) |
 
 ## Iteration 7 ledger
 
