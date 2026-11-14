@@ -860,3 +860,8 @@ Scope: `git log build-20261108-4..build-20261108-5`, `reviews/h6-*.md`, the "Ite
 
 **Decision:** (1) The flip to `run.mode: "field"` stays in h7-sim, and the whole stack lands through `merge-task h7-client`. (2) Art is folded into h7-client; a separate art-direction task only if h7-client's Critic finds the new silhouettes unreadable. (3) The H6 campaign bots stay in the code, retired from the gate, and their tests run on a campaign-mode fixture; deleting them goes with cw-root-code-removal once the overworld's fate is known. (4) The field guard counts and `field.fleetCap` 30 are starting values for h7-design-data to calibrate.
 **Why:** the field reference replay and browser cross-engine check run on shipped data, so flipping early keeps them honest. The overworld is parked, not dropped (Q21), so its bots shouldn't be deleted while it might return. Folding art keeps 4 launches spare.
+
+## 2026-11-14 · Director · h7-bots round 3 to the core-engineer; recycle rule extended to pocket waves
+
+**Decision:** h7-bots was rejected twice (a wounded drone sent in a pocket wave; a second dead end after a failed pocket wave). Per the deadlock rule, round 3 goes to the core-engineer (resumed from h7-sim, which knows the field code). The Director's recycle rule is extended: once a pocket is the plan, recycling may also free room for that pocket's wave, down to the same `raid.firstAtEcon` floor.
+**Why:** the second dead end sits in the rule as first written (it freed room only for the hive wave). Recycle is a player action, and the no-idle requirement outranks keeping the bot minimal. adaptive-no-raids is the in-build A/B for `raid.enabled`, so it must not falsely report that the field can't be won without raids.
