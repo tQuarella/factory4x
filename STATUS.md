@@ -26,6 +26,8 @@ Launches: 6 / 12.
 | 5 | engineer | h7-bots | launch | Build, from task/h7-sim |
 | 6 | engineer | h7-client | launch | Build, from task/h7-sim (top of stack) |
 | r5 | critic | h7-raids | resume | Review round 1: APPROVE (c46e2b5); bots and client told to merge it |
+| r6 | critic | h7-bots | resume | Review round 1: REJECT (econ limit skipped in raid branch; all-zero dead end; gate ignores sweep; greedy offence before hit) |
+| r7 | engineer | h7-bots | resume | Fix round 1; Director: adaptive takes other pocket, else recycles econ, to make room |
 
 ## Iteration 6 ledger
 
