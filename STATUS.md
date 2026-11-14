@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 7, hypothesis H7 A: One field, live enemy)
-**State:** Iteration 7 in flight. Owner answered Q21 "A, yes" (dda12d7): ship economy, spider-graph allocation, raids; pillars 3 and 4 rewritten; faction-ai activated. Step: Build. Spec and split f2452cf; h7-sim approved (3c846b7). h7-raids approved (c46e2b5). h7-bots approved (9dff1c0). h7-design-data calibrating; h7-client in fix round 1; h7-design-data after h7-bots approval.
+**State:** Iteration 7 in flight. Owner answered Q21 "A, yes" (dda12d7): ship economy, spider-graph allocation, raids; pillars 3 and 4 rewritten; faction-ai activated. Step: Build. Spec and split f2452cf; h7-sim approved (3c846b7). h7-raids approved (c46e2b5). h7-bots approved (9dff1c0). h7-design-data in review; h7-client fixed and green with bots merged (4e0561f), final round after design-data; h7-design-data after h7-bots approval.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-5 (H6 Open frontier), commit 626307f, live (CI gates and deploy green; site shows 626307f · data v11). Release gates passed locally (192/192 smoke).
@@ -31,7 +31,8 @@ Launches: 7 / 12.
 | r8 | critic | h7-bots | resume | Review round 2: REJECT (wounded drone in pocket wave; dead end after failed pocket wave) |
 | r9 | core-engineer | h7-bots | resume | Fix round 3, reassigned per deadlock rule (ce6d659): adaptive 19:00, greedy 19:49, no-raids 14:37 |
 | r11 | critic | h7-bots | resume | Review round 3: APPROVE (9dff1c0) |
-| r12 | designer | h7-design-data | resume | Calibrate v12 → v13, stacked on task/h7-bots |
+| r12 | designer | h7-design-data | resume | Calibrated v13 (68fbb09): all 7 flags met; adaptive 20:02, greedy 30:16 |
+| r13 | critic | h7-design-data | resume | Review round 1 (h7-client Critic) |
 | 7 | critic | h7-client | launch | Review round 1 (9a7f480): REJECT (probe sheet scrolls with Recycle; raid line wrong after retarget; raid texts untested) |
 | r10 | engineer | h7-client | resume | Fix round 1; Director: compact probe sheet, map keeps ~200 px |
 
