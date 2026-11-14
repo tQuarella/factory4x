@@ -62,3 +62,61 @@ Required changes:
 - [ ] Re-run the gates and the full smoke, and list the results in the fix commit.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-14 (final, top of the H7 stack)
+
+Reviewed `git diff c74cb7d...task/h7-client` at head 9d022f9. The stack is now all on this branch:
+- the fix round (3c9f761);
+- h7-bots, merged with its approving review 9dff1c0 (4e0561f);
+- h7-design-data, merged with its approving review c9656ef (cdea719);
+- `main` (89be29d);
+- two smoke-only commits (5802b2b, 9d022f9) that step the sim with `advanceTicks` instead of waiting in real time.
+
+Every lower task's approving review commit is an ancestor.
+
+**Round 1 required changes:**
+1. **The probe sheet fits with Recycle shown.**
+   - The radar is now the header (140x104). Rally and Recycle sit side by side beside it, so Recycle showing adds no height. The rows are one name line and one state line each.
+   - The new smoke test is the state I flagged: ships parked at the probe, Recycle shown, Lancer and Flak on their locked lines. It runs at both fonts, asserts no scrolling, and checks that the map keeps 195+ px with the probe and hive above the sheet.
+   - I re-measured with my own round 1 script, at 375x667 on the phone project, drone weight 5, after 5400 ticks. scrollHeight equals clientHeight: 353 / 353 with the normal font, 358 / 358 with the wide font. Every row is visible in my screenshots.
+   - Done.
+2. **The raid leg.** `drawRaid` draws from `raid.from` to the target (out) or to the hive (home), with progress `1 − ticksLeft ÷ flightTicks`. The client-side `flight` guess is gone. There are two smoke tests:
+   - a retarget made by Stopping the target through its sheet: the new leg starts at the old target, with the new flight's progress;
+   - a reload mid-flight: the marker is about half way along, not back at the hive.
+   Done.
+3. **Raid texts.** Unit tests cover:
+   - `raidChipText` in all nine states, including off, "Next raid", "Raids ready" and "Raid leaving";
+   - `raidEndText` for beaten (with and without losses), hit (every loss kind, singular and plural), turned back and withered;
+   - `raidMixText`, `raidMusterLine`, `raidFightLine` and the clock rounding.
+   Done.
+4. **The raid-rank line.** A smoke test shows it on the rank-1 rock, absent on a rank > 1 rock, and gone after Stop. Done.
+5. **The result panel.** A smoke test takes the hive with tuned values and real taps (Attack with all), and sees the panel open from the real trigger. Keep playing closes it, and it doesn't reopen as the run goes on. The campaign's win panel stays hidden, and New run asks first, then starts a fresh field. Done.
+6. **Cleanup.** `ROW_SELECTOR` and `incomeText` are removed, and the `buildProbeSheet` doc is fixed. Done.
+
+**Changes beyond my list, all logged in DECISIONS:**
+- The probe sheet's money line is gone; the top bar already shows ore and ore/min.
+- A row's cost moved to its tooltip, which a phone never shows. That is acceptable against the spec, which doesn't list a cost on the rows. The state line still shows the ore cost while saving ("saving 13/18") and the resource while waiting ("needs 4 crystal").
+- The locked lines are shorter ("needs crystal pocket" / "needs ice pocket"). DESIGN.md matches since h7-design-data round 2.
+
+**Determinism and data:** no sim or data code on this branch beyond the approved stack. Data is v13, and the client tests read the shipped values.
+
+**Gates (run by me on 9d022f9):**
+- `npm run gates -- --base main`: **every gate passes.**
+  - typecheck, lint and protected-files;
+  - test: 901 / 901;
+  - determinism: final ad177b58;
+  - bots: adaptive 24:54 and greedy 30:12, flags 1–7 met.
+- Build plus full smoke: **232 / 232**.
+- Full smoke with **`--repeat-each 5`** at the default worker count, desktop and phone: **1160 / 1160**, no flakes.
+- Branch CI: run 43630983499 on 9d022f9 is **success**. This review commit only adds this file. If `merge-task` requires CI on the exact merged commit, it needs one more green CI run on the head that carries this review.
+
+**Pillar fit.** Every decision the hypothesis needs fits one phone screen: the allocation (radar and five steppers), the Mine marks, and the raid warning with its target one tap away.
+
+**Non-blocking notes, for the handoff:**
+- With the probe sheet open, the map is about 200 px tall, and the rings round A1, A2 and the hive overlap at that scale. It stays readable, and the Director already holds it as a handoff question.
+- Under the wide-font stress the "Recycle… N" label wraps, and its ellipsis touches the button edge. It's fine at the normal font, and the controls-fit check passes.
+- `raidStatus` lacks `from` and `flightTicks`, so the map reads `world.raid` directly. The Can wait item for core is logged.
+
+Required changes: none.
+
+VERDICT: APPROVE
