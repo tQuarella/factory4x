@@ -6,6 +6,12 @@ Player-facing changes per build. Three plain lines per build, written by the Dir
 
 Nothing yet.
 
+## build-20261114-1 (2026-11-14, commit f565c11) · Milestone 2, H7: One field, live enemy
+
+- One asteroid field, one run: no overworld for now. The probe builds Extractor ships that mine a rock and Hauler ships that fly the ore home. Tap a rock and choose "Mine this rock" or "Stop mining". You land with economy only, so the first minute is about mining.
+- No build queue: on the probe sheet, set a weight from 0 to 5 for each ship type (Extractor, Hauler, Drone, Lancer, Flak). The spider graph shows the split, and the probe spends its income in that ratio. The fleet limit is 30 ships, economy ships included.
+- The hive raids you. Raids grow with your economy, never with time. A banner warns while a raid musters, and the raiders fly to the mined rock nearest the hive. Meet them with warships, or stop mining that rock. Take the ice and crystal pockets for Flak and Lancers, then take the hive to win.
+
 ## build-20261108-5 (2026-11-08, commit 626307f) · Milestone 2, H6: Open frontier
 
 - A bigger overworld you drag to pan: 10 areas in four bands, and you need only some of them to win. Command relays replace Command limit research. Reclaim the first relay in a band and your fleet limit rises (12, then 20, then 28) and the next band opens. Locked areas are visible but can't be entered until then. A second area of the same kind pays half its haul. The Root is gone.

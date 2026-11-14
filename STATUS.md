@@ -3,11 +3,11 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 7, hypothesis H7 A: One field, live enemy)
-**State:** Iteration 7 in flight. Owner answered Q21 "A, yes" (dda12d7): ship economy, spider-graph allocation, raids; pillars 3 and 4 rewritten; faction-ai activated. Step: Build. Spec and split f2452cf; h7-sim approved (3c846b7). h7-raids approved (c46e2b5). h7-bots approved (9dff1c0). h7-design-data approved (c9656ef); h7-client merged the whole stack on v13 (9d022f9), gates/smoke/CI green; Critic final round in progress. Next: merge-task h7-client, release-gates, /handoff.
+**State:** Awaiting owner feedback on build-20261114-1 (H7 One field, live enemy). Handoff block at the top of QUESTIONS.md. Next: /retro, then wait; on feedback, /resume triages it.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
-**Last build:** build-20261108-5 (H6 Open frontier), commit 626307f, live (CI gates and deploy green; site shows 626307f · data v11). Release gates passed locally (192/192 smoke).
-**Last updated:** 2026-11-14, iteration 7 start
+**Last build:** build-20261114-1 (H7 One field, live enemy), commit f565c11, live (CI 43638281605 gates and deploy green; site shows f565c11 · data v13). Release gates passed locally (232/232 smoke).
+**Last updated:** 2026-11-14, handoff of build-20261114-1
 
 ## Iteration 7 ledger
 
@@ -36,7 +36,7 @@ Launches: 7 / 12.
 | r14 | designer | h7-design-data | resume | Fix round 1 (79b80d4): p2 1/2, target met; adaptive 24:54, greedy 30:12 |
 | r15 | critic | h7-design-data | resume | Review round 2: APPROVE (c9656ef) |
 | r16 | engineer | h7-client | resume | Merged design-data + main (9d022f9): gates green, smoke 1160/1160 at x5, CI 43630983499 green; smoke waits now step the sim |
-| r17 | critic | h7-client | resume | Review round 2 (final) on 9d022f9 |
+| r17 | critic | h7-client | resume | Review round 2: APPROVE (003021c); branch CI green; merged f565c11, release gates green, deployed |
 | 7 | critic | h7-client | launch | Review round 1 (9a7f480): REJECT (probe sheet scrolls with Recycle; raid line wrong after retarget; raid texts untested) |
 | r10 | engineer | h7-client | resume | Fix round 1; Director: compact probe sheet, map keeps ~200 px |
 

@@ -4,6 +4,30 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
+## Build build-20261114-1 is ready (2026-11-14): H7, One field, live enemy
+
+Play: https://factory4x.pages.dev (on your phone, portrait; 4x is fine). The bots take the hive in about 25–30 game minutes, so roughly 7–8 real minutes at 4x plus your decisions. Your old save is from an older data version, so the game starts fresh.
+
+What changed:
+- One asteroid field, one run: no overworld for now. The probe builds Extractor ships that mine a rock and Hauler ships that fly the ore home. Tap a rock and choose "Mine this rock" or "Stop mining". You land with economy only, so the first minute is about mining.
+- No build queue: on the probe sheet, set a weight from 0 to 5 for each ship type (Extractor, Hauler, Drone, Lancer, Flak). The spider graph shows the split, and the probe spends its income in that ratio. The fleet limit is 30 ships, economy ships included.
+- The hive raids you. Raids grow with your economy, never with time. A banner warns while a raid musters, and the raiders fly to the mined rock nearest the hive. Meet them with warships, or stop mining that rock. Take the ice and crystal pockets for Flak and Lancers, then take the hive to win.
+
+Try this: grow the economy until the first raid banner appears (around 3 minutes in), then turn Drones up and rally them to the rock it names. Later, when you have a pocket's ship type, decide whether to keep adding extractors or turn the warship weights up and push for the hive. To compare, set "Raids" or "Economy ships count" to 0 in the tuning panel.
+
+Fun questions (the H7 hypothesis):
+1. Did you change the spider graph during the run? What made you change it?
+2. Did the raids make you build a little force, or did they feel like a timer or a nuisance?
+3. Was there a moment you chose between more economy and more offence? Which way did you go, and did it pay off?
+
+Known from the team (not hidden from you):
+- With the probe sheet open, the map is only about 200 px tall on a phone and the rings round the nearest rocks and the hive overlap. Close the sheet to see the field.
+- Haulers keep flying to a rock while a raid hits it; "Stop mining" on the rock is how you pull them back.
+- After you take a pocket, raids can still come for the rock nearest the hive. Raids never target the probe or retake rocks.
+
+Also open: none.
+Protected files changed this build: VISION.md (pillars 3 and 4, approved in Q21).
+
 ## Build build-20261108-5 is ready (2026-11-08): H6, the Open frontier
 
 Play: https://factory4x.pages.dev (on your phone, portrait). A run to the probe core takes the bots about 46–62 game minutes, so roughly 12–16 real minutes at 4x plus your decisions. Your old save is from an older data version, so the game starts fresh.
