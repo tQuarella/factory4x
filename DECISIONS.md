@@ -1181,3 +1181,8 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 
 **Decision:** haulers held by H10 resume as soon as the raid's outcome is decided (beaten, hit, turned back or withered), not when `world.raid` goes null after the raiders fly home. DESIGN.md H10 amended; h8-raids makes the change before it is merged into the stack.
 **Why:** the Critic noted haulers sit at the probe through the raiders' flight home. The rock is no longer under attack then, and idle haulers are exactly what the owner called "rough" in the build-20261114-1 playtest.
+
+## 2026-11-14 · Director · h8-bots change 1 amended: two fleet-limit exceptions
+
+**Decision:** the bot's Hauler weight may be 0 with a shortfall only (a) at the fleet limit, for an asteroid shortfall, when economy plus the wave being built would not fit, and (b) while recycling economy ships toward a wave, except for a taken pocket with no hauler. DESIGN.md bot change 1 amended. The whole-run test must count zero ticks outside these exceptions, not "under 120 s".
+**Why:** the Critic (h8-bots round 1) found the code contradicted the spec's "never". The engineer's guards prevent a build-recycle-build loop at the limit, which is the same slot trade H7's recycle rule makes; that is a sound bot rule, so the spec follows the code, but the exception must be exact.
