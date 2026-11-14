@@ -1176,3 +1176,8 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 
 **Decision:** accepted. A hauler at a staffed, not-yet-worked rock waits while any extractor staffs it, committed ones included; it leaves on Stop or when nothing docked, bound or committed remains. DESIGN.md updated.
 **Why:** the new replay showed haulers flying empty round trips to a rock whose committed extractor was held by the fleet limit. Waiting costs one ore at minute 10 on the v14 opening; minutes 1–3, the first hauler and the first delivery are unchanged.
+
+## 2026-11-14 · Director · H10 hold ends when the fight ends, not when raiders get home
+
+**Decision:** haulers held by H10 resume as soon as the raid's outcome is decided (beaten, hit, turned back or withered), not when `world.raid` goes null after the raiders fly home. DESIGN.md H10 amended; h8-raids makes the change before it is merged into the stack.
+**Why:** the Critic noted haulers sit at the probe through the raiders' flight home. The rock is no longer under attack then, and idle haulers are exactly what the owner called "rough" in the build-20261114-1 playtest.
