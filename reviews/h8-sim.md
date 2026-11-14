@@ -72,3 +72,45 @@ Its "H8 candidates" background (line 458) still says "Extractors don't need this
 2. Gates stay green after the change.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-14
+
+I reviewed cb74dbc against round 1. Since 43236ca the branch has two merges from main, which bring in cw-smoke-sim-time and the Director's DESIGN.md update (3c6b43e), plus one fix commit. I reviewed the fix commit in full.
+
+**Required change 1 (the replay): met.** The new items at 8660, 8670 and 8720 run with `hauler.autoNeed` 1. `reference-replay.test.ts` asserts each part, and the assertions are concrete:
+- (a) The first pick at a4 is at 8720, with `isStaffed` true and `isHaulable` false. Its hauler waits on every tick from its arrival to the tick before the dock, then loads 2 after the dock.
+- (b) On every `enough` tick, the Extractor has weight 3 and an idle bay. Before 8720 its share is held at 5.
+- (c) The bay restarts at 8720 on the `setMine`, after `enough` at 8719, and the share goes into it.
+
+I re-ran my probe on cb74dbc (scratch file, deleted). Over the ticks with `autoNeed` 1:
+
+| Probe count | Value |
+| --- | --- |
+| Extractor `enough` ticks | 280 |
+| Node-ticks staffed but not haulable | 155 |
+| Hauler-ticks waiting at an unworked rock | 125 |
+
+All three were 0 in round 1. My staffed count differs from DECISIONS.md's 499, probably because the probe definitions differ. It doesn't change the conclusion. The determinism final moved from b8d34d88 to 958a2f1d.
+
+**Required change 2 (gates): met.** I ran `npm run gates -- --base main` on cb74dbc and every gate passed:
+- typecheck, lint and protected-files (35 files, none protected);
+- test: 46 files, 993 tests;
+- determinism: final 958a2f1d;
+- bots: flags 1–7 MET.
+
+**What else changed, judged:**
+- **Haulers now wait for committed extractors too** (`runHaulers` uses `staffCounts`, not `boundCounts`, for the wait).
+  - It follows from the accepted committed-extractors ruling. A rock that is staffed by a committed extractor no longer sends its hauler home empty and back on a loop while the Extractor bay is held.
+  - The release is unchanged: Stop, or nothing docked, bound or committed there. If the commitment moves to another rock, this one stops being staffed and the hauler leaves with what is there.
+  - The opening's first hauler (tick 90) and first delivery (1035) are unchanged, minutes 1–3 are unchanged, and minute 10 is 1 ore lower (592). The pinned curve was updated, not loosened.
+  - I accept it. But DESIGN.md's ruling still reads "waits while an extractor is docked there or on its way". **Director:** add "or committed (in the bay, or a full share)" so that the spec and the code agree before h8-client and h8-design-data build from it. The engineer logged this in DECISIONS.md for you.
+- **The replay's H2 pick check now uses a different baseline.** It takes the targets after the tick, minus the haulers assigned before F6, instead of the state at the start of the tick. The reason given holds: F2 can raise a target in the same tick when the extractor share fills. The assertion is unchanged (every pick takes the largest shortfall, above 0), so this is a more accurate measure, not a looser one.
+- **p1's capture check** moved to the moment of capture, because the script now unmarks p1. It is the same assertion.
+- **Both optional notes from round 1 were taken.** `isEligible`'s parameters are now required, and `staffCounts` has a comment on why unbound extractors aren't placed first.
+- **DESIGN.md (Director, 3c6b43e)** now carries the amendment rulings and "H4b. No surplus extractors", which answers my round-1 note. The only gap left is the committed-wait wording above.
+
+**Pillar fit:** unchanged from round 1. Nothing goes beyond the spec and the Director's logged rulings.
+
+Required changes: none.
+
+VERDICT: APPROVE
