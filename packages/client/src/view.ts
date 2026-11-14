@@ -4,11 +4,14 @@
  * placeholders.ts get pixel radii, so line widths and sprites stay crisp at any
  * map scale. Ships and pods interpolate between ticks using session.alpha.
  */
-import { activeBattles, guardianStatus, heartIndex, isCaptured, isGuarded, isRootCut, lastBattle, nodeStatus, rootIndex, shipCounts, type Node, type World } from '@factory4x/sim';
+import { activeBattles, guardianStatus, heartIndex, isCaptured, isField, isGuarded, isRootCut, lastBattle, nodeStatus, rockStatus, rootIndex, shipCounts, type EconShip, type Node, type World } from '@factory4x/sim';
 import { palette } from './palette.ts';
 import {
   drawAsteroid,
+  drawExtractor,
   drawGuardRing,
+  drawHauler,
+  drawMineBadge,
   drawHitFlash,
   drawPocket,
   drawPod,
@@ -101,7 +104,19 @@ export class MapView {
   private seenCut: number | null = null;
   private wilt: WiltAnim | null = null;
   /** What the last frame drew for each node: the "!" badge and the dashed backed-up route (tests read it through a dev hook). */
-  private readonly drawn = { badge: new Set<number>(), dashed: new Set<number>() };
+  private readonly drawn = {
+    badge: new Set<number>(),
+    dashed: new Set<number>(),
+    /** H7: rocks that wore the Mine badge, haul lines by rock (the drawn thickness level), and the economy hulls drawn by place. */
+    mine: new Set<number>(),
+    haul: new Map<number, number>(),
+    econ: { docked: 0, idle: 0, waiting: 0, moving: 0 },
+  };
+
+  /** H7 test hook: what the last frame drew for the economy (Mine badges, haul lines, hulls docked, idle at the probe, waiting, moving). */
+  drawnField(): { mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number } } {
+    return { mine: [...this.drawn.mine], haul: [...this.drawn.haul], econ: { ...this.drawn.econ } };
+  }
 
   drawnBackedUp(node: number): { badge: boolean; route: boolean } {
     return { badge: this.drawn.badge.has(node), route: this.drawn.dashed.has(node) };
@@ -183,6 +198,9 @@ export class MapView {
     const t = nowMs / 1000;
     this.drawn.badge.clear();
     this.drawn.dashed.clear();
+    this.drawn.mine.clear();
+    this.drawn.haul.clear();
+    this.drawn.econ = { docked: 0, idle: 0, waiting: 0, moving: 0 };
     ctx.fillStyle = palette.space;
     ctx.fillRect(0, 0, w, h);
     for (const st of this.stars) {
@@ -208,6 +226,24 @@ export class MapView {
       this.wilt = w ? { startMs: nowMs, from: w.from, to: w.to } : null;
     }
     if (this.wilt && nowMs - this.wilt.startMs >= WILT_MS) this.wilt = null;
+
+    const field = isField(world);
+    // H7: a probe-to-rock line for every rock with haulers (thicker for more of them), under the nodes.
+    const rocks = new Map<number, ReturnType<typeof rockStatus>>();
+    if (field) {
+      for (const n of world.nodes) {
+        if (n.kind === 'probe' || isGuarded(world, n.index)) continue;
+        const rs = rockStatus(world, n.index);
+        rocks.set(n.index, rs);
+        if (rs.haulers > 0) {
+          const a = this.nodePos(0);
+          const b = this.nodePos(n.index);
+          if (rs.backedUp) this.drawn.dashed.add(n.index);
+          this.drawn.haul.set(n.index, Math.min(3, rs.haulers));
+          drawRoute(ctx, a.x, a.y, b.x, b.y, Math.min(3, rs.haulers), rs.backedUp);
+        }
+      }
+    }
 
     // Routes, then pods on them.
     for (const route of world.routes) {
@@ -308,7 +344,7 @@ export class MapView {
 
       // Label (drawn in a last pass, over every ring), selection ring, rally flag, ship badge, warning badge.
       // A label that would clip at the top edge goes below the node instead.
-      labels.push({ text: nodeLabel(n), x, y: labelTop < LABEL_TOP_PAD ? y + selR + 12 : labelTop });
+      labels.push({ text: nodeLabel(n, field), x, y: labelTop < LABEL_TOP_PAD ? y + selR + 12 : labelTop });
 
       if (selected === n.index) {
         ctx.save();
@@ -328,10 +364,26 @@ export class MapView {
       }
       const parked = counts.at[n.index]!;
       if (parked > 0) this.badge(String(parked), x + rr * 0.85, y - rr * 0.75, palette.ship, '#0b1626');
-      const ns = nodeStatus(world, n.index);
-      if (n.kind !== 'probe' && (isBackedUp(world, n.index, ns) || ns.noRoute)) {
-        this.drawn.badge.add(n.index);
-        this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
+      if (field) {
+        // H7: the Mine badge (a pick) on a rock marked for mining, and the "!" while its buffer is full.
+        const rs = rocks.get(n.index);
+        if (rs?.mine) {
+          this.drawn.mine.add(n.index);
+          ctx.save();
+          ctx.translate(x + rr * 0.95, y + rr * 0.7);
+          drawMineBadge(ctx, Math.max(7, rr * 0.34));
+          ctx.restore();
+        }
+        if (rs?.backedUp && rs.mine) {
+          this.drawn.badge.add(n.index);
+          this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
+        }
+      } else {
+        const ns = nodeStatus(world, n.index);
+        if (n.kind !== 'probe' && (isBackedUp(world, n.index, ns) || ns.noRoute)) {
+          this.drawn.badge.add(n.index);
+          this.badge('!', x - rr * 0.85, y - rr * 0.75, palette.routeBackedUp, '#2a1e00');
+        }
       }
     }
 
@@ -351,6 +403,8 @@ export class MapView {
     }
     ctx.restore();
 
+    if (field) this.drawEcon(world, alpha);
+
     // Ships in transit.
     for (const s of world.ships) {
       const tr = s.transit;
@@ -363,6 +417,71 @@ export class MapView {
       drawShip(ctx, 6, Math.atan2(b.y - a.y, b.x - a.x), s.type);
       ctx.restore();
     }
+  }
+
+  /**
+   * H7: the economy ships. A docked extractor sits on its rock, on an arc over the top (the slot pips are below), its drill toward the
+   * rock; idle ones wait in a row under the probe; a hauler waiting at a rock sits beside it; a ship in flight is drawn between its
+   * nodes. Hulls are about 7 px (a phone's 24 px read is checked in the gallery). A loaded hauler wears a teal dot.
+   */
+  private drawEcon(world: Readonly<World>, alpha: number): void {
+    const f = world.field;
+    if (f === null) return;
+    const dockedAt = new Map<number, number>();
+    const idleAt = new Map<number, number>();
+    const waitingAt = new Map<number, number>();
+    for (const s of f.econ) {
+      if (s.transit) {
+        const tr = s.transit;
+        const a = this.nodePos(tr.from);
+        const b = this.nodePos(tr.to);
+        const fr = progressFrac(tr.ticksLeft, tr.totalTicks, alpha);
+        this.drawn.econ.moving++;
+        this.econHull(s, lerp(a.x, b.x, fr), lerp(a.y, b.y, fr), Math.atan2(b.y - a.y, b.x - a.x));
+        continue;
+      }
+      const at = s.at ?? 0;
+      const p = this.nodePos(at);
+      const n = world.nodes[at]!;
+      if (s.type === 'extractor' && s.target === at && n.kind !== 'probe') {
+        const k = dockedAt.get(at) ?? 0;
+        dockedAt.set(at, k + 1);
+        this.drawn.econ.docked++;
+        const rr = this.nodeR(n);
+        const a = -Math.PI / 2 + (k - (Math.max(1, n.slots) - 1) / 2) * 0.85;
+        const d = rr * 0.92;
+        this.econHull(s, p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, a + Math.PI);
+      } else if (n.kind === 'probe') {
+        const k = idleAt.get(at) ?? 0;
+        idleAt.set(at, k + 1);
+        this.drawn.econ.idle++;
+        const rr = this.nodeR(n);
+        this.econHull(s, p.x + (k - 3.5) * 9, p.y + rr + 12, -Math.PI / 2);
+      } else {
+        const k = waitingAt.get(at) ?? 0;
+        waitingAt.set(at, k + 1);
+        this.drawn.econ.waiting++;
+        const rr = this.nodeR(n);
+        this.econHull(s, p.x + rr + 8, p.y - 6 + k * 9, 0);
+      }
+    }
+  }
+
+  private econHull(s: Readonly<EconShip>, x: number, y: number, heading: number): void {
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(x, y);
+    if (s.type === 'extractor') drawExtractor(ctx, 6.5, heading);
+    else {
+      drawHauler(ctx, 6.5, heading);
+      if (s.cargo > 0) {
+        ctx.fillStyle = palette.asteroidOre;
+        ctx.beginPath();
+        ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
   }
 
   private badge(text: string, x: number, y: number, fill: string, ink: string): void {
@@ -383,9 +502,9 @@ export class MapView {
 }
 
 /** Short on-map name. */
-export function nodeLabel(n: Pick<Node, 'id' | 'kind'>): string {
+export function nodeLabel(n: Pick<Node, 'id' | 'kind'>, hive = false): string {
   if (n.kind === 'probe') return 'PROBE';
-  if (n.kind === 'heart') return 'HEART';
+  if (n.kind === 'heart') return hive ? 'HIVE' : 'HEART';
   if (n.kind === 'root') return 'ROOT';
   return n.id.toUpperCase();
 }

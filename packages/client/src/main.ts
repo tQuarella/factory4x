@@ -1,38 +1,46 @@
 /**
- * Von Neumann Probe client (H4): fixed-step sim, interpolated Canvas 2D map, the overworld and its sheets,
- * node sheets, HUD, tuning, feedback and autosave. See DESIGN.md H1 to H4.
+ * Von Neumann Probe client (H7): fixed-step sim, interpolated Canvas 2D map, node sheets (the probe's allocation and the rocks'
+ * Mine marks), HUD, tuning, feedback and autosave. Shipped data runs in field mode: one field, no overworld. The H4 to H6 overworld
+ * and its sheets stay in the code for the parked campaign (a test or dev hook starts one). See DESIGN.md H1 to H7.
  */
 import './style.css';
 import {
   activeBattles,
+  allocStatus,
   areaStatus,
   campaignStatus,
+  fieldSummary,
   fleetStatus,
   defaultData,
   isCaptured,
+  isField,
   isReclaimed,
   isWon,
   landingEffects,
   replayHashes,
   RESOURCES,
   SHIP_TYPES,
+  rockStatus,
   rootIndex,
   shipCounts,
   shipsAtByType,
   systemStatus,
   throughputPerMin,
   unlockStatus,
+  withRunMode,
   worldHash,
   yardStatus,
   type BattleResult,
   type CampaignStart,
   type Input,
+  type SimData,
   type World,
 } from '@factory4x/sim';
 import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { shortVersion } from './format.ts';
 import { Hud, OverworldHud } from './hud.ts';
-import { FeedbackPanel, TuningPanel, confirmModal, showAreaResult, showWin, type PanelHost } from './panels.ts';
+import { FeedbackPanel, TuningPanel, confirmModal, showAreaResult, showFieldResult, showWin, type PanelHost } from './panels.ts';
+import { FIELD_HINT, fieldFleetFullNotice, fieldUnlockNotice } from './fieldreport.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
 import {
   bannerLines,
@@ -55,10 +63,16 @@ import { MapView } from './view.ts';
 import { AreaSheet, ResearchSheet } from './worldsheets.ts';
 import { WorldView } from './worldview.ts';
 
+/** The shipped data: field mode (H7). A session may hold other data (the parked campaign, from a test hook), so screens read `app.session.data`. */
 const data = defaultData;
 const fullVersion = __BUILD_VERSION__;
 const settings = loadSettings(data);
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
+
+/** The data of the session on screen. */
+function sd(): SimData {
+  return app.session.data;
+}
 
 const newSeed = (): number => Date.now() % 2147483647;
 /** The seed of the system after `seed`: consecutive systems are consecutive Deep layouts. */
@@ -113,7 +127,7 @@ function send(input: Input): void {
 /** All inputs of one press, applied in the same tick even while paused (and on the overworld). */
 function sendAll(inputs: readonly Input[]): void {
   app.session.sendAll(inputs);
-  if (inputs.some((i) => i.type === 'buildExtractor') && !settings.hintDismissed) dismissHint();
+  if (inputs.some((i) => i.type === 'buildExtractor' || i.type === 'setAlloc' || i.type === 'setMine') && !settings.hintDismissed) dismissHint();
   refreshUi();
 }
 
@@ -168,13 +182,19 @@ canvas.addEventListener('click', (ev) => {
   }
   const node = view.hitTest(x, y);
   if (node === null) closeSheet();
-  else sheet.open(node);
+  else {
+    sheet.open(node);
+    // H7: the hint says to tap the probe; once its sheet is up the hint has done its job and its room goes back to the map.
+    if (isField(app.session.world) && node === 0 && !settings.hintDismissed) dismissHint();
+  }
 });
 
 // --- panels ---------------------------------------------------------------------
 const panelHost: PanelHost = {
   app,
-  data,
+  get data() {
+    return app.session.data;
+  },
   settings,
   fullVersion,
   send,
@@ -195,6 +215,7 @@ function adopt(session: Session): void {
   toast.hide();
   $('result').hidden = true;
   $('win').hidden = true;
+  tuning.update();
   writeSave(app.session);
   resizeViews();
   refreshUi();
@@ -205,7 +226,7 @@ function adopt(session: Session): void {
  * guard.capPct and system.variant apply). Its seed is the old one plus one, so consecutive systems cycle through The Deep's layouts. See DECISIONS.md.
  */
 function newSystem(): void {
-  adopt(new Session(dataWithDefaults(data, app.session.world.tun), { seed: nextSeed(app.session.seed) }));
+  adopt(new Session(dataWithDefaults(app.session.data, app.session.world.tun), { seed: nextSeed(app.session.seed) }));
 }
 
 // --- toast (battle reports, notices); stays until tapped ----------------------------
@@ -273,7 +294,7 @@ $('b-world').addEventListener('click', () => {
     send({ type: 'leaveArea' });
     return;
   }
-  const name = data.map.areas[a]!.name;
+  const name = sd().map.areas[a]!.name;
   void confirmModal(
     `Withdraw from ${name}? Everything built here is lost and the area resets. Research and the stockpile are kept.`,
     'Withdraw',
@@ -314,6 +335,17 @@ function modeTransition(): void {
   const s = app.session;
   const w = s.world;
   const active = w.campaign.active;
+  // H7: a field run has no landing and no overworld, so only a new session needs resetting.
+  if (isField(w)) {
+    if (modeSeen.world !== w) {
+      modeSeen.world = w;
+      modeSeen.active = null;
+      unlockSeen.world = null;
+      closeWorldSheets();
+      resizeViews();
+    }
+    return;
+  }
   if (modeSeen.world !== w) {
     modeSeen.world = w;
     modeSeen.active = active;
@@ -322,7 +354,7 @@ function modeTransition(): void {
       closeWorldSheets();
       // A new or resumed session opens centred on the area last reclaimed, else on the start.
       const order = w.campaign.reclaimOrder;
-      worldView.focus(order.length > 0 ? order[order.length - 1]! : Math.max(0, data.map.areas.findIndex((a) => a.tier === 0)));
+      worldView.focus(order.length > 0 ? order[order.length - 1]! : Math.max(0, sd().map.areas.findIndex((a) => a.tier === 0)));
     }
     return;
   }
@@ -341,21 +373,21 @@ function modeTransition(): void {
     // Landing: name every research effect in play.
     s.flags.resultShown = false;
     s.flags.shippedAtLanding = { ...w.campaign.totals.shipped };
-    toast.show(landingNotice(data.map.areas[active]!.name, landingEffects(w, data)));
+    toast.show(landingNotice(sd().map.areas[active]!.name, landingEffects(w, sd())));
     return;
   }
   if (prev === null) return;
   // Back on the overworld: what the visit did.
-  const name = data.map.areas[prev]!.name;
+  const name = sd().map.areas[prev]!.name;
   const base = s.flags.shippedAtLanding;
   const now = w.campaign.totals.shipped;
   const shipped = base === null ? '' : shippedNotice(name, { ore: now.ore - base.ore, ice: now.ice - base.ice, crystal: now.crystal - base.crystal });
   s.flags.shippedAtLanding = null;
   const head = isReclaimed(w, prev)
-    ? reclaimNotice(name, areaStatus(w, data, prev).haulNow, openedByReclaim(w, data, prev))
+    ? reclaimNotice(name, areaStatus(w, sd(), prev).haulNow, openedByReclaim(w, sd(), prev))
     : withdrawNotice(name);
   // H6 step moment: the first relay of a band raises the limit and opens the next band, once per band.
-  const step = isReclaimed(w, prev) ? stepMoment(w, data, prev) : null;
+  const step = isReclaimed(w, prev) ? stepMoment(w, sd(), prev) : null;
   const first = step !== null && !s.flags.stepsShown.includes(step.band);
   const lead = first ? `${stepNotice(step)}\n\n${head}` : head;
   toast.show(shipped === '' ? lead : `${lead}\n\n${shipped}`);
@@ -381,6 +413,7 @@ function transitionPending(): boolean {
   const s = app.session;
   const w = s.world;
   if (modeSeen.world !== w || modeSeen.active !== w.campaign.active) return true;
+  if (isField(w)) return isCaptured(w) && !s.flags.resultShown;
   return !s.onOverworld && isCaptured(w) && !s.flags.resultShown;
 }
 
@@ -390,13 +423,15 @@ let hudOverride: World | null = null;
 function refreshUi(): void {
   // The mode is set first, so a re-fit inside modeTransition measures the layout of the screen it is about to show.
   el.app.dataset.mode = app.session.onOverworld ? 'world' : 'area';
+  el.app.dataset.run = isField(app.session.world) ? 'field' : 'campaign';
   modeTransition();
   const s = app.session;
   const w = s.world;
   const onWorld = s.onOverworld;
-  const won = isWon(w);
+  const field = isField(w);
+  const won = isWon(w) && !field;
   if (onWorld) {
-    owHud.update(w, data);
+    owHud.update(w, sd());
     researchSheet.update();
     areaSheet.update();
   } else {
@@ -407,7 +442,7 @@ function refreshUi(): void {
     setText(el.arrow, dir === 'up' ? '▲' : dir === 'down' ? '▼' : '');
     toggleClass(el.arrow, 'up', dir === 'up');
     toggleClass(el.arrow, 'down', dir === 'down');
-    hud.update(hudOverride ?? w, data);
+    hud.update(hudOverride ?? w, sd());
     el.pause.setAttribute('aria-label', s.paused ? 'Play' : 'Pause');
     toggleClass(el.pause, 'on', s.paused);
     for (const b of document.querySelectorAll<HTMLElement>('.speed')) toggleClass(b, 'on', Number(b.dataset.speed) === s.speed);
@@ -430,7 +465,7 @@ function refreshUi(): void {
     if (ended.length > 0) {
       ended.sort((a, b) => a.endTick - b.endTick || a.node - b.node);
       s.flags.seenBattleEnd = ended[ended.length - 1]!.endTick;
-      toast.show(ended.map((r) => battleReport(w, r, data)).join('\n\n'));
+      toast.show(ended.map((r) => battleReport(w, r, sd())).join('\n\n'));
     }
     // The first delivery that unlocks Lancers or Flak: say what their yard is doing; one tap opens the Probe.
     if (unlockSeen.world !== w) {
@@ -440,36 +475,37 @@ function refreshUi(): void {
     const fresh = (['lancer', 'flak'] as const).filter((t) => unlockStatus(w).ships[t] && !unlockSeen.ships[t]);
     if (fresh.length > 0) {
       for (const t of fresh) unlockSeen.ships[t] = true;
-      const yards = yardStatus(w, data).yards;
       const text = fresh
         .map((t) => {
-          const row = yards.find((y) => y.type === t)!;
+          if (field) return fieldUnlockNotice(t);
+          const row = yardStatus(w, sd()).yards.find((y) => y.type === t)!;
           return unlockNotice(t, !row.researched ? 'needsDesign' : row.on ? 'on' : 'off');
         })
         .join('\n\n');
       toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`, () => sheet.open(0));
     }
     // H5: the first time the fleet fills in a visit, say why the yards stopped and what to do. A resumed, already full fleet isn't announced again.
-    const fleet = fleetStatus(w, data);
+    const fleet = fleetStatus(w, sd());
     if (fleetSeen.world !== w) {
       fleetSeen.world = w;
       fleetSeen.shown = fleet.full;
     }
     if (fleet.full && !fleetSeen.shown && fleet.cap !== null) {
       fleetSeen.shown = true;
-      const text = fleetFullNotice(fleet.count, fleet.cap);
+      const text = field ? fieldFleetFullNotice(fleet.count, fleet.cap, fleet.countsEconomy) : fleetFullNotice(fleet.count, fleet.cap);
       toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`);
     }
   }
   // The first-run hints give way to notices, so the strip keeps room for them.
   const hintDone = onWorld ? settings.worldHintDismissed : settings.hintDismissed;
-  setText(el.hintText, onWorld ? 'Your probe has arrived. Tap Landfall, then Land.' : 'Tap an asteroid to build an extractor');
+  setText(el.hintText, onWorld ? 'Your probe has arrived. Tap Landfall, then Land.' : field ? FIELD_HINT : 'Tap an asteroid to build an extractor');
   setHidden(el.hint, hintDone || showBanner || !toastEl.hidden || (onWorld && w.campaign.reclaimOrder.length > 0));
 
   if (!onWorld && isCaptured(w) && !s.flags.resultShown) {
     s.flags.resultShown = true;
     if (settings.showResult) {
-      showAreaResult($('result'), s, () => send({ type: 'leaveArea' }), () => undefined);
+      if (field) showFieldResult($('result'), s, newSystem, () => undefined);
+      else showAreaResult($('result'), s, () => send({ type: 'leaveArea' }), () => undefined);
     }
   }
   if (won) {
@@ -544,16 +580,17 @@ requestAnimationFrame(frame);
 /** Test and dev hook: replaces the session with a constructed campaign (the start is part of the replay). */
 function startCampaign(start: CampaignStart, tunables: Record<string, number> = {}): void {
   const s = app.session;
-  adopt(new Session(dataWithDefaults(data, { ...s.world.tun, ...tunables }), { seed: s.seed, start }));
+  // H7: the parked campaign: the same shipped data in campaign mode, so every H4 to H6 screen and rule runs as it did.
+  adopt(new Session(dataWithDefaults(withRunMode(data, 'campaign'), { ...s.world.tun, ...tunables }), { seed: s.seed, start }));
   // A constructed landing gets the landing notice a real one would.
   const w = app.session.world;
-  if (w.campaign.active !== null) toast.show(landingNotice(data.map.areas[w.campaign.active]!.name, landingEffects(w, data)));
+  if (w.campaign.active !== null) toast.show(landingNotice(sd().map.areas[w.campaign.active]!.name, landingEffects(w, sd())));
 }
 
 window.__factory4x = {
   version: fullVersion,
   tick: () => app.session.world.tick,
-  replayHashes: (ticks, every, replay) => replayHashes(replay, data, ticks, every),
+  replayHashes: (ticks, every, replay) => replayHashes(replay, replayData(replay), ticks, every),
   nodeScreenPos: (i) => {
     const r = canvas.getBoundingClientRect();
     const p = view.nodePos(i);
@@ -582,7 +619,7 @@ window.__factory4x = {
   selectedArea: () => areaSheet.selected,
   onOverworld: () => app.session.onOverworld,
   activeArea: () => app.session.world.campaign.active,
-  campaign: () => JSON.stringify(campaignStatus(app.session.world, data)),
+  campaign: () => JSON.stringify(campaignStatus(app.session.world, sd())),
   pendingBuilds: () => app.session.world.queue.length + (app.session.world.activeBuild ? 1 : 0),
   stock: () => app.session.world.stock.ore,
   paused: () => app.session.paused,
@@ -625,9 +662,24 @@ window.__factory4x = {
     refreshUi();
   },
   mapBackedUp: (node) => view.drawnBackedUp(node),
-  debugShowResult: () => showAreaResult($('result'), app.session, () => send({ type: 'leaveArea' }), () => undefined),
+  mapField: () => JSON.stringify(view.drawnField()),
+  debugShowResult: () =>
+    isField(app.session.world)
+      ? showFieldResult($('result'), app.session, newSystem, () => undefined)
+      : showAreaResult($('result'), app.session, () => send({ type: 'leaveArea' }), () => undefined),
   startCampaign,
   systemName: () => systemStatus(app.session.world).name,
   rootNode: () => rootIndex(app.session.world),
   newSystem,
+  newRun: newSystem,
+  isField: () => isField(app.session.world),
+  allocStatus: () => JSON.stringify(allocStatus(app.session.world, sd())),
+  rockStatus: (node) => JSON.stringify(rockStatus(app.session.world, node)),
+  fieldSummary: () => JSON.stringify(fieldSummary(app.session.world)),
+  econShips: () => JSON.stringify((app.session.world.field?.econ ?? []).map((e) => ({ id: e.id, type: e.type, at: e.at, target: e.target, moving: e.transit !== null }))),
+  log: () => JSON.stringify(app.session.log.map((l) => l.input)),
+  setSpeed: (v) => {
+    app.session.speed = v;
+    refreshUi();
+  },
 };

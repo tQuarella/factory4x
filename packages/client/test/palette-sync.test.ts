@@ -37,6 +37,7 @@ const roles: Record<keyof typeof palette, string> = {
   laneClosed: 'Closed lane',
   laneOpen: 'Open lane',
   laneOwned: 'Owned lane',
+  econ: 'Economy ship hull',
 };
 
 function tableRows(): Map<string, string> {

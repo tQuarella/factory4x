@@ -48,11 +48,13 @@ function rockPath(ctx: Ctx, r: number, seed: number, n: number, lo: number): voi
   ctx.closePath();
 }
 
+export type AsteroidState = 'normal' | 'raided';
+
 /**
  * Irregular rock; `seed` keeps each outline stable. Extractor pips sit in a
  * row below the rock: filled teal = built, hollow = free slot.
  */
-export function drawAsteroid(ctx: Ctx, r: number, seed: number, extractors: number, slots: number): void {
+export function drawAsteroid(ctx: Ctx, r: number, seed: number, extractors: number, slots: number, state: AsteroidState = 'normal', t = 0): void {
   ctx.save();
   rockPath(ctx, r, seed, 9, 0.75);
   ctx.fillStyle = palette.asteroid;
@@ -60,6 +62,26 @@ export function drawAsteroid(ctx: Ctx, r: number, seed: number, extractors: numb
   ctx.fillStyle = palette.asteroidOre;
   disc(ctx, r * 0.2, -r * 0.15, r * 0.18);
   ctx.fill();
+  if (state === 'raided') {
+    // H7: a rock under raid. A pulsing mob-red glow and a jagged red-pink rim, both inside 1.1 r (the pips sit lower).
+    const pulse = 0.5 + 0.5 * Math.sin(t * 9);
+    ctx.fillStyle = palette.mobGlow;
+    ctx.globalAlpha = 0.6 + 0.4 * pulse;
+    disc(ctx, 0, 0, r * 1.1);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = palette.mob;
+    ctx.lineWidth = Math.max(2, r * 0.12);
+    ctx.lineJoin = 'miter';
+    ctx.beginPath();
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const k = i % 2 === 0 ? 1.0 : 0.84;
+      ctx.lineTo(Math.cos(a) * r * k, Math.sin(a) * r * k);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
   if (slots > 0) {
     const pr = Math.max(2.2, r * 0.11);
     const gap = pr * 2.7;
@@ -1335,5 +1357,207 @@ export function drawRecycleIcon(ctx: Ctx, r: number): void {
   ctx.fillStyle = palette.ship;
   chevronPath(ctx, 0, -r * 0.02, r * 0.3, r * 0.25);
   ctx.fill();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// H7 entities: economy ships, raid marker, radar, mine badge (ART_STYLE.md "H7 entities").
+
+/**
+ * Extractor ship: a squat amber hull with a drill prong, facing right (heading rotates it). The hull is a short wide chamfered
+ * block (the rear), the prong a pale narrow cone ahead of it. Within r.
+ */
+export function drawExtractor(ctx: Ctx, r: number, heading = 0): void {
+  ctx.save();
+  ctx.rotate(heading);
+  ctx.lineJoin = 'round';
+  ctx.fillStyle = palette.econ;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.8, -r * 0.5);
+  ctx.lineTo(r * 0.12, -r * 0.5);
+  ctx.lineTo(r * 0.36, -r * 0.28);
+  ctx.lineTo(r * 0.36, r * 0.28);
+  ctx.lineTo(r * 0.12, r * 0.5);
+  ctx.lineTo(-r * 0.8, r * 0.5);
+  ctx.closePath();
+  ctx.fill();
+  // The drill prong: a pale cone to the nose.
+  ctx.fillStyle = palette.starBright;
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(r * 0.34, r * 0.22);
+  ctx.lineTo(r * 0.34, -r * 0.22);
+  ctx.closePath();
+  ctx.fill();
+  // One accent: a dark cab slot on the hull.
+  ctx.fillStyle = palette.space;
+  ctx.beginPath();
+  ctx.rect(-r * 0.55, -r * 0.13, r * 0.5, r * 0.26);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Hauler ship: a boxy amber hull carrying a big square cargo pod, facing right. The pod (a dark-edged square with a cross brace)
+ * takes the rear, a narrow cab the front, so it reads as a box where the extractor reads as a wedge. Within r.
+ */
+export function drawHauler(ctx: Ctx, r: number, heading = 0): void {
+  ctx.save();
+  ctx.rotate(heading);
+  ctx.lineJoin = 'miter';
+  ctx.fillStyle = palette.econ;
+  // Cab and chassis, then the pod.
+  ctx.beginPath();
+  ctx.rect(-r * 0.1, -r * 0.26, r * 0.95, r * 0.52);
+  ctx.rect(-r * 0.85, -r * 0.5, r * 0.85, r);
+  ctx.fill();
+  ctx.strokeStyle = palette.space;
+  ctx.lineWidth = Math.max(1.2, r * 0.12);
+  const x0 = -r * 0.85 + r * 0.15;
+  const x1 = -r * 0.15;
+  const y0 = -r * 0.5 + r * 0.15;
+  const y1 = r * 0.5 - r * 0.15;
+  ctx.beginPath();
+  ctx.rect(x0, y0, x1 - x0, y1 - y0);
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.moveTo(x1, y0);
+  ctx.lineTo(x0, y1);
+  ctx.stroke();
+  // A pale windscreen on the cab.
+  ctx.fillStyle = palette.starBright;
+  ctx.beginPath();
+  ctx.rect(r * 0.45, -r * 0.12, r * 0.25, r * 0.24);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** A raid's mix: raiders by guard type. */
+export interface RaidMix {
+  thorn: number;
+  spore: number;
+}
+
+/**
+ * Raid marker: the raiders' two-colour ring (a Thorn arc then a Spore arc, each its share of the circle, as `drawGuardRing`) round a
+ * hot-pink (`bloom`) chevron that points right (the caller rotates it along the raid line). Within r.
+ */
+export function drawRaidMarker(ctx: Ctx, r: number, mix: Readonly<RaidMix>): void {
+  ctx.save();
+  const total = Math.max(1, mix.thorn + mix.spore);
+  const w = Math.max(2.5, r * 0.18);
+  const rr = r - w / 2;
+  ctx.lineWidth = w;
+  ctx.lineCap = 'butt';
+  let a0 = 0;
+  for (const [n, colour] of [[mix.thorn, palette.thorn], [mix.spore, palette.spore]] as const) {
+    if (n <= 0) continue;
+    const a1 = a0 + (n / total) * Math.PI * 2;
+    ctx.strokeStyle = colour;
+    ctx.beginPath();
+    ctx.arc(0, 0, rr, a0, a1);
+    ctx.stroke();
+    a0 = a1;
+  }
+  ctx.fillStyle = palette.bloom;
+  ctx.beginPath();
+  ctx.moveTo(r * 0.62, 0);
+  ctx.lineTo(-r * 0.42, r * 0.5);
+  ctx.lineTo(-r * 0.16, 0);
+  ctx.lineTo(-r * 0.42, -r * 0.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** The five axes of the radar, top first and clockwise. */
+export const RADAR_TYPES = ['extractor', 'hauler', 'drone', 'lancer', 'flak'] as const;
+
+/**
+ * Radar readout of the build weights: a pentagon grid (one ring per weight step) with an axis to each type's icon, and the weights
+ * filled in amber (`probe` at 0.3 alpha with a solid edge). Centred at the origin in a w by h box; `weights` has five entries in
+ * RADAR_TYPES order, each 0..max. Display only. Everything, icons included, stays inside the box.
+ */
+export function drawRadar(ctx: Ctx, w: number, h: number, weights: readonly number[], max: number): void {
+  ctx.save();
+  const m = Math.max(1, max);
+  const ic = Math.max(6, Math.min(w, h) * 0.085);
+  // Icons sit 1.1 ic beyond each vertex. Vertically the box holds R + 2.1 ic above the centre line and 0.81 R + 1.89 ic below it.
+  const R = Math.max(8, Math.min((h - 3.99 * ic) / 1.81, (w / 2 - 2.05 * ic) / 0.951));
+  const cy = (0.19 * R + 0.21 * ic) / 2;
+  const ang = (i: number): number => -Math.PI / 2 + (i * Math.PI * 2) / 5;
+  const vx = (i: number, d: number): number => Math.cos(ang(i)) * d;
+  const vy = (i: number, d: number): number => cy + Math.sin(ang(i)) * d;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = palette.starDim;
+  ctx.lineWidth = 1;
+  for (let k = 1; k <= m; k++) {
+    ctx.globalAlpha = k === m ? 1 : 0.55;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) ctx.lineTo(vx(i, (R * k) / m), vy(i, (R * k) / m));
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    ctx.moveTo(0, cy);
+    ctx.lineTo(vx(i, R), vy(i, R));
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // The filled shape. A zero weight sits on the centre, so an all-zero radar is a point.
+  const f = (i: number): number => R * Math.min(1, Math.max(0, (weights[i] ?? 0) / m));
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) ctx.lineTo(vx(i, f(i)), vy(i, f(i)));
+  ctx.closePath();
+  ctx.fillStyle = palette.probe;
+  ctx.globalAlpha = 0.3;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = palette.probe;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  for (let i = 0; i < 5; i++) {
+    if (f(i) <= 0) continue;
+    disc(ctx, vx(i, f(i)), vy(i, f(i)), 2.6);
+    ctx.fill();
+  }
+  for (let i = 0; i < 5; i++) {
+    ctx.save();
+    ctx.translate(vx(i, R + 1.1 * ic), vy(i, R + 1.1 * ic));
+    const t = RADAR_TYPES[i]!;
+    if (t === 'extractor') drawExtractor(ctx, ic);
+    else if (t === 'hauler') drawHauler(ctx, ic);
+    else drawShip(ctx, ic, 0, t);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/**
+ * Mine badge: a small pick on a dark disc with a teal ring, for a Mine-marked rock. Teal (ore), no amber (the lock's shackle and the
+ * "!" pill are amber), and round with a diagonal pick, so it reads apart from both. `r` is the badge's own half-size. Within r.
+ */
+export function drawMineBadge(ctx: Ctx, r: number): void {
+  ctx.save();
+  ctx.fillStyle = palette.space;
+  disc(ctx, 0, 0, r * 0.96);
+  ctx.fill();
+  ctx.strokeStyle = palette.asteroidOre;
+  ctx.lineWidth = Math.max(1.2, r * 0.14);
+  disc(ctx, 0, 0, r * 0.88);
+  ctx.stroke();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(1.5, r * 0.2);
+  // The handle, bottom left to top right; the head, an arc across its top end.
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.4, r * 0.42);
+  ctx.lineTo(r * 0.3, -r * 0.3);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.12, -r * 0.5);
+  ctx.quadraticCurveTo(r * 0.36, -r * 0.62, r * 0.55, -r * 0.1);
+  ctx.stroke();
   ctx.restore();
 }

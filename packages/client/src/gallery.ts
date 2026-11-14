@@ -7,7 +7,12 @@ import {
   type ResearchIconId,
   drawAreaNode,
   drawAsteroid,
+  drawExtractor,
   drawFleetIcon,
+  drawHauler,
+  drawMineBadge,
+  drawRadar,
+  drawRaidMarker,
   drawGuardRing,
   drawHitFlash,
   drawLane,
@@ -88,6 +93,19 @@ function strip(c: Ctx, grey: boolean): void {
   c.restore();
 }
 
+/** The two economy hulls between the three warships, at r. */
+function econRow(c: Ctx, r: number): void {
+  const k = r * 0.2;
+  const xs = [-4, -2, 0, 2, 4].map((i) => i * r * 0.5);
+  const draws: Array<(c2: Ctx) => void> = [(c2) => drawExtractor(c2, r * 0.46), (c2) => drawHauler(c2, r * 0.46), (c2) => drawShip(c2, r * 0.46, 0, 'drone'), (c2) => drawShip(c2, r * 0.46, 0, 'lancer'), (c2) => drawShip(c2, r * 0.46, 0, 'flak')];
+  draws.forEach((f, i) => {
+    c.save();
+    c.translate(xs[i]! + k, 0);
+    f(c);
+    c.restore();
+  });
+}
+
 /** One of every guard-ring split, over a Thorn/Spore pair, at the given r. */
 function ringSet(c: Ctx, r: number): void {
   [[1, 0], [0.5, 0.5], [0.25, 0.25], [0.1, 0.4]].forEach(([a, b], i) => {
@@ -158,6 +176,35 @@ function strip5(c: Ctx, grey: boolean): void {
     (c2) => drawShip(c2, r, 0, 'drone'),
     (c2) => drawResourceIcon(c2, r, 'ore'),
     (c2) => drawStockpileIcon(c2, r),
+  ];
+  c.save();
+  if (grey) c.filter = 'grayscale(1)';
+  items.forEach((f, i) => {
+    c.save();
+    c.translate(r + 2 + (i % 7) * 46, 40 + Math.floor(i / 7) * 48);
+    f(c);
+    c.restore();
+  });
+  c.restore();
+}
+
+/** H7 actual-size strip: the extractor and hauler beside the warships and a rock they must not be mistaken for, then the new marks. */
+function strip7(c: Ctx, grey: boolean): void {
+  const r = 12;
+  const items: ((c2: Ctx) => void)[] = [
+    (c2) => drawExtractor(c2, r),
+    (c2) => drawHauler(c2, r),
+    (c2) => drawShip(c2, r, 0, 'drone'),
+    (c2) => drawShip(c2, r, 0, 'lancer'),
+    (c2) => drawShip(c2, r, 0, 'flak'),
+    (c2) => drawAsteroid(c2, r, 3, 0, 0),
+    (c2) => drawAsteroid(c2, r, 3, 0, 0, 'raided', T),
+    (c2) => drawRaidMarker(c2, r, { thorn: 3, spore: 2 }),
+    (c2) => drawRaidMarker(c2, r, { thorn: 0, spore: 4 }),
+    (c2) => drawMineBadge(c2, r),
+    (c2) => drawLockBadge(c2, r),
+    (c2) => bangBadge(c2, r * 0.6),
+    (c2) => drawResourceIcon(c2, r, 'ore'),
   ];
   c.save();
   if (grey) c.filter = 'grayscale(1)';
@@ -321,6 +368,17 @@ const entries: Entry[] = [
   { label: 'H5 24 px strip, greyscale (shape-only)', draw: (c) => strip5(c, true), strip: true, h: 120 },
   { label: 'H6 24 px strip, colour (relay, lock, relay nodes reclaimed, open, locked+lock, far; plain far; locked+lock, open; fleet, full, !, research fleet, crate; lanes dim, normal, reveal)', draw: (c) => strip6(c, false), strip: true, h: 170 },
   { label: 'H6 24 px strip, greyscale (shape-only)', draw: (c) => strip6(c, true), strip: true, h: 170 },
+  { label: 'H7 24 px strip, colour (extractor, hauler, drone, lancer, flak, rock, raided rock; raid marker 3/2, 0/4; mine badge, lock, "!", ore)', draw: (c) => strip7(c, false), strip: true, h: 120 },
+  { label: 'H7 24 px strip, greyscale (shape-only)', draw: (c) => strip7(c, true), strip: true, h: 120 },
+  { label: 'extractor', draw: (c, r) => drawExtractor(c, r) },
+  { label: 'hauler', draw: (c, r) => drawHauler(c, r) },
+  { label: 'extractor, hauler and the warships (drone, lancer, flak)', draw: (c, r) => econRow(c, r) },
+  { label: 'raid marker: 3 Thorn 2 Spore', draw: (c, r) => drawRaidMarker(c, r, { thorn: 3, spore: 2 }) },
+  { label: 'raid marker: all Spores', draw: (c, r) => drawRaidMarker(c, r, { thorn: 0, spore: 4 }) },
+  { label: 'mine badge (left) vs lock (middle) vs "!" (right)', draw: (c, r) => { c.save(); c.translate(-r * 0.7, 0); drawMineBadge(c, r * 0.4); c.restore(); drawLockBadge(c, r * 0.4); c.save(); c.translate(r * 0.7, 0); bangBadge(c, r * 0.28); c.restore(); } },
+  { label: 'asteroid under raid (the raided state)', draw: (c, r) => drawAsteroid(c, r * 0.8, 3, 1, 3, 'raided', T) },
+  { label: 'radar, 3/2/0/0/0 of 5', draw: (c, r) => drawRadar(c, r * 2, r * 1.7, [3, 2, 0, 0, 0], 5) },
+  { label: 'radar, 4/2/1/3/5 of 5', draw: (c, r) => drawRadar(c, r * 2, r * 1.7, [4, 2, 1, 3, 5], 5) },
   { label: 'drone', draw: (c, r) => drawShip(c, r, 0, 'drone') },
   { label: 'lancer', draw: (c, r) => drawShip(c, r, 0, 'lancer') },
   { label: 'flak', draw: (c, r) => drawShip(c, r, 0, 'flak') },
@@ -485,6 +543,56 @@ for (const s of ['closed', 'open', 'owned'] as LaneState[]) {
   const dist = (x: number, y: number): number => (Math.abs(x) <= 150 ? Math.abs(y) : Math.hypot(Math.abs(x) - 150, y));
   boundLines.push(`lane ${s}: ${measure((c) => drawLane(c, -150, 0, 150, 0, 1.1, s), dist).toFixed(2)} px from segment (limit 4)`);
 }
+boundLines.push(`extractor: ${(measure((c, r) => drawExtractor(c, r)) / 50).toFixed(3)} r`);
+boundLines.push(`hauler: ${(measure((c, r) => drawHauler(c, r)) / 50).toFixed(3)} r`);
+boundLines.push(`raid marker: ${(measure((c, r) => drawRaidMarker(c, r, { thorn: 3, spore: 2 })) / 50).toFixed(3)} r`);
+boundLines.push(`mine badge: ${(measure((c, r) => drawMineBadge(c, r)) / 50).toFixed(3)} r`);
+boundLines.push(`raided rock (rim and glow, no pips): ${(measure((c, r) => drawAsteroid(c, r, 3, 0, 0, 'raided', 0.3)) / 50).toFixed(3)} r (limit 1.100 r)`);
+
+// ---- The 24 px silhouette check (H7): each hull's alpha mask at 24 px against the others, as intersection over union ----
+/** The alpha mask of `draw` at a 24 px entity (r = 12), on a 32 px cell, as a 0/1 array. */
+function mask24(draw: (c: Ctx, r: number) => void): Uint8Array {
+  const size = 32;
+  const cv = document.createElement('canvas');
+  cv.width = size;
+  cv.height = size;
+  const c = cv.getContext('2d', { willReadFrequently: true }) as Ctx;
+  c.translate(size / 2, size / 2);
+  draw(c, 12);
+  const d = c.getImageData(0, 0, size, size).data;
+  const m = new Uint8Array(size * size);
+  for (let i = 0; i < m.length; i++) m[i] = (d[i * 4 + 3] ?? 0) >= 128 ? 1 : 0;
+  return m;
+}
+const iou = (a: Uint8Array, b: Uint8Array): number => {
+  let i = 0;
+  let u = 0;
+  for (let k = 0; k < a.length; k++) {
+    if (a[k] && b[k]) i++;
+    if (a[k] || b[k]) u++;
+  }
+  return u === 0 ? 0 : i / u;
+};
+const sil: Array<[string, (c: Ctx, r: number) => void]> = [
+  ['extractor', (c, r) => drawExtractor(c, r)],
+  ['hauler', (c, r) => drawHauler(c, r)],
+  ['drone', (c, r) => drawShip(c, r, 0, 'drone')],
+  ['lancer', (c, r) => drawShip(c, r, 0, 'lancer')],
+  ['flak', (c, r) => drawShip(c, r, 0, 'flak')],
+  ['rock', (c, r) => drawAsteroid(c, r, 3, 0, 0)],
+];
+const masks = new Map(sil.map(([n, f]) => [n, mask24(f)]));
+const silhouettes: { fill: Record<string, number>; iou: Record<string, number> } = { fill: {}, iou: {} };
+for (const [n] of sil) silhouettes.fill[n] = (masks.get(n) as Uint8Array).reduce((a, b) => a + b, 0);
+for (const a of ['extractor', 'hauler']) {
+  for (const [b] of sil) {
+    if (a === b) continue;
+    const v = iou(masks.get(a) as Uint8Array, masks.get(b) as Uint8Array);
+    silhouettes.iou[`${a}|${b}`] = v;
+    boundLines.push(`24 px silhouette ${a} vs ${b}: overlap ${v.toFixed(2)} (limit 0.75), ${a} covers ${silhouettes.fill[a]} px`);
+  }
+}
+(window as unknown as { __silhouettes: typeof silhouettes }).__silhouettes = silhouettes;
 const boundsEl = document.getElementById('bounds');
 if (boundsEl) boundsEl.textContent = ['(pixel scan includes antialiasing: 1.002 r or 4.00 px is the limit; exact geometry is checked in test/h4-art.test.ts and test/h6-art.test.ts)', ...boundLines].join('\n');
 

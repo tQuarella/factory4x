@@ -1,17 +1,19 @@
 /** Full-screen panels: tuning, feedback, the area result and win panels, and the New system confirmation. */
-import { SHIP_TYPES, areaStatus, campaignSummary, runSummary, tunableMeta, type CaptureEntry, type Input, type ShipTypeCounts, type SimData, type TunableMeta } from '@factory4x/sim';
+import { FIELD_PARKED_KEYS, SHIP_TYPES, areaStatus, campaignSummary, fieldSummary, isField, runSummary, tunableMeta, type CaptureEntry, type Input, type ShipTypeCounts, type SimData, type TunableMeta } from '@factory4x/sim';
 import { btn, h, setText, toggleClass, type Btn } from './dom.ts';
 import { buildNote } from './feedback.ts';
 import { clampInt, mmss, shortVersion, stepFor, ticksText } from './format.ts';
 import type { Settings } from './persist.ts';
 import { iconCanvas } from './icons.ts';
 import { drawProbeCore } from './placeholders.ts';
+import { hiveTimeText, raidsText, typesText } from './fieldreport.ts';
 import { RES_NAME, SHIP_NAME, plusText, recycledText, tripleText } from './report.ts';
 import type { Session } from './session.ts';
 
 export interface PanelHost {
   app: { session: Session };
-  data: SimData;
+  /** The data of the session on screen (H7: field mode on shipped data; the parked campaign in a test). */
+  readonly data: SimData;
   settings: Settings;
   fullVersion: string;
   send(input: Input): void;
@@ -51,8 +53,20 @@ function header(root: HTMLElement, title: string, onClose: () => void): void {
 /** H6: the Root is removed from play, so its starved-heart tunables are hidden (they stay in the data). */
 export const HIDDEN_TUNABLES: readonly string[] = ['bloom.starved'];
 
+/**
+ * Whether the tuning panel hides a key. H7: a field run hides the parked keys (kept in the data, unused in field mode) and the system
+ * variant (the field has one layout); the campaign shows them all. The Root's starved-heart keys are hidden in both (H6).
+ */
+export function isHiddenTunable(key: string, field: boolean): boolean {
+  return HIDDEN_TUNABLES.some((p) => key.startsWith(p)) || (field && ((FIELD_PARKED_KEYS as readonly string[]).includes(key) || key === 'system.variant'));
+}
+
 export const TUNE_LABEL: Readonly<Record<string, string>> = {
   'fleet.cap': 'Fleet limit (0 = none)',
+  'field.fleetCap': 'Fleet limit (0 = none)',
+  'fleet.countsEconomy': 'Economy ships count (0 = warships only)',
+  'raid.enabled': 'Raids (0 = off)',
+  'alloc.maxWeight': 'Weight steps (radar scale)',
   'fleet.recycleRefundPct': 'Recycle refund %',
   'fleet.relayStep': 'Relay limit step',
   'areas.repeatHaulPct': 'Repeat haul %',
@@ -75,6 +89,8 @@ export class TuningPanel {
   private readonly host: PanelHost;
   private rows: TuneRow[] = [];
   private resultToggle!: Btn;
+  /** Whether the panel was built for a field run (H7); it is rebuilt when the session's mode changes. */
+  private builtField = false;
 
   constructor(root: HTMLElement, host: PanelHost) {
     this.root = root;
@@ -110,8 +126,19 @@ export class TuningPanel {
     this.update();
   }
 
+  /** H7: the labels and the list depend on the run mode, so a session of the other mode rebuilds the panel. */
+  private rebuildIfModeChanged(): void {
+    if (isField(this.host.app.session.world) === this.builtField) return;
+    this.root.replaceChildren();
+    this.rows = [];
+    this.build();
+  }
+
   private build(): void {
     const { host } = this;
+    const field = isField(host.app.session.world);
+    this.builtField = field;
+    // H7: the parked keys (and the variant, which the field doesn't use) are hidden in a field run; the campaign keeps all of them.
     header(this.root, 'Tuning', () => this.close());
     const top = h('div', 'ov-actions', '', this.root);
     this.resultToggle = btn(top, '', () => {
@@ -130,17 +157,22 @@ export class TuningPanel {
       host.sendAll(resets);
       this.update();
     });
-    btn(top, 'New system…', () => {
+    btn(top, field ? 'New run…' : 'New system…', () => {
       confirmNewSystem(() => {
         this.close();
         host.newSystem();
-      });
+      }, field);
     }, 'danger');
-    h('div', 'note', `Build ${shortVersion(host.fullVersion)} · data v${host.data.dataVersion}. Changes apply live and are recorded in the replay. New system keeps your tuning.`, this.root);
+    h(
+      'div',
+      'note',
+      `Build ${shortVersion(host.fullVersion)} · data v${host.data.dataVersion}. Changes apply live and are recorded in the replay. ${field ? 'New run' : 'New system'} keeps your tuning.`,
+      this.root,
+    );
 
     let section = '';
     for (const meta of tunableMeta(host.data)) {
-      if (!meta.live || HIDDEN_TUNABLES.some((p) => meta.key.startsWith(p))) continue;
+      if (!meta.live || isHiddenTunable(meta.key, field)) continue;
       if (meta.section !== section) {
         section = meta.section;
         h('div', 't-section', section, this.root);
@@ -148,8 +180,8 @@ export class TuningPanel {
       const row = h('div', 't-row', '', this.root);
       const name = h('div', 't-name', TUNE_LABEL[meta.key] ?? meta.key.slice(meta.section.length + 1), row);
       const info = h('small', '', `${meta.min}–${meta.max} · default ${meta.default}`, name);
-      if (meta.newRunOnly) h('span', 'tag', ' · applies on New system', info);
-      if (meta.key === 'economy.startStock') h('span', 'tag', ' · applies at the next landing', info);
+      if (meta.newRunOnly) h('span', 'tag', field ? ' · applies on New run' : ' · applies on New system', info);
+      if (meta.key === 'economy.startStock') h('span', 'tag', field ? ' · applies on New run' : ' · applies at the next landing', info);
       if (meta.scope === 'client') h('span', 'tag', ' · this device', info);
       // Tick values also show game seconds ("60 · 2.0 s"); the system variant lists what its numbers mean.
       let now: HTMLElement | null = null;
@@ -178,6 +210,7 @@ export class TuningPanel {
 
   /** Refresh shown values (call while open, a few times a second). */
   update(): void {
+    this.rebuildIfModeChanged();
     if (!this.isOpen) return;
     this.resultToggle.set(`Result panel: ${this.host.settings.showResult ? 'ON' : 'OFF'}`);
     for (const r of this.rows) {
@@ -307,10 +340,11 @@ export function byTypeText(c: Readonly<ShipTypeCounts>): string {
 }
 
 const NEW_SYSTEM_CONFIRM = 'Start a new system? This erases your campaign. Your current tuning is kept; use Reset all in the tuning panel to restore the defaults.';
+const NEW_RUN_CONFIRM = 'Start a new run? This erases this field and its ships. Your current tuning is kept; use Reset all in the tuning panel to restore the defaults.';
 
-/** Asks, then runs `onYes`: the one confirm every New system button goes through. */
-export function confirmNewSystem(onYes: () => void): void {
-  void confirmModal(NEW_SYSTEM_CONFIRM, 'Yes, new system', 'Keep playing').then((yes) => {
+/** Asks, then runs `onYes`: the one confirm every New system (H7: New run) button goes through. */
+export function confirmNewSystem(onYes: () => void, field = false): void {
+  void confirmModal(field ? NEW_RUN_CONFIRM : NEW_SYSTEM_CONFIRM, field ? 'Yes, new run' : 'Yes, new system', 'Keep playing').then((yes) => {
     if (yes) onYes();
   });
 }
@@ -381,5 +415,38 @@ export function showWin(root: HTMLElement, session: Session, onNewSystem: () => 
   h('b', '', tripleText(sum.shipped), sh);
   const row = h('div', 'ov-actions', '', card);
   btn(row, 'New system', () => confirmNewSystem(onNewSystem), 'primary');
+  root.hidden = false;
+}
+
+/**
+ * The field result panel (DESIGN.md H7 "Result panel"): shown once when the hive falls, from `fieldSummary`. New run asks first
+ * (the run is won, so the tap is deliberate); Keep playing closes it and free play continues.
+ */
+export function showFieldResult(root: HTMLElement, session: Session, onNewRun: () => void, onStay: () => void): void {
+  const s = fieldSummary(session.world);
+  root.replaceChildren();
+  const card = h('div', 'card field-result', '', root);
+  h('h2', '', 'The hive has fallen', card);
+  statLine(card, 'Time to the hive', hiveTimeText(s));
+  statLine(card, 'Peak ore/min', String(s.peakPerMin));
+  const built = h('div', 'capture-order built-line', '', card);
+  h('span', 'lbl', 'Ships built', built);
+  h('b', '', typesText(s.built), built);
+  const lost = h('div', 'capture-order lost-line', '', card);
+  h('span', 'lbl', 'Ships lost', lost);
+  h('b', '', typesText(s.lost), lost);
+  statLine(card, 'Raids', raidsText(s.raids));
+  statLine(card, 'Economy ships lost to raids', String(s.econLostToRaids));
+  statLine(card, 'Weight changes', String(s.allocChanges));
+  statLine(card, 'Most economy ships at once', String(s.peakEcon));
+  const row = h('div', 'ov-actions', '', card);
+  btn(row, 'New run', () => confirmNewSystem(() => {
+    root.hidden = true;
+    onNewRun();
+  }, true), 'primary');
+  btn(row, 'Keep playing', () => {
+    root.hidden = true;
+    onStay();
+  });
   root.hidden = false;
 }

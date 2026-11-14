@@ -3,7 +3,8 @@ import {
   areaStatus,
   campaignStatus,
   campaignWorld,
-  defaultData,
+  defaultData as shippedData,
+  withRunMode,
   landingEffects,
   replayHashes,
   researchStatus,
@@ -35,7 +36,10 @@ import { bandLabels, nameBox, nodeBox, overlap } from '../src/owlayout.ts';
 import { hopsFromStart, labelSides, laneDraws, prizeOf } from '../src/worldview.ts';
 import { areaStateText, guardedRowText } from '../src/worldsheets.ts';
 
-const data = defaultData;
+/** H7: shipped data is field mode. These tests are about the parked H4 to H6 campaign, so they run on campaign-mode data. */
+const campaignData = withRunMode(shippedData, 'campaign');
+
+const data = campaignData;
 const ids = data.map.areas.map((a) => a.id);
 const idx = (id: string): number => ids.indexOf(id);
 

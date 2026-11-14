@@ -6,6 +6,7 @@ import {
   GUARD_TARGET_ORDER,
   fleetCap,
   fleetStatus,
+  isField,
   isReclaimed,
   guardianStatus,
   supplyStatus,
@@ -76,7 +77,7 @@ export function unlockHint(ship: ShipType): string {
 /** Player-facing name of a guarded node: "Root", "Heart", or the pocket id ("P1"). */
 export function guardName(world: Readonly<World>, node: number): string {
   const n = world.nodes[node]!;
-  return n.kind === 'root' ? 'Root' : n.kind === 'heart' ? 'Heart' : n.id.toUpperCase();
+  return n.kind === 'root' ? 'Root' : n.kind === 'heart' ? (isField(world) ? 'Hive' : 'Heart') : n.id.toUpperCase();
 }
 
 /** Game seconds with one decimal: 60 ticks at 30/s -> "2.0". */
@@ -210,8 +211,13 @@ const SHIP_LOWER: Record<ShipType, { one: string; many: string }> = {
 };
 
 /** "Recycled 3 drones: +27 ore." */
-export function recycleNotice(counts: Readonly<ShipTypeCounts>, ore: number): string {
+export function recycleNotice(counts: Readonly<ShipTypeCounts> & Readonly<Partial<Record<'extractor' | 'hauler', number>>>, ore: number): string {
   const parts = SHIP_TYPES.filter((t) => counts[t] > 0).map((t) => `${counts[t]} ${counts[t] === 1 ? SHIP_LOWER[t].one : SHIP_LOWER[t].many}`);
+  // H7: the economy ships, after the warships.
+  const e = counts.extractor ?? 0;
+  const hl = counts.hauler ?? 0;
+  if (e > 0) parts.push(`${e} ${e === 1 ? 'extractor' : 'extractors'}`);
+  if (hl > 0) parts.push(`${hl} ${hl === 1 ? 'hauler' : 'haulers'}`);
   return `Recycled ${parts.join(', ')}: +${ore} ore.`;
 }
 

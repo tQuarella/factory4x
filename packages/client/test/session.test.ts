@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SEND_ALL, campaignWorld, defaultData, lastBattle, replayHashes, rootIndex, shipCounts, step, worldHash, type BattleResult, type Input, type World } from '@factory4x/sim';
+import { SEND_ALL, campaignWorld, defaultData as shippedData, withRunMode, lastBattle, replayHashes, rootIndex, shipCounts, step, worldHash, type BattleResult, type Input, type World } from '@factory4x/sim';
 import { Session, dataWithDefaults, replayData } from '../src/session.ts';
 import { decodeSave, encodeSave, loadSave, loadSettings, writeSave, SAVE_KEY, type StorageLike } from '../src/persist.ts';
 import { buildNote } from '../src/feedback.ts';
@@ -15,8 +15,11 @@ import { fixtureData } from '../../sim/test/fixture.ts';
 // H4: createWorld starts on the overworld; an H3 game is The Deep from a constructed campaign.
 import { deepStart, h3World } from '../../sim/test/h3-world.ts';
 
+/** H7: shipped data is field mode. These tests are about the parked H4 to H6 campaign, so they run on campaign-mode data. */
+const campaignData = withRunMode(shippedData, 'campaign');
+
 /** The H3 game as a session: The Deep from a constructed campaign (the start is part of the replay). */
-function deep(seed: number, data = defaultData): Session {
+function deep(seed: number, data = campaignData): Session {
   return new Session(data, { seed, start: deepStart(data) });
 }
 
@@ -52,7 +55,7 @@ describe('session replay log', () => {
     const s = deep(7);
     play(s, 1500, script);
     expect(s.log.length).toBeGreaterThanOrEqual(4);
-    const h = replayHashes(s.replay(), defaultData, s.world.tick, s.world.tick)[0];
+    const h = replayHashes(s.replay(), campaignData, s.world.tick, s.world.tick)[0];
     expect(h).toBe(worldHash(s.world));
   });
 
@@ -99,7 +102,7 @@ function stagedAtProbeAndA5(): Session {
 }
 
 /** The Deep's heart on the shipped data (h6-sim: index 14, since The Deep has no Root from data v10). */
-const DEEP_HEART = campaignWorld(1, defaultData, deepStart(defaultData)).nodes.findIndex((n) => n.kind === 'heart');
+const DEEP_HEART = campaignWorld(1, campaignData, deepStart(campaignData)).nodes.findIndex((n) => n.kind === 'heart');
 
 /** An attack on the heart from the probe and a5. */
 const attackAll: Input[] = [
@@ -108,7 +111,7 @@ const attackAll: Input[] = [
 ];
 
 function replayMatches(s: Session): boolean {
-  return replayHashes(s.replay(), defaultData, s.world.tick, s.world.tick)[0] === worldHash(s.world);
+  return replayHashes(s.replay(), campaignData, s.world.tick, s.world.tick)[0] === worldHash(s.world);
 }
 
 describe('one press, one tick (sendAll)', () => {
@@ -159,14 +162,14 @@ describe('autosave', () => {
     const s = deep(99);
     play(s, 700, script);
     s.send({ type: 'setShipyard', shipType: 'drone', on: false });
-    const out = decodeSave(encodeSave(s), defaultData);
+    const out = decodeSave(encodeSave(s), campaignData);
     expect(out.kind).toBe('resumed');
     if (out.kind !== 'resumed') return;
     const r = out.session;
     expect(worldHash(r.world)).toBe(worldHash(s.world));
     expect(r.pending).toEqual(s.pending);
     play(r, 600, { 700: [{ type: 'buildExtractor', node: 2 }] });
-    const h = replayHashes(r.replay(), defaultData, r.world.tick, r.world.tick)[0];
+    const h = replayHashes(r.replay(), campaignData, r.world.tick, r.world.tick)[0];
     expect(h).toBe(worldHash(r.world));
     expect(r.replay().seed).toBe(99);
   });
@@ -176,13 +179,13 @@ describe('autosave', () => {
     const s = deep(5);
     play(s, 100);
     expect(writeSave(s, st)).toBe(true);
-    expect(loadSave(defaultData, st).kind).toBe('resumed');
+    expect(loadSave(campaignData, st).kind).toBe('resumed');
     const parsed = JSON.parse(st.map.get(SAVE_KEY)!) as Record<string, unknown>;
     const inner = JSON.parse(parsed.world as string) as Record<string, unknown>;
-    inner.dataVersion = defaultData.dataVersion + 1;
+    inner.dataVersion = campaignData.dataVersion + 1;
     parsed.world = JSON.stringify(inner);
     st.map.set(SAVE_KEY, JSON.stringify(parsed));
-    const out = loadSave(defaultData, st);
+    const out = loadSave(campaignData, st);
     expect(out.kind).toBe('discarded');
     expect(st.map.has(SAVE_KEY)).toBe(false);
   });
@@ -199,10 +202,10 @@ describe('autosave', () => {
         throw new Error('no');
       },
     };
-    expect(loadSave(defaultData, bad).kind).toBe('none');
+    expect(loadSave(campaignData, bad).kind).toBe('none');
     expect(writeSave(deep(1), bad)).toBe(false);
-    expect(loadSettings(defaultData, bad).autosaveSec).toBe(defaultData.tunables['client.autosaveSec'].default);
-    expect(decodeSave('not json', defaultData).kind).toBe('discarded');
+    expect(loadSettings(campaignData, bad).autosaveSec).toBe(campaignData.tunables['client.autosaveSec'].default);
+    expect(decodeSave('not json', campaignData).kind).toBe('discarded');
   });
 });
 
@@ -213,18 +216,18 @@ describe('New system keeps tuning', () => {
     old.send({ type: 'setTunable', key: 'guard.capPct', value: 50 });
     old.stepOnce();
     // A real New system starts on the overworld; the tuned start stock applies at the landing, so land in The Deep from a constructed start.
-    const s = new Session(dataWithDefaults(defaultData, old.world.tun), { seed: 2, start: deepStart(defaultData) });
+    const s = new Session(dataWithDefaults(campaignData, old.world.tun), { seed: 2, start: deepStart(campaignData) });
     expect(s.world.stock.ore).toBe(150);
     // Seed 2 is Twin Seams. Its p1 (the first guardian) starts at floor(count × 50 / 100) per type.
     // This test runs on the shipped data (replayData rebuilds from it), so the count is read from the layout.
-    const p1 = defaultData.map.layouts[2]!.pockets.p1!;
+    const p1 = campaignData.map.layouts[2]!.pockets.p1!;
     expect(s.world.system.variant).toBe(2);
     expect(s.world.guardians[0]!.guards.length).toBe(Math.floor(p1.thorns / 2) + Math.floor(p1.spores / 2));
     play(s, 800, script);
     const r = s.replay();
     expect(r.startTunables).toEqual({ 'economy.startStock': 150, 'guard.capPct': 50 });
     expect(replayHashes(r, replayData(r), s.world.tick, s.world.tick)[0]).toBe(worldHash(s.world));
-    const out = decodeSave(encodeSave(s), defaultData);
+    const out = decodeSave(encodeSave(s), campaignData);
     expect(out.kind).toBe('resumed');
     if (out.kind !== 'resumed') return;
     expect(out.session.replay()).toEqual(r);
@@ -236,15 +239,15 @@ describe('feedback note', () => {
   it('carries versions, hash and replay, and falls back when long', () => {
     const s = deep(3);
     play(s, 60, script);
-    const n = buildNote(s, defaultData, 'too slow', 'dev-abcdef0123456789', { viewport: '375x812', userAgent: 'x' });
+    const n = buildNote(s, campaignData, 'too slow', 'dev-abcdef0123456789', { viewport: '375x812', userAgent: 'x' });
     expect(n.text).toContain('dev-abcdef0123456789');
-    expect(n.text).toContain(`Data version: ${defaultData.dataVersion}`);
+    expect(n.text).toContain(`Data version: ${campaignData.dataVersion}`);
     expect(n.text).toContain(worldHash(s.world));
     expect(n.text).toContain('"seed":3');
     expect(n.url).not.toBeNull();
     play(s, 4000, { 100: [{ type: 'setRally', node: 5 }] });
     for (let i = 0; i < 300; i++) s.log.push({ tick: 5000 + i, input: { type: 'setShipyard', shipType: 'drone', on: i % 2 === 0 } });
-    const long = buildNote(s, defaultData, 'x', 'v', { viewport: 'a', userAgent: 'b' });
+    const long = buildNote(s, campaignData, 'x', 'v', { viewport: 'a', userAgent: 'b' });
     expect(long.url).toBeNull();
     expect(long.shortUrl.length).toBeLessThan(2000);
   });
@@ -269,7 +272,7 @@ describe('helpers', () => {
   });
 
   it('fitMap keeps every node inside the area', () => {
-    const nodes = defaultData.map.nodes;
+    const nodes = campaignData.map.nodes;
     for (const [w, h] of [[375, 350], [375, 700], [300, 375]] as const) {
       const f = fitMap(nodes, w, h);
       for (const n of nodes) {
@@ -292,7 +295,7 @@ describe('helpers', () => {
   });
 
   it('a pocket capture names its prize, and the unlock only until that prize has been delivered', () => {
-    const w = campaignWorld(3, defaultData, deepStart(defaultData));
+    const w = campaignWorld(3, campaignData, deepStart(campaignData));
     const pockets = w.nodes.filter((n) => n.kind === 'pocket');
     const ice = pockets.find((n) => n.prize === 'ice')!;
     const text = battleReport(w, result({ node: ice.index, outcome: 'captured', shipsEngaged: 12, shipsLost: 3, guardsKilled: 9 }));

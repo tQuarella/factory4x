@@ -49,6 +49,7 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Closed lane | `#707b90` |
 | Open lane | `#9fb4d4` |
 | Owned lane | `#ffd27a` |
+| Economy ship hull | `#f0a83a` |
 
 Contrast check: every entity color must read against `#05070d` at 4.5:1 or better.
 

@@ -3,7 +3,7 @@
  * the tuning panel and the save flags. Every number comes from the sim or a live tunable; none is pinned.
  */
 import { describe, expect, it } from 'vitest';
-import { GUARD_TARGET_ORDER, areaStatus, campaignWorld, defaultData, fleetCap, overworldStatus, tunableMeta } from '@factory4x/sim';
+import { GUARD_TARGET_ORDER, areaStatus, campaignWorld, defaultData as shippedData, withRunMode, fleetCap, overworldStatus, tunableMeta } from '@factory4x/sim';
 import { Session } from '../src/session.ts';
 import { decodeSave, encodeSave } from '../src/persist.ts';
 import { GUARD_TARGET_LINE, fleetLimitText, stepMoment, stepNotice } from '../src/report.ts';
@@ -11,7 +11,10 @@ import { HIDDEN_TUNABLES } from '../src/panels.ts';
 import { areaStateText, decayWord, farLine, haulLine, lockLine, relayLine } from '../src/worldsheets.ts';
 import { laneDraws, laneMode, nodeState } from '../src/worldview.ts';
 
-const data = defaultData;
+/** H7: shipped data is field mode. These tests are about the parked H4 to H6 campaign, so they run on campaign-mode data. */
+const campaignData = withRunMode(shippedData, 'campaign');
+
+const data = campaignData;
 const ids = data.map.areas.map((a) => a.id);
 const idx = (id: string): number => ids.indexOf(id);
 const name = (i: number): string => data.map.areas[i]!.name;

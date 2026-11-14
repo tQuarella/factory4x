@@ -3,10 +3,24 @@
  * type with a −/+ stepper (44 px), the count and "All". Every row defaults to 0, never to all. A live refund preview comes from the
  * sim's `recycleRefund` on the clamped counts, so ships that leave while it is open can't make the order wrong.
  */
-import { SHIP_TYPES, clampSendCounts, recycleRefund, shipsAtByType, unlockStatus, type Input, type ShipType, type ShipTypeCounts, type World } from '@factory4x/sim';
+import {
+  BUILD_TYPES,
+  SHIP_TYPES,
+  clampSendCounts,
+  econAtByType,
+  isField,
+  recycleRefund,
+  shipsAtByType,
+  unlockStatus,
+  type BuildType,
+  type Input,
+  type RecycleCounts,
+  type World,
+} from '@factory4x/sim';
 import { btn, h, setHidden, setText, type Btn } from './dom.ts';
-import { recycleIcon, shipIcon } from './icons.ts';
-import { SHIP_NAME, recycleNotice } from './report.ts';
+import { BUILD_NAME } from './fieldreport.ts';
+import { buildIcon, recycleIcon } from './icons.ts';
+import { recycleNotice } from './report.ts';
 import { shortName } from './sheet.ts';
 
 export interface RecyclePanelHost {
@@ -17,8 +31,12 @@ export interface RecyclePanelHost {
   notice(text: string): void;
 }
 
+/** Every type's count, zero where absent (H7: the economy types are only ever present in a field run). */
+type Counts = Record<BuildType, number>;
+const zero = (): Counts => ({ extractor: 0, hauler: 0, drone: 0, lancer: 0, flak: 0 });
+
 interface Row {
-  type: ShipType;
+  type: BuildType;
   wrap: HTMLElement;
   count: HTMLElement;
   minus: Btn;
@@ -30,7 +48,7 @@ export class RecyclePanel {
   private readonly root: HTMLElement;
   private readonly host: RecyclePanelHost;
   private node = -1;
-  private want: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
+  private want: Counts = zero();
   private rows: Row[] = [];
   private title!: HTMLElement;
   private rule!: HTMLElement;
@@ -48,7 +66,7 @@ export class RecyclePanel {
 
   open(node: number): void {
     this.node = node;
-    this.want = { drone: 0, lancer: 0, flak: 0 };
+    this.want = zero();
     this.build();
     this.root.hidden = false;
     this.update();
@@ -61,12 +79,26 @@ export class RecyclePanel {
     this.rows = [];
   }
 
-  private avail(): ShipTypeCounts {
-    return shipsAtByType(this.host.world(), this.node);
+  /** The types the panel offers: the three warships, plus the two economy ships in a field run. */
+  private types(): readonly BuildType[] {
+    return isField(this.host.world()) ? BUILD_TYPES : SHIP_TYPES;
   }
 
-  private clamped(): ShipTypeCounts {
-    return clampSendCounts(this.host.world(), this.node, this.want);
+  private avail(): Counts {
+    const w = this.host.world();
+    return { ...zero(), ...shipsAtByType(w, this.node), ...econAtByType(w, this.node) };
+  }
+
+  private clamped(): Counts {
+    const w = this.host.world();
+    const war = clampSendCounts(w, this.node, this.want);
+    const have = econAtByType(w, this.node);
+    return {
+      ...zero(),
+      ...war,
+      extractor: Math.min(this.want.extractor, have.extractor),
+      hauler: Math.min(this.want.hauler, have.hauler),
+    };
   }
 
   private build(): void {
@@ -77,22 +109,22 @@ export class RecyclePanel {
     recycleIcon(head, 24);
     this.title = h('span', '', '', head);
     this.rule = h('div', 'note', '', card);
-    for (const type of SHIP_TYPES) {
+    for (const type of this.types()) {
       const wrap = h('div', 'sp-row', '', card);
       wrap.dataset.ship = type;
       const label = h('div', 'sp-label', '', wrap);
-      shipIcon(label, 24, type);
-      h('span', 'sp-name', SHIP_NAME[type], label);
+      buildIcon(label, 24, type);
+      h('span', 'sp-name', BUILD_NAME[type], label);
       const minus = btn(wrap, '−', () => this.step(type, -1), 'sp-step');
-      minus.el.setAttribute('aria-label', `Fewer ${SHIP_NAME[type]}`);
+      minus.el.setAttribute('aria-label', `Fewer ${BUILD_NAME[type]}`);
       const count = h('b', 'sp-count', '', wrap);
       const plus = btn(wrap, '+', () => this.step(type, 1), 'sp-step');
-      plus.el.setAttribute('aria-label', `More ${SHIP_NAME[type]}`);
+      plus.el.setAttribute('aria-label', `More ${BUILD_NAME[type]}`);
       const all = btn(wrap, 'All', () => {
         this.want[type] = this.avail()[type];
         this.update();
       }, 'sp-all');
-      all.el.setAttribute('aria-label', `All ${SHIP_NAME[type]}`);
+      all.el.setAttribute('aria-label', `All ${BUILD_NAME[type]}`);
       this.rows.push({ type, wrap, count, minus, plus, all });
     }
     this.preview = h('div', 'recycle-preview', '', card);
@@ -101,7 +133,7 @@ export class RecyclePanel {
     this.go = btn(actions, '', () => this.submit(), 'primary');
   }
 
-  private step(type: ShipType, d: number): void {
+  private step(type: BuildType, d: number): void {
     const shown = this.clamped()[type];
     this.want[type] = Math.max(0, Math.min(this.avail()[type], shown + d));
     this.update();
@@ -110,10 +142,12 @@ export class RecyclePanel {
   private submit(): void {
     const w = this.host.world();
     const counts = this.clamped();
-    const total = counts.drone + counts.lancer + counts.flak;
+    const total = BUILD_TYPES.reduce((a, t) => a + counts[t], 0);
     if (total > 0) {
       const ore = recycleRefund(w, counts);
-      this.host.sendAll([{ type: 'recycleShips', node: this.node, counts }]);
+      // The campaign's order has the three warship counts only; a field order adds the economy ones.
+      const order: RecycleCounts = isField(w) ? counts : { drone: counts.drone, lancer: counts.lancer, flak: counts.flak };
+      this.host.sendAll([{ type: 'recycleShips', node: this.node, counts: order }]);
       this.host.notice(recycleNotice(counts, ore));
     }
     this.close();
@@ -126,11 +160,16 @@ export class RecyclePanel {
     const have = this.avail();
     const shown = this.clamped();
     const unlocked = unlockStatus(w).ships;
-    setText(this.title, `Recycle ships at ${shortName(w.nodes[this.node]!)}`);
-    setText(this.rule, `Scraps ships parked here for ${w.tun['fleet.recycleRefundPct']}% of their ore. The ship's component is lost.`);
+    setText(this.title, `Recycle ships at ${shortName(w.nodes[this.node]!, isField(w))}`);
+    setText(
+      this.rule,
+      isField(w)
+        ? `Scraps ships parked here for ${w.tun['fleet.recycleRefundPct']}% of their ore. A recycled extractor frees its slot.`
+        : `Scraps ships parked here for ${w.tun['fleet.recycleRefundPct']}% of their ore. The ship's component is lost.`,
+    );
     let total = 0;
     for (const r of this.rows) {
-      setHidden(r.wrap, !unlocked[r.type] && have[r.type] === 0);
+      setHidden(r.wrap, r.type !== 'extractor' && r.type !== 'hauler' && !unlocked[r.type] && have[r.type] === 0);
       setText(r.count, `${shown[r.type]}/${have[r.type]}`);
       r.minus.set('−', shown[r.type] > 0);
       r.plus.set('+', shown[r.type] < have[r.type]);
