@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 8 ledger
 
-Launches: 9 / 12.
+Launches: 10 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -33,7 +33,11 @@ Launches: 9 / 12.
 | r8 | critic | h8-raids | resume | Review round 2: APPROVE (d45cca3) |
 | 9 | critic | h8-client | launch | Review round 1: REJECT (76376f9): raids not merged; split ghost; enough text untested; touch-action, badge vs HUD; rock sheet squeezes map to ~160 px; raw colours |
 | r9 | engineer | h8-client | resume | Fix round 1; map keeps 195 px with rock sheet |
-| r10 | critic | h8-bots | resume | Review round 1 on 8157c0a (adaptive 15:53, greedy 15:45, flags 1-7 met; bots gate slower, 115-215 s) |
+| r10 | critic | h8-bots | resume | Review round 1: REJECT (a068a4c): hauler-weight exception vs spec (Director amended, a5a4a6d); greedy wipe latch; shield not asserted |
+| r11 | engineer | h8-bots | resume | Fix round 1; also bots gate time |
+| r12 | engineer | h8-client | resume | Fix round 1 done (af0a91d): map 210 px with rock sheet, raids merged |
+| 10 | critic | h8-client | launch | Launched by mistake for round 2 and stopped at once; counted |
+| r13 | critic | h8-client | resume | Review round 2 (round 1 critic) |
 
 ## Iteration 7 ledger
 
