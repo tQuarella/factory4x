@@ -1298,3 +1298,33 @@ These numbers are from a scratch run of this branch's code. No value fixes it, b
 1. **Committed extractors staff a rock: accepted.** The extractor in the probe's bay, and a full extractor share, count at the rock F5 would send them to (nearest mineable rock with a free slot, then lower index). Without this the amendment as written misses its own acceptance (first hauler at tick 5640). With it, the opening matches H7 to the tick (first hauler 90, first delivery 1035) and delivers more by minute 3 (52 against 40).
 2. **A hauler waits at a staffed rock while an extractor is docked there or on its way: accepted.** It needs no per-rock history, and waiting for a replacement extractor is what a player would expect.
 3. **No surplus extractors (new, added to h8-sim).** With no inputs, H8 builds 25 extractors in 10 minutes against 13 asteroid slots, so 12 idle at the probe taking fleet slots. That is the same complaint the owner made about haulers ("the extra haulers sitting around feel much worse"). The Extractor bay does not start when no Mine-marked rock has a free slot (counting docked, bound and committed extractors); its row shows the `enough` state, and its share is spent elsewhere as the Hauler's is.
+
+## 2026-11-14 · Core Engineer · h8-sim: no surplus extractors (Director's addition)
+
+**Rule, as built (under `hauler.autoNeed` 1 only):**
+- `extractorShortfall` = Σ over mineable rocks (Mine-marked, unguarded) of max(0, slots − free extractors − extractor ships bound there, docked or on their way), minus the unbound extractor ships, minus an extractor in the bay.
+  - The unbound ships are the ones idle at the probe or flying home. F5 puts them in the next slot that opens.
+  - A full share is not subtracted, because the share is what the bay would build. So the "committed" count the Director named is the bay's extractor.
+- While the shortfall is 0 or less, the Extractor gets no ore in F2 and its counter is 0. Its share is kept, its bay doesn't start, and `allocStatus` shows it as `enough`.
+- Marking a rock, capturing a pocket or losing an extractor (a raid, a recycle) opens a slot, so the shortfall comes back above 0.
+
+**Calls:**
+- **One switch, not two.** Surplus extractors and surplus haulers are the same complaint, and `hauler.autoNeed` 0 is already the switch for "the economy staffs itself". A second switch would let the comparison mix H7 haulers with H8 extractors, which no one asked to compare. Under 0, nothing changes: the `hauler.autoNeed` 0 hash test still passes.
+- **Unbound extractors count against the free slots**, so an idle extractor at the probe isn't joined by another one built for the same slot.
+- **Client text (compile-only file):** `allocStateText` now returns "enough extractors" for the Extractor row and "enough haulers" for the Hauler row. Before this change, the Extractor row would have read "enough haulers".
+
+**Measured, v14, seed 1, no inputs, 10 game minutes (final code):**
+- **Extractors:** 19 built, 6 lost to raids, 13 alive, all bound, 0 idle. 13 is the marked asteroid slots. Before this rule, 25 were built.
+- **Haulers:** 13 built, 0 idle.
+- **H7 (`hauler.autoNeed` 0), same run:** 13 extractors built, 8 alive.
+
+**The opening didn't get worse.** First hauler at tick 90 and first delivery at tick 1035, as before. Ore by minutes 1–10 is 8, 24, 52, 80, 112, 172, 248, 344, 465, 593; before this rule, minutes 9 and 10 were 464 and 592. The pinned curve in `h8-haulers.test.ts` is updated to those two values.
+
+**Tests:** `h8-haulers.test.ts`, "no surplus extractors":
+- the shortfall's arithmetic;
+- the `enough` state with its share kept, a full share waiting, and a new mark reopening the bay;
+- `hauler.autoNeed` 0 unchanged;
+- a real raid fight killing the docked extractor, after which the bay restarts and the slot is refilled;
+- a 6-minute run where every Extractor bay start keeps extractors alive plus the one in the bay within the marked slots.
+
+**Gates:** all green. The bots gate's tick p95 is at most 0.0137 ms (budget 2.0 ms). The determinism final is b8d34d88, unchanged, because the replay's H8 items run with the extractor weight at 0.

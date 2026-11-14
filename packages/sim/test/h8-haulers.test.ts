@@ -3,6 +3,8 @@ import {
   PROBE,
   allocStatus,
   createWorld,
+  extractorShortfall,
+  isMineable,
   guardianAt,
   haulerNeed,
   haulerShortfall,
@@ -12,6 +14,7 @@ import {
   step,
   type EconShip,
   type Input,
+  type Raid,
   type World,
 } from '../src/index.ts';
 import { staffCounts } from '../src/field.ts';
@@ -480,7 +483,7 @@ describe('H4 no surplus haulers', () => {
     const h8 = curve(1);
     const h7 = curve(0);
     expect(h7).toEqual({ firstHauler: 90, firstDelivery: 1035, byMinute: [8, 20, 40, 60, 88, 124, 153, 189, 241, 297] });
-    expect(h8).toEqual({ firstHauler: 90, firstDelivery: 1035, byMinute: [8, 24, 52, 80, 112, 172, 248, 344, 464, 592] });
+    expect(h8).toEqual({ firstHauler: 90, firstDelivery: 1035, byMinute: [8, 24, 52, 80, 112, 172, 248, 344, 465, 593] });
   });
 
   it('H1 amendment, the landing: before any extractor launches, the committed extractor (a full share, then the bay) staffs a1, so the Hauler takes ore at tick 0', () => {
@@ -494,4 +497,106 @@ describe('H4 no surplus haulers', () => {
     expect(w.field!.econ.some((s) => s.type === 'extractor')).toBe(false);
   });
 
+});
+
+describe('no surplus extractors (Director, 2026-11-14)', () => {
+  /** Free extractor slots on the mineable rocks: Σ slots − free extractors. */
+  const markedSlots = (w: World): number =>
+    w.nodes.reduce((n, x) => n + (x.index !== PROBE && isMineable(w, x.index) ? x.slots - w.field!.free[x.index]! : 0), 0);
+
+  it('extractorShortfall = Σ free slots on the mineable rocks − unbound extractors − one in the bay', () => {
+    const w = marked(F.a1, F.a3);
+    // a1 2 slots + a3 1 slot.
+    expect(extractorShortfall(w)).toBe(3);
+    dock(w, F.a1, 1);
+    expect(extractorShortfall(w)).toBe(2);
+    addEcon(w, 'extractor', PROBE);
+    expect(extractorShortfall(w)).toBe(1);
+    w.field!.bays.extractor.ticksLeft = 10;
+    expect(extractorShortfall(w)).toBe(0);
+    // An unmarked rock's slots don't count.
+    w.field!.mine[F.a3] = false;
+    expect(extractorShortfall(w)).toBe(-1);
+  });
+
+  it('with every marked slot taken the Extractor is enough: no ore, counter 0, its share kept, the bay idle; marking a new rock reopens it', () => {
+    const w = marked(F.a3);
+    dock(w, F.a3, 1);
+    w.field!.alloc.extractor = 3;
+    w.field!.share.extractor = 7;
+    w.stock.ore = 100;
+    run(w, 30);
+    expect(allocStatus(w, D).rows.find((r) => r.type === 'extractor')!.state).toBe('enough');
+    expect([w.field!.share.extractor, w.field!.allocCur.extractor, w.field!.bays.extractor.ticksLeft]).toEqual([7, 0, 0]);
+    // A full share waits too.
+    w.field!.share.extractor = w.tun['ship.extractor.cost'];
+    run(w, 5);
+    expect(w.field!.bays.extractor.ticksLeft).toBe(0);
+    tick(w, { type: 'setMine', node: F.a4, on: true });
+    expect(w.field!.bays.extractor.ticksLeft).toBe(w.tun['ship.extractor.buildTicks']);
+    expect(allocStatus(w, D).rows.find((r) => r.type === 'extractor')!.state).toBe('building');
+  });
+
+  it('hauler.autoNeed 0: the Extractor stays eligible and builds with no free slot (H7)', () => {
+    const w = marked(F.a3);
+    dock(w, F.a3, 1);
+    w.tun['hauler.autoNeed'] = 0;
+    w.field!.alloc.extractor = 3;
+    w.stock.ore = 100;
+    run(w, 5);
+    expect(w.field!.bays.extractor.ticksLeft).toBeGreaterThan(0);
+    expect(allocStatus(w, D).rows.find((r) => r.type === 'extractor')!.state).toBe('building');
+  });
+
+  it('after a raid kills a docked extractor, the bay restarts and the slot is refilled', () => {
+    const w = marked(F.a3);
+    dock(w, F.a3, 1);
+    w.field!.alloc.extractor = 3;
+    w.field!.share.extractor = w.tun['ship.extractor.cost'];
+    w.tun['raid.enabled'] = 1;
+    run(w, 3);
+    expect(w.field!.bays.extractor.ticksLeft).toBe(0);
+    // A raid already fighting at a3, with one Thorn strong enough to kill the extractor in a round.
+    const raid: Raid = {
+      id: 1,
+      phase: 'fight',
+      target: F.a3,
+      guards: [{ id: w.nextId++, type: 'thorn', hp: 50 }],
+      ticksLeft: 0,
+      planned: { thorn: 1, spore: 0 },
+      flightTicks: 0,
+      from: F.a3,
+      retargeted: false,
+      lostEcon: { extractor: 0, hauler: 0 },
+      lostShips: { drone: 0, lancer: 0, flak: 0 },
+      killed: { thorn: 0, spore: 0 },
+    };
+    w.raid = raid;
+    w.tun['guard.thorn.damage'] = 20;
+    let i = 0;
+    while (w.stats.econLost.extractor === 0 && i++ < 200) tick(w);
+    expect(w.stats.econLost.extractor).toBe(1);
+    expect(w.nodes[F.a3]!.extractors).toBe(0);
+    tick(w);
+    expect(w.field!.bays.extractor.ticksLeft).toBeGreaterThan(0);
+    run(w, w.tun['ship.extractor.buildTicks'] + 5);
+    expect(w.field!.econ.filter((s) => s.type === 'extractor' && s.target === F.a3)).toHaveLength(1);
+  });
+
+  it('the v14 landing for 6 game minutes (no inputs): every Extractor bay start leaves extractors alive plus the one building within the marked slots', () => {
+    const v = createWorld(1, D);
+    let started = 0;
+    for (let t = 0; t < 6 * T; t++) {
+      const before = v.field!.bays.extractor.ticksLeft;
+      tick(v);
+      if (before <= 1 && v.field!.bays.extractor.ticksLeft === v.tun['ship.extractor.buildTicks']) {
+        started++;
+        const alive = v.field!.econ.filter((s) => s.type === 'extractor').length + 1;
+        expect(alive, `tick ${t}`).toBeLessThanOrEqual(markedSlots(v));
+      }
+    }
+    expect(started).toBeGreaterThan(0);
+    // Nothing idles at the probe: every extractor alive is bound to a rock.
+    expect(v.field!.econ.filter((s) => s.type === 'extractor' && s.target === null)).toHaveLength(0);
+  });
 });

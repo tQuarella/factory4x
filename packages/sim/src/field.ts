@@ -64,9 +64,15 @@ export function bayOf(world: Readonly<World>, type: BuildType): Readonly<Yard> {
  * F2: a type is eligible for the next ore if its weight is above 0, it is unlocked, and its share is below its cost.
  * H8 H4: with hauler.autoNeed 1, the Hauler is eligible only while some rock is short of haulers (haulersWanted).
  */
-export function isEligible(world: Readonly<World>, type: BuildType, wanted: boolean = haulersWanted(world)): boolean {
+export function isEligible(
+  world: Readonly<World>,
+  type: BuildType,
+  wanted: boolean = haulersWanted(world),
+  extractorsOk: boolean = extractorsWanted(world),
+): boolean {
   const f = fieldOf(world);
   if (type === 'hauler' && !wanted) return false;
+  if (type === 'extractor' && !extractorsOk) return false;
   return f.alloc[type] > 0 && isTypeUnlocked(world, type) && f.share[type] < oreCost(world, type);
 }
 
@@ -90,12 +96,14 @@ export function allocate(world: World): void {
   }
   // H8 H4: nothing inside F2 changes the shortfall (no bay starts, no hauler moves), so it is read once.
   let wanted = haulersWanted(world);
+  // No surplus extractors: nothing in F2 opens or fills a slot, so this is read once.
+  const extractorsOk = extractorsWanted(world);
   const eligible: BuildType[] = [];
   for (;;) {
     eligible.length = 0;
     let sum = 0;
     for (const t of BUILD_TYPES) {
-      if (isEligible(world, t, wanted)) {
+      if (isEligible(world, t, wanted, extractorsOk)) {
         eligible.push(t);
         sum += f.alloc[t];
       } else f.allocCur[t] = 0;
@@ -128,7 +136,8 @@ function newEconShip(world: World, type: EconType): EconShip {
  * probe (a warship flies to the rally point, as rule 5b). Start: in type order, an idle bay starts when its share
  * equals its ore cost, the stock covers its resource cost, and (for a counted type) the fleet is below the limit,
  * the count rising with each start this tick. Starting pays the resource, empties the share and sets
- * ticksLeft = ship.<type>.buildTicks. H8 H4: the Hauler bay also needs a rock short of haulers (haulersWanted).
+ * ticksLeft = ship.<type>.buildTicks. H8 H4: the Hauler bay also needs a rock short of haulers (haulersWanted), and
+ * (Director, 2026-11-14) the Extractor bay a free slot on a Mine-marked rock (extractorsWanted).
  */
 export function runBays(world: World, data: SimData): void {
   const f = fieldOf(world);
@@ -147,6 +156,8 @@ export function runBays(world: World, data: SimData): void {
     if (f.share[t] !== cost) continue;
     // H8 H4: a full Hauler share waits (kept) while no rock is short; the probe never builds a hauler no rock needs.
     if (t === 'hauler' && !haulersWanted(world)) continue;
+    // No surplus extractors (Director, 2026-11-14): the bay waits, its share kept, while no marked rock has a free slot.
+    if (t === 'extractor' && !extractorsWanted(world)) continue;
     const rc = resourceCost(world, t);
     if (rc !== null && world.stock[rc.res] < rc.amount) continue;
     if (isCountedType(world, t) && isFleetFull(world, data)) continue;
@@ -406,6 +417,30 @@ export function haulerShortfall(world: Readonly<World>): number {
   for (const s of f.econ) if (isIdleHauler(s)) short -= 1;
   if (f.bays.hauler.ticksLeft > 0) short -= 1;
   return short;
+}
+
+/**
+ * No surplus extractors (Director, 2026-11-14, with hauler.autoNeed 1): the free extractor slots. Σ over mineable
+ * (Mine-marked, unguarded) nodes of max(0, slots − free extractors − extractor ships bound there, docked or on their
+ * way), minus the unbound extractor ships (idle at the probe or flying home: F5 puts them in the next slot that
+ * opens), minus an extractor in the bay. A full share is not subtracted: it is what the bay would build.
+ */
+export function extractorShortfall(world: Readonly<World>): number {
+  const f = fieldOf(world);
+  const bound = boundCounts(world);
+  let open = 0;
+  for (const n of world.nodes) {
+    if (n.index === PROBE || !isMineable(world, n.index)) continue;
+    open += Math.max(0, n.slots - f.free[n.index]! - bound[n.index]!);
+  }
+  for (const s of f.econ) if (s.type === 'extractor' && s.target === null) open -= 1;
+  if (f.bays.extractor.ticksLeft > 0) open -= 1;
+  return open;
+}
+
+/** The probe may fill and start an Extractor: always with hauler.autoNeed 0, else while extractorShortfall > 0. */
+export function extractorsWanted(world: Readonly<World>): boolean {
+  return !isAutoNeed(world) || extractorShortfall(world) > 0;
 }
 
 /** H8 H4: the probe may fill and start a Hauler: always with hauler.autoNeed 0, else while haulerShortfall > 0. */

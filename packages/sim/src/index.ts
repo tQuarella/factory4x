@@ -241,7 +241,8 @@
  *   movePreview(world, from, part)  the counts a moveShips would carry now (the drag ghost).
  *   recycleOrder(world, type)       the ships recycleFleet would take, in order.
  *   allocStatus rows                gain incomePct (floor(weight × 100 ÷ Σ weights of unlocked types above 0); 0 off or
- *                                   locked) and the state 'enough' (the Hauler while no rock is short).
+ *                                   locked) and the state 'enough' (the Hauler while no rock is short; the Extractor while
+ *                                   no Mine-marked rock has a free slot, extractorShortfall ≤ 0; hauler.autoNeed 1 only).
  *   rockStatus                      gains haulerNeed, haulerSet, haulerTarget, raidTarget and haulersHeld (h8-raids).
  *   fleetStatus.types               per BUILD_TYPES type {alive, idle, building (0/1), recyclable}.
  *
@@ -293,6 +294,7 @@ export type { Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './fac
 export {
   econAlive,
   econAtByType,
+  extractorShortfall,
   haulerNeed,
   haulerShortfall,
   haulerTarget,

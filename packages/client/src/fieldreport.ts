@@ -44,7 +44,7 @@ export function allocStateText(row: Readonly<AllocRow>): string {
     case 'filling':
       return `saving ${row.share}/${row.cost.ore}`;
     case 'enough':
-      return 'enough haulers';
+      return row.type === 'extractor' ? 'enough extractors' : 'enough haulers';
   }
 }
 

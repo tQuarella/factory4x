@@ -25,6 +25,7 @@ import {
   haulerNeed,
   haulerSetOf,
   haulerTarget,
+  extractorsWanted,
   haulersWanted,
   isDocked,
   isEconType,
@@ -831,7 +832,8 @@ export function runSummary(world: Readonly<World>): RunSummary {
  * share 'waitingResource' (the stock lacks the crystal or ice) or 'fleetFull' (a counted type at the limit), else
  * 'filling' ("saving 12/20"). The bay checks the resource before the limit (F3), and so does the state.
  * H8 H4: 'enough' ("enough haulers"), the Hauler with a weight above 0 and an idle bay while no rock is short of
- * haulers (hauler.autoNeed 1): it takes no ore and its share is kept. It comes after 'building' and 'off'.
+ * haulers (hauler.autoNeed 1): it takes no ore and its share is kept. It comes after 'building' and 'off'. The
+ * Extractor is 'enough' the same way while no Mine-marked rock has a free slot (Director, 2026-11-14).
  */
 export type AllocState = 'off' | 'locked' | 'filling' | 'waitingResource' | 'fleetFull' | 'building' | 'enough';
 
@@ -870,6 +872,7 @@ export function allocStatus(world: Readonly<World>, data: SimData): AllocStatus 
   const f = fieldOrThrow(world);
   const full = isFleetFull(world, data);
   const wanted = haulersWanted(world);
+  const extractorsOk = extractorsWanted(world);
   let weightSum = 0;
   for (const t of BUILD_TYPES) if (f.alloc[t] > 0 && isTypeUnlocked(world, t)) weightSum += f.alloc[t];
   const rows = BUILD_TYPES.map((type): AllocRow => {
@@ -883,6 +886,7 @@ export function allocStatus(world: Readonly<World>, data: SimData): AllocStatus 
     if (bay.ticksLeft > 0) state = 'building';
     else if (f.alloc[type] === 0) state = 'off';
     else if (type === 'hauler' && !wanted) state = 'enough';
+    else if (type === 'extractor' && !extractorsOk) state = 'enough';
     else if (!unlocked) state = 'locked';
     else if (f.share[type] >= ore && resource !== null && world.stock[resource.res] < resource.amount) state = 'waitingResource';
     else if (f.share[type] >= ore && isCountedType(world, type) && full) state = 'fleetFull';
