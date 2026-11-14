@@ -1,7 +1,20 @@
 import { BUILD_TYPES, type BuildType, type EconType, type Prize, type RawResource, type SimData } from './data.ts';
+import { haulersHeld } from './factions/index.ts';
 import { isCountedType, isFleetFull } from './fleet.ts';
+import { ceilDiv } from './math.ts';
 import { advance, newShip, startTransit } from './ships.ts';
-import { PROBE, fieldOf, isGuarded, nodeDistance, type EconShip, type EconTypeCounts, type World, type Yard } from './world.ts';
+import {
+  PROBE,
+  fieldOf,
+  isGuarded,
+  nodeDistance,
+  perExtractorPerMin,
+  ticksPerMin,
+  type EconShip,
+  type EconTypeCounts,
+  type World,
+  type Yard,
+} from './world.ts';
 
 /**
  * H7 field mode (DESIGN.md H7 "Rules (field mode), per tick in this order", F2–F7, F9, F11 and F14): the
@@ -47,9 +60,13 @@ export function bayOf(world: Readonly<World>, type: BuildType): Readonly<Yard> {
   return isEconType(type) ? fieldOf(world).bays[type] : world.yards[type];
 }
 
-/** F2: a type is eligible for the next ore if its weight is above 0, it is unlocked, and its share is below its cost. */
-export function isEligible(world: Readonly<World>, type: BuildType): boolean {
+/**
+ * F2: a type is eligible for the next ore if its weight is above 0, it is unlocked, and its share is below its cost.
+ * H8 H4: with hauler.autoNeed 1, the Hauler is eligible only while some rock is short of haulers (haulersWanted).
+ */
+export function isEligible(world: Readonly<World>, type: BuildType, wanted: boolean = haulersWanted(world)): boolean {
   const f = fieldOf(world);
+  if (type === 'hauler' && !wanted) return false;
   return f.alloc[type] > 0 && isTypeUnlocked(world, type) && f.share[type] < oreCost(world, type);
 }
 
@@ -71,12 +88,14 @@ export function allocate(world: World): void {
       f.share[t] = cost;
     }
   }
+  // H8 H4: nothing inside F2 changes the shortfall (no bay starts, no hauler moves), so it is read once.
+  const wanted = haulersWanted(world);
   const eligible: BuildType[] = [];
   for (;;) {
     eligible.length = 0;
     let sum = 0;
     for (const t of BUILD_TYPES) {
-      if (isEligible(world, t)) {
+      if (isEligible(world, t, wanted)) {
         eligible.push(t);
         sum += f.alloc[t];
       } else f.allocCur[t] = 0;
@@ -107,7 +126,7 @@ function newEconShip(world: World, type: EconType): EconShip {
  * probe (a warship flies to the rally point, as rule 5b). Start: in type order, an idle bay starts when its share
  * equals its ore cost, the stock covers its resource cost, and (for a counted type) the fleet is below the limit,
  * the count rising with each start this tick. Starting pays the resource, empties the share and sets
- * ticksLeft = ship.<type>.buildTicks.
+ * ticksLeft = ship.<type>.buildTicks. H8 H4: the Hauler bay also needs a rock short of haulers (haulersWanted).
  */
 export function runBays(world: World, data: SimData): void {
   const f = fieldOf(world);
@@ -124,6 +143,8 @@ export function runBays(world: World, data: SimData): void {
     if (bay.ticksLeft !== 0) continue;
     const cost = oreCost(world, t);
     if (f.share[t] !== cost) continue;
+    // H8 H4: a full Hauler share waits (kept) while no rock is short; the probe never builds a hauler no rock needs.
+    if (t === 'hauler' && !haulersWanted(world)) continue;
     const rc = resourceCost(world, t);
     if (rc !== null && world.stock[rc.res] < rc.amount) continue;
     if (isCountedType(world, t) && isFleetFull(world, data)) continue;
@@ -247,14 +268,107 @@ export function isHaulable(world: Readonly<World>, node: number): boolean {
   return fieldOf(world).mine[node] === true && isWorked(world, node);
 }
 
-/** The F6 pick for a hauler at the probe with no haulable target: the best worked, Mine-marked node, or null (it parks idle). */
+/**
+ * The pick for a hauler at the probe with no haulable target, or null (it parks idle). H7 F6 (hauler.autoNeed 0):
+ * the best worked, Mine-marked node by betterHaulTarget. H8 H2 (autoNeed 1): needPick.
+ */
 export function haulTarget(world: Readonly<World>, assigned: readonly number[]): number | null {
+  if (isAutoNeed(world)) return needPick(world, assigned);
   let best: number | null = null;
   for (const n of world.nodes) {
     if (!isHaulable(world, n.index)) continue;
     if (best === null || betterHaulTarget(world, assigned, n.index, best)) best = n.index;
   }
   return best;
+}
+
+/** H8 H5: hauler.autoNeed 1 staffs rocks by need (H1–H4); 0 is H7's F6 exactly (the in-build comparison). */
+export function isAutoNeed(world: Readonly<World>): boolean {
+  return world.tun['hauler.autoNeed'] >= 1;
+}
+
+/** H8 H1: the ticks a hauler takes from the probe to `node` at ship.hauler.speedSu (F7's leg), there and back. */
+export function haulRoundTrip(world: Readonly<World>, node: number): number {
+  return 2 * ceilDiv(nodeDistance(world, PROBE, node), world.tun['ship.hauler.speedSu']);
+}
+
+/** H8 H1: what `node` yields per game minute now: its extractors (docked plus free) × its kind's rate per extractor (F4). */
+export function yieldPerMin(world: Readonly<World>, node: number): number {
+  const n = world.nodes[node]!;
+  return n.extractors * perExtractorPerMin(world.tun, n.kind);
+}
+
+/**
+ * H8 H1, the need: for a haulable node, max(1, ceilDiv(yieldPerMin × roundTrip × hauler.needPct, 100 × T ×
+ * ship.hauler.cargo)), T = ticks per game minute. So a rock with only a buffer (no working extractor) needs 1.
+ * 0 for a node that isn't haulable.
+ */
+export function haulerNeed(world: Readonly<World>, node: number): number {
+  if (!isHaulable(world, node)) return 0;
+  const num = yieldPerMin(world, node) * haulRoundTrip(world, node) * world.tun['hauler.needPct'];
+  const den = 100 * ticksPerMin(world) * world.tun['ship.hauler.cargo'];
+  return Math.max(1, ceilDiv(num, den));
+}
+
+/**
+ * H8 H7: the count the player set for `node` (`setHaulers`), or null for Auto. A count above rock.haulerMax (the
+ * max was tuned down live) reads as rock.haulerMax, as alloc.maxWeight caps the weights; the stored count is kept.
+ */
+export function haulerSetOf(world: Readonly<World>, node: number): number | null {
+  const set = fieldOf(world).haulerSet[node] ?? null;
+  return set === null ? null : Math.min(set, world.tun['rock.haulerMax']);
+}
+
+/** H8 H1: the target: the set count if there is one, else the need; 0 for a node that isn't haulable. */
+export function haulerTarget(world: Readonly<World>, node: number): number {
+  if (!isHaulable(world, node)) return 0;
+  return haulerSetOf(world, node) ?? haulerNeed(world, node);
+}
+
+/**
+ * H8 H2: the haulable node with the largest shortfall (target − assigned) above 0; ties to the node nearest the
+ * probe, then the lower index. Null if no node is short (the hauler parks idle at the probe).
+ */
+export function needPick(world: Readonly<World>, assigned: readonly number[]): number | null {
+  let best: number | null = null;
+  let bestShort = 0;
+  let bestDist = 0;
+  for (const n of world.nodes) {
+    const short = haulerTarget(world, n.index) - assigned[n.index]!;
+    if (short <= 0) continue;
+    const d = nodeDistance(world, PROBE, n.index);
+    // Nodes are visited in index order, so the strict comparisons keep the lower index on a full tie.
+    if (best === null || short > bestShort || (short === bestShort && d < bestDist)) {
+      best = n.index;
+      bestShort = short;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+/** A hauler parked at the probe with no node: idle. */
+export function isIdleHauler(s: Readonly<EconShip>): boolean {
+  return s.type === 'hauler' && s.transit === null && s.at === PROBE && s.target === null;
+}
+
+/**
+ * H8 H4: haulerShortfall = Σ over haulable nodes of max(0, target − assigned), minus the idle haulers at the probe,
+ * minus a hauler in the bay.
+ */
+export function haulerShortfall(world: Readonly<World>): number {
+  const f = fieldOf(world);
+  const assigned = assignedHaulers(world);
+  let short = 0;
+  for (const n of world.nodes) short += Math.max(0, haulerTarget(world, n.index) - assigned[n.index]!);
+  for (const s of f.econ) if (isIdleHauler(s)) short -= 1;
+  if (f.bays.hauler.ticksLeft > 0) short -= 1;
+  return short;
+}
+
+/** H8 H4: the probe may fill and start a Hauler: always with hauler.autoNeed 0, else while haulerShortfall > 0. */
+export function haulersWanted(world: Readonly<World>): boolean {
+  return !isAutoNeed(world) || haulerShortfall(world) > 0;
 }
 
 /** The per-second ring index of the current tick (stats.deliveredBuckets and the rock rings). */
@@ -296,16 +410,24 @@ function unload(world: World, s: EconShip): void {
 /**
  * F6, haulers, in id order (ships in transit skip; the unload happens on arrival, in F7):
  *  - at the probe: keep the node while it is haulable (worked and Mine-marked; F12: a hauler of an unmarked
- *    node finishes its trip and reassigns); otherwise pick by haulTarget (haulable nodes only), or park idle.
- *    Then fly to the node at ship.hauler.speedSu.
+ *    node finishes its trip and reassigns). A hauler whose node is held for a raid (H8 H10, `haulersHeld`) stays
+ *    there and keeps it. H8 H3 (hauler.autoNeed 1): a hauler whose node has more haulers assigned than its target
+ *    leaves it. Without a node it picks by haulTarget (H7 F6's ratio, or H8 H2's shortfall), or parks idle. Then
+ *    it flies to the node at ship.hauler.speedSu, unless that node is held.
  *  - at its node: once the buffer holds a full cargo, or the node has no working extractor left (so the buffer
- *    can't grow), or its mark is off (Stop ends the trip now), load min(buffer, cargo) and fly to the probe.
+ *    can't grow), or its mark is off (Stop ends the trip now), or the node is held (H10), load min(buffer, cargo)
+ *    and fly to the probe.
+ *
+ * H3's "when a hauler arrives at the probe and unloads" is this at-probe pass: a hauler reaches the probe and
+ * unloads in F7, and its next F6 (the following tick) is its first pass here. Haulers with a node are at the probe
+ * only on that pass (they leave in it) or while held, so the rebalance reaches arriving haulers and no others.
  */
 export function runHaulers(world: World): void {
   const f = fieldOf(world);
   const assigned = assignedHaulers(world);
   const cargoCap = world.tun['ship.hauler.cargo'];
   const speed = world.tun['ship.hauler.speedSu'];
+  const auto = isAutoNeed(world);
   for (const s of f.econ) {
     if (s.type !== 'hauler' || s.transit !== null || s.at === null) continue;
     if (s.at === PROBE) {
@@ -315,16 +437,22 @@ export function runHaulers(world: World): void {
         assigned[s.target] = assigned[s.target]! - 1;
         s.target = null;
       }
+      if (s.target !== null && haulersHeld(world, s.target)) continue;
+      if (s.target !== null && auto && assigned[s.target]! > haulerTarget(world, s.target)) {
+        assigned[s.target] = assigned[s.target]! - 1;
+        s.target = null;
+      }
       if (s.target === null) {
         const n = haulTarget(world, assigned);
         if (n === null) continue;
         s.target = n;
         assigned[n] = assigned[n]! + 1;
       }
+      if (haulersHeld(world, s.target)) continue;
       startTransit(world, s, s.target, speed);
     } else if (s.at === s.target) {
       const node = world.nodes[s.at]!;
-      if (node.buffer < cargoCap && node.extractors > 0 && f.mine[s.at] === true) continue;
+      if (node.buffer < cargoCap && node.extractors > 0 && f.mine[s.at] === true && !haulersHeld(world, s.at)) continue;
       const load = Math.min(node.buffer, cargoCap);
       node.buffer -= load;
       s.cargo = load;
@@ -377,6 +505,11 @@ export function applySetAlloc(world: World, type: BuildType, weight: number): vo
 /** F12 `setMine`: set the mark. Turning it off unbinds the node's extractors in F5 this tick. */
 export function applySetMine(world: World, node: number, on: boolean): void {
   fieldOf(world).mine[node] = on;
+}
+
+/** H8 H7 `setHaulers`: the node's hauler count, or null for Auto. Kept while the rock is unmarked. */
+export function applySetHaulers(world: World, node: number, count: number | null): void {
+  fieldOf(world).haulerSet[node] = count;
 }
 
 /** Economy ships of each type parked at `node` (not in transit). */

@@ -43,6 +43,8 @@ export function allocStateText(row: Readonly<AllocRow>): string {
       return 'fleet full';
     case 'filling':
       return `saving ${row.share}/${row.cost.ore}`;
+    case 'enough':
+      return 'enough haulers';
   }
 }
 

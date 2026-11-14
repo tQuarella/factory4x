@@ -29,7 +29,7 @@ declare const console: { log(...args: unknown[]): void };
 /**
  * h7-sim acceptance 1 and 4: data v12 (DESIGN.md H7). The shipped data is checked against the H7 "The field"
  * and "Tunables (H7 …)" tables, so a retune edits data and DESIGN.md together and no test. Validation runs on the
- * frozen v12 fixture. The dataVersion pin lives here.
+ * frozen v12 fixture. h8-sim moved the dataVersion pin to data-h8.test.ts.
  */
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -77,10 +77,6 @@ function specFieldRows(): string[][] {
 }
 
 describe('data/sim.json (shipped) at H7', () => {
-  it('is data version 13', () => {
-    expect(defaultData.dataVersion).toBe(13);
-  });
-
   it('runs in field mode: run.mode is "field"', () => {
     expect(shippedRaw.run).toEqual({ mode: 'field' });
     expect(runMode(defaultData)).toBe('field');
@@ -101,8 +97,8 @@ describe('data/sim.json (shipped) at H7', () => {
       const [min, max] = range.split('–').map(Number);
       expect(defaultData.tunables[k], k).toEqual({ default: Number(/^\d+/.exec(def)![0]), min, max });
     }
-    // Every H7 key is in TUNABLE_KEYS, after the H6 keys and before stats.* and client.*.
-    expect(TUNABLE_KEYS.slice(TUNABLE_KEYS.indexOf('system.variant') + 1, TUNABLE_KEYS.indexOf('stats.throughputWindowSec'))).toEqual(keys);
+    // Every H7 key is in TUNABLE_KEYS, after the H6 keys and before the H8 keys (h8-sim: they follow hive.regrowPct).
+    expect(TUNABLE_KEYS.slice(TUNABLE_KEYS.indexOf('system.variant') + 1, TUNABLE_KEYS.indexOf('hauler.autoNeed'))).toEqual(keys);
     const meta = tunableMeta(defaultData).filter((m) => keys.includes(m.key));
     const newRunOnly = ['alloc.start.extractor', 'alloc.start.hauler'];
     expect(meta.map((m) => [m.key, m.live, m.newRunOnly, m.scope])).toEqual(keys.map((k) => [k, true, newRunOnly.includes(k), 'sim']));

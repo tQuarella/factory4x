@@ -398,6 +398,22 @@ export function raidWither(world: World): void {
   finish(world, 'withered');
 }
 
+/**
+ * DESIGN.md H8 H10 ("Haulers hold", `raid.haulersHold`): true while haulers whose node is `node` hold for a raid.
+ * `runHaulers` (F6) asks it for a hauler at the probe (true: it stays there and keeps its assignment) and for a
+ * hauler at its node (true: it loads min(buffer, cargo) and leaves at once); a hauler flying out finishes its leg
+ * and is then asked at the node. `rockStatus.haulersHeld` reads it too.
+ *
+ * h8-sim stub: always false (H7's haulers). h8-raids implements it (from launch, phase `out`, to the raid's end,
+ * for the raid's target, when raid.haulersHold is 1).
+ */
+export function haulersHeld(world: Readonly<World>, node: number): boolean {
+  // The stub reads its arguments only to keep the signature h8-raids implements.
+  void world;
+  void node;
+  return false;
+}
+
 /** `raidStatus` (DESIGN.md H7 "Selectors"). */
 export interface RaidStatus {
   /** `raid.enabled` is 1 (the client hides the chip when it isn't). */

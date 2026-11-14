@@ -1,6 +1,6 @@
 import type { ShipType } from './data.ts';
 import { ceilDiv } from './math.ts';
-import { PROBE, nodeDistance, type Ship, type Transit, type World } from './world.ts';
+import { PROBE, nodeDistance, type Ship, type ShipTypeCounts, type Transit, type World } from './world.ts';
 
 /**
  * Ship movement and spawning shared by the campaign yards (rule 5b), the H7 field bays (F3) and the inputs.
@@ -43,4 +43,11 @@ export function newShip(world: World, type: ShipType): Ship {
   if (world.stats.firstShipTick === null) world.stats.firstShipTick = world.tick;
   if (world.rally !== PROBE) startTransit(world, ship, world.rally);
   return ship;
+}
+
+/** Warships of each type parked at `node` (not in transit). Moved from inputs.ts (h8-sim) for H8's moveShips counts. */
+export function shipsAtByType(world: Readonly<World>, node: number): ShipTypeCounts {
+  const c: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
+  for (const s of world.ships) if (s.at === node) c[s.type] += 1;
+  return c;
 }

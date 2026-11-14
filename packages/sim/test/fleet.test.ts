@@ -244,6 +244,14 @@ describe('yardStatus fleetFull and fleetStatus', () => {
       countsEconomy: true,
       econByType: { extractor: 0, hauler: 0 },
       econBuildingByType: { extractor: 0, hauler: 0 },
+      // h8-sim: the fleet panel rows are field-mode only, so all zero in a campaign world.
+      types: {
+        extractor: { alive: 0, idle: 0, building: 0, recyclable: 0 },
+        hauler: { alive: 0, idle: 0, building: 0, recyclable: 0 },
+        drone: { alive: 0, idle: 0, building: 0, recyclable: 0 },
+        lancer: { alive: 0, idle: 0, building: 0, recyclable: 0 },
+        flak: { alive: 0, idle: 0, building: 0, recyclable: 0 },
+      },
     });
     const overworld = campaignWorld(1, D);
     expect(fleetStatus(overworld, D)).toMatchObject({ cap: D.tunables['fleet.cap'].default, count: 0, full: false, commandedBands: 0, level: 0, maxLevel: 0 });

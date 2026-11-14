@@ -132,6 +132,14 @@ describe('rockStatus', () => {
       deliveredPerMin: 0,
       // The only raidable rock (Mine-marked, a docked extractor and an assigned hauler): rank 1.
       raidRank: 1,
+      // h8-sim: H1 at a5 (one docked extractor, round trip 2 × ceil(530 ÷ 2) = 530 ticks, cargo 4, needPct 110):
+      // max(1, ceilDiv(10 × 530 × 110, 100 × 1800 × 4)) = 1; no count set, so the target is the need. The raid
+      // fields are h8-raids' (false here).
+      haulerNeed: 1,
+      haulerSet: null,
+      haulerTarget: 1,
+      raidTarget: false,
+      haulersHeld: false,
     });
     expect(rockStatus(w, F.a1)).toMatchObject({ mine: false, mineable: false, docked: 0, bound: 0, haulers: 0, raidRank: 0 });
   });

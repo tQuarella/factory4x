@@ -215,6 +215,32 @@
  *   oreCost, resourceCost, isTypeUnlocked, isMineable, isMarkable, isWorked, econAtByType, econAlive   field helpers.
  *   FIELD_PARKED_KEYS               the tunables unused in field mode (the tuning panel hides them).
  *
+ * H8 "Hold the front" (the h8-sim changes are logged under "h8-sim")
+ *   world.field.haulerSet           per node: the hauler count the player set (setHaulers), or null for Auto. Saved.
+ *   Haulers (hauler.autoNeed 1)     H1 need max(1, ceilDiv(yieldPerMin × roundTrip × hauler.needPct, 100 × T × cargo))
+ *                                   for a haulable (worked, Mine-marked) node, else 0; target = set count (capped at
+ *                                   rock.haulerMax) or the need. H2: a hauler at the probe with no node takes the largest
+ *                                   shortfall (target − assigned) above 0, ties nearest the probe then lower index, or
+ *                                   idles at the probe. H3: arriving at the probe over its node's target, it leaves the
+ *                                   node and picks again. H4: the Hauler is eligible in F2 (and its bay starts) only while
+ *                                   haulerShortfall > 0 (Σ max(0, target − assigned) − idle haulers − a hauler in the bay).
+ *                                   hauler.autoNeed 0 is H7's F6 exactly.
+ *   haulerNeed / haulerTarget / isHaulable(world, node), haulerShortfall(world)   the H1–H4 numbers.
+ *   haulersHeld(world, node)        H10 hook in src/factions (h8-raids implements it; false until then): runHaulers keeps
+ *                                   a held node's haulers at the probe and sends one at the node home with what is there.
+ *   Inputs (field, H8)              moveShips{from, to, part: 'all' | 'split'}: the warships at `from` (all, or per type
+ *                                   floor(count × move.splitPct ÷ 100), 1-ship fallback), computed when it applies, then
+ *                                   a sendShips. setHaulers{node, count: null | 0..rock.haulerMax} (an asteroid, or a
+ *                                   captured pocket or hive). recycleFleet{counts: all five types}: recycleOrder per type
+ *                                   (idle at the probe, parked or docked by node index, in transit; lowest id first; not
+ *                                   at a living guarded node or a fighting raid's target), each refunding as recycleShips.
+ *   movePreview(world, from, part)  the counts a moveShips would carry now (the drag ghost).
+ *   recycleOrder(world, type)       the ships recycleFleet would take, in order.
+ *   allocStatus rows                gain incomePct (floor(weight × 100 ÷ Σ weights of unlocked types above 0); 0 off or
+ *                                   locked) and the state 'enough' (the Hauler while no rock is short).
+ *   rockStatus                      gains haulerNeed, haulerSet, haulerTarget, raidTarget and haulersHeld (h8-raids).
+ *   fleetStatus.types               per BUILD_TYPES type {alive, idle, building (0/1), recyclable}.
+ *
  * Reading `World` fields directly is fine (it is plain data); never mutate it outside `step`.
  * Time: `world.tickRate` ticks per game second (30). Ships in transit: interpolate from
  * `ship.transit.{from,to,ticksLeft,totalTicks}`; pods from `route.pods[].ticksLeft` and
@@ -258,11 +284,15 @@ export {
   worstHauls,
 } from './data.ts';
 export type { BuildType, EconType, FieldMap, RunMode } from './data.ts';
-export { isRaidable, launchMix, raidKeep, raidMix, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
+export { haulersHeld, isRaidable, launchMix, raidKeep, raidMix, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
 export type { Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
 export {
   econAlive,
   econAtByType,
+  haulerNeed,
+  haulerShortfall,
+  haulerTarget,
+  isHaulable,
   isMarkable,
   isMineable,
   isTypeUnlocked,
@@ -271,10 +301,12 @@ export {
   resourceCost,
 } from './field.ts';
 export type { ResourceCost } from './field.ts';
+export { recycleOrder } from './orders.ts';
+export type { MovePart } from './orders.ts';
 export { isCountedType } from './fleet.ts';
 export { ECON_STRIKE_ORDER, guardPools, guardStrike } from './step.ts';
 export type { StrikeKills } from './step.ts';
-export { allocStatus, fieldSummary, rockStatus } from './selectors.ts';
+export { allocStatus, fieldSummary, movePreview, rockStatus } from './selectors.ts';
 export type { AllocRow, AllocState, AllocStatus, BuildTypeCounts, FieldSummary, RockStatus } from './selectors.ts';
 export type { RecycleCounts } from './inputs.ts';
 export { isField } from './world.ts';
@@ -395,7 +427,7 @@ export { clampSendCounts, inputCost, isValidInput } from './inputs.ts';
 export type { Input } from './inputs.ts';
 export { GUARD_TARGET_ORDER, counterPct, step } from './step.ts';
 export { fleetCap, fleetCount, fleetStatus, isFleetFull, recycleRefund } from './fleet.ts';
-export type { FleetStatus } from './fleet.ts';
+export type { FleetStatus, FleetTypeRow } from './fleet.ts';
 export { replayHashes, worldHash } from './replay.ts';
 export type { Replay } from './replay.ts';
 export { deserializeWorld, serializeWorld } from './save.ts';

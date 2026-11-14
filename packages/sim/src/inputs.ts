@@ -1,8 +1,9 @@
 import { buyResearch, canBuyResearch, isAreaOpen, isWon, leaveActive } from './campaign.ts';
 import { BUILD_TYPES, ECON_TYPES, SHIP_TYPES, isSimTunableKey, type BuildType, type ShipType, type SimData, type TunableKey } from './data.ts';
-import { applySetAlloc, applySetMine, clampEconCounts, isMarkable, recycleEcon } from './field.ts';
+import { applySetAlloc, applySetHaulers, applySetMine, clampEconCounts, isMarkable, recycleEcon, syncExtractors } from './field.ts';
 import { fleetCap, recycleRefundEach } from './fleet.ts';
-import { startTransit } from './ships.ts';
+import { applyRecycleFleet, clampFleetCounts, isMovePart, moveCounts, type MovePart } from './orders.ts';
+import { shipsAtByType, startTransit } from './ships.ts';
 import { PROBE, guardianAt, isGuarded, landArea, nodeDistance, routeFrom, type EconTypeCounts, type ShipTypeCounts, type World } from './world.ts';
 
 /** recycleShips counts: the warship counts, plus (H7 field mode) optional extractor and hauler counts. */
@@ -41,7 +42,24 @@ export type Input =
   /** H7 F12 (field mode only): set a type's allocation weight, 0..alloc.maxWeight. At 0 its share goes back to stock. */
   | { type: 'setAlloc'; shipType: BuildType; weight: number }
   /** H7 F12 (field mode only): Mine-mark an asteroid, or a captured pocket or hive, on or off. */
-  | { type: 'setMine'; node: number; on: boolean };
+  | { type: 'setMine'; node: number; on: boolean }
+  /**
+   * H8 H6 (field mode only): move the warships parked at `from` to `to`: all of them, or per type
+   * floor(count × move.splitPct ÷ 100) with a 1-ship fallback (moveCounts). The counts are computed on the tick it
+   * applies, then it is a sendShips with them (an attack if `to` is guarded). Invalid if from = to or the count is 0.
+   */
+  | { type: 'moveShips'; from: number; to: number; part: MovePart }
+  /**
+   * H8 H7 (field mode only): an asteroid's, or a captured pocket's or hive's, hauler count: null (Auto: the need)
+   * or 0..rock.haulerMax. Kept while the rock is unmarked.
+   */
+  | { type: 'setHaulers'; node: number; count: number | null }
+  /**
+   * H8 H8 (field mode only): recycle up to counts[type] ships of each of the five types, wherever they are
+   * (recycleOrder: idle at the probe, then parked or docked by node index, then in transit; lowest id first). Ships
+   * at a living guarded node or at a fighting raid's target are excluded. Valid if the clamped total is ≥ 1.
+   */
+  | { type: 'recycleFleet'; counts: Record<BuildType, number> };
 
 function isIndex(world: Readonly<World>, v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < world.nodes.length;
@@ -80,12 +98,6 @@ function queueFull(world: Readonly<World>): boolean {
   return world.queue.length >= world.tun['build.queueMax'];
 }
 
-/** Ships of each type parked at `node`. */
-export function shipsAtByType(world: Readonly<World>, node: number): ShipTypeCounts {
-  const c: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
-  for (const s of world.ships) if (s.at === node) c[s.type] += 1;
-  return c;
-}
 
 /** The counts a `sendShips` order would really send: each requested count clamped to the ships of that type at `from`. */
 export function clampSendCounts(world: Readonly<World>, from: number, counts: Readonly<ShipTypeCounts>): ShipTypeCounts {
@@ -167,6 +179,23 @@ function validFieldInput(world: Readonly<World>, input: Input): boolean {
     }
     case 'setRally':
       return isIndex(world, input.node);
+    case 'moveShips': {
+      if (!isIndex(world, input.from) || !isIndex(world, input.to) || input.from === input.to || !isMovePart(input.part)) return false;
+      return validAreaInput(world, { type: 'sendShips', from: input.from, to: input.to, counts: moveCounts(world, input.from, input.part) });
+    }
+    case 'setHaulers': {
+      if (!isIndex(world, input.node) || !isMarkable(world, input.node)) return false;
+      const c: unknown = input.count;
+      return c === null || (typeof c === 'number' && Number.isInteger(c) && c >= 0 && c <= world.tun['rock.haulerMax']);
+    }
+    case 'recycleFleet': {
+      const c: unknown = input.counts;
+      if (c === null || typeof c !== 'object') return false;
+      const rec = c as Record<string, unknown>;
+      if (!BUILD_TYPES.every((t) => typeof rec[t] === 'number' && Number.isInteger(rec[t]) && (rec[t] as number) >= 0)) return false;
+      const k = clampFleetCounts(world, input.counts);
+      return BUILD_TYPES.reduce((n, t) => n + k[t], 0) >= 1;
+    }
     default:
       return false;
   }
@@ -231,7 +260,29 @@ export function inputCost(world: Readonly<World>, input: Input): number {
   }
 }
 
-export { startTransit };
+export { shipsAtByType, startTransit };
+
+/**
+ * sendShips' effect (H3, H5), shared by H8's moveShips: the lowest-id warships of each type parked at `from`, up to
+ * `counts`, fly to `to`; a living guarded `to` is an attack.
+ */
+function applySend(world: World, data: SimData, from: number, to: number, counts: Readonly<ShipTypeCounts>): void {
+  const left = clampSendCounts(world, from, counts);
+  // Ships are in id order, so the first of each type found are the lowest ids.
+  for (const s of world.ships) {
+    if (s.at !== from || left[s.type] === 0) continue;
+    startTransit(world, s, to);
+    left[s.type] -= 1;
+  }
+  // Sending to a guarded node while it lives is an attack (step folds same-tick orders per node into one wave).
+  const target = guardianAt(world, to);
+  if (target !== null && target.alive) {
+    target.wavesSent++;
+    world.stats.wavesSent++;
+    // H5: a running battle takes the limit this wave was sent at.
+    if (target.battle !== null) target.battle.capAtSend = fleetCap(world, data);
+  }
+}
 
 /** Rule 1: apply one input if valid; otherwise do nothing. */
 export function applyInput(world: World, data: SimData, input: Input): void {
@@ -261,24 +312,21 @@ export function applyInput(world: World, data: SimData, input: Input): void {
     case 'setShipyard':
       world.yards[input.shipType].on = input.on;
       return;
-    case 'sendShips': {
-      const left = clampSendCounts(world, input.from, input.counts);
-      // Ships are in id order, so the first of each type found are the lowest ids.
-      for (const s of world.ships) {
-        if (s.at !== input.from || left[s.type] === 0) continue;
-        startTransit(world, s, input.to);
-        left[s.type] -= 1;
-      }
-      // Sending to a guarded node while it lives is an attack (step folds same-tick orders per node into one wave).
-      const target = guardianAt(world, input.to);
-      if (target !== null && target.alive) {
-        target.wavesSent++;
-        world.stats.wavesSent++;
-        // H5: a running battle takes the limit this wave was sent at.
-        if (target.battle !== null) target.battle.capAtSend = fleetCap(world, data);
-      }
+    case 'sendShips':
+      applySend(world, data, input.from, input.to, input.counts);
       return;
-    }
+    case 'moveShips':
+      // H8 H6: the counts are computed now, on the tick the order applies; then it is exactly a sendShips.
+      applySend(world, data, input.from, input.to, moveCounts(world, input.from, input.part));
+      return;
+    case 'setHaulers':
+      applySetHaulers(world, input.node, input.count);
+      return;
+    case 'recycleFleet':
+      applyRecycleFleet(world, input.counts, (t) => recycleRefundEach(world, t));
+      // A recycled docked extractor leaves its node's count now; F5 re-dispatches into the freed slot this tick.
+      syncExtractors(world);
+      return;
     case 'recycleShips': {
       const left = clampSendCounts(world, input.node, input.counts);
       let refund = 0;

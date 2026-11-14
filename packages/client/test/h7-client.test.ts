@@ -47,7 +47,7 @@ import { nodeLabel } from '../src/view.ts';
 const data = defaultData;
 
 function row(over: Partial<AllocRow> & { state: AllocState }): AllocRow {
-  return { type: 'extractor', weight: 3, share: 6, cost: { ore: 20, resource: null }, unlocked: true, building: 0, ticksLeft: 0, totalTicks: 120, ...over };
+  return { type: 'extractor', weight: 3, share: 6, cost: { ore: 20, resource: null }, unlocked: true, building: 0, ticksLeft: 0, totalTicks: 120, incomePct: 0, ...over };
 }
 
 describe('acceptance 1: field mode end to end', () => {
@@ -190,7 +190,7 @@ describe('acceptance 2: the probe sheet text, one line for each allocStatus stat
 
 describe('acceptance 3: the rock sheet text', () => {
   const rs = (over: Partial<RockStatus>): RockStatus => ({
-    node: 1, id: 'a1', kind: 'asteroid', prize: 'ore', mine: true, mineable: true, docked: 1, bound: 3, inFlight: 2, slots: 3, freeExtractors: 0, haulers: 2, buffer: 4, bufferCap: 40, backedUp: false, deliveredPerMin: 12, raidRank: 0, ...over,
+    node: 1, id: 'a1', kind: 'asteroid', prize: 'ore', mine: true, mineable: true, docked: 1, bound: 3, inFlight: 2, slots: 3, freeExtractors: 0, haulers: 2, buffer: 4, bufferCap: 40, backedUp: false, deliveredPerMin: 12, raidRank: 0, haulerNeed: 0, haulerSet: null, haulerTarget: 0, raidTarget: false, haulersHeld: false, ...over,
   });
   it('the pip line counts docked and free extractors and names the ones on the way', () => {
     expect(pipText(rs({}))).toBe('1/3 (+2 on the way)');

@@ -6,7 +6,9 @@ import {
   defaultData as data,
   fleetStatus,
   isValidInput,
+  movePreview,
   raidStatus,
+  recycleOrder,
   replayHashes,
   rockStatus,
   step,
@@ -41,6 +43,12 @@ describe('reference replay (field mode)', () => {
   let recycle: { tick: number; econBefore: number; econAfter: number; refund: number } | null = null;
   const raidLog: Array<{ tick: number; phase: string; target: number | null; raids: World['stats']['raids']; econ: number; warshipsAtTarget: number }> = [];
   let raidPhase = 'none:null';
+  // h8-sim: the H8 items (from tick 8100).
+  const picks: Array<{ tick: number; id: number; to: number; short: number; maxShort: number }> = [];
+  const leaves: Array<{ tick: number; id: number; from: number; to: number | null }> = [];
+  let enoughTicks = 0;
+  const moves: Array<{ tick: number; from: number; to: number; part: string; preview: Record<string, number>; moved: Record<string, number>; at: Record<string, number> }> = [];
+  let fleetRecycle: { tick: number; orderHaulers: Array<{ id: number; at: number | null; target: number | null }>; orderExtractors: Array<{ id: number; at: number | null; docked: boolean }>; gone: number[]; slotsBefore: number; slotsAfter: number } | null = null;
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
     const probe = inputs.length > 0 ? clone(w) : w;
@@ -57,7 +65,52 @@ describe('reference replay (field mode)', () => {
     const boundThere = unmark ? f.econ.filter((s) => s.type === 'extractor' && s.target === unmark.node).map((s) => s.id) : [];
     const econBefore = f.econ.length;
     const refundBefore = w.stats.oreRefunded;
+    // h8-sim: each hauler pick against the shortfalls after this tick's inputs (rockStatus on the input-applied copy).
+    const shortBefore = t >= 8100 ? probe.nodes.map((n) => rockStatus(probe, n.index).haulerTarget - rockStatus(probe, n.index).haulers) : [];
+    const targetBefore = new Map(probe.field!.econ.filter((s) => s.type === 'hauler').map((s) => [s.id, s.target]));
+    const moveInputs = inputs.filter((i): i is Extract<Input, { type: 'moveShips' }> => i.type === 'moveShips');
+    const moveBefore = moveInputs.map((i) => ({ i, preview: movePreview(w, i.from, i.part), ids: w.ships.filter((s) => s.at === i.from).map((s) => s.id) }));
+    const fleetIn = inputs.find((i) => i.type === 'recycleFleet');
+    const orderBefore = fleetIn
+      ? {
+          haulers: recycleOrder(w, 'hauler').map((s) => ({ id: s.id, at: s.at, target: 'target' in s ? s.target : null })),
+          extractors: recycleOrder(w, 'extractor').map((s) => ({ id: s.id, at: s.at, docked: 'target' in s && s.at !== null && s.at === s.target && s.transit === null })),
+          slots: rockStatus(w, 2).bound,
+        }
+      : null;
     step(w, data, inputs);
+    if (t >= 8100) {
+      const short = shortBefore;
+      for (const s of f.econ) {
+        if (s.type !== 'hauler') continue;
+        const was = targetBefore.get(s.id) ?? null;
+        if (was === s.target) continue;
+        if (was !== null) {
+          short[was] = short[was]! + 1;
+          leaves.push({ tick: t, id: s.id, from: was, to: s.target });
+        }
+        if (s.target !== null) {
+          picks.push({ tick: t, id: s.id, to: s.target, short: short[s.target]!, maxShort: Math.max(...short) });
+          short[s.target] = short[s.target]! - 1;
+        }
+      }
+      if (allocStatus(w, data).rows.find((r) => r.type === 'hauler')!.state === 'enough') enoughTicks++;
+    }
+    for (const m of moveBefore) {
+      const moved = { drone: 0, lancer: 0, flak: 0 };
+      const at = { drone: 0, lancer: 0, flak: 0 };
+      for (const s of w.ships) if (m.ids.includes(s.id) && s.transit !== null && s.transit.to === m.i.to) moved[s.type] += 1;
+      for (const id of m.ids) {
+        const s = w.ships.find((x) => x.id === id);
+        if (s) at[s.type] += 1;
+      }
+      moves.push({ tick: t, from: m.i.from, to: m.i.to, part: m.i.part, preview: { ...m.preview }, moved, at });
+    }
+    if (fleetIn && orderBefore) {
+      const alive = new Set([...f.econ.map((s) => s.id), ...w.ships.map((s) => s.id)]);
+      const gone = [...orderBefore.haulers, ...orderBefore.extractors].map((s) => s.id).filter((id) => !alive.has(id));
+      fleetRecycle = { tick: t, orderHaulers: orderBefore.haulers, orderExtractors: orderBefore.extractors, gone, slotsBefore: orderBefore.slots, slotsAfter: rockStatus(w, 2).bound };
+    }
     if (zeroing && before && shareReturned === null) {
       shareReturned = { tick: t, share: before.share, stockBefore: before.stock, stockAfter: w.stock.ore, shareAfter: f.share[zeroing.shipType] };
     }
@@ -96,8 +149,8 @@ describe('reference replay (field mode)', () => {
     });
   });
 
-  it('changes the allocation six times; the setAlloc to 0 at tick 280 returns the extractor share to stock', () => {
-    expect(w.stats.allocChanges).toBe(6); // 450 x2, 280 x2, 850, and drone 5 at tick 7000
+  it('changes the allocation nine times; the setAlloc to 0 at tick 280 returns the extractor share to stock', () => {
+    expect(w.stats.allocChanges).toBe(9); // 450 x2, 280 x2, 850, drone 5 at tick 7000, and h8-sim's three at 8100
     expect(shareReturned).not.toBeNull();
     expect(shareReturned!.tick).toBe(280);
     expect(shareReturned!.share).toBeGreaterThan(0);
@@ -143,7 +196,8 @@ describe('reference replay (field mode)', () => {
     expect(recycle!.econBefore).toBeGreaterThan(0);
     expect(recycle!.econAfter).toBe(recycle!.econBefore - 1);
     expect(recycle!.refund).toBe(Math.floor((5 * t['fleet.recycleRefundPct'].default) / 100));
-    expect(w.stats.econRecycled).toEqual({ extractor: 1, hauler: 0 });
+    // This extractor, plus (h8-sim) the recycleFleet at 8488: 1 extractor and 4 haulers.
+    expect(w.stats.econRecycled).toEqual({ extractor: 2, hauler: 4 });
   });
 
   it('a raid musters once the economy reaches raid.firstAtEcon (tick 95), is mustered, launched at a1 and, a1 being stopped, retargets to the captured p1', () => {
@@ -192,8 +246,74 @@ describe('reference replay (field mode)', () => {
     expect(w.guardians.find((g) => nodeId(g.node) === 'heart')!.guards).toEqual([]);
   });
 
+  // h8-sim (DESIGN.md H8 "Save, data version and replay"), after the hive falls, with hauler.autoNeed back to 1.
+  it('H8: hauler.autoNeed 0 until tick 8100 (H7 haulers for the H7 items), 1 from then on', () => {
+    const tuned = referenceReplay.inputs.filter((e) => e.input.type === 'setTunable' && e.input.key === 'hauler.autoNeed').map((e) => [e.tick, (e.input as Extract<Input, { type: 'setTunable' }>).value]);
+    expect(tuned).toEqual([[0, 0], [8100, 1]]);
+    expect(w.tun['hauler.autoNeed']).toBe(1);
+  });
+
+  it('H8 H2: need-based assignment: every hauler pick from 8100 takes a rock with the largest shortfall, above 0 (the three new haulers and the rebalanced one)', () => {
+    expect(picks.length).toBeGreaterThanOrEqual(4);
+    for (const p of picks) {
+      expect(p.short, JSON.stringify(p)).toBeGreaterThan(0);
+      expect(p.short, JSON.stringify(p)).toBe(p.maxShort);
+    }
+    // The heart (target 2, nobody assigned at 8100) gets one of them.
+    expect(picks.some((p) => nodeId(p.to) === 'heart')).toBe(true);
+  });
+
+  it('H8 H3: a2, over its target once hauler.autoNeed is 1, loses a hauler as it gets home; after setHaulers a2 1 (8400) the next one home leaves too and parks idle', () => {
+    const fromA2 = leaves.filter((l) => nodeId(l.from) === 'a2');
+    expect(fromA2.length).toBe(2);
+    expect(fromA2[0]!.tick).toBeLessThan(8400);
+    expect(nodeId(fromA2[0]!.to!)).toBe('heart');
+    expect(fromA2[1]!.tick).toBeGreaterThan(8400);
+    expect(fromA2[1]!.to).toBeNull();
+    expect(rockStatus(w, 2)).toMatchObject({ haulerSet: 1, haulerTarget: 1 });
+  });
+
+  it('H8 H4: the Hauler reaches the state enough (weight above 0, no rock short)', () => {
+    expect(enoughTicks).toBeGreaterThan(0);
+    expect(w.field!.alloc.hauler).toBe(2);
+  });
+
+  it('H8 H6: moveShips split carries floor(count × move.splitPct ÷ 100) per type, the 1-ship fallback sends the lone Flak, and moveShips all carries every warship', () => {
+    const pct = t['move.splitPct'].default;
+    expect(moves.map((m) => [m.tick, nodeId(m.from), nodeId(m.to), m.part])).toEqual([
+      [8450, 'heart', 'p2', 'split'],
+      [8450, 'p1', 'a2', 'split'],
+      [8650, 'p2', 'a3', 'all'],
+    ]);
+    const [split, fallback, all] = moves;
+    expect(split!.moved).toEqual(split!.preview);
+    expect(split!.moved).toEqual({ drone: Math.floor((split!.at.drone * pct) / 100), lancer: 0, flak: Math.floor((split!.at.flak * pct) / 100) });
+    expect(split!.moved.drone).toBeGreaterThan(0);
+    expect(split!.moved.flak).toBeGreaterThan(0);
+    expect(fallback!.at).toEqual({ drone: 0, lancer: 0, flak: 1 });
+    expect(fallback!.moved).toEqual({ drone: 0, lancer: 0, flak: 1 });
+    expect(all!.moved).toEqual(all!.at);
+    expect(all!.moved.drone + all!.moved.flak).toBeGreaterThan(split!.moved.drone + split!.moved.flak);
+  });
+
+  it('H8 H8: recycleFleet takes the docked extractor at a2 (freeing its slot) and the haulers in order: idle, parked by node index, then the lowest id in transit', () => {
+    expect(fleetRecycle).not.toBeNull();
+    const r = fleetRecycle!;
+    expect(r.tick).toBe(8488);
+    // No extractor idled, so the first in order is docked, at a2 (the lowest node index with one).
+    expect(r.orderExtractors[0]).toMatchObject({ at: 2, docked: true });
+    expect(r.gone).toContain(r.orderExtractors[0]!.id);
+    expect(r.slotsAfter).toBe(r.slotsBefore - 1);
+    const four = r.orderHaulers.slice(0, 4);
+    expect(four.map((h) => (h.at === PROBE && h.target === null ? 'idle' : h.at === null ? 'transit' : `at ${nodeId(h.at)}`))).toEqual(['idle', 'at a3', 'at heart', 'transit']);
+    const transitIds = r.orderHaulers.filter((h) => h.at === null).map((h) => h.id);
+    expect(four[3]!.id).toBe(Math.min(...transitIds));
+    for (const h of four) expect(r.gone).toContain(h.id);
+    expect(r.gone).toHaveLength(5);
+  });
+
   it('uses every field input type it needs, with no input ignored', () => {
-    expect([...typesApplied].sort()).toEqual(['recycleShips', 'sendShips', 'setAlloc', 'setMine', 'setRally', 'setTunable']);
+    expect([...typesApplied].sort()).toEqual(['moveShips', 'recycleFleet', 'recycleShips', 'sendShips', 'setAlloc', 'setHaulers', 'setMine', 'setRally', 'setTunable']);
     expect(ignored).toEqual([]);
   });
 

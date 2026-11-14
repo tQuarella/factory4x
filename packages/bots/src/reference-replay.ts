@@ -25,6 +25,21 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - 7000 (h7-raids): the fleet limit rises to 40, the rally goes back to the probe and drones get all the ore, so the
  *     new warships wait at the probe. 7750: sendShips from the probe to the hive. It falls at tick 8010.
  *
+ * h8-sim (DESIGN.md H8 "Save, data version and replay"): everything above runs with hauler.autoNeed 0 (set at tick
+ * 0), H7's haulers exactly, so the H7 items and their timings stay as they were. The H8 items follow the hive's fall,
+ * once raids have ended, with hauler.autoNeed back to 1 (the shipped default):
+ *   - 8100: hauler.autoNeed 1, the hauler weight 2, drone and flak 0. a2 has 3 haulers for a target of 2: the first
+ *     to reach the probe leaves it (8167) and takes the heart's shortfall (a rebalance and a need-based pick).
+ *   - 8150: recycleFleet of 3 drones frees 3 places under the limit of 40; the probe builds exactly the 3 haulers the
+ *     rocks are short of (p2, a3, the heart, each the largest shortfall when it spawns), then the Hauler is `enough`.
+ *   - 8400: setHaulers a2 1. Its next hauler home (8437) is over the target, leaves a2 and, with no rock short,
+ *     parks idle at the probe.
+ *   - 8450: moveShips split from the heart to p2 (per type, half of 13 drones and 14 Flak), and moveShips split from
+ *     p1, where one Flak stands (half is 0, so the 1-ship fallback sends it).
+ *   - 8488: recycleFleet of 1 extractor and 4 haulers: the docked extractor at a2 (no extractor idles), and the
+ *     haulers in order: the idle one, those parked at a3 and at the heart, then the lowest id in transit.
+ *   - 8650: moveShips all from p2 to a3 (the split group, arrived, plus the Flak there).
+ *
  * The raids (DESIGN.md H7 R1-R9) run on their own from tick 95, when the economy reaches 6 ships, and the script
  * leaves them alone: raid 1 musters at a1 and, a1 being stopped at 600, retargets to the captured p1, where the rally
  * defenders beat it (tick 900). Raid 2 (muster 3600) hits p1 after the ships went to p2: undefended, it kills a docked
@@ -70,6 +85,7 @@ export const referenceReplay: Replay = {
       tun('raid.maxSize', 10),
       tun('raid.gapTicks', 2700),
       tun('hive.regrowPct', 100),
+      tun('hauler.autoNeed', 0),
       mine(3, false),
       mine(4, false),
       mine(5, false),
@@ -86,5 +102,11 @@ export const referenceReplay: Replay = {
     ...at(2400, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
     ...at(7000, tun('field.fleetCap', 40), { type: 'setRally', node: 0 }, alloc('drone', 5)),
     ...at(7750, { type: 'sendShips', from: 0, to: 10, counts: SEND_ALL }),
+    ...at(8100, tun('hauler.autoNeed', 1), alloc('hauler', 2), alloc('drone', 0), alloc('flak', 0)),
+    ...at(8150, { type: 'recycleFleet', counts: { extractor: 0, hauler: 0, drone: 3, lancer: 0, flak: 0 } }),
+    ...at(8400, { type: 'setHaulers', node: 2, count: 1 }),
+    ...at(8450, { type: 'moveShips', from: 10, to: 9, part: 'split' }, { type: 'moveShips', from: 8, to: 2, part: 'split' }),
+    ...at(8488, { type: 'recycleFleet', counts: { extractor: 1, hauler: 4, drone: 0, lancer: 0, flak: 0 } }),
+    ...at(8650, { type: 'moveShips', from: 9, to: 3, part: 'all' }),
   ],
 };
