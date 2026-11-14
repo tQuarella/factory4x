@@ -56,3 +56,31 @@ Required changes:
 - [ ] Re-run the gates. The bots gate must stay green.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-14
+
+Reviewed `git diff 9b0f1a0...task/h7-design-data` (head 79b80d4, one commit) against my round 1 required changes.
+
+**Round 1 items:**
+- **The pocket target.**
+  - It is now met as written, and the amendment is withdrawn in DESIGN.md and DECISIONS. The false claim is retracted with the measured table.
+  - p2 is 1 / 2: 5 drones, not 2. That matches my round 1 measurement. It keeps one Thorn, so it stays the Lancer door.
+  - p1 stays 0 / 4 (6 drones).
+  - The only data change is p2's spore count. `dataVersion` stays 13, which is correct: v13 hasn't shipped.
+  - DESIGN tables and targets are updated. The order check reports p2 5 / 5.
+- **The rerun.**
+  - The report is regenerated: adaptive 24:54, greedy 30:12, adaptive-no-raids 10:55, flags 1–7 met. That holds the pace targets (15–30, ≤ 40).
+  - Flag 1 now holds through static's timeout, not its losses (8 of 17 lost). Either half of the flag is enough, so this is fine.
+  - The reference replay drops its tick-3500 `sendShips`. That input was a no-op at p2 1 / 2, and all its checks pass without it. The four pinned raid knobs stay, as the Director accepted.
+- **The state-line wording.** The Director confirms h7-client's fix round (3c9f761) builds and tests "needs crystal pocket" / "needs ice pocket". The DESIGN.md line now matches the build, and DECISIONS records why. My round 1 objection was that the edit was unlogged and contradicted the build; neither is true now. h7-client's final round will check the text against this spec.
+
+**Gates (run by me on 79b80d4, `npm run gates -- --base main`):**
+- typecheck, lint, protected-files and determinism pass (final ad177b58, re-baselined, no pinned hash).
+- **The bots gate passes**, and its numbers reproduce the committed report.
+- The test gate fails with the same 15 expected failures as round 1, all in h7-client's files (`packages/client/test/{h4,h5,h6}-client.test.ts`, `session.test.ts`). Every sim and bots test passes.
+
+**Pillar fit.** Unchanged from round 1. The raid and hive values serve the hypothesis, and both pockets are now cheap first doors that need more than the opening stock. Thin margin to watch: flag 4 at 31% against 30%.
+
+Required changes: none. This lands with the stack through `merge-task h7-client`.
+
+VERDICT: APPROVE
