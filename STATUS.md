@@ -32,7 +32,8 @@ Launches: 7 / 12.
 | r9 | core-engineer | h7-bots | resume | Fix round 3, reassigned per deadlock rule (ce6d659): adaptive 19:00, greedy 19:49, no-raids 14:37 |
 | r11 | critic | h7-bots | resume | Review round 3: APPROVE (9dff1c0) |
 | r12 | designer | h7-design-data | resume | Calibrated v13 (68fbb09): all 7 flags met; adaptive 20:02, greedy 30:16 |
-| r13 | critic | h7-design-data | resume | Review round 1 (h7-client Critic) |
+| r13 | critic | h7-design-data | resume | Review round 1: REJECT (false 'Thorn needs 8 drones' claim; state-line edit unlogged, was Director's request) |
+| r14 | designer | h7-design-data | resume | Fix round 1 |
 | 7 | critic | h7-client | launch | Review round 1 (9a7f480): REJECT (probe sheet scrolls with Recycle; raid line wrong after retarget; raid texts untested) |
 | r10 | engineer | h7-client | resume | Fix round 1; Director: compact probe sheet, map keeps ~200 px |
 
