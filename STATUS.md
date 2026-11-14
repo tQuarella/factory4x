@@ -28,6 +28,8 @@ Launches: 8 / 12.
 | 6 | faction-ai | h8-raids | launch | Build, from task/h8-sim |
 | 7 | engineer | h8-bots | launch | Build, from task/h8-sim |
 | 8 | engineer | h8-client | launch | Build, from task/h8-sim (top of stack) |
+| r6 | critic | h8-raids | resume | Review round 1: APPROVE (26a1a76) |
+| r7 | faction-ai | h8-raids | resume | Director change: hold ends at the outcome, not at home (ec04b17) |
 
 ## Iteration 7 ledger
 
