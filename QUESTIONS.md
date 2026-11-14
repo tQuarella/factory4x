@@ -58,6 +58,10 @@ Details: DESIGN.md → "H8 candidates (iteration 8)". Answer like "A", "A, plus 
 
 *Director: B with the ride-alongs (hauler staffing by need, rebalance at home, no surplus haulers, raid target icon, fleet panel with Recycle). Gesture: drag from a rock to another moves all its ships of the chosen kind; long-press then drag moves half. "Hate the economy stuff" left as read (no correction).*
 
+**Answer (owner, 2026-11-14, follow-up):** "Do A at the same time"
+
+*Director: H8 is A and B together, with the ride-alongs.*
+
 ## Build build-20261108-5 is ready (2026-11-08): H6, the Open frontier
 
 Play: https://factory4x.pages.dev (on your phone, portrait). A run to the probe core takes the bots about 46–62 game minutes, so roughly 12–16 real minutes at 4x plus your decisions. Your old save is from an older data version, so the game starts fresh.
