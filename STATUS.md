@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 8 ledger
 
-Launches: 4 / 12.
+Launches: 5 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -19,8 +19,10 @@ Launches: 4 / 12.
 | r1 | designer | H8 spec + task split (A+B) | resume | Spec and split (0d76117) |
 | 2 | core-engineer | h8-sim | launch | Build; repro of the A1/A2 hauler case first |
 | 3 | engineer | cw-smoke-sim-time | launch | Built c199647: CI gates job 12m03s, deploy 8m34s (run 43645327666) |
-| 4 | critic | cw-smoke-sim-time | launch | Review round 1 |
-| r2 | core-engineer | h8-sim | resume | Built 19f98f6 (repro 0291294 reproduced A1/A2); first hauler 3:13 on v14, so Director amended H1 (8739109); implementing before Critic |
+| 4 | critic | cw-smoke-sim-time | launch | Review round 1: APPROVE (96667d4); main merged (86bf159), CI running |
+| r2 | core-engineer | h8-sim | resume | Built 19f98f6 (repro 0291294 reproduced A1/A2); first hauler 3:13 on v14, so Director amended H1 (8739109); implemented a2f709f (committed extractors staff a rock; opening = H7 to the tick) |
+| r3 | core-engineer | h8-sim | resume | No surplus extractors (0246e00): 19 built in 10 min, 0 idle |
+| 5 | critic | h8-sim | launch | Review round 1 |
 
 ## Iteration 7 ledger
 

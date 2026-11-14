@@ -1328,3 +1328,7 @@ These numbers are from a scratch run of this branch's code. No value fixes it, b
 - a 6-minute run where every Extractor bay start keeps extractors alive plus the one in the bay within the marked slots.
 
 **Gates:** all green. The bots gate's tick p95 is at most 0.0137 ms (budget 2.0 ms). The determinism final is b8d34d88, unchanged, because the replay's H8 items run with the extractor weight at 0.
+## 2026-11-14 · Director · cw-smoke-sim-time merged; h7-art gallery wait kept; H8 spec updated
+
+- cw-smoke-sim-time merged (66c9581) after green CI 43647913292 on 86bf159; main had moved by DECISIONS.md and STATUS.md only (docs-only exception). The h7-art gallery wait was left in real time: it waits on canvas drawing in the dev gallery, not on sim time, so `advanceTicks` can't replace it (Critic note). Folding `h7-economy.spec.ts`'s local `stepUntil` into `stepSimUntil` is a small Can wait cleanup.
+- DESIGN.md H8 now carries the committed-extractor and waiting-hauler rulings and "H4b. No surplus extractors", replacing "Extractors don't need this rule", so h8-client and h8-design-data build from the spec (h8-sim Critic note).

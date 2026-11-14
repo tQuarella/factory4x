@@ -455,7 +455,7 @@ These are the H7 rule gaps and the regression from the triage. Each holds whiche
    - At v13 values and 110%, the needs are a1 1, a2 1, a3 1, a4 1, a5 3, a6 2, a7 2, so 11 for the full field. H7's ratio rule tends toward 13, with 2 on a1 and a2 where 0.73 is enough. This answers "Two haulers ended up at A1 when it looks like only one is needed".
    - Assignment picks the rock with the largest shortfall (need − assigned). Ties go to the rock nearest the probe, then the lower index.
 2. **Haulers rebalance at the probe.** After each delivery, a hauler whose rock has more haulers assigned than its need moves to the rock with the largest shortfall, if one exists. At most one hauler moves per delivery, and only from over-need to under-need, so it can't thrash. This answers "The haulers should redistribute once they drop at home."
-3. **No surplus haulers.** The hauler type is eligible for the allocation only while the field's total shortfall is above 0 (Σ need − haulers alive − haulers in the bay). The hauler weight becomes a priority ("how soon"), not an amount, and its state line reads "enough haulers". This answers "the extra haulers sitting around feel much worse". Extractors don't need this rule: they already stop at the free slots.
+3. **No surplus haulers.** The hauler type is eligible for the allocation only while the field's total shortfall is above 0 (Σ need − haulers alive − haulers in the bay). The hauler weight becomes a priority ("how soon"), not an amount, and its state line reads "enough haulers". This answers "the extra haulers sitting around feel much worse". *(Superseded 2026-11-14: extractors did not stop at the free slots, since H8 measured 25 built against 13 slots. See "H4b. No surplus extractors".)*
 4. **Raid target badge.** From muster to the raid's end, the target rock carries the raiders' two-colour ring as a badge, and the rock's sheet says "Raid coming". This answers "an icon designation on the asteroid that's going to be raided".
 5. **Fleet panel with Recycle.** The top bar's "Fleet 18/30" chip opens a panel:
    - five rows (icon, count alive, how many idle at the probe), plus Recycle with a −/+ count per type;
@@ -630,6 +630,18 @@ There is no A/B for this: a mode where the drag also carries haulers would bring
 - The Hauler type is **eligible** in F2 only while `haulerShortfall > 0`, on top of the H7 conditions.
 - The hauler weight is now a priority (how fast), not an amount.
 - While the type is ineligible, its share keeps what it holds, and `allocStatus` reports the new state `enough`.
+
+
+**H1 amendment rulings (Director, 2026-11-14, from h8-sim).**
+- **Committed extractors staff a rock.** The extractor in the probe's bay, and a full extractor share, count at the rock F5 would send them to (the nearest mineable rock with a free slot, then the lower index). A share with weight 0 doesn't count. F2 rereads the shortfall when the extractor share fills, so tick 0 splits as H7 did. Result on v14: first hauler at tick 90 and first delivery at tick 1035, the same as H7, and 52 ore by minute 3 against H7's 40.
+- **A hauler at a staffed rock that isn't worked yet waits** while an extractor is docked there or on its way. It leaves on Stop, or once every bound extractor is lost.
+
+**H4b. No surplus extractors (Director, 2026-11-14; under `hauler.autoNeed` 1 only).**
+- The Extractor gets no ore and its bay doesn't start while no Mine-marked, unguarded rock has a free slot.
+- Free slots are counted after extractors docked, on their way, unbound (idle at the probe or flying home), and the one in the bay.
+- While the Extractor is blocked, its share is kept and its row reads "enough extractors", the same way the Hauler's does.
+- Marking a rock, capturing a pocket, or losing an extractor to a raid or a recycle reopens it.
+- Why: with no inputs, H8 as first built made 25 extractors in 10 minutes against 13 slots. The owner's complaint about idle haulers applies to idle extractors as well.
 
 **H5. `hauler.autoNeed` 0 restores H7's F6 exactly:** the ratio pick, haulers that stay on their rock, no rebalance and no H4 condition. The per-rock count is then ignored and its stepper hidden. This is the in-build comparison.
 
