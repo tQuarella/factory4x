@@ -11,6 +11,10 @@ interface Sil {
   iou: Record<string, number>;
 }
 
+// The gallery is a dev page with a very tall canvas; at a phone's device pixel ratio it takes over a minute to draw. The scans it reports are
+// made on offscreen canvases at 1x, so the ratio changes nothing they measure.
+test.use({ deviceScaleFactor: 1 });
+
 test('the extractor and hauler read at 24 px against the warships and a rock; new draws stay within their bounds', async ({ page }) => {
   // The gallery draws a few hundred scans on load; on a phone-sized device pixel ratio under a loaded machine that takes a while.
   test.setTimeout(120_000);

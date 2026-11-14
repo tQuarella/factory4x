@@ -454,6 +454,50 @@ const entries: Entry[] = [
   { label: 'route backed up', draw: (c, r) => drawRoute(c, -r, 0, r, 0, 1, true) },
 ];
 
+// ---- The 24 px silhouette check (H7): each hull's alpha mask at 24 px against the others, as intersection over union ----
+/** The alpha mask of `draw` at a 24 px entity (r = 12), on a 32 px cell, as a 0/1 array. */
+function mask24(draw: (c: Ctx, r: number) => void): Uint8Array {
+  const size = 32;
+  const cv = document.createElement('canvas');
+  cv.width = size;
+  cv.height = size;
+  const c = cv.getContext('2d', { willReadFrequently: true }) as Ctx;
+  c.translate(size / 2, size / 2);
+  draw(c, 12);
+  const d = c.getImageData(0, 0, size, size).data;
+  const m = new Uint8Array(size * size);
+  for (let i = 0; i < m.length; i++) m[i] = (d[i * 4 + 3] ?? 0) >= 128 ? 1 : 0;
+  return m;
+}
+const iou = (a: Uint8Array, b: Uint8Array): number => {
+  let i = 0;
+  let u = 0;
+  for (let k = 0; k < a.length; k++) {
+    if (a[k] && b[k]) i++;
+    if (a[k] || b[k]) u++;
+  }
+  return u === 0 ? 0 : i / u;
+};
+const sil: Array<[string, (c: Ctx, r: number) => void]> = [
+  ['extractor', (c, r) => drawExtractor(c, r)],
+  ['hauler', (c, r) => drawHauler(c, r)],
+  ['drone', (c, r) => drawShip(c, r, 0, 'drone')],
+  ['lancer', (c, r) => drawShip(c, r, 0, 'lancer')],
+  ['flak', (c, r) => drawShip(c, r, 0, 'flak')],
+  ['rock', (c, r) => drawAsteroid(c, r, 3, 0, 0)],
+];
+const masks = new Map(sil.map(([n, f]) => [n, mask24(f)]));
+const silhouettes: { fill: Record<string, number>; iou: Record<string, number> } = { fill: {}, iou: {} };
+for (const [n] of sil) silhouettes.fill[n] = (masks.get(n) as Uint8Array).reduce((a, b) => a + b, 0);
+for (const a of ['extractor', 'hauler']) {
+  for (const [b] of sil) {
+    if (a === b) continue;
+    const v = iou(masks.get(a) as Uint8Array, masks.get(b) as Uint8Array);
+    silhouettes.iou[`${a}|${b}`] = v;
+  }
+}
+(window as unknown as { __silhouettes: typeof silhouettes }).__silhouettes = silhouettes;
+
 const sizes = [24, 48, 96];
 // Columns sum to 344 px so all three fit a 375 px screen with no sideways scroll.
 const cellW = [60, 104, 180];
@@ -549,50 +593,10 @@ boundLines.push(`raid marker: ${(measure((c, r) => drawRaidMarker(c, r, { thorn:
 boundLines.push(`mine badge: ${(measure((c, r) => drawMineBadge(c, r)) / 50).toFixed(3)} r`);
 boundLines.push(`raided rock (rim and glow, no pips): ${(measure((c, r) => drawAsteroid(c, r, 3, 0, 0, 'raided', 0.3)) / 50).toFixed(3)} r (limit 1.100 r)`);
 
-// ---- The 24 px silhouette check (H7): each hull's alpha mask at 24 px against the others, as intersection over union ----
-/** The alpha mask of `draw` at a 24 px entity (r = 12), on a 32 px cell, as a 0/1 array. */
-function mask24(draw: (c: Ctx, r: number) => void): Uint8Array {
-  const size = 32;
-  const cv = document.createElement('canvas');
-  cv.width = size;
-  cv.height = size;
-  const c = cv.getContext('2d', { willReadFrequently: true }) as Ctx;
-  c.translate(size / 2, size / 2);
-  draw(c, 12);
-  const d = c.getImageData(0, 0, size, size).data;
-  const m = new Uint8Array(size * size);
-  for (let i = 0; i < m.length; i++) m[i] = (d[i * 4 + 3] ?? 0) >= 128 ? 1 : 0;
-  return m;
+for (const key of Object.keys(silhouettes.iou)) {
+  const [hull] = key.split('|') as [string];
+  boundLines.push(`24 px silhouette ${key.replace('|', ' vs ')}: overlap ${(silhouettes.iou[key] as number).toFixed(2)} (limit 0.75), ${hull} covers ${silhouettes.fill[hull]} px`);
 }
-const iou = (a: Uint8Array, b: Uint8Array): number => {
-  let i = 0;
-  let u = 0;
-  for (let k = 0; k < a.length; k++) {
-    if (a[k] && b[k]) i++;
-    if (a[k] || b[k]) u++;
-  }
-  return u === 0 ? 0 : i / u;
-};
-const sil: Array<[string, (c: Ctx, r: number) => void]> = [
-  ['extractor', (c, r) => drawExtractor(c, r)],
-  ['hauler', (c, r) => drawHauler(c, r)],
-  ['drone', (c, r) => drawShip(c, r, 0, 'drone')],
-  ['lancer', (c, r) => drawShip(c, r, 0, 'lancer')],
-  ['flak', (c, r) => drawShip(c, r, 0, 'flak')],
-  ['rock', (c, r) => drawAsteroid(c, r, 3, 0, 0)],
-];
-const masks = new Map(sil.map(([n, f]) => [n, mask24(f)]));
-const silhouettes: { fill: Record<string, number>; iou: Record<string, number> } = { fill: {}, iou: {} };
-for (const [n] of sil) silhouettes.fill[n] = (masks.get(n) as Uint8Array).reduce((a, b) => a + b, 0);
-for (const a of ['extractor', 'hauler']) {
-  for (const [b] of sil) {
-    if (a === b) continue;
-    const v = iou(masks.get(a) as Uint8Array, masks.get(b) as Uint8Array);
-    silhouettes.iou[`${a}|${b}`] = v;
-    boundLines.push(`24 px silhouette ${a} vs ${b}: overlap ${v.toFixed(2)} (limit 0.75), ${a} covers ${silhouettes.fill[a]} px`);
-  }
-}
-(window as unknown as { __silhouettes: typeof silhouettes }).__silhouettes = silhouettes;
 const boundsEl = document.getElementById('bounds');
 if (boundsEl) boundsEl.textContent = ['(pixel scan includes antialiasing: 1.002 r or 4.00 px is the limit; exact geometry is checked in test/h4-art.test.ts and test/h6-art.test.ts)', ...boundLines].join('\n');
 

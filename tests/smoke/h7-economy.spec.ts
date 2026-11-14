@@ -365,7 +365,10 @@ test.describe('375x667 portrait, by touch', () => {
     }
     await page.locator('#b-pause').click();
     await page.evaluate(() => window.__factory4x!.setSpeed(4));
-    await expect.poll(async () => JSON.parse(await page.evaluate(() => window.__factory4x!.mapField())).econ.idle, { timeout: 60_000 }).toBeGreaterThan(0);
+    // An extractor itself (not only a hauler) is parked at the probe.
+    await expect
+      .poll(async () => (JSON.parse(await page.evaluate(() => window.__factory4x!.econShips())) as Array<{ type: string; at: number | null }>).filter((e) => e.type === 'extractor' && e.at === 0).length, { timeout: 60_000 })
+      .toBeGreaterThan(0);
     await pause(page);
     await tapNode(page, 'probe');
     const recycle = page.locator('#sheet .recycle-btn');
