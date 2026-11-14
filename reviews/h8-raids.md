@@ -57,3 +57,34 @@ Small point, not required: the test "a warship that arrives after a round starte
 Required changes: none.
 
 VERDICT: APPROVE
+
+## Round 2 · 2026-11-14
+
+I reviewed def6c5f against round 1. Two things changed since round 1: the Director's H10 amendment (ec04b17, DESIGN.md and DECISIONS.md) and its implementation (def6c5f).
+
+**The change.** `haulersHeld` is now true only in phases `out` and `fight`. The hold ends on the tick the outcome is decided:
+- beaten or withered: the raid ends;
+- hit or turned back: `goHome` switches the phase to `home`.
+
+`rockStatus.raidTarget` still runs from muster to the raid's end, so the badge stays while the raiders fly home. That is correct under "Raid-target badge: from muster to the raid's end". During `home` the raiders don't fight (R7 runs only in `fight`), so a hauler that leaves then is not at risk. This answers my round-1 note, and the Director logged it with its reason.
+
+**Tests.**
+- `raids-h8.test.ts` steps each outcome one tick at a time until the hold drops. For hit and turned back, it asserts the raid is still in `home` with `lastRaid` null, so the hold didn't wait for the raiders to land. For beaten and withered, it asserts the raid has ended.
+- A new test shows that in `home` a hauler at the probe leaves the next tick, `haulersHeld` is false, `raidTarget` is true and `holding` is 0.
+- The selector test now checks `home` separately.
+- The replay pins raid 2's outcome at tick 4350, 215 ticks before the raiders land. p1's haulers leave within a tick of it.
+- With the shorter hold, h8-sim's original a4 assertions come back exactly: the first pick at 8720, and that hauler is the first to load. So round 1's two re-baselines are reverted, not carried.
+
+**Gates (run by me on def6c5f, `npm run gates -- --base main`): all PASS.**
+- typecheck, lint, and protected-files (38 files, none protected).
+- test: 47 files, 1020 tests.
+- determinism: final cdbdea56.
+- bots: flags 1–7 MET, and flag 2 is still "greedy first hit killed 2".
+
+**Director, needs fixing (not in h8-raids' files): the DESIGN.md amendment is in the wrong section.** ec04b17 put the line "*Amended (Director, 2026-11-14):* the hold ends on the tick the raid's outcome is decided …" in the client section, between "Fallback: tap-Move-tap" and "Hauler count (rock sheet)" (about line 764). "H10. Haulers hold" (about line 681) still reads "From launch (phase `out`) until the raid ends". Anyone reading H10 gets the old rule, and the tap-Move-tap section gains an unrelated line. Move the line under H10, or reword H10, before h8-client builds the "Haulers waiting at the probe" line. The code, tests and DECISIONS.md all agree on the amended rule, so this is a spec-text fix, not a defect in this task.
+
+Everything else from round 1 stands.
+
+Required changes (h8-raids): none.
+
+VERDICT: APPROVE
