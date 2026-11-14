@@ -956,3 +956,18 @@ All four fail on a511610's `field.ts` (4 of 43) and pass on the fix. The `raid-h
 Flight to each rock at `raid.speedSu` 3 (ticks): a5 144, a6 and a7 178, p1 and p2 215, a3 and a4 245, a1 and a2 272. A raid's size follows `econ`, not the rock's value; the target is the nearest mined rock to the hive, so a5, a6 and a7 (the richest) are hit first.
 
 **Gates on the branch:** typecheck, lint and determinism green; sim tests all pass; the bots gate and 41 tests in the same 7 bots and client files as h7-sim are red, as the stack note expects.
+
+## 2026-11-14 · Engineer · h7-bots: field runner, six strategies, seven flags, campaign bots retired from the gate
+
+- **Campaign bots stay in code, off the gate.** `runner.ts` (runCampaign, H6 flags), `strategies.ts`, `waves.ts` and their tests stay; their tests build worlds with `withRunMode(defaultData, 'campaign')`. The old CLI is `campaign-cli.ts` (runnable by hand, not an npm script); `npm run bots` is the new field suite (`cli.ts`). *Rejected:* deleting them (the H4-H6 tests would be rewritten for nothing; the overworld may return).
+- **New files:** `field-runner.ts` (runField: won / timeout 45 min / softlock 5 min with no bay start and no hauler delivery / crash; raid log from `world.raid` and `stats.raids`), `field-strategies.ts`, `field-estimate.ts` (the min-wave estimate on an inert copy of the field, via the existing `minMix` and `minSingle`; its cache keys include the field layout, after a collision found in testing), `field-flags.ts`, `cli.ts`.
+- **Readings of the spec where it was silent:**
+  - Offence waits on the fleet limit: warships get `fleetCap - economy` slots. Adaptive builds for the hive at its current strength if that fits, else for the hive with a full-size raid away (R4 arithmetic), and attacks the moment the estimate on the guards at home is covered (so a raid out opens the window). It sends all ships at its staging node to the hive.
+  - In offence the economy grows only while `econ + 3 + smallest hive wave <= cap` (the trade in slots; the margin covers ships already paid for). A hauler may still go to the counter's pocket: its first delivery unlocks the counter.
+  - The counter pocket (Spores: ice, Thorns: crystal) is taken at econ 12 or after the first muster, with the pocket's min-wave of drones. Only the majority's pocket, as written, so the other counter is never unlocked.
+  - Warship weights follow the missing ships (need minus alive, per type), so a covered type goes to 0.
+  - Raid response: counter type at max weight until defenders (at or flying to the target) match the planned size; rally and idle warships go to the target; after the raid the standing guard is ceil(planned / 2) at the target. `greedy` ignores musters (no response, no counter pocket) until `stats.raids.hit >= 1`.
+  - `static` best-of: a win, then the earlier hive, then fewer economy ships lost. Sweep (extractor/hauler/drone/lancer/flak): econ-lean 4/3/1/1/1, even 3/2/2/2/2, drone-heavy 3/2/4/1/1, flak-heavy 3/2/1/1/4, lancer-heavy 3/2/1/4/1, war-lean 2/1/3/2/3.
+  - `idle` counts a full share as built, so it holds econ at exactly `raid.firstAtEcon - 1`.
+  - Bots read `world.raid` and `stats.raids` directly (what `raidStatus` reports). They never use Stop (not in the spec).
+- **Flags 1-3 read the run logs; 4-7 the estimate on a fresh field.** Flag 6's "full economy" is the open Mine slots plus `peakHaulers` of the adaptive runs.

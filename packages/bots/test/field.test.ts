@@ -62,7 +62,7 @@ function play(world: World, data: SimData, bot: FieldBot, ticks: number, extra: 
 
 /** Give a world a raid in a phase, with a planned size. */
 function setRaid(w: World, phase: 'muster' | 'out' | 'fight', target: number, planned: { thorn: number; spore: number }): void {
-  w.raid = { id: 1, phase, target, guards: [], ticksLeft: 300, planned };
+  w.raid = { id: 1, phase, target, guards: [], ticksLeft: 300, planned, flightTicks: 144, from: 10, retargeted: false, lostEcon: { extractor: 0, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 } };
 }
 
 describe('the field runner (acceptance 1)', () => {
@@ -123,7 +123,7 @@ describe('the field runner (acceptance 1)', () => {
     expect(r.peakHaulers).toBeGreaterThan(0);
     expect(r.allocChanges).toBeGreaterThan(0);
     expect(Object.keys(r.raids).sort()).toEqual(['beaten', 'hit', 'mustered', 'turnedBack']);
-    expect(r.econLost).toEqual({ extractor: 0, hauler: 0 });
+    expect(Object.keys(r.econLost).sort()).toEqual(['extractor', 'hauler']);
     expect(r.tickMsP95).toBeGreaterThanOrEqual(r.tickMsP50);
   });
 });
@@ -144,9 +144,16 @@ describe('the six strategies (acceptance 2)', () => {
     expect(weightInputs(w, { extractor: 3, hauler: 2, drone: 99, lancer: 0, flak: 0 })).toEqual([{ type: 'setAlloc', shipType: 'drone', weight: w.tun['alloc.maxWeight'] }]);
   });
 
-  it('adaptive opens economy only: no warship weight and no send in the first 3 minutes', () => {
+  it('adaptive opens economy only: no warship weight, build or send until the first muster', () => {
     const w = createWorld(1, easy);
-    const log = play(w, easy, adaptive.make(easy), 3 * MIN);
+    const bot = adaptive.make(easy);
+    const log: { tick: number; input: Input }[] = [];
+    for (let i = 0; i < 6 * MIN && w.raid === null; i++) {
+      const inputs = bot.decide(w, easy);
+      for (const input of inputs) log.push({ tick: w.tick, input });
+      step(w, easy, inputs);
+    }
+    expect(w.tick).toBeGreaterThan(MIN);
     for (const t of BUILD_TYPES) if (t !== 'extractor' && t !== 'hauler') expect(w.field!.alloc[t], t).toBe(0);
     expect(log.some((l) => l.input.type === 'sendShips')).toBe(false);
     expect(w.stats.shipsBuilt).toEqual({ drone: 0, lancer: 0, flak: 0 });
@@ -312,7 +319,7 @@ describe('the six strategies (acceptance 2)', () => {
 
   it('static attacks when the estimate fits: it sends only what the ships at the probe cover', () => {
     const w = createWorld(1, easy);
-    const log = play(w, easy, staticStrategy(STATIC_SHAPES[2]!).make(easy), 10 * MIN);
+    const log = play(w, easy, staticStrategy(STATIC_SHAPES[2]!).make(easy), 10 * MIN, (t) => (t === 0 ? [{ type: 'setTunable', key: 'raid.enabled', value: 0 }] : []));
     expect(log.some((l) => l.input.type === 'sendShips')).toBe(true);
   });
 
@@ -461,5 +468,51 @@ describe('the seven capability flags (acceptance 4)', () => {
     const f = computeFieldFlags([], fixtureV12)[6]!;
     expect(f.pass).toBe(true);
     for (const id of ['p1', 'p2', 'heart']) expect(f.detail).toContain(`${id} needs more than`);
+  });
+});
+
+describe('raids in the runs (h7-raids merged)', () => {
+  it('idle holds below the raid threshold and is never raided; its raid count feeds flag 3', () => {
+    const r = runField(idle, 1, fixtureV12, { ...defaultFieldOptions(fixtureV12), capTicks: 12 * MIN });
+    expect(r.raids.mustered).toBe(0);
+  });
+
+  it('the runner logs each raid with its outcome and the economy ships it killed', () => {
+    const r = runField(greedy, 1, fixtureV12, { ...defaultFieldOptions(fixtureV12), capTicks: 20 * MIN });
+    expect(r.raids.mustered).toBeGreaterThan(0);
+    const ended = r.raids.beaten + r.raids.hit + r.raids.turnedBack;
+    expect(r.raidLog.length).toBe(ended);
+    expect(r.raidLog.filter((x) => x.outcome === 'hit').length).toBe(r.raids.hit);
+    expect(r.raidLog.reduce((n, x) => n + x.econLost, 0)).toBeLessThanOrEqual(r.econLost.extractor + r.econLost.hauler);
+    for (const x of r.raidLog) expect(x.endTick).toBeGreaterThan(x.startTick);
+  });
+
+  it('greedy builds no warships and sends no response before its first hit, then answers the next muster at its target', () => {
+    const w = createWorld(1, fixtureV12);
+    const bot = greedy.make(fixtureV12);
+    const log: { tick: number; input: Input }[] = [];
+    let hitTick = -1;
+    for (let i = 0; i < 40 * MIN && !(hitTick >= 0 && w.raid !== null && w.raid.phase === 'muster' && w.tick > hitTick); i++) {
+      const inputs = bot.decide(w, fixtureV12);
+      for (const input of inputs) log.push({ tick: w.tick, input });
+      step(w, fixtureV12, inputs);
+      if (hitTick < 0 && w.stats.raids.hit >= 1) hitTick = w.tick;
+    }
+    expect(hitTick).toBeGreaterThan(0);
+    const before = log.filter((l) => l.tick < hitTick);
+    expect(before.some((l) => l.input.type === 'setRally' || l.input.type === 'sendShips')).toBe(false);
+    expect(before.some((l) => l.input.type === 'setAlloc' && l.input.shipType === 'drone' && l.input.weight > 0)).toBe(false);
+    // The next muster (the loop ran one decision into it): the answer is in the world.
+    const target = w.raid!.target;
+    for (let i = 0; i < 3; i++) step(w, fixtureV12, bot.decide(w, fixtureV12));
+    expect(w.rally).toBe(target);
+  });
+
+  it('adaptive answers a real muster: rally at the raid target by the time the raid launches', () => {
+    const w = createWorld(1, fixtureV12);
+    const bot = adaptive.make(fixtureV12);
+    for (let i = 0; i < 20 * MIN && !(w.raid !== null && w.raid.phase === 'out'); i++) step(w, fixtureV12, bot.decide(w, fixtureV12));
+    expect(w.raid).not.toBeNull();
+    expect(w.rally).toBe(w.raid!.target);
   });
 });

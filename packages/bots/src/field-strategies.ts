@@ -246,7 +246,7 @@ export class AdaptiveBot implements FieldBot {
 
     // 3. Counter pocket (the hive's majority counter), once offence has started or a raid has been answered.
     const counter = hiveCounter(world);
-    if (!this.opts.dronesOnly && counter.pocket !== null && isGuarded(world, counter.pocket) && !isTypeUnlocked(world, counter.type) && (this.offence || world.stats.raids.mustered > 0)) {
+    if (!this.opts.dronesOnly && counter.pocket !== null && isGuarded(world, counter.pocket) && !isTypeUnlocked(world, counter.type) && (this.offence || (this.respond && world.stats.raids.mustered > 0))) {
       const pocketMix = waveFor(world, data, counter.pocket, ['drone'], limit, guardsAtHome(world, counter.pocket));
       if (pocketMix !== null && pocketMix.total <= room) {
         if (covers(here, pocketMix.fleet) && guardianAt(world, counter.pocket)!.battle === null) {
