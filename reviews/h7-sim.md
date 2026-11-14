@@ -59,3 +59,48 @@ For the player, Stop on a pocket or hive does nothing visible to its haulers. Un
 - [ ] Re-run the gates. The red set must stay exactly the 7 bots and client files listed above.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-14
+
+Reviewed `git diff 325356f..d828ea5`.
+
+**Pillar fit.** Stop now means stop. Only Mine-marked rocks can be assigned haulers (`isHaulable`), and the assignment and keep rules both use it. A hauler waiting at a rock whose mark goes off loads what is there and flies home at once. An unmarked rock's leftover buffer waits until the rock is marked again. The Director made the buffer choice, and DECISIONS records it with the reason: a rock with assigned haulers stays a raid target (R5). The immediate departure is a reasonable reading of F12's "finish their trip" and is logged too. Neither changes the game beyond the spec's intent.
+
+**Verification.** I re-ran my round 1 scratch script on d828ea5:
+- p1 is captured with one hauler, then Stopped. Only the 4 ice already in the hold is delivered after Stop, and the hauler's target goes to null.
+- With a1 and a2 also worked (three haulers), every hauler moves to a1 or a2 and p1 delivers nothing more.
+
+Before the fix, the single-hauler case delivered 40 ice over the same 6000 ticks. The four new `field.test.ts` cases cover the following, and the author reports all four fail on a511610:
+- Stop on p1 alone;
+- Stop on p1 with other rocks worked;
+- Stop on the hive;
+- an unmarked asteroid's buffer.
+
+`raid-hook.test.ts` now marks p2 for its pin. That is a correct consequence of the new rule, not a loosened test.
+
+**Round 1 required changes:**
+- [x] Haulers are never assigned to, or kept on, an unmarked rock with free extractors.
+- [x] The asteroid-buffer rule: only marked rocks are assignable, and it is tested.
+- [x] Tests for both.
+- [x] The DECISIONS F6 bullet is corrected (struck through, with the correction beside it) and a round 2 entry added.
+- [x] Gates re-run: same red set (below).
+
+The round 1 non-blocking notes are also done:
+- Save validation now covers each economy ship's `at`, `transit` and cargo, plus `mine`, `free` and the `rockBuckets` rings, with 13 corruption cases and two valid baselines.
+- The replay's recycle check no longer compares a value with itself.
+- A `Readonly` overload of `bayOf` removes the cast.
+
+**Gates (run by me on d828ea5, `npm run gates -- --base main`):**
+- typecheck, lint, determinism and protected-files pass. The determinism final hash is still 648970fd: the replay's only Stop already ended that wait the same tick, so the hash is unchanged.
+- The test gate fails with 41 failures out of 673 tests, in exactly the same 7 files as round 1:
+  - bots: `needs-driven`, `runner`, `waves`;
+  - client: `h4-client`, `h5-client`, `h6-client`, `session`.
+- The bots gate fails fast on the `runCampaign` field-mode guard.
+
+That is the stack's expected red set, and nothing in `packages/sim` is red.
+
+**Note for the stack (not an h7-sim change).** h7-raids' R5 counts "assigned hauler". A hauler flying home from a Stopped rock keeps its target until it reaches the probe. h7-raids should decide whether that hauler still makes the rock a raid target, and test it.
+
+Required changes: none. This merges only as part of the stack, through `merge-task h7-client`.
+
+VERDICT: APPROVE
