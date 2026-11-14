@@ -1155,3 +1155,8 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 3. If bot flag 1 (static loses) fails under staffing by need, the Designer reports it as a finding about the claim, not a number to tune away; the Director decides then.
 4. Q18 (pillar 1 wording) goes in the H8 handoff, not now.
 **Why:** both CI jobs are past 80% of their limits (retro after build-20261114-1), and h8-client adds smoke tests; the two tasks share no files.
+
+## 2026-11-14 · Director · H8 H1 amendment: rocks with extractors on their way are staffed
+
+**Decision:** for hauler staffing, a Mine-marked rock with an extractor bound for it (docked or on its way) counts as needing haulers; see DESIGN.md "H1 amendment". h8-sim implements it before its Critic round.
+**Why:** h8-sim built H1 as written and measured the first hauler at 3:13 on v14 and no ore delivered before minute 4 (H7: first hauler at tick 90, first delivery at tick 1035). The owner's first note on H7 praised starting on mining; a three-minute dead opening would undo that. No data value fixes it, so it is a rule fix, not calibration.
