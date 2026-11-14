@@ -1171,3 +1171,8 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 
 - cw-smoke-sim-time merged (66c9581) after green CI 43647913292 on 86bf159; main had moved by DECISIONS.md and STATUS.md only (docs-only exception). The h7-art gallery wait was left in real time: it waits on canvas drawing in the dev gallery, not on sim time, so `advanceTicks` can't replace it (Critic note). Folding `h7-economy.spec.ts`'s local `stepUntil` into `stepSimUntil` is a small Can wait cleanup.
 - DESIGN.md H8 now carries the committed-extractor and waiting-hauler rulings and "H4b. No surplus extractors", replacing "Extractors don't need this rule", so h8-client and h8-design-data build from the spec (h8-sim Critic note).
+
+## 2026-11-14 · Director · h8-sim round 2: haulers also wait for committed extractors
+
+**Decision:** accepted. A hauler at a staffed, not-yet-worked rock waits while any extractor staffs it, committed ones included; it leaves on Stop or when nothing docked, bound or committed remains. DESIGN.md updated.
+**Why:** the new replay showed haulers flying empty round trips to a rock whose committed extractor was held by the fleet limit. Waiting costs one ore at minute 10 on the v14 opening; minutes 1–3, the first hauler and the first delivery are unchanged.
