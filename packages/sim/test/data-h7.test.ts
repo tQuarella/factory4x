@@ -77,8 +77,8 @@ function specFieldRows(): string[][] {
 }
 
 describe('data/sim.json (shipped) at H7', () => {
-  it('is data version 12', () => {
-    expect(defaultData.dataVersion).toBe(12);
+  it('is data version 13', () => {
+    expect(defaultData.dataVersion).toBe(13);
   });
 
   it('runs in field mode: run.mode is "field"', () => {

@@ -33,7 +33,8 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  * Node indices are the field's nodes in frame order: 0 probe, 1-7 a1-a7, 8 p1 (ice), 9 p2 (crystal), 10 heart.
  * It runs on the shipped data, so a calibration that changes the field's guards can break the script
  * (packages/sim/test/reference-replay.test.ts says so); the tunables it depends on are set at tick 0 to keep that
- * rare.
+ * rare. h7-design-data (data v13) added the four raid knobs it calibrated (raid.econPerRaider 3, raid.maxSize 10,
+ * raid.gapTicks 2700, hive.regrowPct 100: the values the raid timings below were written for).
  */
 const at = (tick: number, ...inputs: Input[]) => inputs.map((input) => ({ tick, input }));
 const tun = (key: Extract<Input, { type: 'setTunable' }>['key'], value: number): Input => ({ type: 'setTunable', key, value });
@@ -65,6 +66,10 @@ export const referenceReplay: Replay = {
       tun('guard.thorn.regrowTicks', 600),
       tun('guard.spore.regrowTicks', 600),
       tun('field.fleetCap', 12),
+      tun('raid.econPerRaider', 3),
+      tun('raid.maxSize', 10),
+      tun('raid.gapTicks', 2700),
+      tun('hive.regrowPct', 100),
       mine(3, false),
       mine(4, false),
       mine(5, false),

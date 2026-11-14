@@ -1032,3 +1032,27 @@ Round 3 was reassigned to the Core Engineer under PROCESS step 2. It answers the
   - greedy wins in 19:49 (9 raids: 7 beaten, 1 hit; 6 lost).
   - adaptive-no-raids now wins in 14:37. In round 2 it timed out with a 35-minute idle stretch.
   - The bots gate passes.
+
+## 2026-11-14 · Designer · h7-design-data: calibration to data v13
+
+**Decision:** data v13 changes only values: the hive 12 / 24 → 12 / 18; p1 0 / 6 → 0 / 4; p2 4 / 2 → 1 / 3; `raid.econPerRaider` 3 → 2; `raid.maxSize` 10 → 12; `hive.regrowPct` 100 → 200; `raid.gapTicks` 2700 → 3600. The table, the reasons and every target are in DESIGN.md "Calibration result (h7-design-data, data v13)". Reports: `reports/archive/h7-probe-v12.md`, `reports/archive/h7-design-data-v13.md`. Four calls in it:
+1. **Flag 4 is met with raids that happen in play.** Raising `raid.maxSize` alone would have met the flag, which measures a "full-size" raid, while real raids (`ceil(econ ÷ 3)`, 5–8 ships) never came near it. So the raid per economy ship went up (`raid.econPerRaider` 2), and `raid.maxSize` 12 is what a full economy (23) actually musters.
+2. **The pocket target is amended, not met as written** ("each pocket within 6 drones"). Spores regrow every 20 ticks and Thorns repair 2 per round, so any pocket with a Thorn needs at least 8 drones. The amended target: the cheaper pocket within 6 (and not 2), the other within 8 by drones alone or within 6 with the first pocket's counter. Two doors with different costs, not two pure-Spore pockets that both open Flak.
+3. **The raid gap was lengthened to keep `greedy` inside its target with margin** (39:20 against 40 at 90 s; 30:16 at 120 s). Waiting still makes nothing worse: `idle` is never raided (flag 3).
+4. **Out-of-list edit: `packages/bots/src/reference-replay.ts`.** Its own header and test say a calibration that changes the field's guards breaks the script and to regenerate it then. Two of its 14 checks failed on v13. The fix pins the four raid knobs at tick 0 (the values its timings were written for, as it already pins economy knobs) and adds one `sendShips` p1 → p2 at tick 3500, because at v13 one warship was still at p1 when raid 2 arrived (checked: without that input the "undefended" assertion fails with 1 warship). All 14 checks pass; no hash is pinned anywhere.
+
+**Why:** values only, as the spec requires. Each target is measured, and the `min-wave` numbers were rerun in a second order (ships flak-first, raid-away keeping the highest ids) with no change.
+
+**For the Director (not changed here):**
+- **Rule question:** a captured pocket's haulers keep flying into an undefended raid (h7-raids review). A possible rule: a hauler waits at the probe while its node is the target of a raid that's out or fighting.
+- **Bot finding:** `drones-only` ends in the runner's softlock at 28:12 on every seed. After its economy is wiped it sets every weight to 0 and idles. `adaptive` and `greedy` share those rules after a wipe, so this is a latent gate risk.
+
+## 2026-11-14 · Designer · h7-design-data round 1 fixes: pocket target met as written; state-line wording
+
+**Decision:**
+1. **The pocket target is met as originally written, and the amendment is withdrawn.** The amendment logged above (item 2 of "h7-design-data: calibration to data v13") rested on a false claim: "any pocket with a Thorn needs at least 8 drones". The Critic measured on v13 (`fieldSingle`, p2 only): 1/0 → 3, 1/1 → 4, 1/2 → 5, 1/3 → 8, 2/0 → 8. I generalised from three points (1/3, 2/2, 4/2) and skipped the cases that disprove it.
+   - p2 is now 1 / 2: 5 drones, not 2. It keeps a Thorn, so it stays the Lancer door. p1 stays 0 / 4 (6 drones).
+   - The order check is unchanged (p2 5 / 5).
+   - Bots on v13: adaptive 24:54, greedy 30:12, flags 1–7 met.
+   - The reference replay no longer needs its tick-3500 `sendShips`. At p2 1 / 2 no warship is left at p1 when raid 2 arrives, so that input was ignored, and it was removed. The four pinned raid knobs stay.
+2. **The DESIGN.md probe-sheet state line ("needs crystal pocket" / "needs ice pocket")** was changed at the Director's request, to match the text h7-client built and tests in its fix round (3c9f761).

@@ -1,0 +1,5837 @@
+{
+  "generatedAt": "2026-11-14T18:02:29.383Z",
+  "dataVersion": 13,
+  "seeds": 3,
+  "capMinutes": 45,
+  "softlockMinutes": 5,
+  "tickBudgetMsP95": 2,
+  "runSeconds": 61.85,
+  "failures": [],
+  "flags": [
+    {
+      "name": "Splitting matters: static either loses at least half the economy ships it built to raids or fails to take the hive within the cap, and adaptive takes the hive",
+      "pass": true,
+      "detail": "static/1 (war-lean 2/1/3/2/3) timeout, lost 8 of 17 economy ships ok; static/2 (war-lean 2/1/3/2/3) timeout, lost 8 of 17 economy ships ok; static/3 (war-lean 2/1/3/2/3) timeout, lost 8 of 17 economy ships ok; adaptive/1 won, adaptive/2 won, adaptive/3 won"
+    },
+    {
+      "name": "Greed is answered by raids: greedy's first hitting raid kills at least 2 economy ships, and greedy still wins after responding",
+      "pass": true,
+      "detail": "greedy/1 first hit killed 4, won ok; greedy/2 first hit killed 4, won ok; greedy/3 first hit killed 4, won ok"
+    },
+    {
+      "name": "Waiting is safe: idle is raided at most once",
+      "pass": true,
+      "detail": "idle/1 raids mustered 0 (hit 0, beaten 0, turned back 0) ok; idle/2 raids mustered 0 (hit 0, beaten 0, turned back 0) ok; idle/3 raids mustered 0 (hit 0, beaten 0, turned back 0) ok"
+    },
+    {
+      "name": "The counter-attack window is real: the hive's smallest winning wave with a full-size raid out is at least 30% smaller than at full strength",
+      "pass": true,
+      "detail": "best mix at full strength 16; with a raid of 4 Thorns and 8 Spores out 11"
+    },
+    {
+      "name": "Counters matter: drones-only can't take the hive within field.fleetCap minus 10 economy ships (its best drone wave doesn't fit)",
+      "pass": true,
+      "detail": "smallest drone wave none within 30 against 20 warship slots (field.fleetCap 30 minus 10)"
+    },
+    {
+      "name": "Economy against offence is a trade in slots: the hive's best mix plus a full economy is more than field.fleetCap, and the best mix plus 10 economy ships fits",
+      "pass": true,
+      "detail": "best mix 16; full economy 23 (13 Mine slots plus 10 haulers at adaptive's peak); field.fleetCap 30; best mix + full economy = 39, best mix + 10 = 26"
+    },
+    {
+      "name": "No free first win: every guarded node needs more drones than the opening stock buys",
+      "pass": true,
+      "detail": "p1 needs more than 3 drones (2 buyable from the opening stock) ok; p2 needs more than 3 drones (2 buyable from the opening stock) ok; heart needs more than 3 drones (2 buyable from the opening stock) ok"
+    }
+  ],
+  "staticSweep": [
+    {
+      "name": "econ-lean 4/3/1/1/1",
+      "weights": {
+        "extractor": 4,
+        "hauler": 3,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 1
+      }
+    },
+    {
+      "name": "even 3/2/2/2/2",
+      "weights": {
+        "extractor": 3,
+        "hauler": 2,
+        "drone": 2,
+        "lancer": 2,
+        "flak": 2
+      }
+    },
+    {
+      "name": "drone-heavy 3/2/4/1/1",
+      "weights": {
+        "extractor": 3,
+        "hauler": 2,
+        "drone": 4,
+        "lancer": 1,
+        "flak": 1
+      }
+    },
+    {
+      "name": "flak-heavy 3/2/1/1/4",
+      "weights": {
+        "extractor": 3,
+        "hauler": 2,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 4
+      }
+    },
+    {
+      "name": "lancer-heavy 3/2/1/4/1",
+      "weights": {
+        "extractor": 3,
+        "hauler": 2,
+        "drone": 1,
+        "lancer": 4,
+        "flak": 1
+      }
+    },
+    {
+      "name": "war-lean 2/1/3/2/3",
+      "weights": {
+        "extractor": 2,
+        "hauler": 1,
+        "drone": 3,
+        "lancer": 2,
+        "flak": 3
+      }
+    }
+  ],
+  "results": [
+    {
+      "strategy": "adaptive",
+      "variant": null,
+      "seed": 1,
+      "outcome": "won",
+      "ticks": 44821,
+      "hiveTick": 44820,
+      "raids": {
+        "mustered": 9,
+        "beaten": 5,
+        "hit": 3,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 12825,
+          "endTick": 13831,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 17431,
+          "endTick": 18516,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 22116,
+          "endTick": 23011,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 26611,
+          "endTick": 27361,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 30961,
+          "endTick": 31896,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 35496,
+          "endTick": 36211,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 39811,
+          "endTick": 40501,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 15
+      },
+      "econLost": {
+        "extractor": 4,
+        "hauler": 2
+      },
+      "peakEcon": 17,
+      "peakHaulers": 10,
+      "allocChanges": 122,
+      "built": {
+        "extractor": 10,
+        "hauler": 15,
+        "drone": 19,
+        "lancer": 14,
+        "flak": 20
+      },
+      "lost": {
+        "extractor": 4,
+        "hauler": 2,
+        "drone": 13,
+        "lancer": 6,
+        "flak": 15
+      },
+      "peakPerMin": 68,
+      "tickMsP50": 0.004200000000309956,
+      "tickMsP95": 0.008199999999987995,
+      "finalHash": "ed4766e5"
+    },
+    {
+      "strategy": "adaptive",
+      "variant": null,
+      "seed": 2,
+      "outcome": "won",
+      "ticks": 44821,
+      "hiveTick": 44820,
+      "raids": {
+        "mustered": 9,
+        "beaten": 5,
+        "hit": 3,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 12825,
+          "endTick": 13831,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 17431,
+          "endTick": 18516,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 22116,
+          "endTick": 23011,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 26611,
+          "endTick": 27361,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 30961,
+          "endTick": 31896,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 35496,
+          "endTick": 36211,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 39811,
+          "endTick": 40501,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 15
+      },
+      "econLost": {
+        "extractor": 4,
+        "hauler": 2
+      },
+      "peakEcon": 17,
+      "peakHaulers": 10,
+      "allocChanges": 122,
+      "built": {
+        "extractor": 10,
+        "hauler": 15,
+        "drone": 19,
+        "lancer": 14,
+        "flak": 20
+      },
+      "lost": {
+        "extractor": 4,
+        "hauler": 2,
+        "drone": 13,
+        "lancer": 6,
+        "flak": 15
+      },
+      "peakPerMin": 68,
+      "tickMsP50": 0.003899999999703141,
+      "tickMsP95": 0.007700000000113505,
+      "finalHash": "e2e8bd87"
+    },
+    {
+      "strategy": "adaptive",
+      "variant": null,
+      "seed": 3,
+      "outcome": "won",
+      "ticks": 44821,
+      "hiveTick": 44820,
+      "raids": {
+        "mustered": 9,
+        "beaten": 5,
+        "hit": 3,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 12825,
+          "endTick": 13831,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 17431,
+          "endTick": 18516,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 22116,
+          "endTick": 23011,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 26611,
+          "endTick": 27361,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 30961,
+          "endTick": 31896,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 35496,
+          "endTick": 36211,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 39811,
+          "endTick": 40501,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 15
+      },
+      "econLost": {
+        "extractor": 4,
+        "hauler": 2
+      },
+      "peakEcon": 17,
+      "peakHaulers": 10,
+      "allocChanges": 122,
+      "built": {
+        "extractor": 10,
+        "hauler": 15,
+        "drone": 19,
+        "lancer": 14,
+        "flak": 20
+      },
+      "lost": {
+        "extractor": 4,
+        "hauler": 2,
+        "drone": 13,
+        "lancer": 6,
+        "flak": 15
+      },
+      "peakPerMin": 68,
+      "tickMsP50": 0.003899999999703141,
+      "tickMsP95": 0.007099999998899875,
+      "finalHash": "0540c1ae"
+    },
+    {
+      "strategy": "greedy",
+      "variant": null,
+      "seed": 1,
+      "outcome": "won",
+      "ticks": 54361,
+      "hiveTick": 54360,
+      "raids": {
+        "mustered": 11,
+        "beaten": 6,
+        "hit": 4,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 10685,
+          "endTick": 11943,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 17271,
+          "endTick": 18271,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 21871,
+          "endTick": 22986,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 26586,
+          "endTick": 27631,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 31231,
+          "endTick": 32346,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 35946,
+          "endTick": 36871,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 40471,
+          "endTick": 41311,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 44911,
+          "endTick": 45661,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 49261,
+          "endTick": 49981,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 12,
+        "hauler": 16
+      },
+      "econLost": {
+        "extractor": 7,
+        "hauler": 5
+      },
+      "peakEcon": 19,
+      "peakHaulers": 13,
+      "allocChanges": 75,
+      "built": {
+        "extractor": 12,
+        "hauler": 16,
+        "drone": 35,
+        "lancer": 6,
+        "flak": 11
+      },
+      "lost": {
+        "extractor": 7,
+        "hauler": 5,
+        "drone": 31,
+        "lancer": 3,
+        "flak": 9
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.004000000000814907,
+      "tickMsP95": 0.007300000001123408,
+      "finalHash": "9b027327"
+    },
+    {
+      "strategy": "greedy",
+      "variant": null,
+      "seed": 2,
+      "outcome": "won",
+      "ticks": 54361,
+      "hiveTick": 54360,
+      "raids": {
+        "mustered": 11,
+        "beaten": 6,
+        "hit": 4,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 10685,
+          "endTick": 11943,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 17271,
+          "endTick": 18271,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 21871,
+          "endTick": 22986,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 26586,
+          "endTick": 27631,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 31231,
+          "endTick": 32346,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 35946,
+          "endTick": 36871,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 40471,
+          "endTick": 41311,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 44911,
+          "endTick": 45661,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 49261,
+          "endTick": 49981,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 12,
+        "hauler": 16
+      },
+      "econLost": {
+        "extractor": 7,
+        "hauler": 5
+      },
+      "peakEcon": 19,
+      "peakHaulers": 13,
+      "allocChanges": 75,
+      "built": {
+        "extractor": 12,
+        "hauler": 16,
+        "drone": 35,
+        "lancer": 6,
+        "flak": 11
+      },
+      "lost": {
+        "extractor": 7,
+        "hauler": 5,
+        "drone": 31,
+        "lancer": 3,
+        "flak": 9
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.004000000000814907,
+      "tickMsP95": 0.0072000000000116415,
+      "finalHash": "b6dbbb75"
+    },
+    {
+      "strategy": "greedy",
+      "variant": null,
+      "seed": 3,
+      "outcome": "won",
+      "ticks": 54361,
+      "hiveTick": 54360,
+      "raids": {
+        "mustered": 11,
+        "beaten": 6,
+        "hit": 4,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 10685,
+          "endTick": 11943,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 17271,
+          "endTick": 18271,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 21871,
+          "endTick": 22986,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 26586,
+          "endTick": 27631,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 31231,
+          "endTick": 32346,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 35946,
+          "endTick": 36871,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 40471,
+          "endTick": 41311,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 44911,
+          "endTick": 45661,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 49261,
+          "endTick": 49981,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 12,
+        "hauler": 16
+      },
+      "econLost": {
+        "extractor": 7,
+        "hauler": 5
+      },
+      "peakEcon": 19,
+      "peakHaulers": 13,
+      "allocChanges": 75,
+      "built": {
+        "extractor": 12,
+        "hauler": 16,
+        "drone": 35,
+        "lancer": 6,
+        "flak": 11
+      },
+      "lost": {
+        "extractor": 7,
+        "hauler": 5,
+        "drone": 31,
+        "lancer": 3,
+        "flak": 9
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.0039000000033411197,
+      "tickMsP95": 0.006900000000314321,
+      "finalHash": "3ad00d9a"
+    },
+    {
+      "strategy": "idle",
+      "variant": null,
+      "seed": 1,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 0,
+        "beaten": 0,
+        "hit": 0,
+        "turnedBack": 0
+      },
+      "raidLog": [],
+      "econBuilt": {
+        "extractor": 3,
+        "hauler": 2
+      },
+      "econLost": {
+        "extractor": 0,
+        "hauler": 0
+      },
+      "peakEcon": 5,
+      "peakHaulers": 2,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 3,
+        "hauler": 2,
+        "drone": 25,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 0,
+        "hauler": 0,
+        "drone": 0,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 20,
+      "tickMsP50": 0.003700000001117587,
+      "tickMsP95": 0.006400000002031447,
+      "finalHash": "c3207edd"
+    },
+    {
+      "strategy": "idle",
+      "variant": null,
+      "seed": 2,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 0,
+        "beaten": 0,
+        "hit": 0,
+        "turnedBack": 0
+      },
+      "raidLog": [],
+      "econBuilt": {
+        "extractor": 3,
+        "hauler": 2
+      },
+      "econLost": {
+        "extractor": 0,
+        "hauler": 0
+      },
+      "peakEcon": 5,
+      "peakHaulers": 2,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 3,
+        "hauler": 2,
+        "drone": 25,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 0,
+        "hauler": 0,
+        "drone": 0,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 20,
+      "tickMsP50": 0.003700000001117587,
+      "tickMsP95": 0.006300000000919681,
+      "finalHash": "373d01f9"
+    },
+    {
+      "strategy": "idle",
+      "variant": null,
+      "seed": 3,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 0,
+        "beaten": 0,
+        "hit": 0,
+        "turnedBack": 0
+      },
+      "raidLog": [],
+      "econBuilt": {
+        "extractor": 3,
+        "hauler": 2
+      },
+      "econLost": {
+        "extractor": 0,
+        "hauler": 0
+      },
+      "peakEcon": 5,
+      "peakHaulers": 2,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 3,
+        "hauler": 2,
+        "drone": 25,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 0,
+        "hauler": 0,
+        "drone": 0,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 20,
+      "tickMsP50": 0.0036999999974796083,
+      "tickMsP95": 0.006100000002334127,
+      "finalHash": "fe195b10"
+    },
+    {
+      "strategy": "drones-only",
+      "variant": null,
+      "seed": 1,
+      "outcome": "softlock",
+      "ticks": 50780,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 8,
+        "beaten": 1,
+        "hit": 7,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11653,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17703,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 21303,
+          "endTick": 22533,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 26133,
+          "endTick": 27333,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 30933,
+          "endTick": 32103,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 35703,
+          "endTick": 36781,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 40381,
+          "endTick": 41853,
+          "outcome": "hit",
+          "econLost": 8,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 13,
+        "hauler": 12
+      },
+      "econLost": {
+        "extractor": 13,
+        "hauler": 11
+      },
+      "peakEcon": 12,
+      "peakHaulers": 8,
+      "allocChanges": 22,
+      "built": {
+        "extractor": 13,
+        "hauler": 12,
+        "drone": 22,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 13,
+        "hauler": 11,
+        "drone": 21,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 48,
+      "tickMsP50": 0.003700000001117587,
+      "tickMsP95": 0.006499999999505235,
+      "finalHash": "9eb5ed74"
+    },
+    {
+      "strategy": "drones-only",
+      "variant": null,
+      "seed": 2,
+      "outcome": "softlock",
+      "ticks": 50780,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 8,
+        "beaten": 1,
+        "hit": 7,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11653,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17703,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 21303,
+          "endTick": 22533,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 26133,
+          "endTick": 27333,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 30933,
+          "endTick": 32103,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 35703,
+          "endTick": 36781,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 40381,
+          "endTick": 41853,
+          "outcome": "hit",
+          "econLost": 8,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 13,
+        "hauler": 12
+      },
+      "econLost": {
+        "extractor": 13,
+        "hauler": 11
+      },
+      "peakEcon": 12,
+      "peakHaulers": 8,
+      "allocChanges": 22,
+      "built": {
+        "extractor": 13,
+        "hauler": 12,
+        "drone": 22,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 13,
+        "hauler": 11,
+        "drone": 21,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 48,
+      "tickMsP50": 0.003700000001117587,
+      "tickMsP95": 0.006699999998090789,
+      "finalHash": "0df7d200"
+    },
+    {
+      "strategy": "drones-only",
+      "variant": null,
+      "seed": 3,
+      "outcome": "softlock",
+      "ticks": 50780,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 8,
+        "beaten": 1,
+        "hit": 7,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 5191,
+          "endTick": 6363,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11653,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17703,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 21303,
+          "endTick": 22533,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 26133,
+          "endTick": 27333,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 30933,
+          "endTick": 32103,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 35703,
+          "endTick": 36781,
+          "outcome": "beaten",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 40381,
+          "endTick": 41853,
+          "outcome": "hit",
+          "econLost": 8,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 13,
+        "hauler": 12
+      },
+      "econLost": {
+        "extractor": 13,
+        "hauler": 11
+      },
+      "peakEcon": 12,
+      "peakHaulers": 8,
+      "allocChanges": 22,
+      "built": {
+        "extractor": 13,
+        "hauler": 12,
+        "drone": 22,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 13,
+        "hauler": 11,
+        "drone": 21,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 48,
+      "tickMsP50": 0.003700000001117587,
+      "tickMsP95": 0.006300000000919681,
+      "finalHash": "7bdb0205"
+    },
+    {
+      "strategy": "adaptive-no-raids",
+      "variant": null,
+      "seed": 1,
+      "outcome": "won",
+      "ticks": 19651,
+      "hiveTick": 19650,
+      "raids": {
+        "mustered": 0,
+        "beaten": 0,
+        "hit": 0,
+        "turnedBack": 0
+      },
+      "raidLog": [],
+      "econBuilt": {
+        "extractor": 6,
+        "hauler": 10
+      },
+      "econLost": {
+        "extractor": 0,
+        "hauler": 0
+      },
+      "peakEcon": 14,
+      "peakHaulers": 8,
+      "allocChanges": 44,
+      "built": {
+        "extractor": 6,
+        "hauler": 10,
+        "drone": 8,
+        "lancer": 8,
+        "flak": 10
+      },
+      "lost": {
+        "extractor": 0,
+        "hauler": 0,
+        "drone": 2,
+        "lancer": 3,
+        "flak": 9
+      },
+      "peakPerMin": 64,
+      "tickMsP50": 0.0038000000022293534,
+      "tickMsP95": 0.006699999998090789,
+      "finalHash": "82818586"
+    },
+    {
+      "strategy": "adaptive-no-raids",
+      "variant": null,
+      "seed": 2,
+      "outcome": "won",
+      "ticks": 19651,
+      "hiveTick": 19650,
+      "raids": {
+        "mustered": 0,
+        "beaten": 0,
+        "hit": 0,
+        "turnedBack": 0
+      },
+      "raidLog": [],
+      "econBuilt": {
+        "extractor": 6,
+        "hauler": 10
+      },
+      "econLost": {
+        "extractor": 0,
+        "hauler": 0
+      },
+      "peakEcon": 14,
+      "peakHaulers": 8,
+      "allocChanges": 44,
+      "built": {
+        "extractor": 6,
+        "hauler": 10,
+        "drone": 8,
+        "lancer": 8,
+        "flak": 10
+      },
+      "lost": {
+        "extractor": 0,
+        "hauler": 0,
+        "drone": 2,
+        "lancer": 3,
+        "flak": 9
+      },
+      "peakPerMin": 64,
+      "tickMsP50": 0.0037999999985913746,
+      "tickMsP95": 0.006600000000617001,
+      "finalHash": "aa5db9fe"
+    },
+    {
+      "strategy": "adaptive-no-raids",
+      "variant": null,
+      "seed": 3,
+      "outcome": "won",
+      "ticks": 19651,
+      "hiveTick": 19650,
+      "raids": {
+        "mustered": 0,
+        "beaten": 0,
+        "hit": 0,
+        "turnedBack": 0
+      },
+      "raidLog": [],
+      "econBuilt": {
+        "extractor": 6,
+        "hauler": 10
+      },
+      "econLost": {
+        "extractor": 0,
+        "hauler": 0
+      },
+      "peakEcon": 14,
+      "peakHaulers": 8,
+      "allocChanges": 44,
+      "built": {
+        "extractor": 6,
+        "hauler": 10,
+        "drone": 8,
+        "lancer": 8,
+        "flak": 10
+      },
+      "lost": {
+        "extractor": 0,
+        "hauler": 0,
+        "drone": 2,
+        "lancer": 3,
+        "flak": 9
+      },
+      "peakPerMin": 64,
+      "tickMsP50": 0.0037999999985913746,
+      "tickMsP95": 0.006499999995867256,
+      "finalHash": "32f0cefd"
+    },
+    {
+      "strategy": "static",
+      "variant": "war-lean 2/1/3/2/3",
+      "seed": 1,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 4,
+        "turnedBack": 11
+      },
+      "raidLog": [
+        {
+          "startTick": 14521,
+          "endTick": 15693,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 20769,
+          "endTick": 21873,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 25473,
+          "endTick": 26376,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 29976,
+          "endTick": 30906,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 34506,
+          "endTick": 35436,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 39036,
+          "endTick": 39936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 43536,
+          "endTick": 44436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 48036,
+          "endTick": 48936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 52536,
+          "endTick": 53436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 57036,
+          "endTick": 57936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 61536,
+          "endTick": 62436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 66036,
+          "endTick": 66936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 70536,
+          "endTick": 71436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 75036,
+          "endTick": 75936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 79536,
+          "endTick": 80436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 7
+      },
+      "econLost": {
+        "extractor": 6,
+        "hauler": 2
+      },
+      "peakEcon": 10,
+      "peakHaulers": 5,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 10,
+        "hauler": 7,
+        "drone": 17,
+        "lancer": 1,
+        "flak": 6
+      },
+      "lost": {
+        "extractor": 6,
+        "hauler": 2,
+        "drone": 2,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 52,
+      "tickMsP50": 0.004199999995762482,
+      "tickMsP95": 0.006099999998696148,
+      "finalHash": "cfd90f58"
+    },
+    {
+      "strategy": "static",
+      "variant": "war-lean 2/1/3/2/3",
+      "seed": 2,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 4,
+        "turnedBack": 11
+      },
+      "raidLog": [
+        {
+          "startTick": 14521,
+          "endTick": 15693,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 20769,
+          "endTick": 21873,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 25473,
+          "endTick": 26376,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 29976,
+          "endTick": 30906,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 34506,
+          "endTick": 35436,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 39036,
+          "endTick": 39936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 43536,
+          "endTick": 44436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 48036,
+          "endTick": 48936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 52536,
+          "endTick": 53436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 57036,
+          "endTick": 57936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 61536,
+          "endTick": 62436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 66036,
+          "endTick": 66936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 70536,
+          "endTick": 71436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 75036,
+          "endTick": 75936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 79536,
+          "endTick": 80436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 7
+      },
+      "econLost": {
+        "extractor": 6,
+        "hauler": 2
+      },
+      "peakEcon": 10,
+      "peakHaulers": 5,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 10,
+        "hauler": 7,
+        "drone": 17,
+        "lancer": 1,
+        "flak": 6
+      },
+      "lost": {
+        "extractor": 6,
+        "hauler": 2,
+        "drone": 2,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 52,
+      "tickMsP50": 0.004099999998288695,
+      "tickMsP95": 0.005999999993946403,
+      "finalHash": "9abd6612"
+    },
+    {
+      "strategy": "static",
+      "variant": "war-lean 2/1/3/2/3",
+      "seed": 3,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 4,
+        "turnedBack": 11
+      },
+      "raidLog": [
+        {
+          "startTick": 14521,
+          "endTick": 15693,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 20769,
+          "endTick": 21873,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 25473,
+          "endTick": 26376,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 29976,
+          "endTick": 30906,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 34506,
+          "endTick": 35436,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 39036,
+          "endTick": 39936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 43536,
+          "endTick": 44436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 48036,
+          "endTick": 48936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 52536,
+          "endTick": 53436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 57036,
+          "endTick": 57936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 61536,
+          "endTick": 62436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 66036,
+          "endTick": 66936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 70536,
+          "endTick": 71436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 75036,
+          "endTick": 75936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 79536,
+          "endTick": 80436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 7
+      },
+      "econLost": {
+        "extractor": 6,
+        "hauler": 2
+      },
+      "peakEcon": 10,
+      "peakHaulers": 5,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 10,
+        "hauler": 7,
+        "drone": 17,
+        "lancer": 1,
+        "flak": 6
+      },
+      "lost": {
+        "extractor": 6,
+        "hauler": 2,
+        "drone": 2,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 52,
+      "tickMsP50": 0.004099999998288695,
+      "tickMsP95": 0.006000000001222361,
+      "finalHash": "88aa35cd"
+    }
+  ],
+  "sweep": [
+    {
+      "strategy": "static",
+      "variant": "econ-lean 4/3/1/1/1",
+      "seed": 1,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 16,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6121,
+          "endTick": 7323,
+          "outcome": "hit",
+          "econLost": 5,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 13607,
+          "endTick": 14733,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 18333,
+          "endTick": 19473,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 23073,
+          "endTick": 24096,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 27696,
+          "endTick": 28465,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 32065,
+          "endTick": 32845,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 36445,
+          "endTick": 37225,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 40825,
+          "endTick": 41605,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 45205,
+          "endTick": 45985,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 49585,
+          "endTick": 50365,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 53965,
+          "endTick": 54745,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 58345,
+          "endTick": 59125,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 62725,
+          "endTick": 63505,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 67105,
+          "endTick": 67885,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 71485,
+          "endTick": 72265,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 75865,
+          "endTick": 76645,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 33,
+        "hauler": 22
+      },
+      "econLost": {
+        "extractor": 24,
+        "hauler": 7
+      },
+      "peakEcon": 25,
+      "peakHaulers": 15,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 33,
+        "hauler": 22,
+        "drone": 7,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 24,
+        "hauler": 7,
+        "drone": 1,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 92,
+      "tickMsP50": 0.00450000000273576,
+      "tickMsP95": 0.006800000002840534,
+      "finalHash": "92fa3b29"
+    },
+    {
+      "strategy": "static",
+      "variant": "even 3/2/2/2/2",
+      "seed": 1,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 16,
+        "beaten": 0,
+        "hit": 15,
+        "turnedBack": 1
+      },
+      "raidLog": [
+        {
+          "startTick": 8665,
+          "endTick": 9813,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 14018,
+          "endTick": 15183,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 19784,
+          "endTick": 20883,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 24483,
+          "endTick": 25386,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 28986,
+          "endTick": 29916,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 33516,
+          "endTick": 34476,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 38076,
+          "endTick": 39006,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 42606,
+          "endTick": 43536,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 47136,
+          "endTick": 48066,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 51666,
+          "endTick": 52596,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 56196,
+          "endTick": 57126,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 60726,
+          "endTick": 61656,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 65256,
+          "endTick": 66186,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 69786,
+          "endTick": 70716,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 74316,
+          "endTick": 75246,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 78846,
+          "endTick": 79776,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 25,
+        "hauler": 13
+      },
+      "econLost": {
+        "extractor": 18,
+        "hauler": 5
+      },
+      "peakEcon": 15,
+      "peakHaulers": 8,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 25,
+        "hauler": 13,
+        "drone": 11,
+        "lancer": 4,
+        "flak": 3
+      },
+      "lost": {
+        "extractor": 18,
+        "hauler": 5,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.00429999999323627,
+      "tickMsP95": 0.006300000000919681,
+      "finalHash": "9da6ac9c"
+    },
+    {
+      "strategy": "static",
+      "variant": "drone-heavy 3/2/4/1/1",
+      "seed": 1,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 14,
+        "turnedBack": 1
+      },
+      "raidLog": [
+        {
+          "startTick": 12841,
+          "endTick": 13983,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 19071,
+          "endTick": 19956,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 23556,
+          "endTick": 24486,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 28086,
+          "endTick": 29016,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 32616,
+          "endTick": 33546,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 37146,
+          "endTick": 38076,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 41676,
+          "endTick": 42606,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 46206,
+          "endTick": 47136,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 50736,
+          "endTick": 51666,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 55266,
+          "endTick": 56196,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 59796,
+          "endTick": 60726,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 64326,
+          "endTick": 65256,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 68856,
+          "endTick": 69786,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 73386,
+          "endTick": 74316,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 77916,
+          "endTick": 78846,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 21,
+        "hauler": 9
+      },
+      "econLost": {
+        "extractor": 14,
+        "hauler": 2
+      },
+      "peakEcon": 14,
+      "peakHaulers": 7,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 21,
+        "hauler": 9,
+        "drone": 16,
+        "lancer": 2,
+        "flak": 1
+      },
+      "lost": {
+        "extractor": 14,
+        "hauler": 2,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.004300000000512227,
+      "tickMsP95": 0.0063999999983934686,
+      "finalHash": "3e58439a"
+    },
+    {
+      "strategy": "static",
+      "variant": "flak-heavy 3/2/1/1/4",
+      "seed": 1,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 17,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6887,
+          "endTick": 8043,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11791,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17583,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 21183,
+          "endTick": 22206,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 25806,
+          "endTick": 26575,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 30175,
+          "endTick": 30955,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 34555,
+          "endTick": 35335,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 38935,
+          "endTick": 39715,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 43315,
+          "endTick": 44095,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 47695,
+          "endTick": 48475,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 52075,
+          "endTick": 52855,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 56455,
+          "endTick": 57235,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 60835,
+          "endTick": 61615,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 65215,
+          "endTick": 65995,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 69595,
+          "endTick": 70375,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 73975,
+          "endTick": 74755,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 78355,
+          "endTick": 79135,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 31,
+        "hauler": 21
+      },
+      "econLost": {
+        "extractor": 22,
+        "hauler": 6
+      },
+      "peakEcon": 25,
+      "peakHaulers": 15,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 31,
+        "hauler": 21,
+        "drone": 8,
+        "lancer": 1,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 22,
+        "hauler": 6,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 96,
+      "tickMsP50": 0.0044000000052619725,
+      "tickMsP95": 0.006300000000919681,
+      "finalHash": "f98ad26d"
+    },
+    {
+      "strategy": "static",
+      "variant": "lancer-heavy 3/2/1/4/1",
+      "seed": 1,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 17,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6887,
+          "endTick": 8043,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11791,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17583,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 21183,
+          "endTick": 22206,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 25806,
+          "endTick": 26575,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 30175,
+          "endTick": 30955,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 34555,
+          "endTick": 35335,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 38935,
+          "endTick": 39715,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 43315,
+          "endTick": 44095,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 47695,
+          "endTick": 48475,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 52075,
+          "endTick": 52855,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 56455,
+          "endTick": 57235,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 60835,
+          "endTick": 61615,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 65215,
+          "endTick": 65995,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 69595,
+          "endTick": 70375,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 73975,
+          "endTick": 74755,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 78355,
+          "endTick": 79135,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 29,
+        "hauler": 18
+      },
+      "econLost": {
+        "extractor": 21,
+        "hauler": 5
+      },
+      "peakEcon": 21,
+      "peakHaulers": 13,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 29,
+        "hauler": 18,
+        "drone": 6,
+        "lancer": 4,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 21,
+        "hauler": 5,
+        "drone": 1,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 84,
+      "tickMsP50": 0.004399999997986015,
+      "tickMsP95": 0.006800000002840534,
+      "finalHash": "93e70351"
+    },
+    {
+      "strategy": "static",
+      "variant": "war-lean 2/1/3/2/3",
+      "seed": 1,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 4,
+        "turnedBack": 11
+      },
+      "raidLog": [
+        {
+          "startTick": 14521,
+          "endTick": 15693,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 20769,
+          "endTick": 21873,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 25473,
+          "endTick": 26376,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 29976,
+          "endTick": 30906,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 34506,
+          "endTick": 35436,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 39036,
+          "endTick": 39936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 43536,
+          "endTick": 44436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 48036,
+          "endTick": 48936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 52536,
+          "endTick": 53436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 57036,
+          "endTick": 57936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 61536,
+          "endTick": 62436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 66036,
+          "endTick": 66936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 70536,
+          "endTick": 71436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 75036,
+          "endTick": 75936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 79536,
+          "endTick": 80436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 7
+      },
+      "econLost": {
+        "extractor": 6,
+        "hauler": 2
+      },
+      "peakEcon": 10,
+      "peakHaulers": 5,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 10,
+        "hauler": 7,
+        "drone": 17,
+        "lancer": 1,
+        "flak": 6
+      },
+      "lost": {
+        "extractor": 6,
+        "hauler": 2,
+        "drone": 2,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 52,
+      "tickMsP50": 0.004199999995762482,
+      "tickMsP95": 0.006099999998696148,
+      "finalHash": "cfd90f58"
+    },
+    {
+      "strategy": "static",
+      "variant": "econ-lean 4/3/1/1/1",
+      "seed": 2,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 16,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6121,
+          "endTick": 7323,
+          "outcome": "hit",
+          "econLost": 5,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 13607,
+          "endTick": 14733,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 18333,
+          "endTick": 19473,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 23073,
+          "endTick": 24096,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 27696,
+          "endTick": 28465,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 32065,
+          "endTick": 32845,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 36445,
+          "endTick": 37225,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 40825,
+          "endTick": 41605,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 45205,
+          "endTick": 45985,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 49585,
+          "endTick": 50365,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 53965,
+          "endTick": 54745,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 58345,
+          "endTick": 59125,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 62725,
+          "endTick": 63505,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 67105,
+          "endTick": 67885,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 71485,
+          "endTick": 72265,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 75865,
+          "endTick": 76645,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 33,
+        "hauler": 22
+      },
+      "econLost": {
+        "extractor": 24,
+        "hauler": 7
+      },
+      "peakEcon": 25,
+      "peakHaulers": 15,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 33,
+        "hauler": 22,
+        "drone": 7,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 24,
+        "hauler": 7,
+        "drone": 1,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 92,
+      "tickMsP50": 0.004600000000209548,
+      "tickMsP95": 0.007499999999708962,
+      "finalHash": "6faee8fb"
+    },
+    {
+      "strategy": "static",
+      "variant": "even 3/2/2/2/2",
+      "seed": 2,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 16,
+        "beaten": 0,
+        "hit": 15,
+        "turnedBack": 1
+      },
+      "raidLog": [
+        {
+          "startTick": 8665,
+          "endTick": 9813,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 14018,
+          "endTick": 15183,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 19784,
+          "endTick": 20883,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 24483,
+          "endTick": 25386,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 28986,
+          "endTick": 29916,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 33516,
+          "endTick": 34476,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 38076,
+          "endTick": 39006,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 42606,
+          "endTick": 43536,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 47136,
+          "endTick": 48066,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 51666,
+          "endTick": 52596,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 56196,
+          "endTick": 57126,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 60726,
+          "endTick": 61656,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 65256,
+          "endTick": 66186,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 69786,
+          "endTick": 70716,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 74316,
+          "endTick": 75246,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 78846,
+          "endTick": 79776,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 25,
+        "hauler": 13
+      },
+      "econLost": {
+        "extractor": 18,
+        "hauler": 5
+      },
+      "peakEcon": 15,
+      "peakHaulers": 8,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 25,
+        "hauler": 13,
+        "drone": 11,
+        "lancer": 4,
+        "flak": 3
+      },
+      "lost": {
+        "extractor": 18,
+        "hauler": 5,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.004300000000512227,
+      "tickMsP95": 0.006199999996169936,
+      "finalHash": "b9e541d2"
+    },
+    {
+      "strategy": "static",
+      "variant": "drone-heavy 3/2/4/1/1",
+      "seed": 2,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 14,
+        "turnedBack": 1
+      },
+      "raidLog": [
+        {
+          "startTick": 12841,
+          "endTick": 13983,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 19071,
+          "endTick": 19956,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 23556,
+          "endTick": 24486,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 28086,
+          "endTick": 29016,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 32616,
+          "endTick": 33546,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 37146,
+          "endTick": 38076,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 41676,
+          "endTick": 42606,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 46206,
+          "endTick": 47136,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 50736,
+          "endTick": 51666,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 55266,
+          "endTick": 56196,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 59796,
+          "endTick": 60726,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 64326,
+          "endTick": 65256,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 68856,
+          "endTick": 69786,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 73386,
+          "endTick": 74316,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 77916,
+          "endTick": 78846,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 21,
+        "hauler": 9
+      },
+      "econLost": {
+        "extractor": 14,
+        "hauler": 2
+      },
+      "peakEcon": 14,
+      "peakHaulers": 7,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 21,
+        "hauler": 9,
+        "drone": 16,
+        "lancer": 2,
+        "flak": 1
+      },
+      "lost": {
+        "extractor": 14,
+        "hauler": 2,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.004300000000512227,
+      "tickMsP95": 0.006100000005972106,
+      "finalHash": "5c568886"
+    },
+    {
+      "strategy": "static",
+      "variant": "flak-heavy 3/2/1/1/4",
+      "seed": 2,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 17,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6887,
+          "endTick": 8043,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11791,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17583,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 21183,
+          "endTick": 22206,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 25806,
+          "endTick": 26575,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 30175,
+          "endTick": 30955,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 34555,
+          "endTick": 35335,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 38935,
+          "endTick": 39715,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 43315,
+          "endTick": 44095,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 47695,
+          "endTick": 48475,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 52075,
+          "endTick": 52855,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 56455,
+          "endTick": 57235,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 60835,
+          "endTick": 61615,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 65215,
+          "endTick": 65995,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 69595,
+          "endTick": 70375,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 73975,
+          "endTick": 74755,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 78355,
+          "endTick": 79135,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 31,
+        "hauler": 21
+      },
+      "econLost": {
+        "extractor": 22,
+        "hauler": 6
+      },
+      "peakEcon": 25,
+      "peakHaulers": 15,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 31,
+        "hauler": 21,
+        "drone": 8,
+        "lancer": 1,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 22,
+        "hauler": 6,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 96,
+      "tickMsP50": 0.0044000000052619725,
+      "tickMsP95": 0.006300000000919681,
+      "finalHash": "efff5889"
+    },
+    {
+      "strategy": "static",
+      "variant": "lancer-heavy 3/2/1/4/1",
+      "seed": 2,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 17,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6887,
+          "endTick": 8043,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11791,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17583,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 21183,
+          "endTick": 22206,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 25806,
+          "endTick": 26575,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 30175,
+          "endTick": 30955,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 34555,
+          "endTick": 35335,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 38935,
+          "endTick": 39715,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 43315,
+          "endTick": 44095,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 47695,
+          "endTick": 48475,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 52075,
+          "endTick": 52855,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 56455,
+          "endTick": 57235,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 60835,
+          "endTick": 61615,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 65215,
+          "endTick": 65995,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 69595,
+          "endTick": 70375,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 73975,
+          "endTick": 74755,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 78355,
+          "endTick": 79135,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 29,
+        "hauler": 18
+      },
+      "econLost": {
+        "extractor": 21,
+        "hauler": 5
+      },
+      "peakEcon": 21,
+      "peakHaulers": 13,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 29,
+        "hauler": 18,
+        "drone": 6,
+        "lancer": 4,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 21,
+        "hauler": 5,
+        "drone": 1,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 84,
+      "tickMsP50": 0.004399999997986015,
+      "tickMsP95": 0.006600000000617001,
+      "finalHash": "bffd2a65"
+    },
+    {
+      "strategy": "static",
+      "variant": "war-lean 2/1/3/2/3",
+      "seed": 2,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 4,
+        "turnedBack": 11
+      },
+      "raidLog": [
+        {
+          "startTick": 14521,
+          "endTick": 15693,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 20769,
+          "endTick": 21873,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 25473,
+          "endTick": 26376,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 29976,
+          "endTick": 30906,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 34506,
+          "endTick": 35436,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 39036,
+          "endTick": 39936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 43536,
+          "endTick": 44436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 48036,
+          "endTick": 48936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 52536,
+          "endTick": 53436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 57036,
+          "endTick": 57936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 61536,
+          "endTick": 62436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 66036,
+          "endTick": 66936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 70536,
+          "endTick": 71436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 75036,
+          "endTick": 75936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 79536,
+          "endTick": 80436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 7
+      },
+      "econLost": {
+        "extractor": 6,
+        "hauler": 2
+      },
+      "peakEcon": 10,
+      "peakHaulers": 5,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 10,
+        "hauler": 7,
+        "drone": 17,
+        "lancer": 1,
+        "flak": 6
+      },
+      "lost": {
+        "extractor": 6,
+        "hauler": 2,
+        "drone": 2,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 52,
+      "tickMsP50": 0.004099999998288695,
+      "tickMsP95": 0.005999999993946403,
+      "finalHash": "9abd6612"
+    },
+    {
+      "strategy": "static",
+      "variant": "econ-lean 4/3/1/1/1",
+      "seed": 3,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 16,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6121,
+          "endTick": 7323,
+          "outcome": "hit",
+          "econLost": 5,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 13607,
+          "endTick": 14733,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 18333,
+          "endTick": 19473,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 23073,
+          "endTick": 24096,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 27696,
+          "endTick": 28465,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 32065,
+          "endTick": 32845,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 36445,
+          "endTick": 37225,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 40825,
+          "endTick": 41605,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 45205,
+          "endTick": 45985,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 49585,
+          "endTick": 50365,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 53965,
+          "endTick": 54745,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 58345,
+          "endTick": 59125,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 62725,
+          "endTick": 63505,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 67105,
+          "endTick": 67885,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 71485,
+          "endTick": 72265,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 75865,
+          "endTick": 76645,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 33,
+        "hauler": 22
+      },
+      "econLost": {
+        "extractor": 24,
+        "hauler": 7
+      },
+      "peakEcon": 25,
+      "peakHaulers": 15,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 33,
+        "hauler": 22,
+        "drone": 7,
+        "lancer": 0,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 24,
+        "hauler": 7,
+        "drone": 1,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 92,
+      "tickMsP50": 0.00450000000273576,
+      "tickMsP95": 0.006600000000617001,
+      "finalHash": "633138dc"
+    },
+    {
+      "strategy": "static",
+      "variant": "even 3/2/2/2/2",
+      "seed": 3,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 16,
+        "beaten": 0,
+        "hit": 15,
+        "turnedBack": 1
+      },
+      "raidLog": [
+        {
+          "startTick": 8665,
+          "endTick": 9813,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 14018,
+          "endTick": 15183,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 19784,
+          "endTick": 20883,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 24483,
+          "endTick": 25386,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 28986,
+          "endTick": 29916,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 33516,
+          "endTick": 34476,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 38076,
+          "endTick": 39006,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 42606,
+          "endTick": 43536,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 47136,
+          "endTick": 48066,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 51666,
+          "endTick": 52596,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 56196,
+          "endTick": 57126,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 60726,
+          "endTick": 61656,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 65256,
+          "endTick": 66186,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 69786,
+          "endTick": 70716,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 74316,
+          "endTick": 75246,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 78846,
+          "endTick": 79776,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 5
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 25,
+        "hauler": 13
+      },
+      "econLost": {
+        "extractor": 18,
+        "hauler": 5
+      },
+      "peakEcon": 15,
+      "peakHaulers": 8,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 25,
+        "hauler": 13,
+        "drone": 11,
+        "lancer": 4,
+        "flak": 3
+      },
+      "lost": {
+        "extractor": 18,
+        "hauler": 5,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.004300000000512227,
+      "tickMsP95": 0.006499999995867256,
+      "finalHash": "fd222921"
+    },
+    {
+      "strategy": "static",
+      "variant": "drone-heavy 3/2/4/1/1",
+      "seed": 3,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 14,
+        "turnedBack": 1
+      },
+      "raidLog": [
+        {
+          "startTick": 12841,
+          "endTick": 13983,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 19071,
+          "endTick": 19956,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 23556,
+          "endTick": 24486,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 28086,
+          "endTick": 29016,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 32616,
+          "endTick": 33546,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 37146,
+          "endTick": 38076,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 41676,
+          "endTick": 42606,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 46206,
+          "endTick": 47136,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 50736,
+          "endTick": 51666,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 55266,
+          "endTick": 56196,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 59796,
+          "endTick": 60726,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 64326,
+          "endTick": 65256,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 68856,
+          "endTick": 69786,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 73386,
+          "endTick": 74316,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        },
+        {
+          "startTick": 77916,
+          "endTick": 78846,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 5
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 21,
+        "hauler": 9
+      },
+      "econLost": {
+        "extractor": 14,
+        "hauler": 2
+      },
+      "peakEcon": 14,
+      "peakHaulers": 7,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 21,
+        "hauler": 9,
+        "drone": 16,
+        "lancer": 2,
+        "flak": 1
+      },
+      "lost": {
+        "extractor": 14,
+        "hauler": 2,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 56,
+      "tickMsP50": 0.004300000000512227,
+      "tickMsP95": 0.006100000005972106,
+      "finalHash": "a49b9ef1"
+    },
+    {
+      "strategy": "static",
+      "variant": "flak-heavy 3/2/1/1/4",
+      "seed": 3,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 17,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6887,
+          "endTick": 8043,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11791,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17583,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 21183,
+          "endTick": 22206,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 25806,
+          "endTick": 26575,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 30175,
+          "endTick": 30955,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 34555,
+          "endTick": 35335,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 38935,
+          "endTick": 39715,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 43315,
+          "endTick": 44095,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 47695,
+          "endTick": 48475,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 52075,
+          "endTick": 52855,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 56455,
+          "endTick": 57235,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 60835,
+          "endTick": 61615,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 65215,
+          "endTick": 65995,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 69595,
+          "endTick": 70375,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 73975,
+          "endTick": 74755,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        },
+        {
+          "startTick": 78355,
+          "endTick": 79135,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 8
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 31,
+        "hauler": 21
+      },
+      "econLost": {
+        "extractor": 22,
+        "hauler": 6
+      },
+      "peakEcon": 25,
+      "peakHaulers": 15,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 31,
+        "hauler": 21,
+        "drone": 8,
+        "lancer": 1,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 22,
+        "hauler": 6,
+        "drone": 1,
+        "lancer": 1,
+        "flak": 0
+      },
+      "peakPerMin": 96,
+      "tickMsP50": 0.0044999999954598024,
+      "tickMsP95": 0.006599999993341044,
+      "finalHash": "b8c836fe"
+    },
+    {
+      "strategy": "static",
+      "variant": "lancer-heavy 3/2/1/4/1",
+      "seed": 3,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 17,
+        "beaten": 0,
+        "hit": 17,
+        "turnedBack": 0
+      },
+      "raidLog": [
+        {
+          "startTick": 6887,
+          "endTick": 8043,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 11791,
+          "endTick": 12903,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 16503,
+          "endTick": 17583,
+          "outcome": "hit",
+          "econLost": 3,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 21183,
+          "endTick": 22206,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 2,
+            "spore": 4
+          }
+        },
+        {
+          "startTick": 25806,
+          "endTick": 26575,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 3,
+            "spore": 6
+          }
+        },
+        {
+          "startTick": 30175,
+          "endTick": 30955,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 34555,
+          "endTick": 35335,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 38935,
+          "endTick": 39715,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 43315,
+          "endTick": 44095,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 47695,
+          "endTick": 48475,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 52075,
+          "endTick": 52855,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 56455,
+          "endTick": 57235,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 60835,
+          "endTick": 61615,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 65215,
+          "endTick": 65995,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 69595,
+          "endTick": 70375,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 73975,
+          "endTick": 74755,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        },
+        {
+          "startTick": 78355,
+          "endTick": 79135,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 4,
+            "spore": 7
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 29,
+        "hauler": 18
+      },
+      "econLost": {
+        "extractor": 21,
+        "hauler": 5
+      },
+      "peakEcon": 21,
+      "peakHaulers": 13,
+      "allocChanges": 3,
+      "built": {
+        "extractor": 29,
+        "hauler": 18,
+        "drone": 6,
+        "lancer": 4,
+        "flak": 0
+      },
+      "lost": {
+        "extractor": 21,
+        "hauler": 5,
+        "drone": 1,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 84,
+      "tickMsP50": 0.004399999997986015,
+      "tickMsP95": 0.006600000000617001,
+      "finalHash": "9a3b5642"
+    },
+    {
+      "strategy": "static",
+      "variant": "war-lean 2/1/3/2/3",
+      "seed": 3,
+      "outcome": "timeout",
+      "ticks": 81000,
+      "hiveTick": null,
+      "raids": {
+        "mustered": 15,
+        "beaten": 0,
+        "hit": 4,
+        "turnedBack": 11
+      },
+      "raidLog": [
+        {
+          "startTick": 14521,
+          "endTick": 15693,
+          "outcome": "hit",
+          "econLost": 4,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 20769,
+          "endTick": 21873,
+          "outcome": "hit",
+          "econLost": 2,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 25473,
+          "endTick": 26376,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 1,
+            "spore": 2
+          }
+        },
+        {
+          "startTick": 29976,
+          "endTick": 30906,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 34506,
+          "endTick": 35436,
+          "outcome": "hit",
+          "econLost": 1,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 39036,
+          "endTick": 39936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 43536,
+          "endTick": 44436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 48036,
+          "endTick": 48936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 52536,
+          "endTick": 53436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 57036,
+          "endTick": 57936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 61536,
+          "endTick": 62436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 66036,
+          "endTick": 66936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 70536,
+          "endTick": 71436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 75036,
+          "endTick": 75936,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        },
+        {
+          "startTick": 79536,
+          "endTick": 80436,
+          "outcome": "turnedBack",
+          "econLost": 0,
+          "planned": {
+            "thorn": 2,
+            "spore": 3
+          }
+        }
+      ],
+      "econBuilt": {
+        "extractor": 10,
+        "hauler": 7
+      },
+      "econLost": {
+        "extractor": 6,
+        "hauler": 2
+      },
+      "peakEcon": 10,
+      "peakHaulers": 5,
+      "allocChanges": 5,
+      "built": {
+        "extractor": 10,
+        "hauler": 7,
+        "drone": 17,
+        "lancer": 1,
+        "flak": 6
+      },
+      "lost": {
+        "extractor": 6,
+        "hauler": 2,
+        "drone": 2,
+        "lancer": 0,
+        "flak": 0
+      },
+      "peakPerMin": 52,
+      "tickMsP50": 0.004099999998288695,
+      "tickMsP95": 0.006000000001222361,
+      "finalHash": "88aa35cd"
+    }
+  ]
+}
