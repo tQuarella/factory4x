@@ -37,7 +37,7 @@ Launches: 10 / 12.
 | r11 | engineer | h8-bots | resume | Fix round 1; also bots gate time |
 | r12 | engineer | h8-client | resume | Fix round 1 done (af0a91d): map 210 px with rock sheet, raids merged |
 | 10 | critic | h8-client | launch | Launched by mistake for round 2 and stopped at once; counted |
-| r13 | critic | h8-client | resume | Review round 2 (round 1 critic) |
+| r13 | critic | h8-client | resume | Review round 2: REJECT on stack items only (94757b1); client work complete; final round after design-data |
 
 ## Iteration 7 ledger
 

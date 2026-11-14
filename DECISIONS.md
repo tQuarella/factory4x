@@ -1186,3 +1186,8 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 
 **Decision:** the bot's Hauler weight may be 0 with a shortfall only (a) at the fleet limit, for an asteroid shortfall, when economy plus the wave being built would not fit, and (b) while recycling economy ships toward a wave, except for a taken pocket with no hauler. DESIGN.md bot change 1 amended. The whole-run test must count zero ticks outside these exceptions, not "under 120 s".
 **Why:** the Critic (h8-bots round 1) found the code contradicted the spec's "never". The engineer's guards prevent a build-recycle-build loop at the limit, which is the same slot trade H7's recycle rule makes; that is a sound bot rule, so the spec follows the code, but the exception must be exact.
+
+## 2026-11-14 · Director · h8-client: a reject held only for the stack doesn't count toward the deadlock rule
+
+**Decision:** h8-client round 2 (94757b1) rejected only because acceptance 11–12 wait on h8-bots and h8-design-data; the Critic asked for no code or test changes. That reject does not count as a rework round under PROCESS.md's deadlock rule. The next round is the final, stack-integration round. If it rejects for rework, that counts as the third and the rule applies as written.
+**Why:** the deadlock rule exists to stop an author looping on the same defects. A round that only waits for other tasks isn't a loop, and parking the top of the stack would block the whole build for no quality gain. In future, the Director holds a top-of-stack Critic round until the lower tasks are approved, rather than spend a round on it.
