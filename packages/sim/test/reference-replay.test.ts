@@ -121,7 +121,12 @@ describe('reference replay (field mode)', () => {
   });
 
   it('recycles a docked extractor at a2 (tick 900) for its refund (the replay tunes ship.extractor.cost to 5)', () => {
-    expect(recycle).toEqual({ tick: 900, econBefore: recycle!.econBefore, econAfter: recycle!.econBefore - 1, refund: Math.floor((5 * t['fleet.recycleRefundPct'].default) / 100) });
+    expect(recycle).not.toBeNull();
+    expect(recycle!.tick).toBe(900);
+    // One economy ship fewer after the tick (no economy bay finishes then: both economy weights are 0 from tick 280).
+    expect(recycle!.econBefore).toBeGreaterThan(0);
+    expect(recycle!.econAfter).toBe(recycle!.econBefore - 1);
+    expect(recycle!.refund).toBe(Math.floor((5 * t['fleet.recycleRefundPct'].default) / 100));
     expect(w.stats.econRecycled).toEqual({ extractor: 1, hauler: 0 });
   });
 

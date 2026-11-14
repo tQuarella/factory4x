@@ -846,7 +846,7 @@ export function allocStatus(world: Readonly<World>, data: SimData): AllocStatus 
   const f = fieldOrThrow(world);
   const full = isFleetFull(world, data);
   const rows = BUILD_TYPES.map((type): AllocRow => {
-    const bay = bayOf(world as World, type);
+    const bay = bayOf(world, type);
     const ore = oreCost(world, type);
     const resource = resourceCost(world, type);
     const unlocked = isTypeUnlocked(world, type);

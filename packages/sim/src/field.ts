@@ -41,7 +41,9 @@ export function isEconType(type: BuildType): type is EconType {
 }
 
 /** The probe's bay for `type` (F3): the economy bays live in world.field, the warship bays are world.yards. */
-export function bayOf(world: World, type: BuildType): Yard {
+export function bayOf(world: World, type: BuildType): Yard;
+export function bayOf(world: Readonly<World>, type: BuildType): Readonly<Yard>;
+export function bayOf(world: Readonly<World>, type: BuildType): Readonly<Yard> {
   return isEconType(type) ? fieldOf(world).bays[type] : world.yards[type];
 }
 
@@ -236,11 +238,20 @@ function betterHaulTarget(world: Readonly<World>, assigned: readonly number[], a
   return a < b;
 }
 
-/** The F6 pick for a hauler at the probe with no worked target: the best worked node, or null (it parks idle). */
+/**
+ * F6: a node a hauler may be assigned to: worked and Mine-marked. Director, 2026-11-14 (h7-sim review round 1):
+ * only Mine-marked rocks can be assigned haulers, so Stop means stop (raids target rocks with assigned haulers,
+ * R5). An unmarked rock's leftover buffer stays on the rock until it is marked again.
+ */
+export function isHaulable(world: Readonly<World>, node: number): boolean {
+  return fieldOf(world).mine[node] === true && isWorked(world, node);
+}
+
+/** The F6 pick for a hauler at the probe with no haulable target: the best worked, Mine-marked node, or null (it parks idle). */
 export function haulTarget(world: Readonly<World>, assigned: readonly number[]): number | null {
   let best: number | null = null;
   for (const n of world.nodes) {
-    if (!isWorked(world, n.index)) continue;
+    if (!isHaulable(world, n.index)) continue;
     if (best === null || betterHaulTarget(world, assigned, n.index, best)) best = n.index;
   }
   return best;
@@ -284,11 +295,11 @@ function unload(world: World, s: EconShip): void {
 
 /**
  * F6, haulers, in id order (ships in transit skip; the unload happens on arrival, in F7):
- *  - at the probe: keep the node while it is worked and still Mine-marked (F12: a hauler of an unmarked node
- *    finishes its trip and reassigns); otherwise pick by haulTarget, or park idle. Then fly to the node at
- *    ship.hauler.speedSu.
+ *  - at the probe: keep the node while it is haulable (worked and Mine-marked; F12: a hauler of an unmarked
+ *    node finishes its trip and reassigns); otherwise pick by haulTarget (haulable nodes only), or park idle.
+ *    Then fly to the node at ship.hauler.speedSu.
  *  - at its node: once the buffer holds a full cargo, or the node has no working extractor left (so the buffer
- *    can't grow), load min(buffer, cargo) and fly to the probe.
+ *    can't grow), or its mark is off (Stop ends the trip now), load min(buffer, cargo) and fly to the probe.
  */
 export function runHaulers(world: World): void {
   const f = fieldOf(world);
@@ -300,7 +311,7 @@ export function runHaulers(world: World): void {
     if (s.at === PROBE) {
       // A hauler placed at the probe with cargo (never in play: it unloads on arrival) unloads here.
       unload(world, s);
-      if (s.target !== null && !(f.mine[s.target] === true && isWorked(world, s.target))) {
+      if (s.target !== null && !isHaulable(world, s.target)) {
         assigned[s.target] = assigned[s.target]! - 1;
         s.target = null;
       }
@@ -313,7 +324,7 @@ export function runHaulers(world: World): void {
       startTransit(world, s, s.target, speed);
     } else if (s.at === s.target) {
       const node = world.nodes[s.at]!;
-      if (node.buffer < cargoCap && node.extractors > 0) continue;
+      if (node.buffer < cargoCap && node.extractors > 0 && f.mine[s.at] === true) continue;
       const load = Math.min(node.buffer, cargoCap);
       node.buffer -= load;
       s.cargo = load;

@@ -438,6 +438,90 @@ describe('F6 haulers', () => {
     expect(h.transit!.to).toBe(F.a1);
   });
 
+  /** A quiet field with p1 captured (Mine-marked, one free extractor), plus `asteroids` marked with one docked extractor each. */
+  function capturedP1(...asteroids: number[]): World {
+    const w = marked(...asteroids);
+    for (const n of asteroids) addEcon(w, 'extractor', n, n);
+    setGuards(w, F.p1, []);
+    addShips(w, F.p1, 1);
+    tick(w);
+    expect(guardianAt(w, F.p1)!.alive).toBe(false);
+    return w;
+  }
+
+  /** After Stop on p1: runs 6000 ticks and returns the last tick any hauler targeted p1, and the ice delivered after it. */
+  function afterStop(w: World): { lastOnP1: number; iceAfter: number } {
+    let lastOnP1 = -1;
+    for (let i = 0; i < 6000; i++) {
+      if (w.field!.econ.some((s) => s.type === 'hauler' && s.target === F.p1)) lastOnP1 = w.tick;
+      tick(w);
+    }
+    expect(lastOnP1).toBeGreaterThanOrEqual(0);
+    return { lastOnP1, iceAfter: w.stats.delivered.ice };
+  }
+
+  it('Stop on a captured pocket releases its haulers: they finish the trip, never pick it again, and ice deliveries stop (p1 the only worked rock)', () => {
+    const w = capturedP1();
+    const h = addEcon(w, 'hauler', PROBE);
+    runUntil(w, () => h.at === F.p1, 400);
+    tick(w, { type: 'setMine', node: F.p1, on: false });
+    // Stop ends the wait at once: it loads what is there and flies home.
+    expect(h.transit!.to).toBe(PROBE);
+    runUntil(w, () => h.at === PROBE, 400);
+    const ice = w.stats.delivered.ice;
+    tick(w);
+    expect([h.target, h.at, h.transit]).toEqual([null, PROBE, null]);
+    run(w, 6000);
+    expect(h.target).toBeNull();
+    expect(w.stats.delivered.ice).toBe(ice);
+    // The free extractor still works the rock: its buffer stays there, and is collected once the mark is back on.
+    expect(w.nodes[F.p1]!.buffer).toBeGreaterThan(0);
+    tick(w, { type: 'setMine', node: F.p1, on: true });
+    expect(h.target).toBe(F.p1);
+  });
+
+  it('Stop on a captured pocket releases its haulers with other rocks worked too (a1 and a2, three haulers): none targets p1 after its trip', () => {
+    const w = capturedP1(F.a1, F.a2);
+    for (let i = 0; i < 3; i++) addEcon(w, 'hauler', PROBE);
+    runUntil(w, () => w.field!.econ.some((s) => s.type === 'hauler' && s.target === F.p1 && s.at === F.p1), 2000);
+    tick(w, { type: 'setMine', node: F.p1, on: false });
+    // Every hauler that was on p1 is flying home within one round trip.
+    const { lastOnP1, iceAfter } = afterStop(w);
+    const roundTrip = 2 * Math.ceil(358 / w.tun['ship.hauler.speedSu']) + 2;
+    expect(lastOnP1).toBeLessThan(w.tick - 6000 + roundTrip);
+    const iceAtStop = iceAfter;
+    run(w, 3000);
+    expect(w.stats.delivered.ice).toBe(iceAtStop);
+    // The other rocks keep their haulers.
+    expect(w.field!.econ.filter((s) => s.type === 'hauler' && s.target !== null).every((s) => s.target === F.a1 || s.target === F.a2)).toBe(true);
+  });
+
+  it('the hive after Stop gets no haulers either', () => {
+    const w = quietField();
+    setGuards(w, F.heart, []);
+    addShips(w, F.heart, 1);
+    tick(w, { type: 'setTunable', key: 'ship.hauler.speedSu', value: 10 });
+    expect(w.field!.mine[F.heart]).toBe(true);
+    tick(w, { type: 'setMine', node: F.heart, on: false });
+    const h = addEcon(w, 'hauler', PROBE);
+    run(w, 600);
+    expect([h.target, h.at]).toEqual([null, PROBE]);
+    expect(w.stats.delivered.ore).toBe(0);
+  });
+
+  it('only Mine-marked rocks are assigned haulers: an unmarked asteroid\'s leftover buffer stays on it until it is marked again (Director, 2026-11-14)', () => {
+    const w = quietField();
+    w.nodes[F.a1]!.buffer = 10;
+    const h = addEcon(w, 'hauler', PROBE);
+    run(w, 300);
+    expect([h.target, w.nodes[F.a1]!.buffer]).toEqual([null, 10]);
+    tick(w, { type: 'setMine', node: F.a1, on: true });
+    expect(h.target).toBe(F.a1);
+    runUntil(w, () => w.stats.delivered.ore > 0, 400);
+    // No extractor works a1: the hauler loads what is there (min(buffer, cargo)) each trip until it is empty.
+    expect(w.stats.delivered.ore).toBe(w.tun['ship.hauler.cargo']);
+  });
+
   it('a hauler of an unmarked node finishes its trip and reassigns at the probe', () => {
     const w = docks(1, 1);
     const h = addEcon(w, 'hauler', F.a1, F.a1);

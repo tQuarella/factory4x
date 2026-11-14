@@ -105,8 +105,9 @@ describe('guardStrike: the guard damage F10 uses, exported for the raid fight (R
     setGuards(w, F.p2, [['thorn', 20]]);
     addShips(w, F.p2, 1);
     const x = addEcon(w, 'hauler', F.p2, F.p2);
-    // Pin it there: with a working extractor and an empty buffer, F6 keeps it waiting at its node.
+    // Pin it there: marked, with a working extractor and an empty buffer, F6 keeps it waiting at its node.
     w.field!.free[F.p2] = 1;
+    w.field!.mine[F.p2] = true;
     tick(w);
     expect(x.at).toBe(F.p2);
     expect(w.ships[0]!.hp).toBe(w.tun['ship.drone.hp'] - w.tun['guard.thorn.damage']);

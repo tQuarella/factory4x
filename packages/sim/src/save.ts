@@ -83,10 +83,38 @@ function fieldOk(f: unknown, nodes: number | null): boolean {
     isObj(bays) &&
     ECON_TYPES.every((t) => isObj(bays[t]) && isInt(bays[t].ticksLeft)) &&
     Array.isArray(f.econ) &&
-    f.econ.every((s: unknown) => isObj(s) && isInt(s.id) && (s.type === 'extractor' || s.type === 'hauler') && isInt(s.hp) && isIntOrNull(s.target) && isInt(s.cargo)) &&
+    f.econ.every((s: unknown) => econShipOk(s, nodes)) &&
     perNode(f.mine) &&
+    (f.mine as unknown[]).every((m) => typeof m === 'boolean') &&
     perNode(f.free) &&
-    perNode(f.rockBuckets)
+    (f.free as unknown[]).every((v) => isInt(v) && v >= 0) &&
+    perNode(f.rockBuckets) &&
+    (f.rockBuckets as unknown[]).every((ring) => Array.isArray(ring) && ring.length > 0 && ring.every((v: unknown) => isInt(v) && v >= 0))
+  );
+}
+
+const isNodeIndex = (v: unknown, nodes: number): boolean => isInt(v) && v >= 0 && v < nodes;
+const isNodeOrNull = (v: unknown, nodes: number): boolean => v === null || isNodeIndex(v, nodes);
+
+/**
+ * H7: one economy ship: integer id and hp, a known type, parked at a node (`at`, no transit) or in transit between
+ * two nodes (`at` null), a node or null target, and a cargo that is 0 with no resource or positive with one.
+ */
+function econShipOk(s: unknown, nodes: number): boolean {
+  if (!isObj(s) || !isInt(s.id) || !isInt(s.hp) || (s.type !== 'extractor' && s.type !== 'hauler')) return false;
+  if (!isNodeOrNull(s.target, nodes) || !isInt(s.cargo) || s.cargo < 0) return false;
+  if (s.cargo === 0 ? s.cargoRes !== null : !(RAW_RESOURCES as readonly unknown[]).includes(s.cargoRes)) return false;
+  const tr = s.transit;
+  if (tr === null) return isNodeIndex(s.at, nodes);
+  return (
+    s.at === null &&
+    isObj(tr) &&
+    isNodeIndex(tr.from, nodes) &&
+    isNodeIndex(tr.to, nodes) &&
+    isInt(tr.ticksLeft) &&
+    isInt(tr.totalTicks) &&
+    tr.ticksLeft >= 0 &&
+    tr.ticksLeft <= tr.totalTicks
   );
 }
 

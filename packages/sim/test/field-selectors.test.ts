@@ -256,6 +256,38 @@ describe('save (field mode)', () => {
     const noStats = JSON.parse(text) as { world: { stats: Record<string, unknown> } };
     delete noStats.world.stats.peakEcon;
     expect(deserializeWorld(JSON.stringify(noStats), FD)).toMatchObject({ ok: false, reason: 'corrupt' });
+    // Deeper shape checks: an economy ship's position, transit and cargo, and the rock rings' contents.
+    type Econ = Record<string, unknown>;
+    const edits: Array<(econ: Econ, f: Record<string, unknown>) => void> = [
+      (s) => (s.at = 99),
+      (s) => ((s.at = null), (s.transit = null)),
+      (s) => (s.transit = { from: 0, to: 1, ticksLeft: 5, totalTicks: 9 }),
+      (s) => ((s.at = null), (s.transit = { from: 0, to: 42, ticksLeft: 5, totalTicks: 9 })),
+      (s) => ((s.at = null), (s.transit = { from: 0, to: 1, ticksLeft: 10, totalTicks: 9 })),
+      (s) => ((s.cargo = 3), (s.cargoRes = null)),
+      (s) => ((s.cargo = 0), (s.cargoRes = 'ore')),
+      (s) => ((s.cargo = 2), (s.cargoRes = 'lens')),
+      (s) => (s.target = 11),
+      (_, f) => ((f.rockBuckets as unknown[][])[1]![0] = -1),
+      (_, f) => ((f.rockBuckets as unknown[])[2] = []),
+      (_, f) => ((f.mine as unknown[])[1] = 1),
+      (_, f) => ((f.free as unknown[])[1] = -1),
+    ];
+    for (const [i, edit] of edits.entries()) {
+      const bad = JSON.parse(text) as { world: { field: Record<string, unknown> & { econ: Econ[] } } };
+      const s = bad.world.field.econ[0]!;
+      s.at = 1;
+      s.transit = null;
+      edit(s, bad.world.field);
+      expect(deserializeWorld(JSON.stringify(bad), FD), `edit ${i}`).toMatchObject({ ok: false, reason: 'corrupt' });
+    }
+    // The same baseline without an edit (a ship parked at a1, empty) is a valid save.
+    const ok = JSON.parse(text) as { world: { field: { econ: Econ[] } } };
+    Object.assign(ok.world.field.econ[0]!, { at: 1, transit: null, cargo: 0, cargoRes: null });
+    expect(deserializeWorld(JSON.stringify(ok), FD).ok).toBe(true);
+    const loaded = JSON.parse(text) as { world: { field: { econ: Econ[] } } };
+    Object.assign(loaded.world.field.econ[0]!, { at: null, transit: { from: 0, to: 1, ticksLeft: 3, totalTicks: 9 }, cargo: 4, cargoRes: 'ice' });
+    expect(deserializeWorld(JSON.stringify(loaded), FD).ok).toBe(true);
     const badRaid = JSON.parse(text) as { world: Record<string, unknown> };
     delete badRaid.world.nextRaidTick;
     expect(deserializeWorld(JSON.stringify(badRaid), FD)).toMatchObject({ ok: false, reason: 'corrupt' });

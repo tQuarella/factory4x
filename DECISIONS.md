@@ -875,7 +875,7 @@ Scope: `git log build-20261108-4..build-20261108-5`, `reviews/h6-*.md`, the "Ite
 **Spec readings:**
 - **F6 "wait until … the node is no longer worked":** I read this as "the node has no working extractor left". Read literally, a node with a buffer of 1 or more is still worked, so a hauler waiting on an unmarked rock with a buffer below one cargo would wait forever. "The partial load when a node stops being worked" is that case.
 - **F6 ratio with 0 working extractors** (a worked node with a buffer only): there is no finite ratio, so it ranks after every node with an extractor, and among such nodes the one with fewer haulers goes first. Plain cross-multiplication makes such a node tie with every other node (0 × e = h × 0).
-- **F6 keep vs F12:** a hauler keeps its node at the probe while the node is worked *and* still Mine-marked. F12 says an unmarked node's haulers "finish their trip and reassign". The reassignment may pick the same node again if it is the only one worked.
+- **F6 keep vs F12:** a hauler keeps its node at the probe while the node is worked *and* still Mine-marked. F12 says an unmarked node's haulers "finish their trip and reassign". ~~The reassignment may pick the same node again if it is the only one worked.~~ *Corrected in round 2 (h7-sim review, round 1 defect):* that sentence was wrong. Assignment ignored the mark, so a captured pocket or hive after Stop (still worked by its free extractor) was picked straight back, even with other rocks worked. Assignment now takes Mine-marked worked nodes only. See "h7-sim round 2" below.
 - **F5 re-dispatch "from where they are":** a docked extractor leaves from its node. An extractor unbound in flight finishes its leg, then dispatches from the node it reached (a `Transit` only runs node to node). An unbound extractor with no slot anywhere flies home and idles at the probe. "Nearest the probe" is measured from the probe even when it leaves from elsewhere, as F5 says.
 - **F6 delivery "on arrival"** happens in F7, the tick the hauler reaches the probe. Its next trip starts in the following tick's F6.
 - **F2 live tuning:** weights above `alloc.maxWeight` are clamped at the start of F2 each tick ("lowering it clamps the weights"). A share above its type's cost, after the cost is tuned down, returns the excess to stock, or F3's "share equals its cost" could never hold.
@@ -895,3 +895,24 @@ Scope: `git log build-20261108-4..build-20261108-5`, `reviews/h6-*.md`, the "Ite
 **Compile-only edits in packages/client and packages/bots:** none were needed. The widened types are additive and typecheck passes.
 
 **Approved out-of-list edit (Director, 2026-11-14): a fail-fast guard in `runCampaign` (`packages/bots/src/runner.ts`).** On field data, `campaign.active` never leaves null, so the runner's play-tick cap (`playTicksNow`) never advanced, and `runner.test.ts`, `npm run bots` and with them `npm test` and `npm run gates` ran forever. `runCampaign` now throws a clear error on field-mode data, so these fail fast (red, as the stack note expects) instead of hanging. Campaign-mode behaviour is unchanged. h7-bots replaces the runner for field mode. Measured after the change: `npx vitest run` finishes in 19 s (41 failed, 628 passed, all failures in bots and client files), and `npm run bots -- --seeds 1` exits 1 in 1 s with that error.
+
+## 2026-11-14 · Core Engineer · h7-sim round 2: Stop releases haulers; only Mine-marked rocks get haulers
+
+**Decision (Director's call on the review's required change 2):** only Mine-marked rocks can be assigned haulers. `isHaulable(node)` means Mine-marked and worked. Both F6 assignment (`haulTarget`) and the at-probe keep rule use it. An unmarked rock's leftover buffer stays on the rock and is collected if the rock is marked again.
+**Why (Director):** Stop must mean stop, because raids target rocks with assigned haulers (R5). *Rejected:* draining an unmarked rock's buffer first. That would keep haulers assigned to a rock the player had just Stopped, and so keep it a raid target.
+
+**The defect it fixes (review round 1):** assignment checked only "worked", and a captured pocket or the hive stays worked after Stop through its free extractor (a free extractor works whether or not the rock is marked). So its haulers dropped it at the probe and `haulTarget` picked it straight back, at ratio 0 ÷ 1.
+
+**One more reading, so Stop takes effect at once:** a hauler waiting at its node now also loads (min(buffer, cargo)) and flies home when the node's mark is off. Before, it loaded only on a full cargo or when the node had no working extractor. Without this, a hauler waiting at a Stopped pocket kept waiting for a full cargo from the free extractor. With it, F12's "finish their trip" means the current leg, then home. The reference replay's hashes are unchanged (final 648970fd), because its one Stop (a1 at tick 600) already ended the wait that tick when a1's extractors left.
+
+**Tests** (`field.test.ts`, F6):
+- Stop on a captured p1 with p1 the only worked rock, and again with a1 and a2 also worked (three haulers).
+- Stop on the hive.
+- An unmarked asteroid's buffer is left alone until the rock is marked again.
+
+All four fail on a511610's `field.ts` (4 of 43) and pass on the fix. The `raid-hook.test.ts` pin (a hauler waiting at a guarded node) now marks the node, since an unmarked node no longer holds a waiting hauler.
+
+**Review notes also done:**
+- `save.ts` validates each economy ship in full: `at` a node index when parked, or null with a node-to-node `transit` and 0 ≤ ticksLeft ≤ totalTicks; `target` a node index or null; cargo 0 with no resource, or more than 0 with a raw resource. It also checks the per-node `mine` (booleans), `free` (≥ 0) and the inner `rockBuckets` rings (non-empty, integers ≥ 0). Each case has a test.
+- The replay's recycle check no longer compares a value with itself: it asserts tick 900, a non-zero count before, one fewer after, and the exact refund.
+- `bayOf` has a `Readonly` overload, so `allocStatus` no longer casts.
