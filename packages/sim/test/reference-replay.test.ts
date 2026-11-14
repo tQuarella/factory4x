@@ -47,7 +47,7 @@ describe('reference replay (field mode)', () => {
   const picks: Array<{ tick: number; id: number; to: number; short: number; maxShort: number }> = [];
   const leaves: Array<{ tick: number; id: number; from: number; to: number | null }> = [];
   let enoughTicks = 0;
-  const moves: Array<{ tick: number; from: number; to: number; part: string; preview: Record<string, number>; moved: Record<string, number>; at: Record<string, number> }> = [];
+  const moves: Array<{ tick: number; from: number; to: number; part: string; preview: { drone: number; lancer: number; flak: number }; moved: { drone: number; lancer: number; flak: number }; at: { drone: number; lancer: number; flak: number } }> = [];
   let fleetRecycle: { tick: number; orderHaulers: Array<{ id: number; at: number | null; target: number | null }>; orderExtractors: Array<{ id: number; at: number | null; docked: boolean }>; gone: number[]; slotsBefore: number; slotsAfter: number } | null = null;
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
