@@ -1155,3 +1155,16 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 3. If bot flag 1 (static loses) fails under staffing by need, the Designer reports it as a finding about the claim, not a number to tune away; the Director decides then.
 4. Q18 (pillar 1 wording) goes in the H8 handoff, not now.
 **Why:** both CI jobs are past 80% of their limits (retro after build-20261114-1), and h8-client adds smoke tests; the two tasks share no files.
+
+## 2026-11-14 · Core Engineer · h8-sim: the hauler repro (acceptance 1), on the v13 rules
+
+**Result: reproduced.** The owner's "A2 just got a third hauler. A1 has no haulers." fails as a rule test on H7's F6, before any H8 change (`packages/sim/test/hauler-repro.test.ts`, frozen fixture `fixtures/sim-v13.json`, the shipped data at dataVersion 13).
+
+- **(a), A1 worked by docked extractors, 0 haulers:** passes. The next hauler goes to A1 (ratio 0 beats A2's 2/2).
+- **(a), A1 worked by its buffer only (no docked extractor, buffer 10), 0 haulers, A2 with 2 haulers and 2 extractors:** **fails**. The next hauler goes to A2. Cause: H7's F6 reading (h7-sim, "F6 ratio with 0 working extractors") ranks a worked node with no working extractor after *every* node with one, whatever its hauler count. The H7 test "a node with a buffer but no working extractor ranks after every node with one" pins that order.
+- **(b), the shipped opening for 6 game minutes, no inputs:** passes (no violation in 6 minutes; I also ran it for 15 minutes as a probe, with none).
+- **(b), the same opening with one Stop of A1 at 3:00 and its re-mark at 3:05:** **fails**, twice: "tick 8160: hauler 47 → a1 (1 haulers, 1 extractors, buffer 1) while a3 (0 haulers, 0 extractors, buffer 3)" and "tick 9390: hauler 49 → a1 (2 haulers, …) while a3 (0 haulers, 0 extractors, buffer 3)". How it got there (traced): in the opening, extractors fill a1–a4 first (nearest the probe), so the first raid targets a1 (the nearest *mined* rock to the hive). The Stop retargeted it (R6) to a3, which it hit: it killed a3's hauler and its one extractor, leaving a3 worked by a buffer of 3, Mine-marked, with 0 haulers. New haulers then went to a1, which already had haulers, for the next 3 minutes, until a new extractor docked at a3.
+
+**So the state that produces the observation in play is "a raid (or a recycle, or a Stop then re-mark) leaves a marked rock with ore in its buffer, no docked extractor and no hauler".** The opening's first raids land on a1, so A1 is the rock most likely to be in it. Two more states make the owner's words true without any rule fault: a marked rock whose extractors are still flying in with an empty buffer (not worked, so nothing to haul yet), and a rock that is Stopped (only Mine-marked rocks get haulers, Director 2026-11-14).
+
+**Fix:** H2 (assignment by shortfall) gives every haulable rock a target of at least 1 (`max(1, …)` in H1), so a buffer-only rock with 0 haulers has shortfall 1 and ranks by shortfall, not after every producing rock. The H8 commit shows both failing tests pass under H2 (`hauler.autoNeed` 1). Under `hauler.autoNeed` 0 the order stays as H7 had it, because H5 asks for H7's F6 exactly and the H7 hauler tests to pass unchanged (one of them pins this order).
