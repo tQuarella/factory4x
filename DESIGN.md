@@ -614,7 +614,7 @@ Frame nodes from the H3 frame (positions unchanged). The heart is the **hive**.
 
 The guard counts are starting values for h7-design-data, which calibrates them to "Calibration targets (H7)". Data shape: `map.field = { nodes: [ids], mine: [ids], layout: { pockets: {...}, heart: {thorns, spores} } }`, in the H4 area layout format (no Root, no starved counts). `parseSimData` checks that every id is a frame node, `probe` is first, `heart` is present, `mine` holds asteroids only, and in field mode that `ship.hauler.cargo ≤ node.bufferCap` and `economy.probeOrePerMin ≥ 1` (the softlock floor).
 
-What this means in play: the far rocks (a5, a6, a7: 7 of the 11 asteroid slots) are the closest to the hive, so the richest economy is also the most exposed. The near rocks (a1–a4, 6 slots) are safe longest.
+What this means in play: the far rocks (a5, a6, a7: 7 of the 13 asteroid slots) are the closest to the hive, so the richest economy is also the most exposed. The near rocks (a1–a4, 6 slots) are safe longest.
 
 #### Ship types
 
