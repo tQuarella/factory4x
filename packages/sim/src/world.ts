@@ -21,7 +21,7 @@ import {
   type SimData,
   type Tunables,
 } from './data.ts';
-import { initialRaidState, type Raid } from './factions/index.ts';
+import type { Raid, RaidResult } from './factions/index.ts';
 import { isqrt } from './math.ts';
 
 /**
@@ -433,6 +433,8 @@ export interface World {
   raid: Raid | null;
   /** H7 R1: no raid musters before this tick (R8 sets it from the end of a raid). */
   nextRaidTick: number;
+  /** H7 R8: what the last finished raid did (raidStatus().last), or null. */
+  lastRaid: RaidResult | null;
 }
 
 /** H7: true for a field-mode world. */
@@ -836,6 +838,8 @@ function createCampaignWorld(seed: number, data: SimData): World {
       wonTick: null,
     },
     field: null,
-    ...initialRaidState(),
+    raid: null,
+    nextRaidTick: 0,
+    lastRaid: null,
   };
 }

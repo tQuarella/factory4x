@@ -19,6 +19,7 @@ import {
 } from './data.ts';
 import { designResearched, extractPct, yardBuildTicks } from './campaign.ts';
 import { bayOf, boundCounts, assignedHaulers, isDocked, isEconType, isMineable, isTypeUnlocked, oreCost, resourceCost, type ResourceCost } from './field.ts';
+import { raidRank } from './factions/index.ts';
 import { isCountedType, isFleetFull } from './fleet.ts';
 import { shipsAtByType } from './inputs.ts';
 import { counterPct, deliveredInWindow, perExtractorPerMin, prizeInWindow, reservedOre } from './step.ts';
@@ -891,8 +892,8 @@ export interface RockStatus {
   /** Units delivered from here by haulers over the last 60 game seconds. */
   deliveredPerMin: number;
   /**
-   * 1 if this is the current raid target (R5), else its position by distance to the hive among mined nodes.
-   * h7-sim: always 0 (h7-raids fills it).
+   * 1 if this is the current raid target (R5), else its position by distance to the hive among the raidable
+   * nodes (Mine-marked, with a docked extractor or an assigned hauler). 0 if the rock is not raidable.
    */
   raidRank: number;
 }
@@ -925,7 +926,7 @@ export function rockStatus(world: Readonly<World>, node: number): RockStatus {
     bufferCap: cap,
     backedUp: n.buffer >= cap,
     deliveredPerMin: delivered,
-    raidRank: 0,
+    raidRank: raidRank(world, node),
   };
 }
 
