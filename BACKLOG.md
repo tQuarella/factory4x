@@ -705,6 +705,170 @@ No `data/sim.json` and no `packages/bots/src` logic.
 4. Re-run the suite and the gates, commit the report, and say which flags hold and which claim no bot exercises. Put any out-of-scope leftover at the top of the report as a blocker.
 5. Before the Critic round, merge h6-bots' approving review commit into this branch.
 
+## Milestone 2, iteration 7: H7 One field, live enemy (spec in `DESIGN.md` → "H7 (Milestone 2, iteration 7, spec ready): One field, live enemy")
+
+The owner picked A and approved the pillar 3 and 4 wording (Q21, 2026-11-14). Faction AI is active for raid behaviour (DECISIONS.md, 2026-11-14). Where this backlog and the spec differ, the spec wins.
+
+**Four build tasks plus a Designer calibration resume.** Art is folded into h7-client (two silhouettes, a raid marker, a radar and a badge). The Director may split it out to art-direction if the budget allows.
+
+**One stack; the top is `h7-client`.** h7-sim flips shipped data to `run.mode: "field"` (data v12), so `createWorld` on shipped data lands in the field. Tests outside h7-sim's files that build worlds from shipped data break at that commit:
+- `packages/bots/test/{runner,strategies,needs-driven,waves}.test.ts` and the bots gate (the H6 campaign strategies can't run in field mode): fixed by h7-bots;
+- `packages/client/test/{h4,h5,h6}-client.test.ts`, `session.test.ts`, and `tests/smoke/{boot,overworld}.spec.ts` (Landfall and the overworld): fixed by h7-client.
+
+So nothing in the stack merges alone. **`merge-task h7-client` lands the whole stack** once every task in it is approved. Before h7-client's final Critic round, merge the approving review commits of h7-sim, h7-raids, h7-bots and h7-design-data into `task/h7-client` (PROCESS "Gates that wait on calibration").
+
+**Order:**
+1. **Now:** `h7-sim` (core-engineer).
+2. **After h7-sim has Critic approval:**
+   - `h7-raids` (faction-ai), branched from `task/h7-sim`;
+   - `h7-client` (engineer), branched from `task/h7-sim`. It builds the economy UI first, then merges `task/h7-raids` once that is approved and adds the raid UI;
+   - `h7-bots` (engineer), branched from `task/h7-sim`. It writes the economy strategies first, then merges `task/h7-raids` once approved, for the raid response and the flags.
+
+   h7-client and h7-bots don't share files, and h7-raids touches only `packages/sim/src/factions/**`, its tests, one call site and the reference replay.
+3. **After h7-bots has Critic approval:** `h7-design-data` (Designer resume), stacked on `task/h7-bots`.
+4. **Last:** h7-client merges `task/h7-design-data` (which carries everything below it), re-runs the gates and the full smoke on v13, gets its final Critic approval, and lands the stack. It is browser-facing, so it needs green branch CI on the exact merged commit.
+
+**Gate expectations below the top:** on h7-sim, h7-raids and h7-bots, typecheck, lint, the sim tests and determinism must be green. The bots gate may be red on h7-sim and h7-raids, and it is judged green on h7-design-data. Client tests and smoke may be red until h7-client. The Critic reviews each lower task as code against its acceptance, and reviews the top with every gate green.
+
+**Planned launches (12):**
+- Designer: 1, done (triage). The spec and h7-design-data are resumes.
+- Builders: 4 (h7-sim core-engineer, h7-raids faction-ai, h7-client engineer, h7-bots engineer).
+- Critics: 2 launches (h7-sim, h7-client). The h7-sim Critic is resumed for h7-raids and h7-bots, and the h7-client Critic for h7-design-data.
+- Retrospective: 1.
+
+That's 8, with 4 spare (rework, a split-out art task, or a broken `main`).
+
+| Id | Task | Owner | Depends on | Status |
+| --- | --- | --- | --- | --- |
+| h7-sim | Field mode (`run.mode`, `map.field`), ship economy (bays, allocation, extractors, haulers, Mine marks), shared fleet limit, first-run fixes, new inputs and selectors, every H7 tunable in data, raid hook stub, data v12, field reference replay | core-engineer | none | Ready |
+| h7-raids | Raids R1–R9 in `packages/sim/src/factions/`: muster, size, target, launch, fight, return, hive regrowth with raiders out, withering at capture; `raidStatus`; replay extended | faction-ai | h7-sim Critic-approved (stacked) | Blocked |
+| h7-bots | Field runner (cap, softlock), six strategies, seven capability flags, gate failures for winners, campaign bots retired from the gate | engineer | h7-sim Critic-approved (stacked); merges h7-raids when approved | Blocked |
+| h7-design-data | Probe on v12, calibrate to "Calibration targets (H7)", data v13 | designer (resume) | h7-bots Critic-approved (stacked) | Blocked |
+| h7-client | Field-mode client: probe sheet radar and steppers, rock sheet and Mine toggle, ship and hauler drawing, raid banner, marker, chip and toasts, result panel, tuning; art for the new entities; smoke and client tests rewritten. **Top of the stack** | engineer | h7-sim Critic-approved; merges h7-raids, then h7-design-data | Blocked |
+
+### h7-sim (core-engineer)
+
+**Files:**
+- `packages/sim/**` (tests included). `packages/sim/src/factions/` gets only an `index.ts` stub with the raid hook (a no-op) and the `world.raid` / `nextRaidTick` state;
+- `data/sim.json`;
+- `packages/bots/src/reference-replay.ts`;
+- **compile-only** edits in `packages/client/src` and `packages/bots/src` if a widened type breaks the build, with no behaviour change (list them in DECISIONS.md);
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Data v12:**
+   - `run.mode` set to `"field"`; `map.field` exactly as the spec's field table, with its `mine` list;
+   - every key in "Tunables (H7 …)" with its default and range, including the `raid.*` and `hive.regrowPct` keys (wired here, used by h7-raids);
+   - `parseSimData` validates `map.field` and the two field-mode checks (cargo ≤ buffer cap, probe mining ≥ 1);
+   - the `dataVersion` pin is 12.
+2. **The campaign is untouched:** with `run.mode` absent or `"campaign"`, every existing rule test on the frozen fixtures passes unchanged. Tests that built campaign worlds from shipped data use shipped data with `run.mode: "campaign"` (a test helper), not deleted assertions (engineer.md: a test changed for new data keeps its strength).
+3. **Rules F2–F7, F9, F11–F14,** each with unit tests on shipped `map.field`. Required cases:
+   - the allocation's proportional property (within 1 over N ore) and the tie order;
+   - a share returned to stock at weight 0;
+   - a full share that waits on the fleet limit while the others keep filling;
+   - a Lancer waiting on crystal, and locked before crystal is first delivered;
+   - extractor dispatch to the nearest free mineable rock, slot reservation in flight, idle at the probe, and re-dispatch when a slot opens or a mark is turned off;
+   - hauler assignment by the haulers-per-extractor ratio, with ties; a full-cargo wait; the partial load when a node stops being worked; delivery into stats and `firstDeliveredTick`;
+   - `fleet.countsEconomy` 0 and 1, and `field.fleetCap` 0;
+   - recycling an extractor frees its slot;
+   - pocket capture auto-marks the pocket; hive capture wins the run;
+   - every invalid input in F12's table.
+4. **First-run fixes (F13):** a landing has drone, lancer and flak at weight 0 and the `alloc.start.*` weights. A shipped-data test asserts that every guarded node's smallest drone wave (with `min-wave`) is more than `floor(economy.startStock ÷ ship.drone.cost)`. If shipped values fail it, report the node; don't retune (calibration does).
+5. **The raid hook:** `step` calls the factions entry point at F8's position, a no-op here. The guard-damage function used by F10 is exported so a raid fight can reuse it with economy ships after warships.
+6. **Selectors:** `allocStatus`, `rockStatus` (all fields except `raidRank`, which h7-raids fills; return 0 here), `fleetStatus` additions, `fieldSummary`. Each is tested.
+7. **The reference replay** runs in field mode and covers the spec's list up to, but not including, the raid items. The hashes are re-baselined.
+8. **Gates:** typecheck, lint, sim tests and determinism are green on the branch. The bots gate, client tests and smoke are expected red (see "Gate expectations"). Name every red test outside your files in your report.
+
+### h7-raids (faction-ai; stacked on `task/h7-sim` after its Critic approval)
+
+**Files:**
+- `packages/sim/src/factions/**`;
+- `packages/sim/test/raids*.test.ts`;
+- the F8 call site and the F11/R9 capture hook in `packages/sim/src/step.ts` (only those lines);
+- `rockStatus.raidRank` in `selectors.ts`;
+- `packages/bots/src/reference-replay.ts` (the raid items);
+- `DECISIONS.md`.
+
+No data value changes. If one is needed, report it rather than making it: h7-design-data owns values.
+
+**Acceptance:**
+1. **R1–R9 exactly,** each with unit tests on shipped `map.field`. Required cases:
+   - no raid below `raid.firstAtEcon` or with `raid.enabled` 0;
+   - the gap counts from the raid's end;
+   - size from `econ`, capped by `raid.maxSize` and by `raid.hiveKeepPct`, with the mix rounding and the short-type fallback;
+   - target tie-break by node index, never the probe, and the retarget on arrival;
+   - a muster cancelled by a battle at the hive;
+   - raiders defend the hive while mustering;
+   - a defended fight (counters apply; raider damage hits warships before haulers before extractors);
+   - an undefended hit that removes docked extractors from the node count;
+   - beaten, hit and turned back recorded;
+   - returning raiders keep their ids and hp;
+   - the hive doesn't regrow raiders that are out, and `hive.regrowPct` slows regrowth;
+   - hive capture with a raid out removes every raider.
+2. **`raidStatus`** and `rockStatus.raidRank` match the spec, tested at each phase.
+3. **No time pressure:** a test runs 60 game minutes with `econ` held below the threshold after one raid and asserts no further raid.
+4. **The reference replay** adds the raid items (defended, undefended, withering at capture). The hashes are re-baselined.
+5. **Determinism:** integer only, fixed orders, no RNG; the lint rules pass.
+6. **Gates:** as h7-sim. Report the raid-related numbers the flags will need (raid sizes at econ 6, 12 and 22 on shipped data).
+
+### h7-bots (engineer; stacked on `task/h7-sim` after its Critic approval, then merges `task/h7-raids`)
+
+**Files:**
+- `packages/bots/src/**` except `reference-replay.ts`;
+- `packages/bots/test/**`;
+- `reports/`;
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **The field runner:**
+   - one run per strategy per seed;
+   - `won` at hive capture; `timeout` at `FIELD_CAP_MIN` (45) game minutes; `softlock` when no ship starts and no hauler delivers for 5 game minutes in a row before the hive falls; `crash`.
+   - Each is tested, including a forced softlock (probe mining 0 and no economy, set through tunables).
+2. **The six strategies** from "Bots (H7): strategies", using only selectors and the existing `min-wave` estimate. No other battle simulation.
+   - `static`'s sweep shapes are fixed in the code and printed in the report.
+   - `greedy` switches to `adaptive`'s rules only after its first `hit` raid.
+3. **The gate** fails exactly on: a crash, tick p95 over budget, or a softlock or timeout of `adaptive` or `greedy` on any seed. The H6 campaign strategies leave the gate. Their code may stay (their unit tests run on shipped data with `run.mode: "campaign"`), or go, with the choice logged in DECISIONS.md.
+4. **The seven capability flags** are reported with pass, fail and detail. Flags never fail the gate. Flag 4 uses `min-wave` on the hive's at-home guards with a full-size raid removed.
+5. **Report:** per strategy, time to the hive, raids by outcome, economy ships lost, peak economy, allocation changes and ships by type, plus the flag lines.
+6. **Gates:** the bots gate is judged on the stacked h7-design-data branch, and may be red here on v12. Everything else is green.
+
+### h7-design-data (designer, resume; stacked on `task/h7-bots` after its Critic approval)
+
+**Files:**
+- `data/sim.json` (values only);
+- `DESIGN.md`, `DECISIONS.md`;
+- the `dataVersion` pin test (version line and title only);
+- `reports/archive/h7-probe-v12.*` and `reports/archive/h7-design-data-v13.*`.
+
+**Acceptance:**
+1. **First,** commit the probe report on v12.
+2. Retune to "Calibration targets (H7)", in the spec's order. Put the reasoning in DECISIONS.md. Values only: a rule finding goes to the Director.
+3. Bump `dataVersion` to 13 if any value changed, and update the pin, its title and every H7 table together. Recompute every derived claim in the spec (distances, warning time, raid sizes).
+4. Before calibrating, check what the spec inherits (designer.md): rerun the hive's `min-wave` measurements in a second arbitrary order and treat any movement as a rule finding.
+5. Re-run the suite and the gates (the bots gate must be green here), commit the report, and say which flags hold and what no bot exercises.
+6. Before the Critic round, merge h7-bots' approving review commit into this branch.
+
+### h7-client (engineer; branched from `task/h7-sim` after its Critic approval; top of the stack)
+
+**Files:**
+- `packages/client/**` (tests included; `placeholders.ts`, `icons.ts`, `gallery.ts` and `palette.ts` for the art);
+- `tests/smoke/**`;
+- `ART_STYLE.md`;
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Field mode end to end:** the run opens on the field; the result panel offers New run; the overworld, research and withdraw are unreachable; the tuning panel shows the H7 keys and hides the parked ones; "New system" reads "New run".
+2. **The probe sheet:** the radar readout (display only) and five rows with −/+ buttons ≥ 44 px and the state line for each `allocStatus` state. It fits 375x667 without scrolling, including under the wide-font stress. A smoke test taps + and − and checks the input log and the radar.
+3. **The rock sheet:** the Mine / Stop toggle, extractor pips (docked and in flight), haulers, buffer and "Backed up: add haulers", delivered per minute, and the raid-rank line. A smoke test turns a rock off and sees its extractors leave.
+4. **Raid readability:**
+   - the muster banner (tap opens the target's sheet), the moving raid marker with its dashed line and countdown, the target flash, the battle line, the three end toasts, and the raid chip in each state;
+   - nothing in the HUD shifts when the banner, chip or toasts appear (measured, as in the H6 bug tests);
+   - smoke tests drive a raid with tunables (`raid.firstAtEcon` 2, `raid.musterTicks` 0) and check each phase.
+5. **The map:** docked extractors, haulers moving on probe–rock lines (thicker for more), idle economy ships at the probe, the Mine badge.
+6. **Art:** `drawExtractor`, `drawHauler`, `drawRaidMarker`, `drawRadar`, `drawMineBadge` and the `'raided'` rock state, in the gallery. The extractor and hauler pass the 24 px silhouette check against the warships and a rock, with bounds checked against the gallery's pixel scan. New palette keys get ART_STYLE.md rows.
+7. **Tests:** the old client and smoke tests that depend on the overworld or Landfall are moved to campaign-mode data (if their feature still exists in code) or retired with their feature, each listed in DECISIONS.md. No assertion is loosened.
+8. **The stack:** merge `task/h7-raids` once it is approved, then `task/h7-design-data` once that is approved. Before the final Critic round, merge every lower task's approving review commit. Run the gates and the full smoke on v13 at desktop and phone sizes, with `--repeat-each 5` at the default worker count. Branch CI must be green on the exact commit that `merge-task h7-client` merges.
+
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-root-code-removal** (core-engineer; from the H6 spec): the Root is out of play through data only (owner, Q19). After H6 ships, and if the owner hasn't asked for it back, delete the dormant Root code: the sim's wilt and starved rules and their fixture tests, the client's vine, Root sheet and wilt toast, the bots' Root targeting, and the `bloom.starved*` tunables. Acceptance: no reference to the Root kind outside the frame data and frozen fixtures; gates pass; determinism hashes are unchanged for shipped data.

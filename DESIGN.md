@@ -16,10 +16,10 @@ Answers from the owner, in their words where possible. These shape everything be
 | Shape | *(Run length superseded by the 2026-11-07 asteroid-field direction, pending QUESTIONS.md Q14.)* **Roguelite campaign.** Each star system is one run of **20–40 minutes**. The campaign of systems spans many sessions. "Shorter sessions but more capability each time." |
 | Carry-forward (NG+) | **Research** carries over, **probe design choices** set your next start, and each new system is **harder** (richer resources, tougher guardians). |
 | Ship control | **Orders to nodes.** Tap a node, assign a fleet to attack, guard or escort a route. Ships act on their own. No unit micro. |
-| Mobs | **Defend only.** They never come for you. |
+| Mobs | ~~**Defend only.** They never come for you.~~ *Superseded 2026-11-14 (Q21, pillar 3 rewritten): mobs raid what you build. See H7.* |
 | Mob factories | Repair and replace defenders **up to a cap**. You take a node by out-producing their replacement rate, or by cutting their supply first. Waiting doesn't make it worse; under-committing wastes ships. |
 | Losing | **No fail state.** You can lose ships and time, never the run. |
-| Tension | **Optimization puzzle.** No clock, no pressure. The challenge is building an efficient network. |
+| Tension | ~~**Optimization puzzle.** No clock, no pressure. The challenge is building an efficient network.~~ *Superseded 2026-11-14 (Q21, pillar 4 rewritten): pressure, not a clock. Raids grow with what you build, never with time. See H7.* |
 | Production chains | **3–4 tiers**: ore → refined → components → ships / probe parts. |
 | Saves | **Autosave** to the browser every few seconds; a run survives the tab being killed. Campaign progress persists between systems. |
 | Mob flavor | Team decides (Designer + Art Direction propose). |
@@ -381,7 +381,7 @@ The economy decision shrinks to "enough to make components and refill".
 
 **Mechanisms I rule out:**
 - **Guards that escalate over time:** they break pillar 4 and the owner's "waiting doesn't make it worse".
-- **Guards that come for you:** they break pillar 3 ("mobs only defend").
+- ~~**Guards that come for you:** they break pillar 3 ("mobs only defend").~~ *Superseded 2026-11-14: the owner asked for an active enemy and pillar 3 now reads "raid what you build" (Q21). H7 builds raids, paced by the player's economy, not by time.*
 - **Areas that toughen as you reclaim others:** this is allowed by the wording, but it punishes exactly the "build strength first" play the owner asked for.
 - **Guards that adapt to your fleet** (a heart that leans against your newest design): possible, and visible on the sheet before you commit. But it turns reading into guessing, so it stays an idea, not a proposal.
 
@@ -432,7 +432,9 @@ H5 (build-20261108-4, spec below) added a fleet limit per area (12, raised to 18
 
 ## Hypotheses
 
-### H7 candidates (awaiting the owner's pick)
+### H7 candidates (iteration 7): A picked
+
+*The owner picked A and approved the pillar 3 and 4 wording (QUESTIONS.md Q21, "A, yes"). The spec is "H7 (Milestone 2, iteration 7, spec ready): One field, live enemy" below; where they differ, the spec wins.*
 
 *Iteration 7, 2026-11-14. Triage in PLAYTEST_LOG.md (build-20261108-5, 2026-11-14). The owner stopped at the start of Frost Shelf and proposed a new direction ("let's try the spider graph idea"). That direction is the baseline here, not one option among equals. QUESTIONS.md Q21 asks the owner to confirm the scope and the pillar wording. No spec until then.*
 
@@ -559,6 +561,348 @@ These come from the same feedback, and each holds whichever slice is picked.
 - **Raids on a timer, or raids that grow with time.** They break "no clock", and the owner's own "waiting doesn't make it worse" (2026-11-06).
 - **Raids that hit the probe or retake rocks.** They break "No fail state".
 - **Node rigs** (H6 candidate C): still later.
+
+### H7 (Milestone 2, iteration 7, spec ready): One field, live enemy
+
+The owner picked A and approved the pillar 3 and 4 wording (QUESTIONS.md Q21, "A, yes", dda12d7). The Director activated Faction AI for raid behaviour (DECISIONS.md, 2026-11-14). The background is "H7 candidates" above. Where this spec and the candidates differ, the spec wins. Where this spec and BACKLOG.md differ, the spec wins.
+
+Everything not mentioned here is H3 inside a field (nodes, pockets, guards, counter combat with the H6 combat amendment, the guard ring, Strong/Even/Weak tags, send and recycle orders) and H1 for time controls, autosave, the tuning panel and the feedback button.
+
+#### Claim
+
+**When the probe's output is split across ship types by an allocation the player can reshape at any time, and a hive raids what the player builds, the player keeps re-deciding economy against force, and that running decision is fun.** Secondary: a ship-based economy (extractor and hauler ships) reads at least as well on a phone as extractors and routes did.
+
+What would disprove it:
+- The owner sets the allocation once and leaves it, or can't say why they changed it.
+- Raids feel like a timer, a nuisance or a punishment for growing.
+- The run still reads as "max economy, then build a fleet and attack".
+- The owner asks how to mine or haul.
+
+#### The smallest mechanics that test it
+
+1. **One field, one run.** A new run lands straight in one field. Taking its hive wins the run. The overworld, research, relays and band locks are parked (see "What is parked, and how").
+2. **Five ship types, all built by the probe:** Extractor, Hauler (economy ships) and Drone, Lancer, Flak (warships).
+3. **The allocation** replaces the build queue and the yard switches: a weight per type, set with −/+ steppers and shown as a radar graph.
+4. **Mine marks:** the player picks which rocks are mined. Extractors and haulers assign themselves.
+5. **Raids:** the hive musters raiders from its own guards and sends them at the mined rock nearest to it, paced by the player's economy, never by the clock.
+6. **A shared fleet limit:** economy ships count against it (`fleet.countsEconomy`, the A/B).
+7. **First-run fixes:** a landing builds economy only, and no guarded node falls to what the opening stock can buy.
+
+New inputs: `setAlloc`, `setMine`. No other new inputs.
+
+#### What is parked, and how
+
+- **A data switch, not a code deletion.** New top-level data key `run.mode`: `"field"` or `"campaign"`. Absent means `"campaign"`, so the frozen fixtures (`sim-v4.json`, `sim-v8.json`) and every existing rule test keep running the H1–H6 rules unchanged. Shipped data sets `"field"`.
+- **In field mode,** `createWorld` lands straight in `map.field` (below). The campaign state is still created, but no area is active, and the overworld, research and stockpile are never shown or used. `isWon` is true once the field's hive is captured.
+- **Kept in data and code, unused in field mode:** `map.areas`, `map.lanes`, `research`, the H1 economy keys (`extractor.cost`, `extractor.buildTicks`, `route.*`, `build.queueMax`), `component.*`, `research.*`, `shipments.pct`, `areas.repeatHaulPct`, `overworld.bandLock`, `fleet.relayStep`, `fleet.cap`, `bloom.starved*`. The tuning panel hides them in field mode.
+- **Why not delete:** the H4–H6 data tests, the campaign rule tests and the overworld client paths would all have to be rewritten for no player-visible gain, and the overworld is meant to come back on top of H7 if it holds. Deleting the dead paths is a later Can wait item, as with the Root.
+
+#### The field (data `map.field`)
+
+Frame nodes from the H3 frame (positions unchanged). The heart is the **hive**.
+
+| Node | Kind | Slots | Prize | Guards (T/S) | Mine at start | Distance to hive (su) |
+| --- | --- | --- | --- | --- | --- | --- |
+| `probe` | probe | – | – | – | – | 960 |
+| `a1`, `a2` | asteroid | 2 each | ore | – | yes | 814 |
+| `a3`, `a4` | asteroid | 1 each | ore | – | yes | 735 |
+| `a5` | asteroid | 3 | ore | – | yes | 430 |
+| `a6`, `a7` | asteroid | 2 each | ore | – | yes | 534 |
+| `p1` | pocket | 2 | ice | 0 / 6 | after capture | 645 |
+| `p2` | pocket | 2 | crystal | 4 / 2 | after capture | 645 |
+| `heart` | the hive | 4 | ore | 12 / 24 | after capture | 0 |
+
+The guard counts are starting values for h7-design-data, which calibrates them to "Calibration targets (H7)". Data shape: `map.field = { nodes: [ids], mine: [ids], layout: { pockets: {...}, heart: {thorns, spores} } }`, in the H4 area layout format (no Root, no starved counts). `parseSimData` checks that every id is a frame node, `probe` is first, `heart` is present, `mine` holds asteroids only, and in field mode that `ship.hauler.cargo ≤ node.bufferCap` and `economy.probeOrePerMin ≥ 1` (the softlock floor).
+
+What this means in play: the far rocks (a5, a6, a7: 7 of the 11 asteroid slots) are the closest to the hive, so the richest economy is also the most exposed. The near rocks (a1–a4, 6 slots) are safe longest.
+
+#### Ship types
+
+| Type | Kind | Cost | Built in (ticks) | hp | Damage | Speed (su/tick) | Unlock |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Extractor | economy | `ship.extractor.cost` ore | `ship.extractor.buildTicks` | `ship.extractor.hp` | 0 | `ship.speedSu` | always |
+| Hauler | economy | `ship.hauler.cost` ore | `ship.hauler.buildTicks` | `ship.hauler.hp` | 0 | `ship.hauler.speedSu` | always |
+| Drone | warship | `ship.drone.cost` ore | `ship.drone.buildTicks` | as H3 | as H3 | `ship.speedSu` | always |
+| Lancer | warship | `ship.lancer.cost` ore + `ship.lancer.crystal` crystal | `ship.lancer.buildTicks` | as H3 | as H3 | `ship.speedSu` | crystal first delivered |
+| Flak | warship | `ship.flak.cost` ore + `ship.flak.ice` ice | `ship.flak.buildTicks` | as H3 | as H3 | `ship.speedSu` | ice first delivered |
+
+There is no lens or plating step in field mode: the assemblers don't run, and the resource is paid directly when a build starts. "Unlock" uses the existing `stats.firstDeliveredTick`, as in H3.
+
+#### Rules (field mode), per tick in this order
+
+`T` = ticks per game minute (1800). All integer. Fixed orders. No RNG. Type order everywhere: extractor, hauler, drone, lancer, flak.
+
+- **F1. Inputs.** Apply this tick's inputs in order. An invalid input is ignored with no state change.
+- **F2. Allocation (replaces the build queue and rule 5b's payment).**
+  - State: `alloc[type]` (weight, 0 to `alloc.maxWeight`), `share[type]` (ore set aside, 0 to the type's ore cost) and `allocCur[type]` (the round-robin counter).
+  - A type is **eligible** if its weight is above 0, it is unlocked, and `share < cost`.
+  - While `stock.ore ≥ 1` and any type is eligible, move 1 ore from stock into one share, picked by smooth weighted round robin:
+    1. add each eligible type's weight to its `allocCur`;
+    2. pick the eligible type with the highest `allocCur` (ties go to type order);
+    3. subtract the sum of the eligible weights from the picked type's `allocCur`;
+    4. `share += 1`.
+  - Set a type's `allocCur` to 0 whenever it is not eligible.
+  - Ore no share can take (every weighted share full, or every weight 0) stays in stock.
+  - **Testable property:** with every type eligible and N ore moved, each type gets within 1 of N × weight ÷ Σweights.
+- **F3. Probe bays (replaces rule 5b's start and finish).** Each type has one bay (`yards[type]`, `ticksLeft`; the `on` flag is unused in field mode).
+  - **Finish:** decrement `ticksLeft`. At 0 the ship spawns at the probe:
+    - an extractor is dispatched (F5);
+    - a hauler is assigned (F6);
+    - a warship flies to the rally point as now.
+  - **Start**, in type order: a bay starts if it is idle, its share equals its ore cost, the stock covers its resource cost (lancer crystal, flak ice), and the fleet limit allows it (F9). Starting pays the resource, sets `share = 0` and `ticksLeft = buildTicks`.
+- **F4. Extraction.** As rule 3. A node's `extractors` is the number of extractor ships docked there, plus its free extractors after capture (`pocket.freeExtractors`, `heart.freeExtractors`; these are not ships and can't be killed). Yields: `extractor.orePerMin` for asteroids, `pocket.resourcePerMin` for pockets, `heart.orePerMin` for the captured hive. Buffers cap at `node.bufferCap`, and overflow is lost (the H1 "backed up" state). Probe mining (`economy.probeOrePerMin`) goes straight into stock.
+- **F5. Extractors.**
+  - A node is **mineable** if it is Mine-marked and not guarded.
+  - An extractor is **bound** to its target node from dispatch on, so slots are reserved in flight.
+  - **Dispatch:** a new or freed extractor flies to the mineable node nearest the probe whose bound extractors plus free extractors are below its slots. Ties go to the lower node index. If no node qualifies, it parks at the probe as **idle**.
+  - On arrival it **docks**: it counts in that node's `extractors`.
+  - Idle extractors re-dispatch on any tick a slot opens (a mark turned on, an extractor lost, a pocket captured).
+  - **Unmarking a node** unbinds its extractors, which re-dispatch from where they are.
+- **F6. Haulers.**
+  - A node is **worked** if it has at least one docked or free extractor, or a buffer of at least 1.
+  - **Assignment:** a hauler at the probe with no worked target picks the worked node with the lowest (assigned haulers ÷ working extractors), compared by cross-multiplication. Ties go to the nearest to the probe, then the lower node index. If no node is worked, it parks idle at the probe.
+  - **Trip:** fly to the node. Wait until `buffer ≥ ship.hauler.cargo`, or until the node is no longer worked, then load `min(buffer, cargo)`. Fly to the probe. On arrival, add the load to stock and to the delivered stats and buckets (the headline ore/min, the ice and crystal chips, `firstDeliveredTick`).
+  - A hauler keeps its node while the node is worked and reassigns at the probe when it isn't.
+  - A hauler destroyed with cargo loses the cargo.
+- **F7. Movement.** As rule 6, for every ship. A ship's speed is its type's speed.
+- **F8. Raids** (Faction AI; see "Raids", R1–R9). This runs after movement and before guarded-node combat.
+- **F9. Fleet limit.**
+  - `fieldCap = field.fleetCap` (0 means no limit).
+  - The **counted** ships are every type when `fleet.countsEconomy` is 1, and warships only when it is 0.
+  - `fleetCount` = counted ships alive + counted bays with `ticksLeft > 0`.
+  - A counted bay may start only if `fleetCount < fieldCap`. The count is recomputed after each start within the tick.
+  - Ships are never removed to meet the limit.
+- **F10. Combat at guarded nodes.** As H3 rule 7 with the H6 combat amendment. Economy ships never go to guarded nodes: they can't be sent (F12), and a guarded node is never mineable.
+- **F11. Capture.**
+  - As now. A captured pocket or hive becomes Mine-marked automatically, gets its free extractor, and its prize unlocks on first delivery.
+  - Capturing the hive wins the run: `capturedTick` is set, the result panel shows, and free play continues.
+  - Capturing the hive also ends raids: every raider away from the hive is removed (R9).
+- **F12. Inputs (field mode).**
+
+| Input | Parameters | Valid when | Effect |
+| --- | --- | --- | --- |
+| `setAlloc` | `type`, `weight` | 0 ≤ weight ≤ `alloc.maxWeight` | Set the weight. If the weight becomes 0, the type's share goes back to stock (switching away from a type never strands ore). |
+| `setMine` | `node`, `on` | the node is an asteroid, or a captured pocket or hive | Set the mark. Off: F5 unbinds its extractors. Its haulers finish their trip and reassign. |
+| `sendShips` | as H5 | as H5, counting **warships only** | Economy ships are never sent by hand. |
+| `recycleShips` | as H5, with `extractor` and `hauler` counts | ships of those types at the node | Refund `fleet.recycleRefundPct` of each ship's ore cost into stock. A recycled extractor frees its slot. |
+| `setRally`, `setTunable` | as now | as now | Rally applies to warships only. |
+| `buildExtractor`, `buildRoute`, `upgradeRoute`, `cancelBuild`, `setShipyard`, `enterArea`, `withdraw`, `buyResearch`, `leaveArea` | – | **never** in field mode | – |
+
+- **F13. Landing (the run start; first-run fixes).**
+  - The stock is `economy.startStock` ore.
+  - The weights are `alloc.start.extractor` and `alloc.start.hauler`, with **drone, lancer and flak at 0**: a run starts on the economy, and warships are built only once the player turns them up.
+  - Mine marks are as `map.field.mine`, and the rally point is the probe.
+  - **No free first win:** every guarded node's smallest winning wave of drones (with `min-wave`) is more than `floor(economy.startStock ÷ ship.drone.cost)`, so the opening stock can't buy a capture. That's 2 drones at defaults. A shipped-data test asserts it.
+- **F14. Stats additions:** `econLost` (economy ships lost, by type), `raids` (mustered, beaten, hit; see R8), `allocChanges` (count of `setAlloc` inputs that changed a weight), `peakEcon` (most economy ships alive at once).
+
+#### Raids (Faction AI, module `packages/sim/src/factions/`)
+
+The hive is the field's heart guardian. Raiders are hive guards (Thorn and Spore, same hp and damage) that leave and come back.
+- **R1. State:** `world.raid` = null, or `{ id, phase: 'muster' | 'out' | 'fight' | 'home', target, guards: Guard[], ticksLeft, planned: {thorn, spore} }`. Also `world.nextRaidTick` (starts at 0).
+- **R2. Economy count:** `econ` = extractor and hauler ships alive (not counting ships in the bays).
+- **R3. Muster starts** when all of these hold:
+  - `raid.enabled` is 1, the hive is alive, `world.raid` is null, and `tick ≥ nextRaidTick`;
+  - `econ ≥ raid.firstAtEcon`;
+  - no battle is running at the hive;
+  - a target exists (R5);
+  - the planned size (R4) is at least 1.
+
+  The raid then enters `muster` for `raid.musterTicks`. Its size and target are fixed for the raid. The raiders stay in the hive's guard list while mustering, so they still defend it.
+- **R4. Size.**
+  - `want = min(raid.maxSize, ceil(econ ÷ raid.econPerRaider))`.
+  - `keep = ceil((thorn cap + spore cap) × raid.hiveKeepPct ÷ 100)`, using the hive's caps after `guard.capPct`.
+  - `size = min(want, max(0, hive guards alive − keep))`.
+  - The mix follows the hive's current mix: `thorn = floor(size × thornsAlive ÷ guardsAlive)`, `spore = size − thorn`. If a type runs short, the other type makes up the difference.
+- **R5. Target:** the mined node (an asteroid or captured pocket with at least one docked extractor or assigned hauler) nearest the hive. Ties go to the lower node index. It is never the probe.
+- **R6. Launch.**
+  - If a battle at the hive started during the muster, the muster is cancelled (`world.raid = null`, `nextRaidTick = tick`) and R3 checks again once the battle ends.
+  - Otherwise, at the end of the muster, take the planned raiders out of the hive's guard list (lowest id of each type first, capped at what's alive above `keep`) and fly them to the target at `raid.speedSu`. The phase becomes `out`.
+  - If the target is no longer mined on arrival, the raid retargets once to the R5 node from where it is. If there is none, it flies home.
+- **R7. The fight at the target**, on round ticks (`tick mod combat.roundTicks = 0`), while raiders are there:
+  - If no player ship is `at` the node at the start of a round, the raid leaves for home.
+  - Otherwise both sides strike at once, from start-of-round state:
+    - **Player damage:** warships present, using H3's `playerDamage` (counters apply). Economy ships do 0 damage.
+    - **Raider damage:** the H6 amendment's pools and type orders across the warships present, then **haulers, then extractors** (id order within a type, with overflow).
+  - Units at hp ≤ 0 are removed. A destroyed docked extractor leaves its node's `extractors` count. Warships that arrive mid-raid join from the next round.
+  - When no raiders are left, the raid ends as **beaten**.
+- **R8. Return and pacing.**
+  - Raiders that leave fly home at `raid.speedSu` and rejoin the hive's guard list on arrival, with their hp and ids. Repair resumes (guard repair as H3).
+  - The raid ends **hit** if it killed at least one economy ship, **beaten** if every raider died, and **turned back** otherwise. All three count in the stats.
+  - When the raid ends, `world.raid = null` and `nextRaidTick = tick + raid.gapTicks`. So the gap runs from the end of a raid, and a small economy (below `raid.firstAtEcon`) is never raided.
+- **R9. Hive regrowth with raiders out.**
+  - Raiders away from the hive count against its caps, so the hive regrows only the guards that died, never the ones that are out.
+  - The hive's regrow ticks are `guard.<type>.regrowTicks × hive.regrowPct ÷ 100`. Pockets are unchanged.
+  - If the hive is captured while a raid is out, every raider is removed ("the raid withers") and raids end.
+
+**Warning time** = `raid.musterTicks` + the flight time. At defaults that is 450 + 430 ÷ 3 ≈ 593 ticks (about 20 s of game time) for a5. Pause is always available.
+
+#### Tunables (H7, data/sim.json, all integers)
+
+New keys. The live flag follows the H1 rule (live unless noted).
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `alloc.maxWeight` | 5 | 3–10 | 3: coarse, a few shapes / 10: fine but fiddly on a phone. Lowering it clamps the weights |
+| `alloc.start.extractor` | 3 | 0–5 | the landing weight (new runs only). 0: you set it yourself |
+| `alloc.start.hauler` | 2 | 0–5 | as above |
+| `ship.extractor.cost` | 20 | 5–60 | 5: the economy is free / 60: every extractor is a commitment |
+| `ship.extractor.buildTicks` | 120 | 15–900 | 15: instant economy / 900: a slow build-up |
+| `ship.extractor.hp` | 6 | 1–40 | 1: any raider kills one per hit / 40: raids barely scratch |
+| `ship.hauler.cost` | 15 | 5–60 | as for the extractor |
+| `ship.hauler.buildTicks` | 90 | 15–900 | as for the extractor |
+| `ship.hauler.hp` | 6 | 1–40 | as for the extractor |
+| `ship.hauler.cargo` | 4 | 1–20 | 1: far rocks need a swarm of haulers / 20: one hauler per rock, and logistics vanish. Must be ≤ `node.bufferCap` |
+| `ship.hauler.speedSu` | 2 | 1–10 | 1: distance dominates / 10: distance is free |
+| `ship.lancer.crystal` | 4 | 1–40 | the crystal per Lancer (replaces lens in field mode) |
+| `ship.flak.ice` | 4 | 1–40 | the ice per Flak (replaces plating in field mode) |
+| `field.fleetCap` | 30 | 0–80 | 0: no limit / 80: the swarm returns |
+| `fleet.countsEconomy` | 1 | 0–1 | 0: the limit counts warships only (H5) / 1: every ship counts (supply) |
+| `raid.enabled` | 1 | 0–1 | 0: no raids, a peaceful field (the in-build A/B) / 1: raids |
+| `raid.firstAtEcon` | 6 | 2–20 | 2: raided almost at once / 20: raids only at a full economy |
+| `raid.econPerRaider` | 3 | 1–10 | 1: every miner needs a guard / 10: raids are a nuisance |
+| `raid.maxSize` | 10 | 2–30 | 2: never a threat / 30: a raid can empty the field |
+| `raid.gapTicks` | 2700 (90 s) | 900–9000 | 900: a siege / 9000: about one raid per run |
+| `raid.hiveKeepPct` | 50 | 25–90 | 25: raids gut the hive, so counter-attacks are easy / 90: raids are tiny and the hive never opens |
+| `raid.musterTicks` | 450 (15 s) | 0–1800 | 0: the flight is the only warning / 1800: raids are telegraphed for a minute |
+| `raid.speedSu` | 3 | 1–10 | 1: you can always intercept / 10: raids land before you react |
+| `hive.regrowPct` | 100 | 100–1000 | 100: dead raiders come back as fast as heart guards / 1000: a beaten raid leaves the hive open for minutes |
+
+Reused with their meaning in field mode: `economy.startStock`, `economy.probeOrePerMin`, `extractor.orePerMin` (per docked extractor), `node.bufferCap`, `pocket.resourcePerMin`, `pocket.freeExtractors`, `heart.orePerMin`, `heart.freeExtractors`, `ship.drone|lancer|flak.*`, `ship.speedSu`, `counter.*`, `guard.*`, `combat.roundTicks`, `fleet.recycleRefundPct`, `system.variant` (unused by the field). The candidates' `fleet.cap` 24 became `field.fleetCap` 30, a new key, so the H5 and H6 tables and their tests stay as they are. 30 is a starting value, and calibration sets it (see the targets).
+
+#### Save, data version and replay
+
+- **`dataVersion` 12** (h7-sim, which also flips `run.mode` to `"field"`). h7-design-data bumps it to 13 if it changes any value. Old saves are discarded with the existing toast.
+- **The reference replay** is regenerated in field mode (h7-sim), then extended by h7-raids. It covers:
+  - a landing;
+  - two `setAlloc` changes, including one to 0 that returns a share to stock;
+  - an extractor dispatched and docked, and an idle extractor re-dispatched;
+  - a hauler delivery;
+  - a `setMine` off;
+  - a pocket capture that unlocks a Lancer or Flak;
+  - a bay held by the fleet limit;
+  - a `recycleShips` of an economy ship;
+  - a raid mustered, launched, beaten by defenders;
+  - a raid that hits an undefended rock;
+  - the hive captured, with a raid out that withers.
+
+  The determinism hashes are re-baselined.
+
+#### Selectors (sim, read-only)
+
+- **`allocStatus(world)`:** per type: `weight`, `share`, `cost` (ore and resource), `unlocked`, `building` (progress 0–100), and `state`. The state is one of `off` (weight 0), `locked` (needs crystal or ice first), `filling`, `waitingResource`, `fleetFull` or `building`. It also gives `stockOre` (unallocated ore) and `incomePerMin`.
+- **`rockStatus(world, node)`:** `mine`, `mineable`, `docked`, `bound`, `slots`, `freeExtractors`, `haulers`, `buffer`, `backedUp`, `deliveredPerMin` (over the stats window), and `raidRank` (1 if this is the current R5 target, else its position by distance to the hive among mined nodes).
+- **`raidStatus(world)`:** `phase`, `planned` and current raiders by type, `target`, `ticksToLaunch`, `ticksToArrival`, `econ`, `nextRaidAtEcon` (the threshold), `ticksToNextAllowed`, and `last` (the outcome, with economy ships lost and raiders killed by type).
+- **`fleetStatus`:** gains `countsEconomy` and the counts by type for all five.
+- **`fieldSummary(world)`:** for the result panel: time to the hive, peak ore/min, ships built and lost by type, raids (mustered, beaten, hit, turned back), economy ships lost to raids, `allocChanges` and `peakEcon`.
+
+#### Client: screens and phone UI (H7)
+
+The H1–H6 rules hold: 375 px portrait, no hover, every target ≥ 44 px, every action ≤ 2 taps from its screen (confirms and panels excepted), and nothing in either HUD wraps or shifts under the wide-font stress.
+
+- **No overworld in field mode.** The run opens on the field. "New run" (result panel and tuning panel) starts a fresh field. Research, withdraw and the overworld screens are unreachable.
+- **Top bar:** ore/min (the headline), stock chips (ore, plus ice and crystal once delivered), "Fleet 18/30" with the fleet icon, and the raid chip (below). Fixed widths, so nothing shifts as numbers change.
+- **Probe sheet:**
+  - A **radar readout** of the five weights: a pentagon, one axis per type with its icon, filled to each weight. It's display only, and tapping it does nothing.
+  - Under it, **five rows**: icon, name, `−` weight `+` (44 px buttons), and a state line ("building 40%", "saving 12/20", "fleet full", "needs crystal: take the crystal pocket", "off").
+  - The rally line, and Recycle (the H5 panel with extractor and hauler rows added).
+- **Rock sheet** (asteroid, or captured pocket or hive):
+  - a **Mine / Stop** toggle;
+  - extractors as pips (docked / slots, with in-flight ones hollow);
+  - haulers N;
+  - buffer and "Backed up: add haulers" when full;
+  - delivered per minute;
+  - and, when `raidRank` is 1: "Nearest mined rock to the hive: raids hit here first."
+- **Raid readability:**
+  - **Muster:** the hive pulses, and a banner in the fixed banner slot reads "Raid gathering: 4 Spores, 1 Thorn → A5 in 15 s". Tapping it opens A5's sheet. The banner never pushes the HUD.
+  - **Out:** a raid marker (the raiders' ring colours) moves along a dashed line to the target, with a countdown to arrival.
+  - **At the target:** the rock flashes. The battle line is "Raid at A5: 3 left".
+  - **End:** a toast: "Raid beaten at A5: 5 killed, 0 lost", "Raid hit A5: lost 2 extractors, 1 hauler", or "Raid turned back".
+  - The raid chip in the top bar shows the phase and the time ("Raid 0:12"). When no raid is possible it reads "Raids at 6 ships" until the first threshold is reached, and it hides when `raid.enabled` is 0.
+- **Map:** docked extractors drawn on their rock, and haulers drawn moving along a probe–rock line that appears when a rock has haulers (thicker for more haulers). Idle economy ships sit at the probe.
+- **Result panel:** `fieldSummary`, plus New run.
+- **Tuning:** the H7 keys, with field-mode hiding of the parked keys. "New system" becomes "New run".
+- **Phone checks:** the probe sheet (radar plus five rows) fits 375x667 without scrolling. The raid banner and chip don't shift the HUD. Every rock is tappable at ≥ 44 px.
+
+#### Art needs (H7, folded into h7-client, within ART_STYLE.md)
+
+- **Extractor:** a squat amber hull with a drill prong. **Hauler:** a boxy amber hull with a cargo pod. Both must read at 24 px against the drone, lancer and flak silhouettes, and against a rock.
+- **Raid marker:** the raiders' two-colour ring on a hot-pink chevron, plus the dashed raid line.
+- **Hive muster pulse** and **rock under raid flash:** draw states.
+- **Radar readout:** a pentagon grid in the panel style, filled amber.
+- **Mine mark:** a small pick badge on a mined rock, distinct from the lock badge and the "!" badge.
+
+Any new colour gets a palette key and an ART_STYLE.md row. Draw functions: `drawExtractor(ctx, r)`, `drawHauler(ctx, r)`, `drawRaidMarker(ctx, r, mix)`, `drawRadar(ctx, w, h, weights, max)`, `drawMineBadge(ctx, r)`, and a `'raided'` state for the asteroid draw.
+
+#### Bots (H7): strategies
+
+Bots see only what a player sees: the selectors, including `raidStatus`. No pre-send battle simulation beyond the existing `min-wave` estimate the H6 bots use.
+
+| Strategy | Expected to win (gate) | What it does |
+| --- | --- | --- |
+| `adaptive` | **yes** | Opens economy only. On a muster, it raises the counter weight for the raid's majority type (Flak against Spores, Lancer against Thorns, Drone before either is unlocked), sends warships to the target and sets the rally there. After the raid, it drops warships back to a standing guard of ⌈planned ÷ 2⌉. It takes the pocket that unlocks the counter for the hive's majority. At `econ ≥ 12` it shifts to offence (economy weights to 1) and attacks the hive when the best-mix estimate fits, preferring the moment a raid is out. |
+| `greedy` | **yes** | The over-investor that has to respond. All economy until every Mine slot is filled, with no warships, ignoring musters. After its **first raid that hits**, it switches to `adaptive`'s rules for the rest of the run. |
+| `static` | no (control) | The best of ≤ 6 fixed allocations from a small sweep (fixed in the code, listed in the report). It never changes weights after its first second, and attacks when the estimate fits. |
+| `idle` | no (control) | Holds `econ` at `raid.firstAtEcon − 1`, then builds warships only. |
+| `drones-only` | no (control) | `adaptive`, but it never sets Lancer or Flak above 0. |
+| `adaptive-no-raids` | no (control) | `adaptive` with `raid.enabled` 0 (the A/B comparison, report only). |
+
+**Run cap:** a run stops with `timeout` after `FIELD_CAP_MIN` = 45 game minutes of play.
+
+**Softlock:** a run is a softlock if, before the hive falls, no ship starts and no hauler delivers for 5 game minutes in a row (with probe mining at least 1/min, this can only come from a rule bug).
+
+**The bots gate fails on** (and only on, with flags reported but never failing):
+- a crash of any strategy;
+- a tick p95 over budget;
+- a winner (`adaptive`, `greedy`) that softlocks or times out on any seed.
+
+The seed doesn't change the field. The gate still runs every seed it's given, which also checks that a run doesn't depend on the seed.
+
+**Capability flags** (reported; each measures what can or can't be done, never minutes):
+1. **Splitting matters:** `static` either loses at least half the economy ships it built to raids, or fails to take the hive within the cap. `adaptive` takes the hive.
+2. **Greed is answered by raids:** `greedy`'s first hitting raid kills at least 2 economy ships, and `greedy` still wins after responding.
+3. **Waiting is safe:** `idle` is raided at most once.
+4. **The counter-attack window is real:** the hive's smallest winning wave (`min-wave` best mix, on the hive's guards at home) with a full-size raid out is at least 30% smaller than at full strength.
+5. **Counters matter:** `drones-only` can't take the hive within `field.fleetCap` minus 10 economy ships (its best drone wave doesn't fit).
+6. **Economy against offence is a trade in slots:** the hive's best mix plus a full economy (every Mine slot filled, plus the haulers `adaptive` ran at its peak) is more than `field.fleetCap`, and the best mix plus 10 economy ships fits.
+7. **No free first win:** F13's property, reported per guarded node.
+
+#### Calibration targets (H7, h7-design-data; the flags measure them)
+
+- **Pace:** `adaptive` takes the hive in 15–30 game minutes, and `greedy` in at most 40.
+- **The first raid** musters between 2 and 6 game minutes into an `adaptive` run.
+- **Raid threat:** an undefended full-economy raid on a5 kills at least 2 economy ships. A defence of matched warships at the target, no larger than the raid, beats it while losing at most 2 ships, so defending is cheaper than being raided.
+- **The hive:** flags 4, 5 and 6 hold. The best mix fits `field.fleetCap − 10` with at least 2 slots to spare.
+- **The pockets:** each falls to drones alone within 6 drones and not within 2 (F13).
+- Calibration changes only values in `data/sim.json` (guard counts, the H7 keys and the reused keys above), never rules. A rule finding goes to the Director.
+
+#### Success criteria (H7; the owner, one 20–30 minute phone session; 4x is fine)
+
+1. In the first minute, the first ships are economy ships, and the owner doesn't mention unwanted drones.
+2. The owner changes the allocation at least three times and can name why for at least one change (a raid warning, a loss, a target).
+3. At least one raid is met by ships built or moved after its warning, and the owner can say whether a raid hurt.
+4. The owner names a moment of choosing more economy or more offence.
+5. They don't call raids a timer, rushed or a punishment for waiting, and don't describe the run as "max economy then attack".
+6. They never ask how to mine or haul.
+7. Every action is ≤ 2 taps from its screen; the probe sheet fits 375x667; raid banners and chips don't shift the HUD.
+
+Optional: they try `raid.enabled` 0 or `fleet.countsEconomy` 0 and say which they prefer.
+
+#### Fun questions for the handoff (H7)
+
+1. Did you change the spider graph during the run? What made you change it?
+2. Did the raids make you build a little force, or did they feel like a timer or a nuisance?
+3. Was there a moment you chose between more economy and more offence? Which way did you go, and did it pay off?
+
+#### Left out of H7 (hard limit)
+
+- The overworld, research, relays, band locks, hauls and new game+ (parked, not deleted).
+- Field variants, seeded maps or more than one field.
+- Drag input on the radar, and preset allocation buttons.
+- Economy ships sent by hand, escorts, and auto-defence (warships guard only where they are sent or rallied).
+- Raids that target the probe, retake rocks or grow with time; more than one raid at once; raids from pockets.
+- New guard or ship types beyond Extractor and Hauler, and components or assemblers in field mode.
+- Deleting the H1–H6 economy, campaign or Root code (a later Can wait item).
+- Node rigs.
 
 ### H6 candidates (iteration 6): A picked, Root removed
 

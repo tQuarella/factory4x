@@ -843,3 +843,15 @@ Scope: `git log build-20261108-4..build-20261108-5`, `reviews/h6-*.md`, the "Ite
 
 **Decision:** The owner answered Q21 "A, yes" in chat. H7 is scope A, "One field, live enemy" (DESIGN.md → "H7 candidates"). VISION.md pillars 3 and 4 are replaced with the Q21 wording, applied by the Director under the protected-file exception (APPROVED-PROTECTED line under Q21 and in VISION.md); this also settles Q20. The **faction-ai agent is activated** from today: it owns raid behaviour (target choice, raid sizing from the player's economy, raiders drawn from hive guards) under `packages/sim` `factions/` and its tunables in `data/`.
 **Why:** raids are the mechanic that makes the economy-against-army split felt, and the owner said the enemy has to be active for the ship economy to work. Raid behaviour is the faction-ai agent's charter; leaving it dormant would push enemy logic onto engineers without that brief. The balance agent stays dormant: tuning in H7 is calibration the Designer already owns.
+
+## 2026-11-14 · Designer · H7 spec and split: non-obvious calls
+
+**Decision:** the H7 spec (DESIGN.md "H7 (Milestone 2, iteration 7, spec ready)") and its split (BACKLOG.md iteration 7) make these calls:
+1. **The overworld is parked by a data switch, `run.mode`** ("field" or "campaign"; absent means campaign), not by deleting code. The frozen fixtures have no `run.mode`, so every H1–H6 rule test keeps running unchanged, and the overworld can come back on top of H7.
+2. **A new key, `field.fleetCap` (30), instead of changing `fleet.cap`'s default.** The H5 and H6 tables and their tests pin `fleet.cap` 12, and the campaign still uses it.
+3. **Raids have a muster phase (`raid.musterTicks`, 15 s) before they fly.** The flight alone gives about 5 s of warning for a5, which is too short to react to on a phone. During the muster the raiders stay in the hive's guard list, so the muster is a warning, not a free opening.
+4. **Raiders count against the hive's caps while they're out, and `hive.regrowPct` slows hive regrowth.** Without this, Spores (one every 20 ticks) refill the hive within seconds, and the counter-attack window the candidates promised wouldn't exist. Flag 4 measures it.
+5. **Economy ships are never sent by hand.** Mine marks and the automatic dispatch rules are their only control, which keeps micro out (VISION.md: no unit micro). Raider damage hits warships before haulers before extractors, so defenders shield the economy.
+6. **The split is one stack, topped by h7-client.** h7-sim flips shipped data to field mode. That breaks bot, client and smoke tests outside its files, which can only be fixed alongside the UI and the strategies. Shipping field mode only behind the client (deferring the flip) would let h7-sim merge alone, but its field-mode reference replay and the browser cross-engine check both run on shipped data, so the flip belongs with the sim. Art is folded into h7-client (two silhouettes, a marker, a radar, a badge) to keep four build tasks.
+
+**Why:** each call keeps the slice testable without rewriting the parked game, and makes the raid warning and the counter-attack window real in play, not only on paper.
