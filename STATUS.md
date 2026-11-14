@@ -2,12 +2,21 @@
 
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
-**Milestone:** 2 — The asteroid field (iteration 6, hypothesis H6: Open frontier, Root removed)
-**State:** Awaiting owner feedback on build-20261108-5 (M2 H6: Open frontier). Retro done; team stopped until the owner answers the three H6 fun questions in QUESTIONS.md. Only Can wait work until then. Candidates: cw-smoke-isolation (retro's pick), cw-worktree-prune, cw-sim-fleet-leftovers, cw-veil-starved-tag, cw-root-code-removal.
+**Milestone:** 2 — The asteroid field (iteration 7, hypothesis H7 A: One field, live enemy)
+**State:** Iteration 7 in flight. Owner answered Q21 "A, yes" (dda12d7): ship economy, spider-graph allocation, raids; pillars 3 and 4 rewritten; faction-ai activated. Step: Spec (Designer resumed).
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261108-5 (H6 Open frontier), commit 626307f, live (CI gates and deploy green; site shows 626307f · data v11). Release gates passed locally (192/192 smoke).
-**Last updated:** 2026-11-08 (desktop), after the iteration 4 retro
+**Last updated:** 2026-11-14, iteration 7 start
+
+## Iteration 7 ledger
+
+Launches: 1 / 12.
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | triage build-20261108-5 owner dictation; H7 candidates | launch | Plan (165e829); owner picked A (dda12d7) |
+| r1 | designer | H7 spec + task split | resume | Spec |
 
 ## Iteration 6 ledger
 
