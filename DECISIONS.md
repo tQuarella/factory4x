@@ -956,3 +956,24 @@ All four fail on a511610's `field.ts` (4 of 43) and pass on the fix. The `raid-h
 Flight to each rock at `raid.speedSu` 3 (ticks): a5 144, a6 and a7 178, p1 and p2 215, a3 and a4 245, a1 and a2 272. A raid's size follows `econ`, not the rock's value; the target is the nearest mined rock to the hive, so a5, a6 and a7 (the richest) are hit first.
 
 **Gates on the branch:** typecheck, lint and determinism green; sim tests all pass; the bots gate and 41 tests in the same 7 bots and client files as h7-sim are red, as the stack note expects.
+
+## 2026-11-14 · Engineer · h7-client: parked campaign tests, replay mode, UI choices
+
+**The campaign client stays reachable for tests, through data.** Shipped data is field mode, so the build has no overworld. The H4 to H6 client code stays (no deletion, per the spec). A test or dev hook runs it: `startCampaign` builds a session on `withRunMode(data, 'campaign')`. Because a replay must run on the same data, the client replay carries `mode: 'campaign'` (only for such sessions), the save has `mode` too, and `replayData` and `decodeSave` read it. A field session's replay and save are unchanged in shape.
+
+**Tests moved, none loosened (acceptance 7):**
+- `h4-client`, `h5-client`, `h6-client`, `session` (unit): moved to campaign-mode data (`campaignData = withRunMode(shippedData, 'campaign')`), every assertion kept. Their features (overworld text, research, yards, Recycle) still exist in code.
+- `boot.spec.ts`, `overworld.spec.ts` (smoke): `ready()` now swaps the page into a constructed campaign with the dev hook, which is the state a fresh H6 page opened in. Every assertion kept. The first test is renamed "parked campaign: ...". The three "old save starts fresh" tests now assert the new run is a field run that is running (stronger than "is on the overworld"). `hud-stability` and `buffer-warning` already used `startCampaign` and needed no change.
+- Retired: none.
+- New: `h7-client.test.ts`, `h7-art.test.ts` (with a shared `recorder.ts`), `h7-economy.spec.ts`, `h7-raids.spec.ts`, `h7-art.spec.ts`.
+
+**UI choices:**
+1. **The probe sheet is in flow like the others but taller (62% of the screen)**, with the radar beside the title, money line, Rally and Recycle buttons, then five 48 px rows (icon, name and cost, state line, − weight +). It has no sheet head of its own; the close button is in the side column. It opens with no scrolling at 375x667 under the wide font (smoke asserts it). The first-run hint is dismissed when the probe sheet opens, to give the map its room back.
+2. **The heart reads "Hive" in a field run** (labels, sheets, banner, toasts), "Heart" in the campaign.
+3. **Top bar:** ore/min, ore, ice and crystal chips, the fleet chip (every ship counts when `fleet.countsEconomy` is 1) and the raid chip. The per-type warship chips and lens and plating are hidden in a field run. The raid chip reads "Raids at N ships" until the threshold, then "Next raid m:ss" or "Raids ready", "Raid m:ss" while mustering or flying out, "Raid on" at the target, "Raid leaving" going home. Its width is reserved by a sizer, so nothing shifts.
+4. **Raid banner and battle line share the banner slot** (muster: "Raid gathering: 4 Spores, 1 Thorn → A5 in 15 s"; at the target: "Raid at A5: 3 left"). A tap opens the target's sheet. The out and home phases show on the map (marker, dashed line, seconds) and the chip, not in the banner. End toasts: beaten (killed and lost counts), hit (what was lost), turned back; a toast's tap opens the target.
+5. **Mine toggle labels:** "Stop mining" when marked, "Mine this rock" when not.
+6. **Result panel** shows when the hive falls (`isCaptured`, once per run) from `fieldSummary`; New run asks first. No smoke test plays a real hive capture (too long for a smoke run); the panel is checked with the debug hook, and the trigger shares its path with the campaign's.
+7. **Silhouette check.** The first extractor and hauler shapes overlapped 0.83 at 24 px, so they were redrawn (small spiked extractor, big boxed hauler) until the gallery's mask overlap was under 0.75 against each other, the warships and a rock.
+8. **Test hooks added:** `isField`, `allocStatus`, `rockStatus`, `fieldSummary`, `econShips`, `log`, `setSpeed`, `mapField`, `raidStatus`, `advanceTicks`, `newRun`.
+
