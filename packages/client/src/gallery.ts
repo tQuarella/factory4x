@@ -13,6 +13,12 @@ import {
   drawMineBadge,
   drawRadar,
   drawRaidMarker,
+  drawRaidBadge,
+  drawDragGhost,
+  drawDragLine,
+  drawDropHighlight,
+  drawDropTag,
+  drawSplitPulse,
   drawGuardRing,
   drawHitFlash,
   drawLane,
@@ -217,6 +223,84 @@ function strip7(c: Ctx, grey: boolean): void {
   c.restore();
 }
 
+/** H8 actual-size strip: the raid badge in three mixes beside the mine badge, then the pulse and the two highlights on a rock. */
+function strip8(c: Ctx, grey: boolean): void {
+  const r = 12;
+  const items: ((c2: Ctx) => void)[] = [
+    (c2) => drawRaidBadge(c2, r, { thorn: 3, spore: 2 }),
+    (c2) => drawRaidBadge(c2, r, { thorn: 0, spore: 4 }),
+    (c2) => drawRaidBadge(c2, r, { thorn: 4, spore: 0 }),
+    (c2) => drawMineBadge(c2, r),
+    (c2) => { drawAsteroid(c2, r * 0.6, 3, 0, 0); drawSplitPulse(c2, r * 0.75, 0.2); },
+    (c2) => { drawAsteroid(c2, r * 0.6, 3, 0, 0); drawDropHighlight(c2, r * 0.9, false, 0); },
+    (c2) => { drawAsteroid(c2, r * 0.6, 3, 0, 0); drawDropHighlight(c2, r * 0.9, true, 0); },
+  ];
+  c.save();
+  if (grey) c.filter = 'grayscale(1)';
+  items.forEach((f, i) => {
+    c.save();
+    c.translate(r + 2 + i * 46, 40);
+    f(c);
+    c.restore();
+  });
+  c.restore();
+}
+
+/** A rock with the raid badge at its lower left and the mine badge at its lower right, as view.ts places them. */
+function rockBadges(c: Ctx, r: number): void {
+  drawAsteroid(c, r * 0.7, 3, 1, 3);
+  c.save();
+  c.translate(-r * 0.7 * 0.95, r * 0.7 * 0.7);
+  drawRaidBadge(c, Math.max(8, r * 0.7 * 0.4), { thorn: 3, spore: 2 });
+  c.restore();
+  c.save();
+  c.translate(r * 0.7 * 0.95, r * 0.7 * 0.7);
+  drawMineBadge(c, Math.max(7, r * 0.7 * 0.34));
+  c.restore();
+}
+
+function dragLines(c: Ctx, r: number): void {
+  const aims = ['move', 'attack', 'none'] as const;
+  aims.forEach((aim, i) => {
+    drawDragLine(c, -r * 1.1, (i - 1) * r * 0.5, r * 1.1, (i - 1) * r * 0.5, aim, 0);
+  });
+}
+
+function ghostRow(c: Ctx, r: number): void {
+  const s = r / 24;
+  c.save();
+  c.scale(s, s);
+  const rows: Array<[Array<{ type: 'drone' | 'lancer' | 'flak'; count: number }>, 'move' | 'attack']> = [
+    [[{ type: 'drone', count: 6 }], 'move'],
+    [[{ type: 'drone', count: 3 }, { type: 'lancer', count: 2 }], 'move'],
+    [[{ type: 'drone', count: 2 }, { type: 'flak', count: 1 }], 'attack'],
+  ];
+  rows.forEach(([entries, aim], i) => {
+    c.save();
+    c.translate(0, (i - 1) * 38);
+    drawDragGhost(c, entries, aim);
+    c.restore();
+  });
+  c.restore();
+}
+
+function dropRow(c: Ctx, r: number): void {
+  c.save();
+  c.translate(-r * 0.75, 0);
+  drawAsteroid(c, r * 0.35, 3, 0, 0);
+  drawDropHighlight(c, r * 0.55, false, 0);
+  c.translate(0, -r * 0.75);
+  drawDropTag(c, 'A5', null);
+  c.restore();
+  c.save();
+  c.translate(r * 0.75, 0);
+  drawRichNode(c, r * 0.35, T, false);
+  drawDropHighlight(c, r * 0.55, true, 0);
+  c.translate(0, -r * 0.75);
+  drawDropTag(c, 'Hive', 'Attack · Even');
+  c.restore();
+}
+
 /** The H1 "!" badge as view.ts draws it (amber pill, dark glyph), for side-by-side checks. */
 function bangBadge(c: Ctx, r: number): void {
   const h = r * 1.3;
@@ -370,6 +454,15 @@ const entries: Entry[] = [
   { label: 'H6 24 px strip, greyscale (shape-only)', draw: (c) => strip6(c, true), strip: true, h: 170 },
   { label: 'H7 24 px strip, colour (extractor, hauler, drone, lancer, flak, rock, raided rock; raid marker 3/2, 0/4; mine badge, lock, "!", ore)', draw: (c) => strip7(c, false), strip: true, h: 120 },
   { label: 'H7 24 px strip, greyscale (shape-only)', draw: (c) => strip7(c, true), strip: true, h: 120 },
+  { label: 'H8 24 px strip, colour (raid badge 3/2, 0/4, 4/0; mine badge beside it; split pulse, drop highlight on a rock, attack highlight; ghost chip and tag are shown below)', draw: (c) => strip8(c, false), strip: true, h: 120 },
+  { label: 'H8 24 px strip, greyscale (shape-only)', draw: (c) => strip8(c, true), strip: true, h: 120 },
+  { label: 'raid badge: 3 Thorn 2 Spore', draw: (c, r) => drawRaidBadge(c, r, { thorn: 3, spore: 2 }) },
+  { label: 'raid badge: all Spores (left) vs all Thorns (right)', draw: (c, r) => { c.save(); c.translate(-r * 0.6, 0); drawRaidBadge(c, r * 0.5, { thorn: 0, spore: 4 }); c.restore(); c.save(); c.translate(r * 0.6, 0); drawRaidBadge(c, r * 0.5, { thorn: 4, spore: 0 }); c.restore(); } },
+  { label: 'a rock with the raid badge (lower left) and the mine badge (lower right)', draw: (c, r) => rockBadges(c, r) },
+  { label: 'drag line: to a node (blue), at an enemy (pink), over nothing (grey)', draw: (c, r) => dragLines(c, r) },
+  { label: 'ghost chip: 6 drones; 3 drones and 2 lancers (blue edge); 2 drones and 1 flak (attack, pink edge)', draw: (c, r) => ghostRow(c, r) },
+  { label: 'drop-target highlight and tag: a rock (move), the hive (attack)', draw: (c, r) => dropRow(c, r) },
+  { label: 'split-armed pulse on a rock', draw: (c, r) => { drawAsteroid(c, r * 0.6, 3, 0, 0); drawSplitPulse(c, r * 0.8, 0.2); } },
   { label: 'extractor', draw: (c, r) => drawExtractor(c, r) },
   { label: 'hauler', draw: (c, r) => drawHauler(c, r) },
   { label: 'extractor, hauler and the warships (drone, lancer, flak)', draw: (c, r) => econRow(c, r) },
@@ -591,6 +684,9 @@ boundLines.push(`extractor: ${(measure((c, r) => drawExtractor(c, r)) / 50).toFi
 boundLines.push(`hauler: ${(measure((c, r) => drawHauler(c, r)) / 50).toFixed(3)} r`);
 boundLines.push(`raid marker: ${(measure((c, r) => drawRaidMarker(c, r, { thorn: 3, spore: 2 })) / 50).toFixed(3)} r`);
 boundLines.push(`mine badge: ${(measure((c, r) => drawMineBadge(c, r)) / 50).toFixed(3)} r`);
+boundLines.push(`raid badge: ${(measure((c, r) => drawRaidBadge(c, r, { thorn: 3, spore: 2 })) / 50).toFixed(3)} r`);
+boundLines.push(`split pulse: ${(measure((c, r) => drawSplitPulse(c, r, 0)) / 50).toFixed(3)} r (limit 1.500 r)`);
+boundLines.push(`drop highlight: ${(measure((c, r) => drawDropHighlight(c, r, true, 0)) / 50).toFixed(3)} r (limit 1.200 r)`);
 boundLines.push(`raided rock (rim and glow, no pips): ${(measure((c, r) => drawAsteroid(c, r, 3, 0, 0, 'raided', 0.3)) / 50).toFixed(3)} r (limit 1.100 r)`);
 
 for (const key of Object.keys(silhouettes.iou)) {

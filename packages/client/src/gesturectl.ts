@@ -31,6 +31,9 @@ export class MoveGestureControl {
   private readonly host: GestureHost;
   private timer = 0;
   private suppress = false;
+  /** The press on the canvas now (any mode), for `consumeTravel`. */
+  private press: { id: number; x: number; y: number } | null = null;
+  private travelled = false;
 
   constructor(host: GestureHost) {
     this.host = host;
@@ -57,6 +60,16 @@ export class MoveGestureControl {
     return s;
   }
 
+  /**
+   * True once after a press on the canvas that travelled past the slop, whether or not drags are on. Mine mode and the tap-Move-tap order
+   * ask it, so a finger dragged across the map is never read as a tap on the rock it was lifted over.
+   */
+  consumeTravel(): boolean {
+    const t = this.travelled;
+    this.travelled = false;
+    return t;
+  }
+
   private local(ev: PointerEvent): { x: number; y: number } {
     const r = this.host.canvas.getBoundingClientRect();
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
@@ -79,6 +92,8 @@ export class MoveGestureControl {
     }
     // Every new press starts a new click cycle.
     this.suppress = false;
+    this.travelled = false;
+    this.press = ev.target === this.host.canvas && ev.isPrimary ? { id: ev.pointerId, x: ev.clientX, y: ev.clientY } : null;
     if (ev.target !== this.host.canvas || !this.host.enabled() || !ev.isPrimary) return;
     if (ev.pointerType === 'mouse' && ev.button !== 0) return;
     const p = this.local(ev);
@@ -117,6 +132,11 @@ export class MoveGestureControl {
 
   private onUp(ev: PointerEvent): void {
     const g = this.gesture;
+    const press = this.press;
+    if (press !== null && press.id === ev.pointerId) {
+      this.press = null;
+      this.travelled = Math.hypot(ev.clientX - press.x, ev.clientY - press.y) > this.host.slopPx();
+    }
     if (!g.active || ev.pointerId !== g.pointer) return;
     this.clearTimer();
     // The release position counts: the last move may be older than the lift.

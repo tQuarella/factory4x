@@ -102,6 +102,8 @@ interface Window {
     raidBadge(): number;
     /** H8: the gesture's phase and how many moves, cancels and split arms it has seen, as JSON text. */
     gestureState(): string;
+    /** H8: fleetStatus(...).types (alive, idle, building, recyclable per build type) as JSON text. */
+    fleetTypes(): string;
     /** H8: Mine mode is on. */
     mineMode(): boolean;
     /** H8: the tap-Move-tap order waiting for its target, as JSON text ({from, part}), or "null". */

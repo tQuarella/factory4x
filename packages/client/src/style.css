@@ -416,11 +416,16 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 .fp-row { min-height: 45px; padding: 0; }
 .fp-wv { flex: 0 0 auto; min-width: 66px; text-align: center; white-space: nowrap; }
 .fp-pct { font-size: 11px; color: var(--dim); }
-.hstep { display: flex; gap: 6px; margin: 2px 0 4px; }
+.hstep { display: flex; gap: 6px; margin: 0 0 2px; }
 .btn.h-step { width: 44px; padding: 0; font-size: 20px; flex: 0 0 auto; }
 .btn.h-auto { flex: 1 1 0; width: auto; min-width: 44px; padding: 0 8px; }
 .rock-note .backed:empty, .rock-note .rank:empty, .rock-note .raid:empty, .rock-note .held:empty { display: none; }
-#sheet.rk { max-height: 62dvh; max-height: 62vh; }
+/* A rock's sheet (the hauler row, the raid lines) is as tall as the probe's, and tighter, so it doesn't scroll on a phone. */
+#sheet.rk { max-height: 62dvh; max-height: 62vh; padding-bottom: calc(4px + var(--safe-b)); }
+#sheet.rk section { padding: 3px 0; }
+#sheet.rk .btn.mine-btn { margin-bottom: 2px; }
+#sheet.rk .rock-note { margin: 0; padding: 4px 8px; }
+#sheet.rk .rock-note .msg { top: 4px; }
 section.move { display: flex; gap: 6px; }
 .btn.move-all, .btn.move-half { flex: 1 1 0; width: auto; border-color: #3a5c8a; }
 .card.fleet-card { max-width: 420px; }

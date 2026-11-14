@@ -175,11 +175,11 @@ canvas.addEventListener('click', (ev) => {
     // H8: the click that ends a drag or a cancelled gesture is not a tap. Mine mode and the tap-Move-tap order take the next tap.
     if (gestureCtl.consumeClick()) return;
     if (mineMode) {
-      mineTap(x, y);
+      if (!gestureCtl.consumeTravel()) mineTap(x, y);
       return;
     }
     if (pendingMove !== null) {
-      moveTap(x, y);
+      if (!gestureCtl.consumeTravel()) moveTap(x, y);
       return;
     }
   }
@@ -850,6 +850,7 @@ window.__factory4x = {
   mapDrag: () => JSON.stringify(view.drawnH8().drag),
   raidBadge: () => view.drawnH8().raidBadge,
   gestureState: () => JSON.stringify({ phase: gestureCtl.gesture.phase, ...gestureCtl.counts }),
+  fleetTypes: () => JSON.stringify(fleetStatus(app.session.world, sd()).types),
   mineMode: () => mineMode,
   pendingMove: () => (pendingMove === null ? 'null' : JSON.stringify(pendingMove)),
   /** Test hook: parks warships at a node, outside the replay (the replay no longer matches the live world after it). */
