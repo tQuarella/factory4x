@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 8, hypothesis H8 B: Move ships by hand)
-**State:** Iteration 8 in flight. Owner played build-20261114-1 to a win (75b3021), triaged (d594224), and picked B in Q22 with a drag gesture (048156b). Step: Spec and split (Designer).
+**State:** Iteration 8 in flight. Owner played build-20261114-1 to a win (75b3021), triaged (d594224), and picked B in Q22 with a drag gesture (048156b). Owner then added A (756a237). Spec and split done (0d76117). Step: Build: h8-sim and cw-smoke-sim-time in parallel; h8-raids, h8-bots, h8-client after h8-sim approval.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (private)
 **Last build:** build-20261114-1 (H7 One field, live enemy), commit f565c11, live (CI 43638281605 gates and deploy green; site shows f565c11 · data v13). Release gates passed locally (232/232 smoke).
@@ -11,12 +11,14 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 8 ledger
 
-Launches: 1 / 12.
+Launches: 3 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | triage build-20261114-1 owner dictation; H8 candidates | launch | Plan (d594224); owner picked B + drag (048156b) |
-| r1 | designer | H8 spec + task split | resume | Spec |
+| r1 | designer | H8 spec + task split (A+B) | resume | Spec and split (0d76117) |
+| 2 | core-engineer | h8-sim | launch | Build; repro of the A1/A2 hauler case first |
+| 3 | engineer | cw-smoke-sim-time | launch | Build, in parallel; CI headroom before h8-client |
 
 ## Iteration 7 ledger
 
