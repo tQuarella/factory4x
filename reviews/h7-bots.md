@@ -107,3 +107,50 @@ Runs on v12:
 PROCESS.md: this is h7-bots' **second rejection**. Under PROCESS step 2, the Director reassigns round 3 to the Core Engineer (resume one if available), or logs a DECISIONS.md entry for keeping the original engineer. A third rejection parks the task.
 
 VERDICT: REJECT
+
+## Round 3 · 2026-11-14
+
+Reviewed `git diff 488b4f9..ce6d659`. Under the deadlock rule (PROCESS step 2), the Director reassigned this round to the core-engineer.
+
+**Director decision accepted.** Recycling may also free room for a pocket wave that is the plan, down to the same `raid.firstAtEcon` floor (DECISIONS.md, ed97343). I judge the code against it.
+
+**Round 2 required changes:**
+- [x] **Pocket waves send exactly the sound ships the estimate counted (`exactSend`).**
+  - For each type it walks the parked ships in id order. It sends each run of sound ships, and recycles a wounded ship that would come next, which is by then the lowest id left.
+  - All the orders go out in one tick, so they make one wave.
+  - I checked the logic against `sendShips`' lowest-id rule and the in-tick input order, and it holds.
+  - Tests cover a wounded lowest-id drone, a wounded drone between sound ones, the same case for `static`, and no send while the sound ships at the stage don't cover the wave.
+  - The hive attack still sends everything parked.
+- [x] **Recycling now also frees room for a pocket wave that is the plan.** It only happens in offence, with economy counted against the fleet limit, when the wave plus the floor fits, and never below the floor. A test covers it.
+  - The engineer also found that a wave already in flight raised `wavesSent`, so the bot re-planned and recycled mid-flight. A pocket with a wave on the way, or a battle there, now counts as committed. That's a sound fix, and it's logged.
+- [x] **No-idle invariant tests on the v12 fixture.** adaptive and adaptive-no-raids each play to the win or the cap. The tests assert no 5-minute stretch with every weight at 0, the hive guarded and ore for a warship. There is also a greedy win test.
+- [x] **Re-run done.**
+
+**My verification.** I re-ran my round 2 trace of adaptive-no-raids on shipped v12, seed 1. It now takes p1, p2 and the hive. Round 2 had a 35-minute idle with 2,547 ore.
+
+**Gates (run by me on ce6d659, `npm run gates -- --base main`):**
+- typecheck, lint, determinism (df9ea7c5), protected-files and **bots** pass.
+- The test gate fails with 15 failures, only in h7-client's 4 client files (`h4-client`, `h5-client`, `h6-client`, `session`), as the stack expects.
+- The bots report:
+
+| Strategy | Result on v12 | Raids | Economy ships lost |
+| --- | --- | --- | --- |
+| adaptive | wins in 19:00 | 8: 6 beaten, 1 hit | 4 |
+| greedy | wins in 19:49 | 9: 7 beaten, 1 hit | 6 |
+| adaptive-no-raids | wins in 14:37 | none (raids off) | 0 |
+| idle | times out (control) | none mustered | 0 |
+| drones-only | times out (control) | 21: 19 beaten, 2 hit | 6 |
+| static (best shape) | times out (control) | most of its raids hit | 21 of 34 built |
+
+- Flags 1, 2, 3, 5, 6 and 7 are met. Flag 4 (14 vs 19, a 26% cut against 30%) is a data question for h7-design-data.
+
+**Code quality.**
+- `recycleEconToward` is now shared between the hive and the pocket, so the rule lives in one place.
+- `onTick` is a read-only observer, and it doesn't change runs: the bots' hashes and outcomes are unchanged for the winners.
+- Determinism is intact: integer arithmetic, id-ordered walks, no RNG.
+
+**Non-blocking.** `static` now recycles wounded drones before a pocket wave. Its weights still never change, so it remains a fixed-allocation control.
+
+Required changes: none. Note that this is the third round, but it is an approval, so PROCESS step 3 (parking) does not apply. h7-design-data can stack on this branch.
+
+VERDICT: APPROVE
