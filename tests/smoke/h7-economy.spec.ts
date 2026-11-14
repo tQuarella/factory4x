@@ -47,9 +47,22 @@ async function tapNode(page: Page, id: string): Promise<number> {
   return node;
 }
 
+/** Pauses (a no-op when already paused: the advanceTicks hook pauses). */
 async function pause(page: Page): Promise<void> {
-  await page.locator('#b-pause').click();
+  if (!(await page.evaluate(() => window.__factory4x!.paused()))) await page.locator('#b-pause').click();
   expect(await page.evaluate(() => window.__factory4x!.paused())).toBe(true);
+}
+
+/**
+ * Steps the sim 30 ticks at a time (the advanceTicks hook, which pauses) until `cond` holds, so a wait costs no wall-clock time and
+ * a short state is never missed. Fails if it takes more than `cap` ticks.
+ */
+async function stepUntil(page: Page, cond: () => Promise<boolean>, cap = 9000, what = 'the state'): Promise<void> {
+  for (let t = 0; t <= cap; t += 30) {
+    if (await cond()) return;
+    await page.evaluate(() => window.__factory4x!.advanceTicks(30));
+  }
+  throw new Error(`${what} was not reached in ${cap} ticks`);
 }
 
 /** Sets a sim tunable through the tuning panel, as a player would (and so through the input log). */
@@ -97,7 +110,7 @@ test('acceptance 1: a run opens in the field and runs; no overworld, research or
   await expect(page.locator('#thr')).toBeVisible();
   await expect(page.locator('#hint-text')).toContainText('mine and haul on their own');
   // The first ships are economy ships: after a while the economy has ships and no warship exists.
-  await expect.poll(async () => JSON.parse(await page.evaluate(() => window.__factory4x!.econShips())).length, { timeout: 20_000 }).toBeGreaterThan(0);
+  await stepUntil(page, async () => JSON.parse(await page.evaluate(() => window.__factory4x!.econShips())).length > 0, 3000, 'the first economy ship');
   expect(await page.evaluate(() => window.__factory4x!.wavesSent())).toBe(0);
   expect((await alloc(page)).rows.filter((r) => r.type !== 'extractor' && r.type !== 'hauler').map((r) => r.weight)).toEqual([0, 0, 0]);
 });
@@ -318,22 +331,21 @@ test.describe('375x667 portrait, by touch', () => {
     await expect(state('flak')).toHaveText('needs ice pocket');
     await expect(state('flak')).toHaveCSS('color', 'rgb(255, 210, 122)');
     // The extractor bay builds: its line reads building N% at some point in the first minute.
-    await page.evaluate(() => window.__factory4x!.setSpeed(4));
-    await expect(state('extractor')).toHaveText(/^building \d+%$/, { timeout: 30_000 });
+    await stepUntil(page, async () => /^building \d+%$/.test((await state('extractor').textContent()) ?? ''), 3000, 'the extractor bay building');
     await expectControlsFit(page, '#sheet', 'the state lines fit');
     // Fleet full: cap the fleet at the ships already out, and the next start waits.
     const n = JSON.parse(await page.evaluate(() => window.__factory4x!.econShips())).length;
     await tap(page, page.locator('#sheet .close'));
     await tune(page, 'field.fleetCap', Math.max(1, n));
     await tapNode(page, 'probe');
-    await expect(sheet.locator('.fp-state', { hasText: 'fleet full' }).first()).toBeVisible({ timeout: 60_000 });
+    await stepUntil(page, async () => (await sheet.locator('.fp-state', { hasText: 'fleet full' }).count()) > 0, 6000, 'fleet full');
+    await expect(sheet.locator('.fp-state', { hasText: 'fleet full' }).first()).toBeVisible();
   });
 
   test('acceptance 3: the rock sheet: Stop takes the extractors off the rock, Mine puts them back; pips, haulers, buffer and delivered read from the status', async ({ page }) => {
     await ready(page, PHONE);
-    await page.evaluate(() => window.__factory4x!.setSpeed(4));
     const a1 = await page.evaluate(() => window.__factory4x!.nodeIndex('a1'));
-    await expect.poll(async () => (await rock(page, a1)).docked, { timeout: 60_000, message: 'an extractor docks at the nearest rock' }).toBeGreaterThan(0);
+    await stepUntil(page, async () => (await rock(page, a1)).docked > 0, 6000, 'an extractor docked at the nearest rock');
     await pause(page);
     await tapNode(page, 'a1');
     const sheet = page.locator('#sheet');
@@ -358,10 +370,9 @@ test.describe('375x667 portrait, by touch', () => {
     await expect(sheet.locator('.mine-btn')).toHaveText('Mine this rock');
     await expect(sheet.locator('.pips .pip.on')).toHaveCount(0);
     // They leave: running, none of them is docked at a1 any more.
-    await page.locator('#b-pause').click();
-    await expect.poll(async () => (await rock(page, a1)).docked, { timeout: 20_000 }).toBe(0);
+    await stepUntil(page, async () => (await rock(page, a1)).docked === 0, 3000, 'the extractors off the rock');
+    await settled(page);
     expect(await page.evaluate(() => JSON.parse(window.__factory4x!.mapField()).mine)).not.toContain(a1);
-    await pause(page);
     await tap(page, sheet.locator('.mine-btn'));
     expect((await inputs(page)).slice(-1)[0]).toEqual({ type: 'setMine', node: a1, on: true });
     expect((await rock(page, a1)).mine).toBe(true);
@@ -369,7 +380,6 @@ test.describe('375x667 portrait, by touch', () => {
   });
 
   test('acceptance 3: a full buffer says "Backed up: add haulers" and holds its room; the note never moves the controls below it', async ({ page }) => {
-    test.setTimeout(120_000);
     await ready(page, PHONE);
     await pause(page);
     await tune(page, 'node.bufferCap', 10);
@@ -379,10 +389,8 @@ test.describe('375x667 portrait, by touch', () => {
     const w = Number(await hauler.locator('.fp-w').textContent());
     for (let i = 0; i < w; i++) await tap(page, hauler.locator('.fp-step', { hasText: '−' }));
     await tap(page, page.locator('#sheet .close'));
-    await page.locator('#b-pause').click();
-    await page.evaluate(() => window.__factory4x!.setSpeed(4));
     const a1 = await page.evaluate(() => window.__factory4x!.nodeIndex('a1'));
-    await expect.poll(async () => (await rock(page, a1)).backedUp, { timeout: 80_000 }).toBe(true);
+    await stepUntil(page, async () => (await rock(page, a1)).backedUp, 12000, 'a full buffer at a1');
     await tapNode(page, 'a1');
     const sheet = page.locator('#sheet');
     await expect(sheet.locator('.rock-note .backed')).toHaveText('Backed up: add haulers');
@@ -398,19 +406,15 @@ test.describe('375x667 portrait, by touch', () => {
   });
 
   test('acceptance 3: the raid-rank line shows on the mined rock nearest the hive, not on the others, and not on a Stopped rock', async ({ page }) => {
-    test.setTimeout(120_000);
     await ready(page, PHONE);
-    await page.evaluate(() => window.__factory4x!.setSpeed(4));
     const ids = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'];
     const nodes = await page.evaluate((l) => l.map((i) => window.__factory4x!.nodeIndex(i)), ids);
     // Raids target a mined rock with an extractor or hauler: wait until two rocks have one.
-    await expect
-      .poll(async () => {
-        let n = 0;
-        for (const i of nodes) if ((await rock(page, i)).raidRank > 0) n++;
-        return n;
-      }, { timeout: 90_000 })
-      .toBeGreaterThanOrEqual(2);
+    await stepUntil(page, async () => {
+      let n = 0;
+      for (const i of nodes) if ((await rock(page, i)).raidRank > 0) n++;
+      return n >= 2;
+    }, 12000, 'two raidable rocks');
     await pause(page);
     const ranks = await Promise.all(nodes.map(async (i) => (await rock(page, i)).raidRank));
     const first = ids[ranks.indexOf(1)]!;
@@ -433,15 +437,17 @@ test.describe('375x667 portrait, by touch', () => {
 
   test('acceptance 5: the map draws the economy: docked extractors, haul lines, idle ships at the probe, and the Mine badge', async ({ page }) => {
     await ready(page, PHONE);
-    await page.evaluate(() => window.__factory4x!.setSpeed(4));
-    const map = async (): Promise<{ mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number } }> =>
-      JSON.parse(await page.evaluate(() => window.__factory4x!.mapField()));
+    // What the last drawn frame shows: a frame is drawn after each step, so settle first.
+    const map = async (): Promise<{ mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number } }> => {
+      await settled(page);
+      return JSON.parse(await page.evaluate(() => window.__factory4x!.mapField()));
+    };
     // The six near rocks and a5, a6 and a7 are marked at the start: seven asteroids wear the badge, the pockets and hive do not.
     const m0 = await map();
     const marked = await page.evaluate(() => ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'].map((id) => window.__factory4x!.nodeIndex(id)));
     expect([...m0.mine].sort((a, b) => a - b)).toEqual([...marked].sort((a, b) => a - b));
-    await expect.poll(async () => (await map()).econ.docked, { timeout: 60_000 }).toBeGreaterThan(0);
-    await expect.poll(async () => (await map()).haul.length, { timeout: 90_000, message: 'a rock with haulers gets its line' }).toBeGreaterThan(0);
+    await stepUntil(page, async () => (await map()).econ.docked > 0, 6000, 'a docked extractor');
+    await stepUntil(page, async () => (await map()).haul.length > 0, 9000, 'a rock with haulers getting its line');
     for (const [, level] of (await map()).haul) expect(level).toBeGreaterThanOrEqual(1);
     // Stop every rock: nothing to mine, so the extractors come home and idle at the probe, and every badge goes.
     await pause(page);
@@ -452,8 +458,7 @@ test.describe('375x667 portrait, by touch', () => {
       await tap(page, page.locator('#sheet .close'));
       expect((await rock(page, node)).mine).toBe(false);
     }
-    await page.locator('#b-pause').click();
-    await expect.poll(async () => (await map()).econ.idle, { timeout: 60_000 }).toBeGreaterThan(0);
+    await stepUntil(page, async () => (await map()).econ.idle > 0, 6000, 'an idle ship at the probe');
     expect((await map()).mine).toEqual([]);
   });
 
@@ -489,12 +494,13 @@ test.describe('375x667 portrait, by touch', () => {
       await tap(page, page.locator('#sheet .mine-btn'));
       await tap(page, page.locator('#sheet .close'));
     }
-    await page.locator('#b-pause').click();
-    await page.evaluate(() => window.__factory4x!.setSpeed(4));
     // An extractor itself (not only a hauler) is parked at the probe.
-    await expect
-      .poll(async () => (JSON.parse(await page.evaluate(() => window.__factory4x!.econShips())) as Array<{ type: string; at: number | null }>).filter((e) => e.type === 'extractor' && e.at === 0).length, { timeout: 60_000 })
-      .toBeGreaterThan(0);
+    await stepUntil(
+      page,
+      async () => (JSON.parse(await page.evaluate(() => window.__factory4x!.econShips())) as Array<{ type: string; at: number | null }>).some((e) => e.type === 'extractor' && e.at === 0),
+      6000,
+      'an extractor parked at the probe',
+    );
     await pause(page);
     await tapNode(page, 'probe');
     const recycle = page.locator('#sheet .recycle-btn');
