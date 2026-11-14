@@ -432,6 +432,134 @@ H5 (build-20261108-4, spec below) added a fleet limit per area (12, raised to 18
 
 ## Hypotheses
 
+### H7 candidates (awaiting the owner's pick)
+
+*Iteration 7, 2026-11-14. Triage in PLAYTEST_LOG.md (build-20261108-5, 2026-11-14). The owner stopped at the start of Frost Shelf and proposed a new direction ("let's try the spider graph idea"). That direction is the baseline here, not one option among equals. QUESTIONS.md Q21 asks the owner to confirm the scope and the pillar wording. No spec until then.*
+
+#### The direction, in one paragraph
+
+The probe builds every ship, including the economy. **Extractor ships** fly to asteroids and mine them, and **hauler ships** run the routes home. There is no build queue. The probe's delivered ore is **split across ship types by an allocation** that the player reshapes at any time, shown as a spider (radar) graph. The enemy is **active**: the hive raids what you build, so you need a little force to protect the economy, and from then on you keep choosing between more economy and more offence. In the owner's words: "a simplified game of StarCraft… econ first, but you need to build a little bit of force to ward off incursions, and then at some point you're deciding whether you go more econ or more offense."
+
+**Why it's the baseline.** Since H2, every difference in this game has been paid in time, and pillar 4 says time doesn't matter, so no trade-off is felt (H4 triage). The fleet limit (H5) fixed that for composition by making slots the currency. Raids fix it for the economy: an unguarded extractor can be lost, and an early army is economy you didn't build. "Max economy, then attack" becomes the greedy line with a visible risk, instead of the only line.
+
+#### First-run fixes (ride along with A or B)
+
+These come from the same feedback, and each holds whichever slice is picked.
+1. **The first area teaches extraction.** Today Landfall's heart has no guards and the opening stock (40) buys a drone (18), so one drone wins it without mining. In H7 the opening stock buys economy ships only (about one extractor and one hauler), and the first target needs more combat ships than the opening stock can pay for.
+2. **A landing starts on the economy.** Today H4 landing rule 4 turns the drone yard on at once. In H7 the landing allocation is economy only (`alloc.start.*`), and combat ships are built only once the player turns them up.
+3. **No build queue.** It's removed by construction: there's nothing to queue, and no `build.queueMax`.
+
+#### A. One field, live enemy (recommended)
+
+- **Claim:** when the probe's output is split across ship types by an allocation the player can reshape at any time, and a hive raids what the player builds, the player keeps re-deciding economy against force, and that running decision is fun. Secondary: a ship-based economy reads at least as well on a phone as extractors and routes did.
+- **What would disprove it:**
+  - The owner sets the allocation once and leaves it ("set and forget"), or can't say why they changed it.
+  - Raids feel like a timer, a nuisance or a punishment for growing.
+  - The run still reads as "max economy, then build a fleet and attack".
+  - The owner asks how to mine or haul.
+
+**The smallest mechanics that test it:**
+1. **One field, one run.** A run is one H3-sized field: the probe, about six asteroids (two of them far and rich), one ice pocket, one crystal pocket and the hive. Taking the hive wins the run, with the result panel and New run as in H1–H3. The overworld, research, relays and band locks are **parked**: dormant in data, as the Root was in H6, and not deleted.
+2. **Five ship types on the allocation:** Extractor, Hauler, Drone, Lancer, Flak.
+   - **Extractor:** flies to an asteroid, docks and mines `ship.extractor.orePerMin` into the rock's buffer. A rock holds as many as its `slots`.
+   - **Hauler:** shuttles from a rock's buffer to the probe, `ship.hauler.cargo` per trip. A route's capacity is its haulers × cargo ÷ round trip, so distance still costs.
+   - **No per-ship micro.** A new extractor docks at the nearest rock marked **Mine** that has a free slot. A new hauler joins the mined rock with the fullest buffer. The logistics choice is which rocks to mine (tap a rock: Mine / Stop), and the far rich rocks are the ones raids reach first. A send order can still move any ship.
+   - **Lancer and Flak** unlock when their pocket's resource first reaches the probe (as in H3), and cost ore plus crystal or ice directly. The lens and plating step goes, to keep the slice small.
+3. **The allocation.** Each type has a weight from 0 to `alloc.maxWeight`. Delivered ore flows into each type's share in proportion to its weight (integer accumulators, fixed type order). A ship launches when its share covers its cost and its resource, and the fleet limit allows it. Weight 0 means "not built". There is no queue and nothing to cancel. The landing allocation is `alloc.start.*` (economy only). **The input is a −/+ stepper (≥ 44 px) per axis, with the radar graph as the readout**, on the probe sheet. Dragging radar points is precision dragging on a phone (under 30 px per step on a five-axis radar at 375 px), so it isn't the input.
+4. **The hive raids.** The field's heart is a hive with Thorn and Spore guards, as today, and it also sends raids:
+   - **Trigger: what you build, never the clock.** The first raid leaves when you have `raid.firstAtEcon` economy ships. After that, at most one raid per `raid.gapTicks`, and only while you still have that many. A small economy is never raided after the first raid, and waiting never makes anything worse.
+   - **Size:** one raider per `raid.econPerRaider` of your economy ships, up to `raid.maxSize`, drawn from the hive's own guards in its Thorn/Spore mix. At least `raid.hiveKeepPct` of the guards stay home. So counters matter in defence too, and a raid that is out (or beaten) leaves the hive weaker. That is a counter-attack window, and it makes pillar 3's "factories" visible.
+   - **Target:** the mined rock nearest the hive. Raiders fight anything there under the normal combat rules (the combat amendment included), kill extractors and haulers, then fly home. They never touch the probe or its own mining, and a raided rock stays yours. **"No fail state" holds.**
+   - **Warning:** when a raid leaves, a notice and a lane marker appear ("Raid: 4 Spores → A5, 25 s"). The flight time is the warning.
+   - **Defence:** ships sent to a rock guard it (the existing send-as-guard). Taking the hive ends the raids.
+5. **Fleet limit: the A/B.** `fleet.countsEconomy` 1 makes every ship count, extractors and haulers included. That is StarCraft's supply, and it makes economy against army a trade in slots, not only in ore. 0 is H5's army-only limit. Recycle stays (50% back); under a shared limit it is how you turn economy ships into army late.
+6. **Removed from play:** the build queue and its inputs (`buildExtractor`, `buildRoute`, `upgradeRoute`, `cancelBuild`), route pods and upgrades, yard switches and their round-robin order, and the assemblers. Probe mining stays, as the floor against a softlock. Whether the dead code is deleted or left dormant is the core engineer's call at spec time.
+
+**Tunables (proposed defaults; Engineers wire them, calibration sets them; all integers):**
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `alloc.maxWeight` | 5 | 3–10 | 3: coarse, a few shapes / 10: fine but fiddly on a phone |
+| `alloc.start.extractor`, `alloc.start.hauler` | 3, 2 | 0–5 | the landing allocation (the others start at 0). 0 and 0: you set it yourself |
+| `ship.extractor.cost` | 20 | 5–60 | 5: the economy is free / 60: every extractor is a commitment |
+| `ship.extractor.orePerMin` | 10 | 2–40 | replaces `extractor.orePerMin` |
+| `ship.hauler.cost` | 15 | 5–60 | as for the extractor |
+| `ship.hauler.cargo` | 10 | 2–40 | 2: far rocks need a swarm of haulers / 40: one hauler per rock, and logistics vanish |
+| `ship.extractor.hp`, `ship.hauler.hp` | 6 | 1–40 | 1: any raider wipes a rock / 40: raids barely scratch |
+| `fleet.countsEconomy` | 1 | 0–1 | 0: the limit counts warships only (H5) / 1: every ship counts (supply) |
+| `fleet.cap` | 24 with a shared limit | 0–60 | 0: no limit / 60: the swarm returns. Calibration sets it; 12 if `fleet.countsEconomy` is 0 |
+| `raid.enabled` | 1 | 0–1 | 0: no raids, a peaceful field (the in-build A/B) / 1: raids |
+| `raid.firstAtEcon` | 6 | 2–20 | 2: raided almost at once / 20: raids only at a full economy |
+| `raid.econPerRaider` | 3 | 1–10 | 1: every miner needs a guard / 10: raids are a nuisance |
+| `raid.maxSize` | 10 | 2–30 | 2: never a threat / 30: a raid can empty the field |
+| `raid.gapTicks` | 2700 (90 s) | 900–9000 | 900: a siege / 9000: about one raid per run |
+| `raid.hiveKeepPct` | 50 | 25–90 | 25: raids gut the hive, so counter-attacks are easy / 90: raids are tiny and the hive never opens |
+
+**Success criteria (the owner, one 20–30 minute phone session; 4x is fine):**
+1. In the first minute, the first ships are economy ships, and the owner doesn't mention unwanted drones.
+2. The owner changes the allocation at least three times, and can name why for at least one change (a raid warning, a loss, a target).
+3. At least one raid is met by ships built or moved after its warning, and the owner can say whether a raid hurt.
+4. The owner names a moment of choosing more economy or more offence.
+5. They don't call raids a timer, rushed or a punishment for waiting, and don't describe the run as "max economy then attack".
+6. They never ask how to mine or haul.
+7. Every action is ≤ 2 taps from its screen; the probe sheet with the radar and five steppers fits 375x667; raid notices don't shift the HUD.
+
+**Fun questions (draft; final at spec):**
+1. Did you change the spider graph during the run? What made you change it?
+2. Did the raids make you build a little force, or did they feel like a timer or a nuisance?
+3. Was there a moment you chose between more economy and more offence? Which way did you go, and did it pay off?
+
+**Capability flags for the bots (draft; each measures what can or can't be done, never minutes):**
+1. A `static` bot (the best fixed allocation from a sweep) either loses at least half its economy ships to raids or can't take the hive within the limit. An `adaptive` bot (economy, defence on a warning, then offence) takes the hive on every seed.
+2. A `greedy` bot (no warships until every rock is mined) has at least one rock wiped by a raid on every seed.
+3. An `idle` bot that stays below `raid.firstAtEcon` economy ships is never raided: waiting makes nothing worse.
+4. While a raid is out or just beaten, the hive's smallest winning wave is at least 30% smaller than at full strength: the counter-attack window is real.
+
+**Risks:**
+- **A continuous allocation can remove decisions instead of adding them.** If one shape is always right, the player sets it once and stops deciding. Raids, counters per target and the landing preset are what force a reshape, and flag 1 checks that a fixed shape fails. If it still plays as set-and-forget, the fallback is the owner's own alternative, "just a simple build queue" of discrete orders ("build 4 Flak"), as the next A/B.
+- **Raids as a timer.** Raids are paced by what you build, not by time; the flight time is the warning; they never touch the probe; and a small economy isn't raided after the first time. `raid.enabled` 0 is the in-build comparison.
+- **Punished for growing.** Raids that scale with your economy can feel like rubber-banding. They grow more slowly than your economy (one raider per three ships), are capped by the hive's own guards, and leave the hive open while they're out, so a beaten raid pays you back.
+- **Auto-assignment hides the logistics.** The owner said simple logistics may be fine at a small scale (H3). The logistics choice that's left is which rocks to mine, weighed against their exposure.
+- **Scope.** It's the biggest change since H3: the sim's economy core, raids, the probe sheet, new bots and a calibration. One field keeps it to one iteration. The H4–H6 campaign bots retire for this slice.
+- **The progression is parked.** The overworld was the owner's idea (build-2). It returns on top of A if A holds, which is B's scope.
+- **Determinism.** Raid triggers, raid targets and auto-assignment need fixed orders and integer shares, and no RNG.
+- **Ownership.** Raid behaviour is Faction AI work, and that agent is dormant until the Director activates it in DECISIONS.md.
+
+#### B. The same, on the H6 overworld (the alternative)
+
+- **Claim:** A's claim, held across a campaign: the ship economy, the allocation and raids in every area, with relays, bands and research carried over.
+- **What changes beyond A:** every area's hive raids; the research items tied to the old economy (Opening ore, Extraction, Seed rigs, Fast yards) need new meanings; all ten areas are recalibrated with raids.
+- **Why not first:** it's about two iterations, and it doesn't isolate the claim. If it fails, we won't know whether the allocation, the raids or the map failed. If A isn't fun in one field, it won't be fun across ten.
+
+#### What happens to H6
+
+- **H6's three fun questions are dropped.** All three are about the overworld (relay steps, choosing areas, an open map), which A parks. Asking the owner to finish the H6 run would spend a session on mechanics we're setting aside. If the overworld returns on top of H7 (B, or a later H8), the questions return with it.
+- The H6 spec stays below as the record of what's built. H6 is neither supported nor failed.
+
+#### Check against VISION.md
+
+| VISION.md line | Fit |
+| --- | --- |
+| Original note: "The rate of resources delivered to the probe sets the rate of ship production." "Mobs have their own factories, so you must outpace and overpower them." | Fits better than any build so far: the allocation splits exactly that rate, and raids come out of the mobs' factories. |
+| Fixed: "Logistics are abstract routes between nodes, not tile-by-tile belts." | Fits. Haulers run node-to-node routes. |
+| Fixed: "No fail state." | Fits if raids kill ships and never the probe or its mining, and a raided rock stays yours. |
+| Fixed: "Ships take orders at nodes (attack, guard, escort); no unit micro." | Fits. Defence is a guard order, and extractors and haulers assign themselves. |
+| Fixed: "Each star system is one long game…" | A is one field, so a run is short. It's a test slice, like H3, and the long game returns with the overworld. No edit. |
+| Pillar 1: "Throughput is the throttle…" | Fits: delivered ore is the one number the allocation splits. Q18 (the fleet limit) stays open as before. A shared limit sharpens it but adds nothing new to ask. |
+| Pillar 2: "Risk scales with reward…" | Fits, and grows: the far rich rocks are the most exposed. |
+| **Pillar 3:** "Guardians have factories. Mobs only defend, but they repair and replace up to a cap. Win a node by out-producing their replacement, or cut their supply first." | **Conflicts** with "only defend". Proposed wording in Q21 (it also settles Q20's Root clause). |
+| **Pillar 4:** "A puzzle, not a race. No clock and no pressure. The challenge is building an efficient network." | **Conflicts** with "no pressure": raids are pressure by intent. What survives is "no clock", because raids grow with what you build and never with time. Proposed wording in Q21. |
+| Pillar 5: "Every system makes the next one stronger." | Untouched (parked with the overworld). |
+| DESIGN.md "Mobs: defend only. They never come for you" (2026-11-06) and "Guards that come for you: ruled out" (2026-11-08b) | Superseded by the owner's direction. The pillars stand until Q21 is answered, and A ships with `raid.enabled` either way. |
+
+#### Considered, not proposed
+
+- **A literal drag-the-points radar.** It's precision dragging on a phone. It can be an A/B later (handles snapped to weights) if the owner asks.
+- **Preset buttons** ("Economy", "Defend", "Attack"). They're phone-friendly, but they'd reduce the graph to three choices before we know whether the graph itself is fun.
+- **Raids on a timer, or raids that grow with time.** They break "no clock", and the owner's own "waiting doesn't make it worse" (2026-11-06).
+- **Raids that hit the probe or retake rocks.** They break "No fail state".
+- **Node rigs** (H6 candidate C): still later.
+
 ### H6 candidates (iteration 6): A picked, Root removed
 
 *Iteration 6, 2026-11-08. The triage is in PLAYTEST_LOG.md (build-20261108-4). **The owner picked A, Open frontier, and chose to remove the Root rather than graft it** (QUESTIONS.md Q19). The spec is "H6 (Milestone 2, iteration 6, spec ready): Open frontier" below; where they differ, the spec wins. Q20 (the pillar 3 wording) is Can wait and changes nothing in the spec.*
@@ -545,6 +673,8 @@ The owner, after build-4: "either remove the root mechanic or give some reward f
 - **Verdict:** H7 or later, once A or B holds. If the owner wants it sooner, the cheapest test is one ore rig screen on today's map, after the VISION edit.
 
 ### H6 (Milestone 2, iteration 6, spec ready): Open frontier
+
+**Result (owner, 2026-11-14): not judged.** The owner stopped at the start of Frost Shelf and proposed a new direction instead. The three fun questions are unanswered and dropped; see "H7 candidates" → "What happens to H6" and PLAYTEST_LOG.md.
 
 The owner picked A and chose to remove the Root (QUESTIONS.md Q19, 2026-11-08). The background is "H6 candidates" above.
 

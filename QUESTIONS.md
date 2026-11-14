@@ -33,7 +33,16 @@ Protected files changed this build: none. Every merge passed the protected-files
 
 ## Blocking
 
-None.
+### Q21. Confirm the H7 scope and two pillar edits (2026-11-14, Designer)
+
+Your spider-graph idea is the plan: the probe builds extractor and hauler ships, a spider graph splits its output across ship types instead of a build queue, and the hive raids what you build. Landing on the economy, and a first area you can't win without mining, come with it. Details: DESIGN.md → "H7 candidates". The three H6 questions are dropped, so there's no need to finish that run.
+
+1. **Scope.** **A (recommended):** one field, one run, with the ship economy, the spider graph and raids. The overworld and research are parked until this proves fun. **B:** the same in every area of the current overworld. It's about twice the work, and harder to read if it fails.
+2. **Pillars.** Raids conflict with two VISION.md pillars. Replace pillar 3 with "3. **Guardians have factories.** Mobs guard the best resources and raid what you build; their factories repair and replace up to a cap. Win a node by out-producing their replacement." (this also settles Q20). Replace pillar 4 with "4. **Pressure, not a clock.** Raids grow with what you build, never with time, so waiting never makes things worse. The challenge is balancing an efficient economy against the force that protects it."
+
+Answer like "A, yes" (yes approves both edits; the Director applies them with a permission prompt), or give a letter and your own wording. Default if unanswered: A, with no pillar edit yet. Raids ship as an experiment with an off switch in the tuning panel, and the pillars are revisited after play.
+
+**Answer:**
 
 ## Answered
 
@@ -325,6 +334,8 @@ APPROVED-PROTECTED: VISION.md
 ### Q20. Pillar 3 wording, now that the Root is gone (2026-11-08, Director)
 
 Pillar 3 in VISION.md ends "Win a node by out-producing their replacement, or cut their supply first." You chose to remove the Root, so "cut their supply first" no longer describes the game. Suggested edit: drop that clause, so the pillar reads "Win a node by out-producing their replacement." This changes only the pillar text. VISION.md is protected, so it needs your yes. It blocks nothing; H6 goes ahead either way.
+
+*Folded into Q21 part 2 (2026-11-14, Designer): its pillar 3 wording drops the same clause. Answering Q21 answers this.*
 
 **Answer:**
 

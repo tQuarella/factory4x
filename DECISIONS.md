@@ -828,3 +828,13 @@ Scope: `git log build-20261108-4..build-20261108-5`, `reviews/h6-*.md`, the "Ite
    - New machine: `git config core.autocrlf false` in the repo. Evidence: the CRLF break reported by the Director, and the system-wide `true` in Git for Windows.
 
 **Not changed:** no gate, guardrail or protected file, and nothing in `critic.md`. The 12-launch budget stays (9 used, counting this retro). The bots gate already got stronger in e9298b6. No new backlog item: `cw-smoke-isolation` already covers the port-4173 risk, and I recommend the Director takes it as the next Can wait task, since H6 reviews had to work around it.
+
+## 2026-11-14 · Designer · H7 candidates: the owner's ship-economy direction as the baseline
+
+**Decision:** the triage of the owner's build-20261108-5 feedback treats the owner's direction (extractor and hauler ships, a spider-graph allocation instead of a build queue, an active enemy) as the H7 baseline and recommends testing it in one field with the overworld parked (DESIGN.md "H7 candidates", A). Four calls inside it:
+1. **Raids scale with what the player builds, never with time.** The first raid comes at `raid.firstAtEcon` economy ships, size is one raider per `raid.econPerRaider` economy ships, and a small economy isn't raided after the first raid. This keeps "no clock" and the owner's 2026-11-06 "waiting doesn't make it worse", while still giving the economy a cost that isn't minutes.
+2. **Raiders come out of the hive's own guards** (at least `raid.hiveKeepPct` stay home), so a raid that's out or beaten opens a counter-attack window. Pillar 3's "factories" becomes something you can see, at no extra mechanic.
+3. **The spider graph is a readout, and the input is a −/+ stepper per axis.** Dragging radar points is precision dragging on a phone (under 30 px per step on a five-axis radar at 375 px).
+4. **H6's three fun questions are dropped, not deferred to the owner.** They're about the overworld, which A parks, and finishing the H6 run would cost the owner a session on mechanics we're setting aside.
+
+**Why:** since H2, every trade-off has been paid in time and wasn't felt (PLAYTEST_LOG.md H4 triage). An enemy that raids the economy is the first mechanic that makes the economy-against-army split a felt choice. One field isolates that claim: if it fails, we know what failed. Pillars 3 and 4 conflict with raids, so their wording goes to the owner as Q21. Activating the dormant Faction AI agent for raids is the Director's call, not made here.
