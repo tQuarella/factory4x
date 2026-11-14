@@ -390,6 +390,13 @@ test.describe('375x667 portrait, by touch', () => {
     const w = Number(await hauler.locator('.fp-w').textContent());
     for (let i = 0; i < w; i++) await tap(page, hauler.locator('.fp-step', { hasText: '−' }));
     await tap(page, page.locator('#sheet .close'));
+    // H8: the weight only stops new haulers, and raids no longer kill the one already built (the shield), so the premise is stated:
+    // a1's hauler count is set to 0, so its buffer fills and stays full.
+    await tapNode(page, 'a1');
+    const less = page.locator('#sheet .h-step', { hasText: '−' });
+    for (let i = 0; i < 6 && (await less.isEnabled()); i++) await tap(page, less);
+    await expect(less).toBeDisabled();
+    await tap(page, page.locator('#sheet .close'));
     const a1 = await page.evaluate(() => window.__factory4x!.nodeIndex('a1'));
     await stepUntil(page, async () => (await rock(page, a1)).backedUp, 12000, 'a full buffer at a1');
     await tapNode(page, 'a1');
