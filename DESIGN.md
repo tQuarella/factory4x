@@ -634,7 +634,7 @@ There is no A/B for this: a mode where the drag also carries haulers would bring
 
 **H1 amendment rulings (Director, 2026-11-14, from h8-sim).**
 - **Committed extractors staff a rock.** The extractor in the probe's bay, and a full extractor share, count at the rock F5 would send them to (the nearest mineable rock with a free slot, then the lower index). A share with weight 0 doesn't count. F2 rereads the shortfall when the extractor share fills, so tick 0 splits as H7 did. Result on v14: first hauler at tick 90 and first delivery at tick 1035, the same as H7, and 52 ore by minute 3 against H7's 40.
-- **A hauler at a staffed rock that isn't worked yet waits** while an extractor is docked there or on its way. It leaves on Stop, or once every bound extractor is lost.
+- **A hauler at a staffed rock that isn't worked yet waits** while any extractor staffs it: docked, on its way, or committed (in the bay or a full share). It leaves on Stop, or once nothing docked, bound or committed is left at the rock. (Widened in h8-sim round 2: waiting only for bound extractors made haulers fly empty round trips to a rock whose committed extractor was held by the fleet limit.)
 
 **H4b. No surplus extractors (Director, 2026-11-14; under `hauler.autoNeed` 1 only).**
 - The Extractor gets no ore and its bay doesn't start while no Mine-marked, unguarded rock has a free slot.

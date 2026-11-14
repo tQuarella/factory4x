@@ -1374,3 +1374,7 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 - `staffCounts` has a comment on why unbound extractors aren't placed before committed ones.
 
 **Gates:** all green. The bots gate's tick p95 is at most 0.0133 ms, and the suite runs in 79.3 s. The smoke suite (main's sped-up version) has 228 passed and the 4 known failures at `h7-economy.spec.ts:286`, which belong to h8-client.
+## 2026-11-14 · Director · h8-sim round 2: haulers also wait for committed extractors
+
+**Decision:** accepted. A hauler at a staffed, not-yet-worked rock waits while any extractor staffs it, committed ones included; it leaves on Stop or when nothing docked, bound or committed remains. DESIGN.md updated.
+**Why:** the new replay showed haulers flying empty round trips to a rock whose committed extractor was held by the fleet limit. Waiting costs one ore at minute 10 on the v14 opening; minutes 1–3, the first hauler and the first delivery are unchanged.
