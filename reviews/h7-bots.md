@@ -55,3 +55,55 @@ The stack note allows a red bots gate here, to be judged on h7-design-data, so t
 - [ ] Re-run the bots suite on v12. In your report, give adaptive's and greedy's econ, warships and stock at 15, 30 and 45 minutes, so the next round can see whether a remaining timeout is a data question (for h7-design-data) or still a bot one. The gate may stay red on v12.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-14
+
+Reviewed `git diff a186071..a61cba3`.
+
+**Director decision accepted.** The rule for a dead end (take the other pocket first, else recycle economy ships down to `raid.firstAtEcon`) is the Director's, and DECISIONS.md logs it. I judge the code against it.
+
+**Gates (run by me on a61cba3, `npm run gates -- --base main`):**
+- typecheck, lint, determinism (df9ea7c5), protected-files and **bots** pass.
+- The test gate fails with 15 failures, only in h7-client's 4 client files (`h4-client`, `h5-client`, `h6-client`, `session`).
+
+Runs on v12:
+- adaptive wins in 19:01 (8 raids: 6 beaten, 1 hit; 4 economy ships lost).
+- greedy wins in 19:49, inside the 15–30 minute pace target.
+- Flags 1, 2, 3, 5, 6 and 7 are met. Flag 4 (14 vs 19) is h7-design-data's.
+
+**Round 1 required changes:**
+- [x] The trade in slots now ends every offence branch through `finish`, the raid response included. The new test covers a muster in progress.
+- [ ] **Not met:** "adaptive (and its variants) never sits with every weight at 0 and a growing stockpile while the hive is guarded and no plan fits." Details below.
+- [x] Every static shape counts for the gate's crash and tick-p95 checks (`gateRuns`). There is a test for a crash in a shape that isn't the best.
+- [x] greedy is economy only until its first hit, then a fresh adaptive. Tested with raids off; DECISIONS matches the code.
+- [x] Re-run done. adaptive and greedy now win on v12.
+
+**Defect 1: the pocket assault sends a wounded ship in place of a sound one.**
+- `pocketAssault` checks `covers(fit, mix.fleet)` with `fit = soundShips(world, stage)`, which counts only ships at half hp or more. It then sends `sendInput(stage, node, mix.fleet)` by counts.
+- `sendShips` takes the lowest-id ships of each type, so a wounded ship with a low id goes and a sound one stays behind.
+- Traced on shipped v12, adaptive-no-raids, seed 1. At tick 16879 it sends 15 drones from the probe to p2, with a drone at hp 2 among them, and one sound drone stays at the probe. The min-wave was 15 sound drones. The wave loses: p2 keeps 6 guards, and 16 drones are lost over the run.
+- `recycleUnfit` would scrap the wounded ship only when the fleet is full, which it wasn't here.
+- The hive attack doesn't have this problem, because it sends `here` (everything parked).
+
+**Defect 2: the same run then dead-ends again.** After the failed wave, p2's `wavesSent` is 1, and the raised drone wave no longer fits the room (30 − 13 = 17), so `pocketAssault` returns null.
+- Then `recycleStep` checks the smallest hive wave with drone and flak only (Lancer is still locked). That wave plus the floor of 6 is over the cap, so it returns null as well.
+- From then on, ticks 18000 to 81000: every weight is 0, there are 2 drones, ore grows from 27 to 2547 and ice to 452, and the run times out.
+- The Director's rule recycles only to fit the hive wave. Nothing recycles to fit the pocket wave that step (a) chose, so (a) to (b) has a gap.
+- adaptive-no-raids is a report-only control, but it is the in-build A/B for `raid.enabled`. A run that idles for 35 minutes reports "no raids can't win", which is false and would mislead h7-design-data and the owner's A/B question.
+- The new dead-end tests pass on constructed worlds. The shipped-data run still takes this path.
+
+**Non-blocking:** `drones-only` times out as a control should (flag 5). I didn't check whether it also idles, because its loss is the expected result.
+
+**Required changes:**
+- [ ] A pocket wave sends the ships the estimate counted:
+  - either send every ship parked at the stage, as the hive attack does;
+  - or recycle or hold back wounded ships first, so the lowest-id ships that `sendShips` takes are sound.
+
+  Add a test: a wounded lowest-id drone at the stage plus exactly the min-wave of sound drones; the wave that leaves contains at least the min-wave of sound drones, and it takes the pocket.
+- [ ] When step (a) has chosen a pocket, the recycle step also makes room for that pocket's (raised) wave, down to the same floor. Then a failed pocket wave can't strand the bot. If this goes beyond the Director's rule as written, say so in DECISIONS.md.
+- [ ] Add a test on the v12 fixture that plays `adaptive-no-raids` and `adaptive` to the cap or the win. Assert that neither spends 5 or more game minutes in a row with every weight at 0, the hive guarded, and `stock.ore` at or above the cheapest warship's cost.
+- [ ] Re-run the gates. adaptive and greedy must still win on v12. Report adaptive-no-raids' outcome.
+
+PROCESS.md: this is h7-bots' **second rejection**. Under PROCESS step 2, the Director reassigns round 3 to the Core Engineer (resume one if available), or logs a DECISIONS.md entry for keeping the original engineer. A third rejection parks the task.
+
+VERDICT: REJECT
