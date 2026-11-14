@@ -187,3 +187,49 @@ export function raidEndText(r: Readonly<RaidLastInput>, target: string): string 
   add(r.lostShips.flak, 'flak', 'flak');
   return `Raid hit ${target}: lost ${parts.length > 0 ? parts.join(', ') : 'nothing'}`;
 }
+
+// ---------------------------------------------------------------------------
+// H8: the weight column, the hauler count row, the raid lines on the rock sheet, the move and fleet-panel texts.
+
+/** The line under the radar. */
+export const RADAR_NOTE = 'Income is split by these weights.';
+
+/** A probe-sheet row's share of income after its weight (the row reads "3 · 30%"). */
+export function pctText(row: Readonly<Pick<AllocRow, 'incomePct'>>): string {
+  return ` · ${row.incomePct}%`;
+}
+
+/**
+ * The rock sheet's Haulers row: "2 · Auto" (the need), "3 · set (Auto 2)" once the player set a count. A rock that isn't being mined
+ * has no need, so it reads "Auto" or "3 · set" (the count is kept and applies again when it is marked).
+ */
+export function haulerRowText(r: Readonly<Pick<RockStatus, 'mine' | 'haulerNeed' | 'haulerSet' | 'haulerTarget'>>): string {
+  if (!r.mine) return r.haulerSet === null ? 'Auto' : `${r.haulerSet} · set`;
+  return r.haulerSet === null ? `${r.haulerTarget} · Auto` : `${r.haulerSet} · set (Auto ${r.haulerNeed})`;
+}
+
+/** The longest raid line on the rock sheet, which sizes the room reserved for it. */
+export const RAID_HELD_TEXT = 'Haulers waiting at the probe';
+
+/** "Raid coming: 4 Spores, 1 Thorn" while it musters or flies out; "Raid here: ..." once it fights at the rock. */
+export function raidRockText(phase: 'muster' | 'out' | 'fight' | 'home' | 'none', mix: Readonly<{ thorn: number; spore: number }>): string {
+  return `${phase === 'fight' ? 'Raid here' : 'Raid coming'}: ${raidMixText(mix)}`;
+}
+
+/** The tap-Move-tap banner: "Tap where to send 6 ships". */
+export function moveBannerText(count: number): string {
+  return `Tap where to send ${count} ${count === 1 ? 'ship' : 'ships'}`;
+}
+
+/** The toast after a move: "Moved 6 → A5", or "Sent 6 to attack P2" when the target is guarded. */
+export function movedText(count: number, target: string, attack: boolean): string {
+  return attack ? `Sent ${count} to attack ${target}` : `Moved ${count} → ${target}`;
+}
+
+/** Entering Mine mode. */
+export const MINE_MODE_TOAST = 'Tap rocks to mine or stop. Tap Mine to finish.';
+
+/** The fleet panel's recycle button, "Recycle 3 (+24 ore)", or "Recycle" with nothing chosen. */
+export function recycleFleetText(total: number, ore: number): string {
+  return total > 0 ? `Recycle ${total} (+${ore} ore)` : 'Recycle';
+}

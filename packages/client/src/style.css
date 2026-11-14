@@ -398,3 +398,46 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 #chips .chip.raid { --num-pad: 'Raids at 00 ships'; border: 1px solid transparent; border-radius: 8px; padding: 0 5px; white-space: nowrap; }
 #chips .chip.raid.active { border-color: var(--bloom); }
 #chips .chip.raid.active b { color: #ffb3cc; }
+
+/* ---- H8: drag to move, the hauler count, Mine mode, the weight column, the fleet panel ---- */
+#app[data-run='campaign'] .field-only { display: none !important; }
+/* Field mode: a drag on the canvas moves ships, so the browser must not scroll or zoom under it (the overworld already does this). */
+#app[data-run='field'] #view { touch-action: none; -webkit-touch-callout: none; }
+#b-mine canvas { display: block; }
+#b-mine.on { background: #12303a; border-color: var(--teal); }
+#movebar {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 0 0 12px;
+  background: rgba(17, 27, 46, 0.97); border: 1px solid var(--ship); border-radius: 10px; font-size: 13px; color: var(--ink);
+}
+#movebar span { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+#movebar button { flex: 0 0 auto; width: 84px; height: 44px; background: none; border: 0; border-left: 1px solid var(--line); color: var(--gold); font: 600 14px ui-monospace, Menlo, Consolas, monospace; }
+/* One line under the radar; compact, because the probe sheet already uses the room the map needs. */
+.fp-note { margin: 0 0 2px; font-size: 11px; line-height: 14px; }
+.fp-row { min-height: 45px; padding: 0; }
+.fp-wv { flex: 0 0 auto; min-width: 66px; text-align: center; white-space: nowrap; }
+.fp-pct { font-size: 11px; color: var(--dim); }
+.hstep { display: flex; gap: 6px; margin: 2px 0 4px; }
+.btn.h-step { width: 44px; padding: 0; font-size: 20px; flex: 0 0 auto; }
+.btn.h-auto { flex: 1 1 0; width: auto; min-width: 44px; padding: 0 8px; }
+.rock-note .backed:empty, .rock-note .rank:empty, .rock-note .raid:empty, .rock-note .held:empty { display: none; }
+#sheet.rk { max-height: 62dvh; max-height: 62vh; }
+section.move { display: flex; gap: 6px; }
+.btn.move-all, .btn.move-half { flex: 1 1 0; width: auto; border-color: #3a5c8a; }
+.card.fleet-card { max-width: 420px; }
+.fleet-head { display: flex; align-items: center; justify-content: space-between; }
+.fleet-head h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.fleet-line { margin: 2px 0 6px; }
+.fl-row { display: flex; align-items: center; gap: 6px; min-height: 48px; border-top: 1px solid var(--line); }
+.fl-text { flex: 1 1 0; min-width: 0; line-height: 1.2; }
+.fl-name { font-size: 13px; overflow-wrap: anywhere; }
+.fl-dot { display: inline-block; width: 8px; height: 8px; margin-left: 6px; border-radius: 50%; background: var(--teal); }
+.fl-alive { font-size: 11px; color: var(--dim); overflow-wrap: anywhere; }
+.fl-count { min-width: 46px; text-align: center; font-size: 15px; flex: 0 0 auto; }
+.fl-count.zero { color: var(--dim); }
+.btn.fl-go { white-space: normal; }
+/* The Fleet chip opens the fleet panel: its tap area is padded out to 44 px high without changing the bar. */
+.chip.fleet { position: relative; cursor: pointer; }
+.chip.fleet::after { content: ''; position: absolute; inset: -10px -3px; }
+@media (min-aspect-ratio: 1/1) {
+  #sheet.rk { max-height: none; }
+}

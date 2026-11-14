@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { expectControlsFit, settled } from './helpers.ts';
+import { expectControlsFit, settled, stepSimUntil } from './helpers.ts';
 
 /**
  * H7 client, the economy part: a run lands in the field, the probe sheet (radar and five rows), the rock sheet (Mine / Stop), the map's
@@ -295,8 +295,9 @@ test.describe('375x667 portrait, by touch', () => {
       await tap(page, plus('flak'));
       await expect(sheet.locator('.fp-row[data-type="lancer"] .fp-state')).toHaveText('needs crystal pocket');
       await expect(sheet.locator('.fp-row[data-type="flak"] .fp-state')).toHaveText('needs ice pocket');
-      // Run until warships and economy ships are parked at the probe (the rally point), so Recycle shows.
-      for (let i = 0; i < 40 && !(await sheet.locator('.recycle-btn').isVisible()); i++) await page.evaluate(() => window.__factory4x!.advanceTicks(60));
+      // The premise is stated, not left to the opening economy (H8 staffs haulers by need, so nothing idles at the probe on its own):
+      // the drone weight is at the top, so a finished drone parks at the probe, the rally point, and Recycle shows.
+      await stepSimUntil(page, () => sheet.locator('.recycle-btn').isVisible(), 14_400, 'a ship parked at the probe', false);
       await expect(sheet.locator('.recycle-btn')).toBeVisible();
       await settled(page);
       const fit = await page.evaluate(() => {

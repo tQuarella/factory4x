@@ -96,6 +96,18 @@ interface Window {
     raidStatus(): string;
     /** The raid's flight state as JSON text ({phase, from, target, ticksLeft, flightTicks}), or "null" (tests). */
     raidFlight(): string;
+    /** H8: what the last frame drew for a drag in progress ({from, part, armed, finger, ghost, target, aim, tag}, canvas px) as JSON text, or "null". */
+    mapDrag(): string;
+    /** H8: the node that wore the raid badge in the last frame, or -1. */
+    raidBadge(): number;
+    /** H8: the gesture's phase and how many moves, cancels and split arms it has seen, as JSON text. */
+    gestureState(): string;
+    /** H8: Mine mode is on. */
+    mineMode(): boolean;
+    /** H8: the tap-Move-tap order waiting for its target, as JSON text ({from, part}), or "null". */
+    pendingMove(): string;
+    /** H8 test hook: parks warships at a node without an input (the replay no longer matches the live world afterwards). */
+    debugParkShips(node: number, counts: Partial<Record<'drone' | 'lancer' | 'flak', number>>): void;
     /** Pauses and steps exactly n ticks, then refreshes the screen (tests). */
     advanceTicks(n: number): void;
     /** The session's input log (inputs only), as JSON text. */

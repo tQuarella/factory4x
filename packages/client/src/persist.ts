@@ -156,10 +156,32 @@ export interface Settings {
   worldHintDismissed: boolean;
   /** `client.autosaveSec`, seconds of wall time between autosaves. */
   autosaveSec: number;
+  /** H8 `client.longPressMs`, `client.dragSlopPx` and `client.moveGesture` (1 drag, 0 tap-Move-tap): this device only, never in the sim. */
+  longPressMs: number;
+  dragSlopPx: number;
+  moveGesture: number;
 }
 
+/** The client-scope keys and the setting each one is stored in. */
+export const CLIENT_SETTING_KEYS = {
+  'client.autosaveSec': 'autosaveSec',
+  'client.longPressMs': 'longPressMs',
+  'client.dragSlopPx': 'dragSlopPx',
+  'client.moveGesture': 'moveGesture',
+} as const;
+export type ClientKey = keyof typeof CLIENT_SETTING_KEYS;
+
 export function defaultSettings(data: SimData): Settings {
-  return { showResult: true, hintDismissed: false, worldHintDismissed: false, autosaveSec: data.tunables['client.autosaveSec'].default };
+  const d = (k: ClientKey): number => data.tunables[k].default;
+  return {
+    showResult: true,
+    hintDismissed: false,
+    worldHintDismissed: false,
+    autosaveSec: d('client.autosaveSec'),
+    longPressMs: d('client.longPressMs'),
+    dragSlopPx: d('client.dragSlopPx'),
+    moveGesture: d('client.moveGesture'),
+  };
 }
 
 export function loadSettings(data: SimData, storage: StorageLike | null = defaultStorage()): Settings {
@@ -175,6 +197,12 @@ export function loadSettings(data: SimData, storage: StorageLike | null = defaul
     if (typeof p.hintDismissed === 'boolean') s.hintDismissed = p.hintDismissed;
     if (typeof p.worldHintDismissed === 'boolean') s.worldHintDismissed = p.worldHintDismissed;
     if (isInt(p.autosaveSec) && p.autosaveSec >= spec.min && p.autosaveSec <= spec.max) s.autosaveSec = p.autosaveSec;
+    for (const key of Object.keys(CLIENT_SETTING_KEYS) as ClientKey[]) {
+      const name = CLIENT_SETTING_KEYS[key];
+      const v = p[name];
+      const sp = data.tunables[key];
+      if (isInt(v) && v >= sp.min && v <= sp.max) s[name] = v;
+    }
   } catch {
     /* fall back to defaults */
   }

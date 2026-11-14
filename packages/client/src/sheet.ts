@@ -19,6 +19,7 @@ import {
   isGuarded,
   isRootCut,
   isValidInput,
+  movePreview,
   nodeStatus,
   queueStatus,
   shipCounts,
@@ -72,6 +73,10 @@ export interface SheetHost {
   choose(from: number, to: number): void;
   /** Opens the Recycle panel for the ships parked at `node`. */
   recycle(node: number): void;
+  /** H8 fallback: starts the tap-Move-tap order for the warships at `from` (the sheet closes; a banner asks where to). */
+  startMove(from: number, part: 'all' | 'split'): void;
+  /** `client.moveGesture`: 1 drag, 0 tap-Move-tap. */
+  moveGesture(): number;
   close(): void;
 }
 
@@ -185,15 +190,18 @@ export class Sheet {
     this.ups = [];
     this.root.replaceChildren();
     this.root.hidden = false;
-    this.root.classList.remove('world', 'fp');
+    this.root.classList.remove('world', 'fp', 'rk');
     this.root.scrollTop = 0;
     const field = isField(world);
+    // H8: a rock's sheet (hauler row, raid lines) may use as much of the screen as the probe's, so it doesn't scroll on a phone.
+    if (field && n.kind !== 'probe' && !isGuarded(world, n.index)) this.root.classList.add('rk');
 
     // H7: the probe sheet carries its own head (the radar sits beside the title and the close button) and its own rally button.
     if (field && n.kind === 'probe') {
       this.root.classList.add('fp');
       buildProbeSheet(this.root, this.fieldHost(), this.ups);
       this.sendSection(n);
+      this.moveSection(n);
       this.update();
       return;
     }
@@ -211,6 +219,7 @@ export class Sheet {
     else this.producerSections(n);
 
     this.sendSection(n);
+    if (field && !isGuarded(world, n.index)) this.moveSection(n);
     if (!isGuarded(world, n.index)) this.recycleSection(n);
     this.rallySection(n);
     this.update();
@@ -640,6 +649,27 @@ export class Sheet {
       all.set(`${attack() ? 'Attack with all sources' : 'Send from all sources'} · ${total}`);
       setHidden(sec, total === 0);
       setText(title, attack() ? `Attack ${guardName(this.world, n.index)}` : 'Send ships here');
+    });
+  }
+
+  /**
+   * H8 fallback (`client.moveGesture` 0): "Move all" and "Move half" start the tap-Move-tap order from this node. Hidden while drags are on,
+   * and while no warship is parked here.
+   */
+  private moveSection(n: Node): void {
+    const sec = h('section', 'move', '', this.root);
+    const all = btn(sec, '', () => this.host.startMove(n.index, 'all'), 'move-all');
+    const half = btn(sec, '', () => this.host.startMove(n.index, 'split'), 'move-half');
+    this.ups.push(() => {
+      const w = this.world;
+      const total = (part: 'all' | 'split'): number => {
+        const c = movePreview(w, n.index, part);
+        return c.drone + c.lancer + c.flak;
+      };
+      const k = total('all');
+      setHidden(sec, this.host.moveGesture() !== 0 || k === 0);
+      all.set(`Move all · ${k}`, k > 0);
+      half.set(`Move half · ${total('split')}`, k > 0);
     });
   }
 

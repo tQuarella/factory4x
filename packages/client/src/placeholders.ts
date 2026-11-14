@@ -1561,3 +1561,181 @@ export function drawMineBadge(ctx: Ctx, r: number): void {
   ctx.stroke();
   ctx.restore();
 }
+
+// ---------------------------------------------------------------------------
+// H8: the raid-target badge, the drag line, ghost chip, drop highlight and tag, and the split-armed pulse.
+
+/**
+ * Raid-target badge: the raiders' two-colour ring (Thorn arc then Spore arc, as `drawRaidMarker`) round a dark disc with two crossed
+ * `bloom` blades. It carries no chevron (the marker's arrow rides the line) and no "!" (the backed-up pill), and it sits on the rock's
+ * upper left, opposite the Mine badge. Within r.
+ */
+export function drawRaidBadge(ctx: Ctx, r: number, mix: Readonly<RaidMix>): void {
+  ctx.save();
+  ctx.fillStyle = palette.space;
+  disc(ctx, 0, 0, r * 0.97);
+  ctx.fill();
+  const total = Math.max(1, mix.thorn + mix.spore);
+  const w = Math.max(2.4, r * 0.24);
+  const rr = r * 0.97 - w / 2;
+  ctx.lineWidth = w;
+  ctx.lineCap = 'butt';
+  let a0 = -Math.PI / 2;
+  for (const [n, colour] of [[mix.thorn, palette.thorn], [mix.spore, palette.spore]] as const) {
+    if (n <= 0) continue;
+    const a1 = a0 + (n / total) * Math.PI * 2;
+    ctx.strokeStyle = colour;
+    ctx.beginPath();
+    ctx.arc(0, 0, rr, a0, a1);
+    ctx.stroke();
+    a0 = a1;
+  }
+  ctx.strokeStyle = palette.bloom;
+  ctx.lineWidth = Math.max(1.5, r * 0.2);
+  ctx.lineCap = 'round';
+  const k = r * 0.36;
+  ctx.beginPath();
+  ctx.moveTo(-k, -k);
+  ctx.lineTo(k, k);
+  ctx.moveTo(k, -k);
+  ctx.lineTo(-k, k);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** What a drag is over: a node it will move to, an enemy node it will attack, or nothing (the drop would cancel). */
+export type DragAim = 'move' | 'attack' | 'none';
+
+const AIM_COLOUR: Record<DragAim, string> = { move: palette.ship, attack: palette.bloom, none: palette.laneClosed };
+
+/** The drag line: dashed from the source to the finger, `ship` blue to a node, `bloom` to an enemy, grey over nothing. `phase` marches the dashes. */
+export function drawDragLine(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, aim: DragAim, phase = 0): void {
+  ctx.save();
+  ctx.strokeStyle = AIM_COLOUR[aim];
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.setLineDash([8, 7]);
+  ctx.lineDashOffset = -phase;
+  ctx.globalAlpha = aim === 'none' ? 0.75 : 0.95;
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = AIM_COLOUR[aim];
+  disc(ctx, x1, y1, 5);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** One ship type on the ghost chip. */
+export interface GhostEntry {
+  type: ShipType;
+  count: number;
+}
+
+/** Ghost chip height, px. */
+export const GHOST_H = 30;
+
+const GHOST_FONT = '700 13px ui-monospace, Menlo, Consolas, monospace';
+const GHOST_GAP = 8;
+const GHOST_ICON_W = 18;
+
+/** The ghost chip's width for these entries (measured in the ghost's font), px. */
+export function ghostWidth(ctx: Ctx, entries: readonly GhostEntry[]): number {
+  ctx.save();
+  ctx.font = GHOST_FONT;
+  const w = Math.max(40, entries.reduce((a, e) => a + GHOST_ICON_W + 3 + ctx.measureText(String(e.count)).width, 0) + GHOST_GAP * (entries.length - 1) + 16);
+  ctx.restore();
+  return w;
+}
+
+/**
+ * The ghost chip (panel style): each carried type's icon and count on a dark rounded panel, edged by the aim colour. Drawn centred on the
+ * origin; returns its width.
+ */
+export function drawDragGhost(ctx: Ctx, entries: readonly GhostEntry[], aim: DragAim): number {
+  ctx.save();
+  ctx.font = GHOST_FONT;
+  const gap = GHOST_GAP;
+  const cells = entries.map((e) => ({ e, tw: ctx.measureText(String(e.count)).width }));
+  const iconW = GHOST_ICON_W;
+  const w = ghostWidth(ctx, entries);
+  ctx.fillStyle = 'rgba(11, 22, 38, 0.94)';
+  ctx.strokeStyle = AIM_COLOUR[aim];
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2, -GHOST_H / 2, w, GHOST_H, 9);
+  ctx.fill();
+  ctx.stroke();
+  let x = -w / 2 + 8;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  for (const c of cells) {
+    ctx.save();
+    ctx.translate(x + iconW / 2, 0);
+    drawShip(ctx, 8, 0, c.e.type);
+    ctx.restore();
+    ctx.fillStyle = palette.starBright;
+    ctx.fillText(String(c.e.count), x + iconW + 3, 1);
+    x += iconW + 3 + c.tw + gap;
+  }
+  ctx.restore();
+  return w;
+}
+
+/** The drop-target highlight: a bright ring round the node that would receive the ships (`starBright`, or `bloom` for an attack). `r` is the node's reach. */
+export function drawDropHighlight(ctx: Ctx, r: number, attack: boolean, t: number): void {
+  ctx.save();
+  const colour = attack ? palette.bloom : palette.starBright;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 8);
+  ctx.strokeStyle = colour;
+  ctx.globalAlpha = 0.28 + 0.2 * pulse;
+  ctx.lineWidth = 8;
+  disc(ctx, 0, 0, r + 3);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 3;
+  disc(ctx, 0, 0, r);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** The drop-target tag: the node's name, and "Attack · Strong" on a guarded one. Centred on the origin; returns its width. */
+export function drawDropTag(ctx: Ctx, name: string, attackText: string | null): number {
+  ctx.save();
+  ctx.font = '700 12px ui-monospace, Menlo, Consolas, monospace';
+  const text = attackText === null ? name : `${name} · ${attackText}`;
+  const w = ctx.measureText(text).width + 14;
+  ctx.fillStyle = attackText === null ? 'rgba(11, 22, 38, 0.94)' : 'rgba(70, 12, 36, 0.95)';
+  ctx.strokeStyle = attackText === null ? palette.starBright : palette.bloom;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2, -10, w, 20, 7);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = attackText === null ? palette.starBright : palette.bloomHi;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, 1);
+  ctx.restore();
+  return w;
+}
+
+/** The split-armed pulse on the source: two `ship` blue rings spreading out from the rock, a beat apart. `t` is in seconds. */
+export function drawSplitPulse(ctx: Ctx, r: number, t: number): void {
+  ctx.save();
+  ctx.strokeStyle = palette.ship;
+  for (const off of [0, 0.5]) {
+    const f = (t * 1.6 + off) % 1;
+    ctx.globalAlpha = 0.85 * (1 - f);
+    ctx.lineWidth = 3 - 1.5 * f;
+    disc(ctx, 0, 0, r * (1 + 0.45 * f));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = 3;
+  disc(ctx, 0, 0, r);
+  ctx.stroke();
+  ctx.restore();
+}
