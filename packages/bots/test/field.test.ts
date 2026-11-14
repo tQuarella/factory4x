@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BUILD_TYPES, createWorld, defaultData, isTypeUnlocked, isValidInput, step, type Input, type SimData, type World } from '@factory4x/sim';
+import { BUILD_TYPES, createWorld, guardianAt, defaultData, isTypeUnlocked, isValidInput, step, type Input, type SimData, type World } from '@factory4x/sim';
 import { fixtureV12 } from '../../sim/test/fixture.ts';
 import { fieldMix, fullRaidAwayCounts, guardsAtHome } from '../src/field-estimate.ts';
 import { computeFieldFlags } from '../src/field-flags.ts';
+import { raisedMix } from '../src/strategies.ts';
 import { FIELD_CAP_MIN, SOFTLOCK_MIN, defaultFieldOptions, fieldGateFailures, gateRuns, runField, type FieldBot, type FieldResult, type FieldStrategy } from '../src/field-runner.ts';
 import {
   FIELD_WINNERS,
@@ -12,6 +13,7 @@ import {
   counterFor,
   dronesOnly,
   economyWeights,
+  exactSend,
   soundShips,
   fieldStrategies,
   greedy,
@@ -620,12 +622,153 @@ describe('review round 1: the economy limit, the dead end, the gate and greedy',
   });
 });
 
-describe('the frozen v12 field (no dead end)', () => {
-  it('adaptive and greedy take the hive within the cap on the v12 fixture, with raids on', () => {
-    for (const s of [adaptive, greedy]) {
-      const r = runField(s, 1, fixtureV12);
-      expect(r.outcome, s.name).toBe('won');
-      expect(r.ticks).toBeLessThan(FIELD_CAP_MIN * MIN);
+describe('review round 2: exact pocket waves, recycling for a pocket, no idling on v12', () => {
+  /** v12, raids off, offence latched (econ 12), the Flak locked: the counter pocket p1 (ice) is the plan. */
+  function pocketPlan(): { w: World; p1: number; need: number } {
+    const w = createWorld(1, fixtureV12);
+    w.tun['raid.enabled'] = 0;
+    addEcon(w, 7, 5);
+    const p1 = w.nodes.findIndex((n) => n.id === 'p1');
+    const need = fieldMix(w, fixtureV12, p1, ['drone'], 30, guardsAtHome(w, p1))!.fleet.drone;
+    return { w, p1, need };
+  }
+  const drone = (w: World, id: number, hp: number): void => {
+    w.ships.push({ id, type: 'drone', hp, at: 0, transit: null, engagedIn: -1 });
+  };
+
+  /** Steps the bot's inputs once; then the ships flying to `to`, and every input applied. */
+  function launch(w: World, to: number): { sent: World['ships']; inputs: Input[] } {
+    const inputs = adaptive.make(fixtureV12).decide(w, fixtureV12);
+    const probe = JSON.parse(JSON.stringify(w)) as World;
+    for (const input of inputs) {
+      expect(isValidInput(probe, fixtureV12, input), JSON.stringify(input)).toBe(true);
+      step(probe, fixtureV12, [input]);
     }
+    step(w, fixtureV12, inputs);
+    return { sent: w.ships.filter((s) => s.transit !== null && s.transit.to === to), inputs };
+  }
+
+  it('a pocket wave sends exactly the sound ships the estimate counted: a wounded lowest-id drone is recycled, not sent, and the wave takes the pocket', () => {
+    const { w, p1, need } = pocketPlan();
+    expect(need).toBeGreaterThan(1);
+    drone(w, 900, 2);
+    for (let i = 0; i < need; i++) drone(w, 901 + i, 10);
+    const { sent, inputs } = launch(w, p1);
+    expect(inputs.filter((i) => i.type === 'recycleShips')).toEqual([{ type: 'recycleShips', node: 0, counts: { drone: 1, lancer: 0, flak: 0, extractor: 0, hauler: 0 } }]);
+    expect(sent.map((s) => s.id)).toEqual(Array.from({ length: need }, (_, i) => 901 + i));
+    expect(sent.every((s) => s.hp === w.tun['ship.drone.hp'])).toBe(true);
+    expect(w.ships.some((s) => s.id === 900)).toBe(false);
+    expect(guardianAt(w, p1)!.wavesSent).toBe(1);
+    for (let i = 0; i < 2 * MIN && guardianAt(w, p1)!.alive; i++) step(w, fixtureV12, []);
+    expect(guardianAt(w, p1)!.alive).toBe(false);
+  });
+
+  it('a wounded drone between sound ones: the run before it is sent, it is recycled, the rest are sent, all as one wave', () => {
+    const { w, p1, need } = pocketPlan();
+    drone(w, 900, 10);
+    drone(w, 901, 3);
+    for (let i = 1; i < need; i++) drone(w, 901 + i, 10);
+    drone(w, 990, 1); // a wounded one past the wave stays where it is
+    const { sent, inputs } = launch(w, p1);
+    expect(inputs.filter((i) => i.type !== 'setAlloc' && i.type !== 'setRally')).toEqual([
+      { type: 'sendShips', from: 0, to: p1, counts: { drone: 1, lancer: 0, flak: 0 } },
+      { type: 'recycleShips', node: 0, counts: { drone: 1, lancer: 0, flak: 0, extractor: 0, hauler: 0 } },
+      { type: 'sendShips', from: 0, to: p1, counts: { drone: need - 1, lancer: 0, flak: 0 } },
+    ]);
+    expect(sent).toHaveLength(need);
+    expect(sent.every((s) => s.hp === 10)).toBe(true);
+    expect(w.ships.find((s) => s.id === 990)!.at).toBe(0);
+    expect(guardianAt(w, p1)!.wavesSent).toBe(1);
+  });
+
+  it('static sends a pocket wave the same way: the wounded lowest-id drone is recycled and exactly the min-wave of sound drones leaves', () => {
+    const { w, p1, need } = pocketPlan();
+    drone(w, 900, 2);
+    for (let i = 0; i < need; i++) drone(w, 901 + i, 10);
+    const inputs = staticStrategy(STATIC_SHAPES[2]!).make(fixtureV12).decide(w, fixtureV12);
+    expect(inputs.filter((i) => i.type === 'sendShips' || i.type === 'recycleShips')).toEqual([
+      { type: 'recycleShips', node: 0, counts: { drone: 1, lancer: 0, flak: 0, extractor: 0, hauler: 0 } },
+      { type: 'sendShips', from: 0, to: p1, counts: { drone: need, lancer: 0, flak: 0 } },
+    ]);
+    step(w, fixtureV12, inputs);
+    const sent = w.ships.filter((s) => s.transit !== null && s.transit.to === p1);
+    expect(sent.map((s) => s.id)).toEqual(Array.from({ length: need }, (_, i) => 901 + i));
+  });
+
+  it('exactSend sends nothing while the sound ships at the stage do not cover the wave', () => {
+    const { w, p1, need } = pocketPlan();
+    drone(w, 900, 2);
+    for (let i = 1; i < need; i++) drone(w, 900 + i, 10);
+    expect(exactSend(w, 0, p1, { drone: need, lancer: 0, flak: 0 })).toEqual([]);
+  });
+
+  it('a pocket that is the plan but whose (raised) wave does not fit: economy weights to 0, and economy ships are recycled toward it, never below raid.firstAtEcon (Director, round 3)', () => {
+    // v12, raids off, the Flak unlocked: the dead end takes the other pocket (p2, crystal), whose wave was raised by a failed one.
+    const w = createWorld(1, fixtureV12);
+    w.tun['raid.enabled'] = 0;
+    w.stats.firstDeliveredTick.ice = 1;
+    w.stock.ore = 3000;
+    addEcon(w, 8, 6);
+    const p2 = w.nodes.findIndex((n) => n.id === 'p2');
+    guardianAt(w, p2)!.wavesSent = 1;
+    const base = fieldMix(w, fixtureV12, p2, ['drone'], 30, guardsAtHome(w, p2))!;
+    const raised = raisedMix(base, 1, 30).total;
+    const floor = w.tun['raid.firstAtEcon'];
+    // The premise: the raised wave is over the room (30 − 14) but fits with the economy at its floor.
+    expect(raised).toBeGreaterThan(30 - 14);
+    expect(raised + floor).toBeLessThanOrEqual(30);
+    const bot = adaptive.make(fixtureV12);
+    const first = bot.decide(w, fixtureV12);
+    expect(first.filter((i) => i.type === 'recycleShips')).toHaveLength(1);
+    expect(weightOf(first, 'extractor')).toBe(0);
+    expect(weightOf(first, 'hauler')).toBe(0);
+    expect(weightOf(first, 'drone')).toBeGreaterThan(0);
+    let lowest = Infinity;
+    let wave = 0;
+    for (let i = 0; i < 15 * MIN && guardianAt(w, p2)!.alive; i++) {
+      const inputs = bot.decide(w, fixtureV12);
+      step(w, fixtureV12, inputs);
+      lowest = Math.min(lowest, w.field!.econ.length);
+      wave = Math.max(wave, w.ships.filter((s) => s.transit !== null && s.transit.to === p2).length);
+    }
+    expect(lowest).toBe(30 - raised);
+    expect(lowest).toBeGreaterThanOrEqual(floor);
+    expect(wave).toBeGreaterThanOrEqual(raised);
+    expect(guardianAt(w, p2)!.alive).toBe(false);
+  });
+
+  /** Plays a strategy to the win or the cap on v12, and returns the longest stretch (ticks) with every weight 0, the hive guarded and the ore for the cheapest warship. */
+  function idleStretch(s: FieldStrategy): { r: FieldResult; longest: number } {
+    let run = 0;
+    let longest = 0;
+    const onTick = (w: Readonly<World>): void => {
+      const zero = BUILD_TYPES.every((t) => w.field!.alloc[t] === 0);
+      const cheapest = Math.min(w.tun['ship.drone.cost'], w.tun['ship.lancer.cost'], w.tun['ship.flak.cost']);
+      run = zero && guardianAt(w, w.nodes.length - 1)!.alive && w.stock.ore >= cheapest ? run + 1 : 0;
+      longest = Math.max(longest, run);
+    };
+    const r = runField(s, 1, fixtureV12, { ...defaultFieldOptions(fixtureV12), onTick });
+    return { r, longest };
+  }
+
+  it('adaptive (raids on) takes the hive on v12 and never idles 5 game minutes with every weight 0, the hive guarded and ore for a warship', () => {
+    const { r, longest } = idleStretch(adaptive);
+    expect(r.outcome).toBe('won');
+    expect(r.ticks).toBeLessThan(FIELD_CAP_MIN * MIN);
+    expect(longest).toBeLessThan(5 * MIN);
+  });
+
+  it('adaptive-no-raids plays to the win or the cap on v12 without such a 5-minute idle stretch', () => {
+    const { r, longest } = idleStretch(adaptiveNoRaids);
+    expect(['won', 'timeout']).toContain(r.outcome);
+    expect(longest).toBeLessThan(5 * MIN);
+  });
+});
+
+describe('the frozen v12 field (no dead end)', () => {
+  it('greedy takes the hive within the cap on the v12 fixture, with raids on (adaptive: the round-2 test above)', () => {
+    const r = runField(greedy, 1, fixtureV12);
+    expect(r.outcome).toBe('won');
+    expect(r.ticks).toBeLessThan(FIELD_CAP_MIN * MIN);
   });
 });

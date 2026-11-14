@@ -91,6 +91,8 @@ export interface FieldRunOptions {
   softlockTicks: number;
   /** Extra tunables set on the first tick, after the strategy's own. */
   tunables?: Readonly<Partial<Record<TunableKey, number>>>;
+  /** Called after every step with the world, read-only (tests and tools observe a run; it never changes one). */
+  onTick?: (world: Readonly<World>) => void;
 }
 
 export function defaultFieldOptions(data: SimData): FieldRunOptions {
@@ -140,6 +142,7 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
       const t0 = performance.now();
       step(world, data, inputs);
       times.push(performance.now() - t0);
+      opts.onTick?.(world);
       // Progress: a bay started a ship, or a hauler delivered.
       const bay = bayTicks(world);
       for (let i = 0; i < bay.length; i++) if (prevBay[i] === 0 && bay[i]! > 0) lastProgress = world.tick;

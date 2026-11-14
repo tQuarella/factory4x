@@ -198,6 +198,37 @@ function sendInput(from: number, to: number, counts: ShipTypeCounts): Input {
   return { type: 'sendShips', from, to, counts };
 }
 
+/**
+ * The inputs that send exactly the sound ships `need` counts from `stage` to `to`, and no wounded one.
+ * `sendShips` takes the lowest-id ships of each type, so per type this walks the parked ships in id order: a run
+ * of sound ships is sent, and a wounded ship that would come next (the lowest id left) is recycled first (the
+ * estimate can't count it, and the stage is never a living guarded node). Every send in one tick to one guarded node
+ * is one wave (rule 1). Returns [] when the sound ships at the stage don't cover `need`.
+ */
+export function exactSend(world: Readonly<World>, stage: number, to: number, need: Readonly<ShipTypeCounts>): Input[] {
+  if (!covers(soundShips(world, stage), need)) return [];
+  const out: Input[] = [];
+  const one = (type: ShipType, n: number): ShipTypeCounts => ({ ...EMPTY, [type]: n });
+  for (const type of WARSHIPS) {
+    let left = need[type];
+    let run = 0;
+    for (const s of world.ships) {
+      if (left === 0) break;
+      if (s.type !== type || s.at !== stage || s.transit !== null) continue;
+      if (s.hp * 2 >= world.tun[`ship.${type}.hp`]) {
+        run++;
+        left--;
+      } else {
+        if (run > 0) out.push(sendInput(stage, to, one(type, run)));
+        run = 0;
+        out.push({ type: 'recycleShips', node: stage, counts: { ...one(type, 1), extractor: 0, hauler: 0 } });
+      }
+    }
+    if (run > 0) out.push(sendInput(stage, to, one(type, run)));
+  }
+  return out;
+}
+
 /** Warships parked away from `stage` (and not fighting at a living guarded node) fly to it. */
 function regroup(world: Readonly<World>, parked: Map<number, ShipTypeCounts>, stage: number): Input[] {
   const out: Input[] = [];
@@ -280,7 +311,7 @@ export class AdaptiveBot implements FieldBot {
     // 3. Counter pocket (the hive's majority counter), once offence has started or a raid has been answered.
     const counter = hiveCounter(world);
     if (!this.opts.dronesOnly && counter.pocket !== null && !isTypeUnlocked(world, counter.type) && (this.offence || (this.respond && rs.last !== null))) {
-      const extra = this.pocketAssault(world, data, counter.pocket, w, here, fit, stage, limit, room);
+      const extra = this.pocketAssault(world, data, counter.pocket, w, fit, stage, limit, room);
       if (extra !== null) return finish([...extra, ...regroup(world, parked, stage)]);
     }
 
@@ -306,10 +337,10 @@ export class AdaptiveBot implements FieldBot {
         // The dead end (the Director's rule): no hive plan fits fleetCap minus the economy. A player can (a) take
         // the other pocket if that unlocks a mix that fits, else (b) Recycle economy ships until the wave fits.
         const other = this.otherPocket(world, data, counter, types, limit);
-        const e = other === null ? null : this.pocketAssault(world, data, other, w, here, fit, stage, limit, room);
+        const e = other === null ? null : this.pocketAssault(world, data, other, w, fit, stage, limit, room);
         if (e !== null) extra.push(...e);
         else {
-          const r = this.recycleStep(world, data, heart, types, limit, room);
+          const r = this.recycleStep(world, data, types, limit, room);
           if (r !== null) extra.push(r);
         }
       }
@@ -324,13 +355,35 @@ export class AdaptiveBot implements FieldBot {
     return finish(regroup(world, parked, stage));
   }
 
-  /** Assault a pocket with drones when the min-wave for it fits the room: weights toward it, and send once the ships at the stage cover it. Null when it doesn't fit. */
-  private pocketAssault(world: Readonly<World>, data: SimData, node: number, w: Weights, here: ShipTypeCounts, fit: ShipTypeCounts, stage: number, limit: number, room: number): Input[] | null {
+  /**
+   * Assault a pocket with drones: weights toward its (raised) min-wave, and once the sound ships at the stage cover
+   * it, send exactly those (exactSend). When the wave doesn't fit the room, in offence the pocket is still the plan
+   * if the wave plus the economy floor fits the limit (the Director's rule, extended in round 3): the economy stops
+   * growing and Recycles down toward the wave, as for the hive. Null when the pocket can't be the plan.
+   */
+  private pocketAssault(world: Readonly<World>, data: SimData, node: number, w: Weights, fit: ShipTypeCounts, stage: number, limit: number, room: number): Input[] | null {
     if (!isGuarded(world, node)) return null;
+    // A wave on its way or fighting there is committed: no new plan (its own order already raised wavesSent).
+    if (guardianAt(world, node)!.battle !== null || world.ships.some((s) => s.transit !== null && s.transit.to === node)) return [];
     const mix = waveFor(world, data, node, ['drone'], limit, guardsAtHome(world, node));
-    if (mix === null || mix.total > room) return null;
+    if (mix === null) return null;
+    const cap = fleetCap(world, data);
+    const counted = cap !== null && world.tun['fleet.countsEconomy'] >= 1;
+    if (mix.total > room) {
+      if (!this.offence || !counted || mix.total + this.econFloor(world) > cap) return null;
+      w.extractor = 0;
+      w.hauler = 0;
+      Object.assign(w, deficitWeights(world, data, mix.fleet));
+      const r = this.recycleEconToward(world, data, mix.total, room);
+      return r === null ? [] : [r];
+    }
+    // The pocket's own trade in slots: in offence the economy stops growing while one more ship would leave the wave no room.
+    if (this.offence && counted && econAliveNow(world, data) + ECON_MARGIN + mix.total > cap) {
+      w.extractor = 0;
+      w.hauler = 0;
+    }
     Object.assign(w, deficitWeights(world, data, mix.fleet));
-    if (covers(fit, mix.fleet)) return guardianAt(world, node)!.battle === null ? [sendInput(stage, node, mix.fleet)] : [];
+    if (covers(fit, mix.fleet)) return exactSend(world, stage, node, mix.fleet);
     // Full of ships this wave can't use (wounded, or other types): scrap one to open a slot.
     const r = w.drone + w.lancer + w.flak > 0 && fleetStatus(world, data).full ? this.recycleUnfit(world, data, mix.fleet) : null;
     return r === null ? [] : [r];
@@ -373,13 +426,23 @@ export class AdaptiveBot implements FieldBot {
    * exposed rocks, nearest the hive, then the lowest yield; haulers before extractors), while the smallest hive wave
    * does not fit the room and the economy stays above its floor. Null when nothing needs to or can be recycled.
    */
-  private recycleStep(world: Readonly<World>, data: SimData, heart: number, types: readonly ShipType[], limit: number, room: number): Input | null {
+  private recycleStep(world: Readonly<World>, data: SimData, types: readonly ShipType[], limit: number, room: number): Input | null {
+    const target = this.smallestHiveWave(world, data, types, limit);
+    return target === null ? null : this.recycleEconToward(world, data, target, room);
+  }
+
+  /**
+   * One Recycle order toward a wave of `need` ships (the hive's, or round 3: a pocket's that is the plan), worst-placed
+   * economy ship first, while `need` exceeds the room, the floor leaves room for it (need + floor ≤ the limit), and
+   * the economy is above the floor. One order per RECYCLE_EVERY ticks. Null when nothing needs to or can go.
+   */
+  private recycleEconToward(world: Readonly<World>, data: SimData, need: number, room: number): Input | null {
     if (world.tick % RECYCLE_EVERY !== 0) return null;
     const cap = fleetCap(world, data);
     if (cap === null || world.tun['fleet.countsEconomy'] < 1) return null;
-    const target = this.smallestHiveWave(world, data, types, limit);
     const floor = this.econFloor(world);
-    if (target === null || target <= room || target + floor > cap || econAliveNow(world, data) <= floor) return null;
+    if (need <= room || need + floor > cap || econAliveNow(world, data) <= floor) return null;
+    const heart = heartIndex(world);
     const nodes = world.nodes
       .filter((n) => !isGuarded(world, n.index))
       .map((n) => ({ node: n.index, probe: n.kind === 'probe' ? 0 : 1, dist: nodeDistance(world, n.index, heart), yield: n.kind === 'probe' ? 0 : rockStatus(world, n.index).deliveredPerMin }))
@@ -516,7 +579,9 @@ class StaticBot implements FieldBot {
     rows.sort((a, b) => a.mix.total - b.mix.total || a.node - b.node);
     for (const r of rows) {
       if (covers(soundShips(world, PROBE), r.mix.fleet)) {
-        inputs.push(sendInput(PROBE, r.node, r.node === heartIndex(world) ? here : r.mix.fleet));
+        // The hive takes everything parked; a pocket takes exactly the sound ships the estimate counted.
+        if (r.node === heartIndex(world)) inputs.push(sendInput(PROBE, r.node, here));
+        else inputs.push(...exactSend(world, PROBE, r.node, r.mix.fleet));
         break;
       }
     }
