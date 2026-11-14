@@ -831,13 +831,13 @@ Flags 1–7 must stay met. A flag that values alone can't meet is a rule finding
 1. They don't mention haulers in the wrong place, or extra haulers sitting around.
 2. They move warships by drag at least three times, including one long-press half move. They don't report a drag going to the wrong node, or a tap turning into a move.
 3. At least one raid is beaten with no economy ship lost (the result panel shows it), and they notice that warships protected the economy.
-4. He marks rocks with Mine mode, or says marking is quick enough.
-5. He checks the fleet panel, or recycles from it.
-6. He can say what a weight of 3 does.
-7. As in H7, he doesn't call raids a timer or a punishment.
+4. They mark rocks with Mine mode, or says marking is quick enough.
+5. They check the fleet panel, or recycles from it.
+6. They can say what a weight of 3 does.
+7. As in H7, they don't call raids a timer or a punishment.
 8. The phone checks above hold: the sheets and the fleet panel fit, and nothing in the HUD shifts.
 
-Optional: he tries `client.moveGesture` 0 or `hauler.autoNeed` 0, and says which he prefers.
+Optional: they try `client.moveGesture` 0 or `hauler.autoNeed` 0, and says which they prefer.
 
 #### Fun questions for the handoff (H8)
 
