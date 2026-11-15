@@ -1,3 +1,5 @@
+> **Values tried, not shipped.** The Director kept data v14 (DECISIONS.md, "Director: h8-design-data stays on v14", 2026-11-15). This report is the record of the v15 exploration (`guard.spore.damage` 2, p1 0 / 3). The shipped result is `reports/archive/h8-design-data-v14.md`.
+
 # Bot suite: PASS
 
 Data version 15, 3 seeds, field mode, 6 strategies (adaptive, greedy, static, idle, drones-only, adaptive-no-raids). Cap 45 game minutes, softlock after 5 minutes with no ship start and no delivery, tick budget p95 ≤ 2 ms. Runs 135.5 s. Times are game minutes (m:ss). Gated for softlock and timeout: adaptive, greedy; the others are controls and are reported only.

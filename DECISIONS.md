@@ -1452,3 +1452,19 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 **For the Director (findings, not tuned around):**
 1. **This is a broad combat change.** Every Spore fight hits twice as hard: raids, pockets and the hive, whose best mix goes from 16 to 18 with exactly 2 slots spare. The narrower alternative is to keep v14 and reword the target to "a defence under half the raid's size is beaten", which v14 already met (5 of 12 loses).
 2. **Greedy now takes the hive 10 minutes before adaptive** (15:57 against 25:54; on v14 they were 8 s apart). Adaptive's partial defences lose more fights (6 hits against greedy's 4). That cuts against "maxing the economy is the risky line". It may come from the bots' defence rule rather than the field, and no bot defends with a force sized to the raid's mix.
+
+## 2026-11-15 · Director: h8-design-data stays on v14
+
+*(Recorded by the Designer, as the Director ruled.)*
+
+**Decision:**
+- Data v15 (`guard.spore.damage` 2, p1 0 / 3; the entry above) is **not shipped**. H8 stays on data v14.
+- The target "a defence of half the raid's size is beaten" becomes **"a defence under half the raid's size is beaten, then the raid hits"**. v14 meets it: 5 ships (2 lancers + 3 flak) against the raid of 12 are beaten, and the raid kills 3 extractors. 6 ships win, losing 3.
+- The v15 exploration stays in `reports/archive/h8-design-data-v15.md`, marked "values tried, not shipped". The shipped result is `reports/archive/h8-design-data-v14.md`.
+
+**Why:**
+- **v15 turns the strategies upside down.** It moves adaptive's win from 15:53 to 25:54 while greedy stays where it was (15:57). That makes defending the costly line and ignoring raids the safe one, the opposite of pillar 2 and of the H7/H8 claim.
+- **It is too broad for one target.** It doubles every Spore fight (pockets, hive, raids) to meet a single target.
+- **The owner's ask is already met.** "Fight through the military first" is answered by the shield rule (H9), not by Spore damage.
+
+**Watch item (a later iteration, not this one).** On v14, greedy and adaptive finish 8 s apart (15:45 and 15:53), so the bots don't yet show that maxing the economy is the risky line. No bot builds a defence matched to the raid.
