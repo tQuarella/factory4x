@@ -1436,3 +1436,19 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 - **Greedy handoff.** The inner AdaptiveBot takes greedy's `Backstops`, so a first hit that wipes the economy is still recovered from; tested.
 - **Shield asserted** (0 economy ships lost under a guard, adaptive and greedy, whole runs). Stale report text fixed. Unused import removed.
 - **Bots gate time.** `haulerShortfall` in the bot reads `haulerTarget` and the hauler assignment directly instead of building a `rockStatus` per rock each tick. The bots run takes 96-98 s (86 s before h8-bots; the rest is the per-tick staffing metrics and the backstops' `allocStatus` read).
+
+## 2026-11-15 · Designer · h8-design-data: data v15 (`guard.spore.damage` 2, p1 0 / 3)
+
+**Decision:**
+- `guard.spore.damage` goes from 1 to 2, and the p1 guards from 0 / 4 to 0 / 3. `dataVersion` is 15.
+- Every H7 and H8 calibration target and all seven flags are met on v15 (`reports/archive/h8-design-data-v15.md`).
+
+**Why:**
+- **v14 missed exactly one target: "a token guard isn't enough".** A half-size matched defence (2 lancers + 4 flak) beat the full-economy raid (4 Thorns and 8 Spores) and lost 3.
+- **No raid value can move that.** At a full economy (24 ships) the raid is `ceil(24 ÷ 2)` = 12 whatever `raid.maxSize` or `raid.hiveKeepPct` say. `raid.econPerRaider` 1 would double every raid from the first.
+- **Of four guard values tried one at a time, only `guard.spore.damage` 2 flips the fight** ("Values tried from v14" in the report). It pushed p1 to 7 drones against the target of at most 6, so p1 drops a Spore.
+- **The order check moved nothing.** The min-waves and the a5 fights were rerun in a second order with the same results.
+
+**For the Director (findings, not tuned around):**
+1. **This is a broad combat change.** Every Spore fight hits twice as hard: raids, pockets and the hive, whose best mix goes from 16 to 18 with exactly 2 slots spare. The narrower alternative is to keep v14 and reword the target to "a defence under half the raid's size is beaten", which v14 already met (5 of 12 loses).
+2. **Greedy now takes the hive 10 minutes before adaptive** (15:57 against 25:54; on v14 they were 8 s apart). Adaptive's partial defences lose more fights (6 hits against greedy's 4). That cuts against "maxing the economy is the risky line". It may come from the bots' defence rule rather than the field, and no bot defends with a force sized to the raid's mix.

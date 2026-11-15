@@ -42,8 +42,8 @@ const H8_SIM = ['hauler.autoNeed', 'hauler.needPct', 'rock.haulerMax', 'raid.shi
 const H8_CLIENT = ['client.longPressMs', 'client.dragSlopPx', 'client.moveGesture'];
 
 describe('data/sim.json (shipped) at H8', () => {
-  it('is data version 14', () => {
-    expect(defaultData.dataVersion).toBe(14);
+  it('is data version 15', () => {
+    expect(defaultData.dataVersion).toBe(15);
   });
 
   it('matches the "Tunables (H8 …)" table: every key with its default and range', () => {

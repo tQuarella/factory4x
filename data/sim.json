@@ -1,5 +1,5 @@
 {
-  "dataVersion": 14,
+  "dataVersion": 15,
   "tickRate": 30,
   "run": { "mode": "field" },
   "tunables": {
@@ -38,7 +38,7 @@
     "guard.thorn.repairPerRound": { "default": 2, "min": 0, "max": 20 },
     "guard.thorn.regrowTicks": { "default": 60, "min": 15, "max": 1800 },
     "guard.spore.hp": { "default": 6, "min": 1, "max": 100 },
-    "guard.spore.damage": { "default": 1, "min": 0, "max": 30 },
+    "guard.spore.damage": { "default": 2, "min": 0, "max": 30 },
     "guard.spore.repairPerRound": { "default": 0, "min": 0, "max": 20 },
     "guard.spore.regrowTicks": { "default": 20, "min": 5, "max": 1800 },
     "guard.capPct": { "default": 100, "min": 25, "max": 300 },
@@ -126,7 +126,7 @@
       "mine": ["a1", "a2", "a3", "a4", "a5", "a6", "a7"],
       "layout": {
         "pockets": {
-          "p1": { "prize": "ice", "slots": 2, "thorns": 0, "spores": 4 },
+          "p1": { "prize": "ice", "slots": 2, "thorns": 0, "spores": 3 },
           "p2": { "prize": "crystal", "slots": 2, "thorns": 1, "spores": 2 }
         },
         "heart": { "thorns": 12, "spores": 18 }

@@ -687,7 +687,7 @@ The target stays mined (its docked extractors stay, and its haulers still count 
 
 #### Save, data version and replay
 
-- **`dataVersion` 14** (h8-sim): the new keys below, plus `haulerSet` in the field state. Old saves are discarded with the existing toast.
+- **`dataVersion` 14** (h8-sim): the new keys below, plus `haulerSet` in the field state. Old saves are discarded with the existing toast. **15** after h8-design-data (`guard.spore.damage` 2, p1 0 / 3; values only).
 - **The reference replay** (h8-sim, then h8-raids) adds:
   - a need-based assignment;
   - a rebalance after `setHaulers` lowers a count;
@@ -832,6 +832,8 @@ Bots keep H7's strategies and selectors. They don't use the drag (it's a client 
 - **Flag 6** (the slot trade) uses the number of haulers at adaptive's peak, which under need staffing drops toward 11. Both halves still hold if the best mix stays at v13's 16 (an arithmetic check; calibration reruns it):
   - 13 Mine slots + 11 haulers + 16 = 40, still more than 30;
   - 16 + 10 = 26, which fits in 30.
+
+  *On v15 (h8-design-data):* the best mix is 18 and adaptive peaks at 10 haulers. 13 + 10 + 18 = 41 > 30, and 18 + 10 = 28 ≤ 30. See "Calibration result (h8-design-data, data v15)".
 - **Raid size** (R4) counts economy ships alive. Fewer haulers make raids a little smaller and the first raid a little later, so the "first raid at 2–6 minutes" target is rechecked.
 - **No new order-dependence.** The shield (H9) depends only on which ships are at the node when the round starts, not on any build or id order. The need (H1) depends only on data and positions. Neither adds a measurement that depends on order. The `min-wave` estimate is unchanged.
 
@@ -844,6 +846,61 @@ H7's targets carry over with the same values. Two are new:
   - outside raids and Stops, at most 1 hauler is idle at the probe.
 
 Flags 1–7 must stay met. A flag that values alone can't meet is a rule finding for the Director. Values only, in `data/sim.json`; `dataVersion` goes to 15 if any value changes.
+
+#### Calibration result (h8-design-data, data v15)
+
+Probe on v14: `reports/archive/h8-probe-v14.md`. Result on v15: `reports/archive/h8-design-data-v15.md`. Both are 3 seeds; the field doesn't depend on the seed, so every seed gives the same run. Each report ends with a Designer section printed by its script (`reports/archive/h8-probe-v14.mts`, `reports/archive/h8-design-data-v15.mts`). Values only; no rule changed.
+
+**The one target v14 missed.** "A token guard isn't enough" failed: a half-size matched defence (2 lancers + 4 flak against the full-economy raid of 4 Thorns and 8 Spores) **beat** the raid, losing 3. Five ships (2 + 3) lost. With the shield, half the raid's size in warships made a rock safe.
+
+Raid-only values can't move this. At a full economy (24 ships: 13 extractors and 11 haulers by need) the raid is `ceil(24 ÷ raid.econPerRaider)` = 12, so `raid.maxSize` and `raid.hiveKeepPct` don't change it. `raid.econPerRaider` 1 would double every raid from the first one on. The probe tried four guard values, each alone; only one flipped the fight:
+
+| Value tried | Half defence (2L + 4F) | Hive best mix | p1 / p2 drones |
+| --- | --- | --- | --- |
+| v14 (none) | wins, loses 3 | 16 | 6 / 5 |
+| `guard.spore.hp` 7 | wins, loses 5 | 17 | 7 / 7 |
+| `guard.spore.hp` 8 | wins, loses 5 | 17 | 8 / 7 |
+| `guard.thorn.damage` 4 | wins, loses 5 | 18 | 6 / 5 |
+| `guard.spore.damage` 2 | **beaten, the raid hits** | 18 | 7 / 6 |
+
+These come from the v15 report's section "Values tried from v14": the same script, with v14's two values restored and one value changed per run.
+
+**Changes (v14 → v15):**
+
+| Value | v14 | v15 | Why |
+| --- | --- | --- | --- |
+| `guard.spore.damage` | 1 | 2 | The only single value that makes a half-size defence lose. It applies to every Spore fight: raids, pockets and the hive. |
+| p1 (T / S) | 0 / 4 | 0 / 3 | With Spores hitting twice as hard, p1 needed 7 drones, against the pocket target of at most 6. At 0 / 3 it needs 6. |
+
+**Targets on v15** (from `reports/archive/h8-design-data-v15.md`):
+
+| Target | v15 | Met |
+| --- | --- | --- |
+| Pace: adaptive 15–30, greedy ≤ 40 | adaptive 25:54, greedy 15:57 (no raids: 10:20) | yes |
+| First raid musters at 2–6 game minutes | 2:42 (tick 4862), 1 Thorn and 2 Spores | yes |
+| An undefended full-economy raid on a5 kills ≥ 2 economy ships | the raid of 12 (4T 8S) kills all 3 docked extractors; the 3 haulers there leave at launch (H10) | yes |
+| A matched defence no larger than the raid wins, losing ≤ 2 | 5 lancers + 4 flak (9) beat it, losing 2, with no economy lost | yes |
+| **A token guard isn't enough:** a half-size defence is beaten, then the raid hits | 2 lancers + 4 flak (6) all die, and the raid kills 3 extractors | yes (v14: no) |
+| **Staffing is right** (adaptive): no rock backed up > 30 s with its target met; at most 1 idle hauler outside raids | backed up: none; idle peak 1, 0 minutes with more than 1 | yes |
+| The hive: flags 4–6; the best mix fits `field.fleetCap − 10` with ≥ 2 spare | best mix 18 (9 lancers, 9 flak), exactly 2 spare under 20; 12 with a full raid out (33% smaller) | yes |
+| Each pocket falls to drones alone within 6, not within 2 | p1 6, p2 6 | yes |
+| Flags 1–7 | all met. Flag 1 holds because `static` times out (its best shape, war-lean, loses 4 of 14 economy ships) | yes |
+
+**Order check (designer.md: what the spec inherits).**
+- **Min-wave:** every answer was rerun with ships placed flak, lancer, drone and the hive keeping its highest guard ids, searching every mix up to the answer. Hive 18 / 18; hive with the full raid out 12 / 12; p1 6 / 6; p2 6 / 6. Nothing moved.
+- **Raid fights at a5:** each fight (undefended, 5L + 4F, the half defence) was rerun with defenders placed flak first and raiders taken highest ids first. Every outcome and loss count is the same.
+- **The shield adds no dependence on order,** as the spec expected.
+
+**What changes for the inherited checks above.** Flag 6 now reads: best mix 18; full economy 23 (13 Mine slots plus 10 haulers at adaptive's peak); 18 + 23 = 41 > 30, and 18 + 10 = 28 ≤ 30.
+
+**Findings for the Director (not tuned around).**
+- **Greedy is now 10 minutes faster than adaptive** (15:57 against 25:54). On v14 the two were within 8 s (15:45 and 15:53). Under v13 greedy was slower (30:12 against 24:54). With Spores at 2, adaptive's standing guards lose more fights early: 10 raids, 6 of them hits, against greedy's 6 raids and 4 hits. So the bots' "economy first, then respond" line beats "respond to every raid". Both are inside their pace targets, and flag 2 (greedy's first hit kills ≥ 2) holds. But it bears on the H7/H8 claim that maxing the economy is the risky line. It may be the bots' defence rule (it defends with what it has, not with a winning mix) rather than the field. **No bot tests whether a player who defends with a matched force beats greedy.**
+- **`guard.spore.damage` 2 is a broad combat change, not a raid knob.** Every Spore fight hits twice as hard: pockets, the hive and raids. The alternative is to keep v14 and change the target to "a defence under half the raid's size is beaten", which v14 already met (5 of 12 loses). The owner never asked for harder fights. If you prefer the narrower change, it is one value back (and p1 back to 0 / 4), and the spec target's wording changes.
+
+**What no bot exercises.**
+- The drag gesture, `setHaulers`, `moveShips`, `recycleFleet` and Mine mode. Sim tests and the replay cover the inputs; h8-client's smoke tests cover the drag and Mine mode.
+- No bot stops a rock to dodge a raid.
+- No bot builds a defence sized to the raid's mix. The "matched defence" numbers come from fights the script sets up, not from runs.
 
 #### Success criteria (H8; the owner, one 20–30 minute phone session; 4x is fine)
 
@@ -1050,11 +1107,11 @@ Frame nodes from the H3 frame (positions unchanged). The heart is the **hive**.
 | `a3`, `a4` | asteroid | 1 each | ore | – | yes | 735 |
 | `a5` | asteroid | 3 | ore | – | yes | 430 |
 | `a6`, `a7` | asteroid | 2 each | ore | – | yes | 534 |
-| `p1` | pocket | 2 | ice | 0 / 4 | after capture | 645 |
+| `p1` | pocket | 2 | ice | 0 / 3 | after capture | 645 |
 | `p2` | pocket | 2 | crystal | 1 / 2 | after capture | 645 |
 | `heart` | the hive | 4 | ore | 12 / 18 | after capture | 0 |
 
-The guard counts are data v13, calibrated by h7-design-data to "Calibration targets (H7)" (v12 had p1 0 / 6, p2 4 / 2 and the hive 12 / 24; see "Calibration result (h7-design-data, data v13)"). Data shape: `map.field = { nodes: [ids], mine: [ids], layout: { pockets: {...}, heart: {thorns, spores} } }`, in the H4 area layout format (no Root, no starved counts). `parseSimData` checks that every id is a frame node, `probe` is first, `heart` is present, `mine` holds asteroids only, and in field mode that `ship.hauler.cargo ≤ node.bufferCap` and `economy.probeOrePerMin ≥ 1` (the softlock floor).
+The guard counts are data v13, calibrated by h7-design-data to "Calibration targets (H7)" (v12 had p1 0 / 6, p2 4 / 2 and the hive 12 / 24; see "Calibration result (h7-design-data, data v13)"), except p1: 0 / 3 since data v15 (h8-design-data, from 0 / 4, when `guard.spore.damage` went from 1 to 2; see "Calibration result (h8-design-data, data v15)"). Data shape: `map.field = { nodes: [ids], mine: [ids], layout: { pockets: {...}, heart: {thorns, spores} } }`, in the H4 area layout format (no Root, no starved counts). `parseSimData` checks that every id is a frame node, `probe` is first, `heart` is present, `mine` holds asteroids only, and in field mode that `ship.hauler.cargo ≤ node.bufferCap` and `economy.probeOrePerMin ≥ 1` (the softlock floor).
 
 What this means in play: the far rocks (a5, a6, a7: 7 of the 13 asteroid slots) are the closest to the hive, so the richest economy is also the most exposed. The near rocks (a1–a4, 6 slots) are safe longest.
 
@@ -3122,7 +3179,7 @@ New or renamed keys. H1 economy, route and build keys are unchanged.
 | `guard.thorn.repairPerRound` | 2 | 0–20 | from `guardian.repairPerRound` |
 | `guard.thorn.regrowTicks` | 60 | 15–1800 | from `guardian.regrowTicks` |
 | `guard.spore.hp` | 6 | 1–100 | 2: spores pop / 20: spores are Thorns that regrow fast |
-| `guard.spore.damage` | 1 | 0–30 | |
+| `guard.spore.damage` | 2 | 0–30 | 2 since data v15 (h8-design-data); 1 before |
 | `guard.spore.repairPerRound` | 0 | 0–20 | 0: the swarm is replaced, not healed |
 | `guard.spore.regrowTicks` | 20 | 5–1800 | 5: Spore pockets need a real counter / 300: Spores are a speed bump |
 | `guard.capPct` | 100 | 25–300 | the live knob for overall guard strength (replaces `root.capBonus`). 25: everything is soft / 300: everything is a fortress |
