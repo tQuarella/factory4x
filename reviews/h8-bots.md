@@ -46,3 +46,34 @@ There is a small cleanup item: `h8-bots.test.ts` imports `weightInputs` without 
 4. Remove the unused `weightInputs` import and `void weightInputs;` from `h8-bots.test.ts`.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-15
+
+I reviewed 03252eb against round 1. Since a068a4c, the Director has amended change 1 (a5a4a6d, in DESIGN.md "Bots (H8)" and DECISIONS.md), and the fix commit 03252eb landed on top of it.
+
+**Gates (run by me on 03252eb, `npm run gates -- --base main`): all PASS.**
+- typecheck, lint and protected-files (46 files, none protected).
+- test: 48 files, 1047 tests.
+- determinism: final cdbdea56.
+- bots: adaptive wins at 15:53 and greedy at 15:45, as before. All seven flags are MET. The suite takes about 107 s, against 80 s before h8-bots; the CI gates job limit is 20 minutes.
+
+**Required changes from round 1:**
+1. **Change 1: met under the Director's amendment.** DESIGN.md now gives exactly two exceptions: (a) an asteroid shortfall at the limit when economy plus the wave being built doesn't fit, and (b) while recycling toward a wave, except a taken pocket with no hauler.
+   - The bot records why its final Hauler weight is 0 with a shortfall (`haulerBlock`).
+   - The whole-run test wraps adaptive and greedy and checks, on the world each decision saw, that every such tick meets its exception's own condition:
+     - (a) needs no pocket shortfall and load ≥ `field.fleetCap`;
+     - (b) needs no bare taken pocket.
+   - An unexplained tick counts as a failure, and the count must be exactly 0. That replaces "under 120 s".
+   - It also asserts the exceptions are actually exercised in adaptive's run, so the check can't pass empty.
+   - `blockLoad` is reported by the bot itself, but the test compares it to the tunable, not to the bot's own threshold. That is enough to catch a regression in the rule.
+2. **Greedy's handoff: met.** The inner AdaptiveBot takes greedy's `Backstops`. The new test wipes the economy on the tick of the first hit and shows greedy holding Extractor and Hauler at their start weights until econ reaches `raid.firstAtEcon − 1`.
+3. **Shield asserted: met.** `econLostGuarded` is 0 for adaptive and greedy over whole v14 runs, and the test checks first that `raid.shieldEcon` ships at 1. The report text is fixed.
+4. **Unused import: met.**
+
+**Also changed:** the bot's `haulerShortfall` now reads `haulerTarget` and the hauler assignments directly, instead of building a `rockStatus` per rock. It gives the same numbers and runs faster. The report was regenerated with the same results.
+
+**Director, for headroom:** the bots gate has grown by about 25 s with h8-bots' per-tick metrics. That is fine against the 20-minute job, but keep an eye on it.
+
+Required changes: none.
+
+VERDICT: APPROVE
