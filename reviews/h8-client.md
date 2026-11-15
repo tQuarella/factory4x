@@ -159,3 +159,45 @@ I am not approving, because acceptance 11 and 12 belong to this task, and BACKLO
 - Make no client changes beyond those, or say what changed and why.
 
 VERDICT: REJECT
+
+## Round 3 (final, stack integration) · 2026-11-15
+
+Reviewed `task/h8-client` at b2a091d.
+
+**Round numbering.** This is the third review file round. Under the Director's ruling 5a47198, round 2's reject was held only for the stack and doesn't count toward the deadlock rule. So this is the stack-integration round the ruling names, not a third rework round.
+
+**The stack is complete.** Each approving review commit is an ancestor of b2a091d, and each review file ends in APPROVE:
+- h8-sim (0b72251);
+- h8-raids (d45cca3);
+- h8-bots (round 2, 6593008);
+- h8-design-data (round 1, 35a4db7).
+
+Design-data stays on data v14 by Director ruling. `data/sim.json` is unchanged since round 2 (`dataVersion` 14), and its review covers the v15 trial that was dropped.
+
+**No client changes since round 2.** `git diff af0a91d b2a091d` touches nothing in `packages/client`, `tests/smoke`, `ART_STYLE.md` or `data/`. The merges bring only the bots, the design-data reports and archives, and docs, all reviewed in their own tasks. So round 2's judgement of the client stands: every round 1 item is done, and there are no open code or test changes.
+
+**Gates (run by me on b2a091d, `npm run gates -- --base main`): all PASS.**
+- typecheck, lint;
+- test: 1072 tests;
+- determinism: cdbdea56;
+- bots: flags 1–7 MET;
+- protected-files: none touched.
+
+**Full smoke (run by me)** on a fresh build of b2a091d, the whole suite at desktop and phone with `--repeat-each 5`: **1370/1370 passed** in 7.9 min locally. That includes h8-client (a)–(d) five times on each project, the rock-sheet map-room check, and every H7 and earlier test, all on the final v14 data.
+
+**Acceptance 11 and 12: CI.**
+- **GitHub Actions has not run on this branch at all.** Runs 43653137152 (887155c), 43654796241 (af0a91d) and 43753735876 (b2a091d) each failed in 2 s. The gates job was never started, and the annotation reads: "The job was not started because recent account payments have failed or your spending limit needs to be increased." So no CI job times exist yet, and branch CI is not green.
+- This is an owner-account blocker. It is not a defect in the task, and no agent can fix it. It also blocks every other merge and deploy.
+- PROCESS puts the Critic's verdict before the merge CI run, so my approval comes first, and the merge waits on CI.
+- This approval covers the code at b2a091d plus this review commit. **It does not waive CI.**
+
+**Conditions on the merge** (merge preconditions under PROCESS, not deferred work):
+- `merge-task h8-client` must not run until branch CI is green on the exact commit that carries this verdict.
+- The Director records the gates and deploy job times, with the run id, in STATUS.md (acceptance 11).
+- If either job is past 80% of its limit, or CI fails on anything, this verdict doesn't cover that commit. It goes back for a new round.
+
+**Owner action needed, one step:** fix GitHub billing or the Actions spending limit for `tQuarella/factory4x` (Settings → Billing & plans). The Director should raise it in QUESTIONS.md if it isn't already there.
+
+**Required changes:** none to the code. The merge waits on green branch CI, as above.
+
+VERDICT: APPROVE
