@@ -810,7 +810,7 @@ Any new colour gets a palette key and an ART_STYLE.md row.
 Bots keep H7's strategies and selectors. They don't use the drag (it's a client gesture), `setHaulers` (they stay on Auto), `moveShips` or `recycleFleet`. Sim tests and the replay cover those, and the report says so.
 
 **Changes:**
-1. **Economy weights.** The Hauler weight no longer stops at "one hauler per slot". It stays at its lean or start value while any rock has a shortfall (`rockStatus.haulerTarget > haulers`); H4 makes the sim stop building on its own. The taken-pocket hauler rule becomes "any rock with a shortfall".
+1. **Economy weights.** The Hauler weight no longer stops at "one hauler per slot". It stays at its lean or start value while any rock has a shortfall (`rockStatus.haulerTarget > haulers`); H4 makes the sim stop building on its own. The taken-pocket hauler rule becomes "any rock with a shortfall". *Amended (Director, 2026-11-14, h8-bots round 1):* two exceptions, and only these. (a) At the fleet limit, a hauler for an asteroid's shortfall is allowed only if economy ships plus the wave being built still fit under `field.fleetCap`. (b) While the bot is recycling economy ships toward a wave, no hauler is built, except for a taken pocket with no hauler at all. Outside (a) and (b) the Hauler weight is never 0 while a rock has a shortfall. Why: without them the bot built a hauler, recycled one and built one again at the limit (the same slot trade as H7's recycle rule).
 2. **Economy wiped** (this folds in Can wait `cw-h7-bots-post-wipe-idle`). When economy ships alive plus economy ships in the bays fall below 2, every strategy except `idle` and `static` sets Extractor and Hauler back to their `alloc.start.*` weights. It keeps them there until `econ` reaches `raid.firstAtEcon − 1`, then resumes its own rules.
 3. **Nothing to build.** This applies when no bay starts for 2 game minutes, while `stockOre` is at least the ore cost of the dearest unlocked warship and all the strategy's warship weights are 0. Then `adaptive`, `greedy` and `drones-only` set their counter type's weight to 1 (Drone before any pocket is taken).
    - `idle` is exempt: it is the control for waiting.
@@ -838,12 +838,48 @@ Bots keep H7's strategies and selectors. They don't use the drag (it's a client 
 #### Calibration targets (H8, h8-design-data)
 
 H7's targets carry over with the same values. Two are new:
-- **A token guard isn't enough.** Against the full-economy raid on a5, a defence of half the raid's size (matched types) is beaten, and the raid then kills at least 1 economy ship. H7's "a matched defence no larger than the raid wins, losing at most 2" still holds.
+- **A token guard isn't enough.** Against the full-economy raid on a5, a defence under half the raid's size is beaten, then the raid hits (it kills at least 1 economy ship). H7's "a matched defence no larger than the raid wins, losing at most 2" still holds. *Reworded by the Director, 2026-11-15, from "a defence of half the raid's size is beaten". On v14 a 5-ship defence (2 lancers + 3 flak) against the raid of 12 (4 Thorns, 8 Spores) is beaten and the raid kills 3 extractors, while 6 ships (2 + 4) win, losing 3. Meeting the half-size wording needed `guard.spore.damage` 2, which wasn't shipped (DECISIONS.md, "Director: h8-design-data stays on v14").*
 - **Staffing is right.** On `adaptive`:
   - no rock's buffer sits at `node.bufferCap` for more than 30 game seconds in a row while its hauler target is met;
   - outside raids and Stops, at most 1 hauler is idle at the probe.
 
 Flags 1–7 must stay met. A flag that values alone can't meet is a rule finding for the Director. Values only, in `data/sim.json`; `dataVersion` goes to 15 if any value changes.
+
+#### Calibration result (h8-design-data, data v14)
+
+**No value changed: H8 ships on data v14.**
+- Probe: `reports/archive/h8-probe-v14.md`.
+- Result: `reports/archive/h8-design-data-v14.md`.
+- Both are 3 seeds; the field doesn't depend on the seed, so every seed gives the same run.
+- Each report ends with a Designer section printed by its script (`reports/archive/h8-probe-v14.mts`, `reports/archive/h8-design-data-v14.mts`).
+
+A v15 calibration (`guard.spore.damage` 2, p1 0 / 3) met the target's first wording, but the Director didn't ship it. It made defending the costly line: adaptive's win moved from 15:53 to 25:54 while greedy stayed at 15:57. It also doubled every Spore fight for one target. Instead the target was reworded (above). The exploration is kept as "values tried, not shipped" in `reports/archive/h8-design-data-v15.md`.
+
+**Targets on v14** (from `reports/archive/h8-design-data-v14.md`):
+
+| Target | v14 | Met |
+| --- | --- | --- |
+| Pace: adaptive 15–30, greedy ≤ 40 | adaptive 15:53, greedy 15:45 (no raids: 9:46) | yes; adaptive is 53 s above the floor |
+| First raid musters at 2–6 game minutes | 2:42 (tick 4862), 1 Thorn and 2 Spores | yes |
+| An undefended full-economy raid on a5 kills ≥ 2 economy ships | the raid of 12 (4T 8S) kills all 3 docked extractors. The 3 haulers there leave at launch (H10) | yes |
+| A matched defence no larger than the raid wins, losing ≤ 2 | 5 lancers + 2 flak (7) win, losing 2. So do 3 lancers + 4 flak (7). No economy ship is lost | yes |
+| **A token guard isn't enough:** a defence under half the raid's size is beaten, then the raid hits | 2 lancers + 3 flak (5) all die, and the raid kills 3 extractors. At half size, 2 lancers + 4 flak (6) win, losing 3 | yes |
+| **Staffing is right** (adaptive): no rock backed up > 30 s with its target met; at most 1 idle hauler outside raids | backed up: none. Idle peak 1, with 0 minutes of more than 1 | yes |
+| The hive: flags 4–6; the best mix fits `field.fleetCap − 10` with ≥ 2 spare | best mix 16 (7 lancers, 9 flak), 4 spare under 20. With a full raid out: 11 (31% smaller) | yes |
+| Each pocket falls to drones alone within 6, not within 2 | p1 6, p2 5 | yes |
+| Flags 1–7 | all met. Flag 1: `static` (best shape drone-heavy) times out and loses 15 of 29 economy ships. Flag 6: best mix 16, full economy 22 (13 Mine slots + 9 haulers at adaptive's peak); 38 > 30 and 26 ≤ 30 | yes |
+
+**Order check (designer.md: what the spec inherits), on v14.**
+- **Min-wave:** every answer was rerun with ships placed flak, lancer, drone and the hive keeping its highest guard ids, searching every mix up to the answer. Hive 16 / 16; hive with the full raid out 11 / 11; p1 6 / 6; p2 5 / 5. Nothing moved.
+- **Raid fights at a5:** every fight in the table was rerun with the defenders placed flak first and the raiders taken highest ids first. That covers undefended, 5L + 2F, 3L + 4F, the half-size 2L + 4F, and the token 2L + 3F. Every outcome and loss count is the same.
+- **So the shield (H9) adds no order dependence,** as the spec expected.
+
+**Watch item (not this iteration).** On v14, greedy and adaptive finish 8 s apart (15:45 and 15:53). So the bots don't yet show that maxing the economy is the risky line. No bot builds a defence matched to the raid. See DECISIONS.md, "Director: h8-design-data stays on v14".
+
+**What no bot exercises.**
+- The drag gesture, `setHaulers`, `moveShips`, `recycleFleet` and Mine mode. Sim tests and the replay cover the inputs; h8-client's smoke tests cover the drag and Mine mode.
+- Stopping a rock to dodge a raid.
+- A defence sized to the raid's mix. The defence numbers above come from fights the script sets up, not from runs.
 
 #### Success criteria (H8; the owner, one 20–30 minute phone session; 4x is fine)
 

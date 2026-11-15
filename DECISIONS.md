@@ -1438,3 +1438,54 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 - **Two palette keys after all:** `ghostFill` and `attackFill` replace the raw `rgba(...)` fills; both have Palette rows in ART_STYLE.md, and the H8 section no longer says "no new keys".
 - **Drop highlight bound restated, not redrawn:** within r + 7 px (an 8 px halo stroke at r + 3), which is 1.32 r at the smallest reach the game passes (22 px) and 1.14 r at 50. Tested at 22, 30 and 50.
 - **An armed split draws its ghost** with the half counts, as the spec's state 3 says.
+## 2026-11-14 · Engineer · h8-bots: bot changes 1-3, staffing metrics, calls made
+
+- **Change 1 (Hauler weight by shortfall).** `economyWeights` keeps the Hauler weight on while any rock has `haulerTarget > haulers` (new `haulerShortfall`), and off only with no shortfall and a hauler per slot. `limitEconomy` gives a taken pocket's shortfall a hauler always (its deliveries unlock the type; blocking it stalled adaptive with 500+ ore for 10 minutes in a traced run). An asteroid's shortfall gets one only while `economy + max(smallest hive wave, the wave being built for) < cap`, and never while economy ships are being Recycled toward a wave. Reason: without those guards the bot built a hauler, recycled one, and built one again (traced on the v12 pocket-recycle test). At the limit, adaptive's last wave (14:12 to 15:39 on v14) runs with Hauler 0 and a shortfall of 1 at a5. That is the slot trade, not an idle.
+- **Change 2 (wipe).** `Backstops` is shared by adaptive, drones-only, adaptive-no-raids and greedy. It latches only after the economy has once had 2 ships, so tick 0 is not a wipe. It releases at `econ >= raid.firstAtEcon - 1`.
+- **Change 3 (nothing to build).** "No bay starts for 2 minutes" is read as "no bay running": a busy bay at any tick restarts the clock. Once triggered it holds while the strategy's own weights stay 0, and lets go when they do not. Greedy is covered before its first hit, as the spec table says, so greedy may now build Drones (weight 1) after 2 idle minutes. The old test that forbade any warship was changed to allow only that.
+- **drones-only dead end.** The spec table says it keeps building drones up to the limit; it did not (raid responses reset change 3's clock, ore piled to 1850). It now sets Drone to max in the dead-end branch. It still cannot win (flag 5).
+- **Runner measures:** idle haulers, backed-up seconds with target met, economy lost in a tick that began with a warship at the raid target, the longest run with ore for a warship + room + no bay running, and a 15/30/45 trace. The no-idle measure excludes a full fleet (a limit wait, not a bot idle).
+- **Result on v14 with h8-raids merged:** bots gate PASS; adaptive wins 15:53, greedy 15:45; all seven flags MET; static does not win (best shape drone-heavy, loses 15 of 29 economy ships), so flag 1 holds and there is no finding for the Director. Flag 2 holds narrowly: greedy's first hit kills exactly 2. Economy lost under a guard is 0 in every run.
+## 2026-11-14 · Director · h8-bots change 1 amended: two fleet-limit exceptions
+
+**Decision:** the bot's Hauler weight may be 0 with a shortfall only (a) at the fleet limit, for an asteroid shortfall, when economy plus the wave being built would not fit, and (b) while recycling economy ships toward a wave, except for a taken pocket with no hauler. DESIGN.md bot change 1 amended. The whole-run test must count zero ticks outside these exceptions, not "under 120 s".
+**Why:** the Critic (h8-bots round 1) found the code contradicted the spec's "never". The engineer's guards prevent a build-recycle-build loop at the limit, which is the same slot trade H7's recycle rule makes; that is a sound bot rule, so the spec follows the code, but the exception must be exact.
+
+## 2026-11-14 · Engineer · h8-bots round 1 fixes
+
+- **Change 1 pinned exactly.** `AdaptiveBot` now records why its final Hauler weight is 0 with a shortfall (`haulerBlock`: 'limit' for (a), 'recycling' for (b)). The whole-run test checks every decide on the world the bot saw: zero ticks outside (a) and (b) for adaptive and greedy, with (a) requiring no pocket shortfall and economy + reserve >= the limit, and (b) requiring no taken pocket with 0 haulers. The 8:00 muster window falls under (a). A first version of the check flagged 2 ticks at 9:29 and 10:08 that were a post-step reading: a pocket was captured during the step, so the shortfall appeared after the bot decided. The test now checks the decide-time world.
+- **Greedy handoff.** The inner AdaptiveBot takes greedy's `Backstops`, so a first hit that wipes the economy is still recovered from; tested.
+- **Shield asserted** (0 economy ships lost under a guard, adaptive and greedy, whole runs). Stale report text fixed. Unused import removed.
+- **Bots gate time.** `haulerShortfall` in the bot reads `haulerTarget` and the hauler assignment directly instead of building a `rockStatus` per rock each tick. The bots run takes 96-98 s (86 s before h8-bots; the rest is the per-tick staffing metrics and the backstops' `allocStatus` read).
+
+## 2026-11-15 · Designer · h8-design-data: data v15 (`guard.spore.damage` 2, p1 0 / 3)
+
+**Decision:**
+- `guard.spore.damage` goes from 1 to 2, and the p1 guards from 0 / 4 to 0 / 3. `dataVersion` is 15.
+- Every H7 and H8 calibration target and all seven flags are met on v15 (`reports/archive/h8-design-data-v15.md`).
+
+**Why:**
+- **v14 missed exactly one target: "a token guard isn't enough".** A half-size matched defence (2 lancers + 4 flak) beat the full-economy raid (4 Thorns and 8 Spores) and lost 3.
+- **No raid value can move that.** At a full economy (24 ships) the raid is `ceil(24 ÷ 2)` = 12 whatever `raid.maxSize` or `raid.hiveKeepPct` say. `raid.econPerRaider` 1 would double every raid from the first.
+- **Of four guard values tried one at a time, only `guard.spore.damage` 2 flips the fight** ("Values tried from v14" in the report). It pushed p1 to 7 drones against the target of at most 6, so p1 drops a Spore.
+- **The order check moved nothing.** The min-waves and the a5 fights were rerun in a second order with the same results.
+
+**For the Director (findings, not tuned around):**
+1. **This is a broad combat change.** Every Spore fight hits twice as hard: raids, pockets and the hive, whose best mix goes from 16 to 18 with exactly 2 slots spare. The narrower alternative is to keep v14 and reword the target to "a defence under half the raid's size is beaten", which v14 already met (5 of 12 loses).
+2. **Greedy now takes the hive 10 minutes before adaptive** (15:57 against 25:54; on v14 they were 8 s apart). Adaptive's partial defences lose more fights (6 hits against greedy's 4). That cuts against "maxing the economy is the risky line". It may come from the bots' defence rule rather than the field, and no bot defends with a force sized to the raid's mix.
+
+## 2026-11-15 · Director: h8-design-data stays on v14
+
+*(Recorded by the Designer, as the Director ruled.)*
+
+**Decision:**
+- Data v15 (`guard.spore.damage` 2, p1 0 / 3; the entry above) is **not shipped**. H8 stays on data v14.
+- The target "a defence of half the raid's size is beaten" becomes **"a defence under half the raid's size is beaten, then the raid hits"**. v14 meets it: 5 ships (2 lancers + 3 flak) against the raid of 12 are beaten, and the raid kills 3 extractors. 6 ships win, losing 3.
+- The v15 exploration stays in `reports/archive/h8-design-data-v15.md`, marked "values tried, not shipped". The shipped result is `reports/archive/h8-design-data-v14.md`.
+
+**Why:**
+- **v15 turns the strategies upside down.** It moves adaptive's win from 15:53 to 25:54 while greedy stays where it was (15:57). That makes defending the costly line and ignoring raids the safe one, the opposite of pillar 2 and of the H7/H8 claim.
+- **It is too broad for one target.** It doubles every Spore fight (pockets, hive, raids) to meet a single target.
+- **The owner's ask is already met.** "Fight through the military first" is answered by the shield rule (H9), not by Spore damage.
+
+**Watch item (a later iteration, not this one).** On v14, greedy and adaptive finish 8 s apart (15:45 and 15:53), so the bots don't yet show that maxing the economy is the risky line. No bot builds a defence matched to the raid.

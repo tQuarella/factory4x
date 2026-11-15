@@ -10,7 +10,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { defaultData } from '@factory4x/sim';
+import { BUILD_TYPES, defaultData } from '@factory4x/sim';
 import budgets from '../../../scripts/gates/budgets.json' with { type: 'json' };
 import { computeFieldFlags } from './field-flags.ts';
 import { FIELD_CAP_MIN, SOFTLOCK_MIN, fieldGateFailures, gateRuns, runField, tickMmss, type FieldResult } from './field-runner.ts';
@@ -96,6 +96,31 @@ const md = [
   '',
   ...head,
   ...sweep.map(row),
+  '',
+  '## Staffing and the shield (H8)',
+  '',
+  'Per run: idle haulers at the probe (peak, and game minutes with more than 1 idle outside raids); backed-up seconds per rock while its hauler target was met (total, with the longest run in brackets); economy ships lost in a tick that began with a warship at the raid target (must be 0: raid.shieldEcon is 1 and h8-raids is merged); the longest run with ore for the dearest unlocked warship in stock, room under the fleet limit and no bay running (the no-idle measure).',
+  '',
+  '| Strategy | Seed | Idle haulers peak | Minutes with more than 1 idle | Backed up with target met (s, longest) | Economy lost under a guard | Longest idle with ore (min) |',
+  '| --- | --- | --- | --- | --- | --- | --- |',
+  ...results.map((r) => {
+    const bu = Object.entries(r.backedUp).map(([id, b]) => `${id} ${b.seconds.toFixed(0)} (${b.longest.toFixed(0)})`).join(', ');
+    return `| ${r.strategy}${r.variant === null ? '' : ` (${r.variant})`} | ${r.seed} | ${r.idleHaulers.peak} | ${r.idleHaulers.minutesOver1} | ${bu === '' ? 'none' : bu} | ${r.econLostGuarded} | ${r.idleWithOreMin} |`;
+  }),
+  '',
+  '## Trace at 15, 30 and 45 game minutes (seed 1)',
+  '',
+  'Economy alive (extractors / haulers), warships alive (drones / lancers / flak), ore in stock, the weights (e/h/d/l/f) and the bays running. A run that ended earlier has fewer rows.',
+  '',
+  '| Strategy | Minute | Extractors / haulers | Warships d/l/f | Stock ore | Weights e/h/d/l/f | Bays running |',
+  '| --- | --- | --- | --- | --- | --- | --- |',
+  ...results
+    .filter((r) => r.seed === 1)
+    .flatMap((r) => r.trace.map((x) => `| ${r.strategy}${r.variant === null ? '' : ` (${r.variant})`} | ${x.minute} | ${x.extractors} / ${x.haulers} | ${x.warships.drone}/${x.warships.lancer}/${x.warships.flak} | ${x.stockOre} | ${BUILD_TYPES.map((t) => x.weights[t]).join('/')} | ${x.bayRunning.join(', ') || 'none'} |`)),
+  '',
+  '## What no bot exercises',
+  '',
+  'Bots stay on Auto haulers and use only `sendShips` and `recycleShips`. No bot uses: the drag gesture (a client gesture), `setHaulers`, `moveShips`, `recycleFleet`, or Mine mode (a client mode; the bots never send `setMine` and play with the marks the map starts with). Sim tests and the reference replay cover `setHaulers`, `moveShips` and `recycleFleet`; h8-client smoke tests cover the drag and Mine mode.',
   '',
   '## H7 capability flags (report lines, not gates)',
   '',

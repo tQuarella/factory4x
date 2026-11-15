@@ -159,7 +159,7 @@ describe('the six strategies (acceptance 2)', () => {
     expect(w.tick).toBeGreaterThan(MIN);
     for (const t of BUILD_TYPES) if (t !== 'extractor' && t !== 'hauler') expect(w.field!.alloc[t], t).toBe(0);
     expect(log.some((l) => l.input.type === 'sendShips')).toBe(false);
-    expect(w.stats.shipsBuilt).toEqual({ drone: 0, lancer: 0, flak: 0 });
+    expect(w.stats.shipsBuilt.lancer + w.stats.shipsBuilt.flak).toBe(0);
   });
 
   it('economyWeights: an extractor type at 0 once every open slot has one (it would idle at the probe)', () => {
@@ -254,7 +254,7 @@ describe('the six strategies (acceptance 2)', () => {
     const w = createWorld(1, easy);
     const bot = greedy.make(easy);
     play(w, easy, bot, 4 * MIN);
-    expect(w.stats.shipsBuilt).toEqual({ drone: 0, lancer: 0, flak: 0 });
+    expect(w.stats.shipsBuilt.lancer + w.stats.shipsBuilt.flak).toBe(0);
     expect(w.stats.econBuilt.extractor).toBeGreaterThan(0);
   });
 
@@ -611,13 +611,17 @@ describe('review round 1: the economy limit, the dead end, the gate and greedy',
     expect(fieldGateFailures(gateRuns([best], [best]), FIELD_WINNERS, names, 2, TR)).toEqual([]);
   });
 
-  it('greedy builds no warship, sends nothing and takes no pocket before its first hit, even with every open slot filled (raids off)', () => {
+  it('greedy sends nothing and takes no pocket before its first hit, even with every open slot filled (raids off); its only warship is the nothing-to-build Drone (H8 change 3), never before 2 idle game minutes', () => {
     const w = createWorld(1, easy);
     const log = play(w, easy, greedy.make(easy), 16 * MIN, (t) => (t === 0 ? [{ type: 'setTunable', key: 'raid.enabled', value: 0 }] : []));
     expect(w.field!.econ.length).toBeGreaterThanOrEqual(openSlots(w));
     expect(log.some((l) => l.input.type === 'sendShips' || l.input.type === 'setRally' || l.input.type === 'recycleShips')).toBe(false);
-    expect(log.some((l) => l.input.type === 'setAlloc' && l.input.weight > 0 && l.input.shipType !== 'extractor' && l.input.shipType !== 'hauler')).toBe(false);
-    expect(w.stats.shipsBuilt).toEqual({ drone: 0, lancer: 0, flak: 0 });
+    const warship = log.filter((l) => l.input.type === 'setAlloc' && l.input.weight > 0 && l.input.shipType !== 'extractor' && l.input.shipType !== 'hauler');
+    for (const l of warship) {
+      expect(l.input).toMatchObject({ shipType: 'drone', weight: 1 });
+      expect(l.tick).toBeGreaterThanOrEqual(2 * MIN);
+    }
+    expect(w.stats.shipsBuilt.lancer + w.stats.shipsBuilt.flak).toBe(0);
     expect(w.stats.captures).toHaveLength(0);
   });
 });
