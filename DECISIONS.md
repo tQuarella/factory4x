@@ -1489,3 +1489,7 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 - **The owner's ask is already met.** "Fight through the military first" is answered by the shield rule (H9), not by Spore damage.
 
 **Watch item (a later iteration, not this one).** On v14, greedy and adaptive finish 8 s apart (15:45 and 15:53), so the bots don't yet show that maxing the economy is the risky line. No bot builds a defence matched to the raid.
+## 2026-11-14 · Director · h8-client: a reject held only for the stack doesn't count toward the deadlock rule
+
+**Decision:** h8-client round 2 (94757b1) rejected only because acceptance 11–12 wait on h8-bots and h8-design-data; the Critic asked for no code or test changes. That reject does not count as a rework round under PROCESS.md's deadlock rule. The next round is the final, stack-integration round. If it rejects for rework, that counts as the third and the rule applies as written.
+**Why:** the deadlock rule exists to stop an author looping on the same defects. A round that only waits for other tasks isn't a loop, and parking the top of the stack would block the whole build for no quality gain. In future, the Director holds a top-of-stack Critic round until the lower tasks are approved, rather than spend a round on it.
