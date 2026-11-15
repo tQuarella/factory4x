@@ -38,6 +38,13 @@ Launches: 10 / 12.
 | r12 | engineer | h8-client | resume | Fix round 1 done (af0a91d): map 210 px with rock sheet, raids merged |
 | 10 | critic | h8-client | launch | Launched by mistake for round 2 and stopped at once; counted |
 | r13 | critic | h8-client | resume | Review round 2: REJECT on stack items only (94757b1); client work complete; final round after design-data |
+| r14 | critic | h8-bots | resume | Review round 2: APPROVE (6593008) on 03252eb |
+| r15 | designer | h8-design-data | resume | Probe v14 (eb00081); tried v15 (Spore damage 2): adaptive slowed to 25:54, so Director ruled stay on v14 and reword the token-guard target; reverted (78b27ae) |
+| r16 | critic | h8-design-data | resume | Review round 1: APPROVE (35a4db7); ships on v14 |
+| r17 | engineer | h8-client | resume | Final round: merged design-data + main (b2a091d); gates green, smoke x5 1370/1370 |
+| r18 | critic | h8-client | resume | Final round: APPROVE (e717b91), merge conditional on green branch CI on e717b91 |
+
+**Blocked (2026-11-15):** GitHub Actions won't start any job ("recent account payments have failed or your spending limit needs to be increased"); every run since 2026-11-14 23:25 failed in 2–4 s, on main too. h8-client can't merge (needs green branch CI) and main can't deploy. Owner step: Q23 in QUESTIONS.md. Then re-run CI on e717b91 (`gh run rerun 43754926621`), record the gates and deploy job times, `npm run merge-task -- h8-client`, release-gates, push main, /handoff, /retro (launch 11).
 
 ## Iteration 7 ledger
 
@@ -281,7 +288,7 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-Waiting on the owner's playtest of build-20261108-2 (handoff block at the top of QUESTIONS.md). When feedback arrives: record it verbatim in PLAYTEST_LOG.md, then the Designer triages it and plans H4 (Factories and reach, per DESIGN.md M2 plan). The iteration 3 retro is done (92e07f4). Can wait candidates are in BACKLOG.md.
+Iteration 8 (H8) is approved end to end and waits only on GitHub Actions billing (Q23). When the owner says it's fixed: re-run CI on task/h8-client e717b91, then merge-task h8-client, release-gates, push main, verify the deploy, /handoff, /retro.
 
 ## Moving to another machine
 

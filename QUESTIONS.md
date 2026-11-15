@@ -4,6 +4,14 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
+## Q23 (Blocking, 2026-11-15): GitHub Actions won't run
+
+GitHub refuses to start any CI job on `tQuarella/factory4x`: "The job was not started because recent account payments have failed or your spending limit needs to be increased." Every run since 2026-11-14 23:25 failed in 2–4 s, including on main. Without CI, the H8 build can't merge or deploy. It's otherwise done: every task is Critic-approved, the gates pass, and the phone and desktop smoke runs pass 1370 of 1370.
+
+**One step for you:** on GitHub, open Settings → Billing and plans and fix the failed payment, or raise the Actions spending limit. Then tell the Director "billing fixed".
+
+**Answer:**
+
 ## Build build-20261114-1 is ready (2026-11-14): H7, One field, live enemy
 
 Play: https://factory4x.pages.dev (on your phone, portrait; 4x is fine). The bots take the hive in about 25–30 game minutes, so roughly 7–8 real minutes at 4x plus your decisions. Your old save is from an older data version, so the game starts fresh.
