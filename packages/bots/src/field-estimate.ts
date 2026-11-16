@@ -46,23 +46,31 @@ const cache = new Map<string, { data: SimData; world: World }>();
 const mixCache = new Map<string, { total: number; fleet: ShipTypeCounts } | null>();
 const singleCache = new Map<string, number | null>();
 
-const fieldHash = new WeakMap<object, string>();
-let lastKey: { world: Readonly<World>; data: SimData; tick: number; key: string } | null = null;
+let lastKey: { world: Readonly<World>; data: SimData; tick: number; names: string[]; values: number[]; key: string } | null = null;
 
 /**
- * The cache key for a world's tunables and the field map. The tunables only change inside `step` (setTunable), so
- * the key is computed once per world and tick: the strategies ask several times a tick, and hashing the tunables
- * each time was a tenth of the bots gate. The map hash is per map object, which is never mutated.
+ * The cache key for a world's tunables and the field map, remembered for a world and tick and re-checked against a
+ * snapshot of every tunable value (an integer compare per tunable, far cheaper than hashing them: the strategies
+ * ask several times a tick, and hashing each time was a tenth of the bots gate). The map hash is recomputed once
+ * per tick, so a map changed in place shows by the next tick.
  */
 const tunKey = (world: Readonly<World>, data: SimData): string => {
-  if (lastKey !== null && lastKey.world === world && lastKey.data === data && lastKey.tick === world.tick) return lastKey.key;
-  let fh = fieldHash.get(data.map);
-  if (fh === undefined) {
-    fh = fnv1a(JSON.stringify(data.map.field));
-    fieldHash.set(data.map, fh);
+  const tun = world.tun as unknown as Record<string, number>;
+  const names = Object.keys(tun);
+  if (lastKey !== null && lastKey.world === world && lastKey.data === data && lastKey.tick === world.tick && lastKey.names.length === names.length) {
+    // Tunables can be tuned in place without a step (tests, the probe scripts), so reuse the key only while every value is the one it was made from.
+    let same = true;
+    for (let i = 0; i < names.length; i++) {
+      if (names[i] !== lastKey.names[i] || tun[names[i]!] !== lastKey.values[i]) {
+        same = false;
+        break;
+      }
+    }
+    if (same) return lastKey.key;
   }
+  const fh = fnv1a(JSON.stringify(data.map.field));
   const key = `${data.dataVersion}|${fh}|${fnv1a(JSON.stringify(world.tun))}`;
-  lastKey = { world, data, tick: world.tick, key };
+  lastKey = { world, data, tick: world.tick, names, values: names.map((n) => tun[n]!), key };
   return key;
 };
 

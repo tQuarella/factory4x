@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BUILD_TYPES, allocStatus, createWorld, defaultData, fleetStatus, heartIndex, rockStatus, step } from '@factory4x/sim';
-import { fieldMix } from '../src/field-estimate.ts';
+import { fieldMix, fieldSingle } from '../src/field-estimate.ts';
 import { adaptive, anyBayRunning, econAliveNow, econCounts, openSlots, weightInputs } from '../src/field-strategies.ts';
 import type { Weights } from '../src/field-runner.ts';
 import { minMix } from '../src/waves.ts';
@@ -62,5 +62,21 @@ describe('the shared battle memo changes no answer', () => {
         expect(a, `${types.join(',')} upTo ${upTo}`).toEqual(minMix(inert, hive, types, upTo, data));
       }
     }
+  });
+});
+
+describe('the estimate follows a tunable changed in place', () => {
+  it('fieldMix and fieldSingle after tuning a guard value without a step equal a fresh, equally tuned world', () => {
+    const ALL = ['drone', 'lancer', 'flak'] as const;
+    const tuned = createWorld(1, data);
+    const hive = heartIndex(tuned);
+    const before = fieldMix(tuned, data, hive, ALL, 60)!;
+    tuned.tun['guard.thorn.damage'] *= 4;
+    const fresh = createWorld(1, data);
+    fresh.tun['guard.thorn.damage'] *= 4;
+    const want = fieldMix(fresh, data, hive, ALL, 60)!;
+    expect(want.total).not.toBe(before.total);
+    expect(fieldMix(tuned, data, hive, ALL, 60)).toEqual(want);
+    expect(fieldSingle(tuned, data, hive, 'drone', 60)).toEqual(fieldSingle(fresh, data, hive, 'drone', 60));
   });
 });
