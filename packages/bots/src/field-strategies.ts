@@ -18,6 +18,7 @@ import {
   rockStatus,
   shipsAtByType,
   type Input,
+  type RaidStatus,
   type ShipType,
   type ShipTypeCounts,
   type SimData,
@@ -231,6 +232,10 @@ export interface AdaptiveOptions {
   dronesOnly: boolean;
   /** Offence starts when this holds (latched). */
   offenceGate: (world: Readonly<World>, data: SimData) => boolean;
+  /** H9 `adaptive-concentrate`: answer only prong 0, with every warship, and post the standing guard only there (H8's rule aimed at prong 0). */
+  concentrate?: boolean;
+  /** Test seam: where the bot reads the raid from (default `raidStatus`), so a unit test can hand it a two-prong raid before the sim builds one. */
+  raidView?: (world: Readonly<World>) => RaidStatus;
 }
 
 /** The type that counters a raid's majority: Flak against Spores, Lancer against Thorns, a Drone while neither is unlocked. */
@@ -321,6 +326,97 @@ function regroup(world: Readonly<World>, parked: Map<number, ShipTypeCounts>, st
   return out;
 }
 
+/** A place warships are held: a rock, the size of the guard wanted there, and the mix of the raid prong it answers. */
+export interface Post {
+  node: number;
+  goal: number;
+  planned: Readonly<{ thorn: number; spore: number }>;
+}
+
+/** Warships standing at `node` or flying to it, which count toward its goal. */
+function armedAt(world: Readonly<World>, node: number): number {
+  let n = 0;
+  for (const s of world.ships) if (s.at === node || (s.transit !== null && s.transit.to === node)) n++;
+  return n;
+}
+
+/**
+ * H9 placement (DESIGN.md "Bots (H9)", change 1). `posts` come largest first (ties to the lower prong). Warships
+ * parked away from every post, and not fighting at a guarded node, are the pool. In post order, each post takes what
+ * its goal lacks (warships already at it, or flying to it, count first); the pool left over goes to the first post,
+ * so with one post this is `regroup`. With more than one post and `minHalf`, a post that the pool can't bring to
+ * `ceil(goal / 2)` gets none: a guard under half its prong loses (calibration target 3). Each post takes the
+ * counter type for its own mix first. One `sendShips` per post and source rock.
+ */
+export function place(world: Readonly<World>, parked: Map<number, ShipTypeCounts>, posts: readonly Post[], minHalf: boolean, dronesOnly: boolean): Input[] {
+  if (posts.length === 0) return regroup(world, parked, PROBE);
+  const isPost = new Set(posts.map((p) => p.node));
+  const pool: { node: number; c: ShipTypeCounts }[] = [];
+  for (const [node, c] of parked) if (!isPost.has(node) && !isGuarded(world, node)) pool.push({ node, c: { ...c } });
+  const left = (): number => pool.reduce((a, r) => a + total(r.c), 0);
+  const sends = posts.map(() => new Map<number, ShipTypeCounts>());
+  const take = (i: number, count: number, first: ShipType | null): void => {
+    let n = count;
+    const order: readonly ShipType[] = first === null ? WARSHIPS : [first, ...WARSHIPS.filter((t) => t !== first)];
+    for (const type of order) {
+      for (const r of pool) {
+        while (n > 0 && r.c[type] > 0) {
+          r.c[type]--;
+          const m = sends[i]!.get(r.node) ?? { ...EMPTY };
+          m[type]++;
+          sends[i]!.set(r.node, m);
+          n--;
+        }
+      }
+    }
+  };
+  posts.forEach((p, i) => {
+    const have = armedAt(world, p.node);
+    const give = Math.min(Math.max(0, p.goal - have), left());
+    if (give === 0) return;
+    if (minHalf && posts.length > 1 && have + give < Math.ceil(p.goal / 2)) return;
+    take(i, give, counterFor(world, p.planned, dronesOnly));
+  });
+  take(0, left(), null);
+  const out: Input[] = [];
+  posts.forEach((p, i) => {
+    for (const r of pool) {
+      const m = sends[i]!.get(r.node);
+      if (m !== undefined && total(m) > 0) out.push(sendInput(r.node, p.node, m));
+    }
+  });
+  return out;
+}
+
+/** The sound ships at any of `nodes`, by type. */
+function soundAt(world: Readonly<World>, nodes: readonly number[]): ShipTypeCounts {
+  const c: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
+  for (const n of nodes) {
+    const f = soundShips(world, n);
+    c.drone += f.drone;
+    c.lancer += f.lancer;
+    c.flak += f.flak;
+  }
+  return c;
+}
+
+/** `exactSend` over several rocks: `need` is taken from the first rock's sound ships, then the next, and so on. [] when they don't cover it. */
+export function exactSendFrom(world: Readonly<World>, nodes: readonly number[], to: number, need: Readonly<ShipTypeCounts>): Input[] {
+  if (!covers(soundAt(world, nodes), need)) return [];
+  const left = { ...need };
+  const out: Input[] = [];
+  for (const node of nodes) {
+    const f = soundShips(world, node);
+    const part: ShipTypeCounts = { drone: Math.min(left.drone, f.drone), lancer: Math.min(left.lancer, f.lancer), flak: Math.min(left.flak, f.flak) };
+    if (total(part) === 0) continue;
+    left.drone -= part.drone;
+    left.lancer -= part.lancer;
+    left.flak -= part.flak;
+    out.push(...exactSend(world, node, to, part));
+  }
+  return out;
+}
+
 /**
  * `adaptive` (and `greedy` after its first hit, and the `drones-only` and `adaptive-no-raids` variants). In order
  * each tick: attack the hive if it can be taken now; answer a raid; take the counter pocket; build for the hive
@@ -329,10 +425,8 @@ function regroup(world: Readonly<World>, parked: Map<number, ShipTypeCounts>, st
  */
 export class AdaptiveBot implements FieldBot {
   private offence = false;
-  /** The last raid's planned size and target: the standing guard is half of it, posted at its target. */
-  private lastPlanned = 0;
-  private lastRaidMix: { thorn: number; spore: number } = { thorn: 0, spore: 0 };
-  private standAt: number = PROBE;
+  /** The last raid's prongs (largest first): the standing guard is half of each, posted at its target while that rock is mined. */
+  private lastPosts: Post[] = [];
   /** The rally this bot last set (no selector reports it). */
   private rally: number = PROBE;
   /** True while this tick's plan Recycles economy ships toward a wave: haulers must not be built back (limitEconomy). */
@@ -358,18 +452,19 @@ export class AdaptiveBot implements FieldBot {
     this.waveTotal = 0;
     this.reserve = 0;
     this.haulerBlock = null;
-    const rs = raidStatus(world);
+    const rs = (this.opts.raidView ?? raidStatus)(world);
     const raid = rs.phase === 'none' ? null : rs;
     const parked = parkedWarships(world);
     if (!this.offence && this.opts.offenceGate(world, data)) this.offence = true;
 
-    // Bookkeeping: the last raid's size, mix and target (the standing guard).
-    if (raid !== null && raid.target !== null) {
-      this.lastPlanned = raid.planned.thorn + raid.planned.spore;
-      this.lastRaidMix = { ...raid.planned };
-      this.standAt = raid.target;
-    }
-    const raidActive = this.respond && raid !== null && raid.target !== null;
+    // The raid's prongs, largest first (ties to prong 0). `adaptive-concentrate` sees H8's one raid aimed at prong 0 (the whole planned size).
+    const prongs = raid === null ? { all: [], live: [] } : this.prongPosts(raid);
+    // Bookkeeping: the last raid's prongs (the standing guard).
+    if (prongs.all.length > 0) this.lastPosts = prongs.all;
+    const livePosts = prongs.live;
+    const raidActive = this.respond && livePosts.length > 0;
+    // The standing guard: half of each prong of the last raid, at its target while that rock is still mined.
+    const standPosts: Post[] = this.respond ? this.lastPosts.filter((p) => p.goal > 0 && world.field!.mine[p.node] === true).map((p) => ({ ...p, goal: Math.ceil(p.goal / 2) })) : [];
     const limit = searchMax(world, data);
     const w: Weights = { ...ZERO, ...economyWeights(world, data, this.offence) };
     const types = unlockedWarships(world, this.opts.dronesOnly);
@@ -377,15 +472,21 @@ export class AdaptiveBot implements FieldBot {
     const hiveMix = this.offence ? waveFor(world, data, heart, types, limit, hiveNow) : null;
     const room = warshipRoom(world, data, limit);
 
-    // Where the warships gather: the raid's target while answering one, the standing post otherwise.
-    const stage = raidActive ? raid.target! : this.respond && this.standAt !== PROBE && world.field!.mine[this.standAt] === true ? this.standAt : PROBE;
+    // Where the warships gather: the prongs' targets while answering a raid, the standing posts otherwise. New ships rally
+    // to the post with the most unmet (the largest prong first), so with one post this is H8's stage.
+    const posts = raidActive ? livePosts : standPosts;
+    const parkedHere = (n: number): number => total(parked.get(n) ?? EMPTY);
+    const unmetAt = (p: Post): number => p.goal - (raidActive ? armedAt(world, p.node) : parkedHere(p.node));
+    const neediest = posts.reduce<Post | null>((best, p) => (best === null || unmetAt(p) > unmetAt(best) ? p : best), null);
+    const stage = neediest === null ? PROBE : neediest.node;
+    const gather: number[] = posts.length === 0 ? [PROBE] : posts.map((p) => p.node);
     const inputs: Input[] = [];
     if (this.rally !== stage) {
       inputs.push({ type: 'setRally', node: stage });
       this.rally = stage;
     }
-    const here = parked.get(stage) ?? EMPTY;
-    const fit = soundShips(world, stage);
+    const fit = soundAt(world, gather);
+    const placeShips = (minHalf: boolean): Input[] => place(world, parked, posts, minHalf, this.opts.dronesOnly);
     /** Every branch ends here: the trade in slots in offence, then the weights. */
     const finish = (extra: Input[]): Input[] => {
       this.limitEconomy(world, data, w, types, limit);
@@ -401,22 +502,23 @@ export class AdaptiveBot implements FieldBot {
     // 1. Offence first when the hive can be taken right now (the raid window included: raiders away shrink hiveNow).
     if (this.offence && isGuarded(world, heart) && hiveMix !== null && covers(fit, hiveMix.fleet) && guardianAt(world, heart)!.battle === null && raid?.phase !== 'fight') {
       Object.assign(w, deficitWeights(world, data, hiveMix.fleet));
-      return finish([sendInput(stage, heart, here)]);
+      return finish(gather.filter((n) => parked.has(n)).map((n) => sendInput(n, heart, parked.get(n)!)));
     }
 
     if (raidActive) {
-      // 2. Answer the raid: the counter for its majority at full weight until the defence matches it, sent to the target.
-      const counter = counterFor(world, raid.planned, this.opts.dronesOnly);
-      const defenders = world.ships.length;
-      if (defenders < raid.planned.thorn + raid.planned.spore) w[counter] = world.tun['alloc.maxWeight'];
-      return finish(regroup(world, parked, stage));
+      // 2. Answer the raid: the counter for the largest unmet prong's majority at full weight while the goals (each
+      // prong's planned size) add up to more than the warships alive; the warships go to the prongs largest first, none
+      // under half a goal.
+      const goals = livePosts.reduce((a, p) => a + p.goal, 0);
+      if (world.ships.length < goals) w[counterFor(world, neediest!.planned, this.opts.dronesOnly)] = world.tun['alloc.maxWeight'];
+      return finish(placeShips(!this.opts.concentrate));
     }
 
     // 3. Counter pocket (the hive's majority counter), once offence has started or a raid has been answered.
     const counter = hiveCounter(world);
     if (!this.opts.dronesOnly && counter.pocket !== null && !isTypeUnlocked(world, counter.type) && (this.offence || (this.respond && rs.last !== null))) {
-      const extra = this.pocketAssault(world, data, counter.pocket, w, fit, stage, limit, room);
-      if (extra !== null) return finish([...extra, ...regroup(world, parked, stage)]);
+      const extra = this.pocketAssault(world, data, counter.pocket, w, fit, gather, limit, room);
+      if (extra !== null) return finish([...extra, ...placeShips(false)]);
     }
 
     if (this.offence && isGuarded(world, heart)) {
@@ -428,7 +530,7 @@ export class AdaptiveBot implements FieldBot {
         const m = waveFor(world, data, heart, types, limit, away);
         if (m !== null && m.total <= room && rs.enabled) plan = m;
       }
-      const extra: Input[] = regroup(world, parked, stage);
+      const extra: Input[] = placeShips(false);
       if (plan !== null) {
         this.waveTotal = plan.total;
         Object.assign(w, deficitWeights(world, data, plan.fleet));
@@ -444,7 +546,7 @@ export class AdaptiveBot implements FieldBot {
         // `drones-only` has no plan that fits by design (flag 5) and no other pocket: as a control it keeps building drones up to the limit (DESIGN.md H8 table).
         if (this.opts.dronesOnly) w.drone = world.tun['alloc.maxWeight'];
         const other = this.otherPocket(world, data, counter, types, limit);
-        const e = other === null ? null : this.pocketAssault(world, data, other, w, fit, stage, limit, room);
+        const e = other === null ? null : this.pocketAssault(world, data, other, w, fit, gather, limit, room);
         if (e !== null) extra.push(...e);
         else {
           const r = this.recycleStep(world, data, types, limit, room);
@@ -454,12 +556,26 @@ export class AdaptiveBot implements FieldBot {
       return finish(extra);
     }
 
-    // 5. The standing guard: half the last raid, counter type for it, until there is that many.
-    if (this.respond && this.lastPlanned > 0) {
-      const guard = Math.ceil(this.lastPlanned / 2);
-      if (total(here) < guard) w[counterFor(world, this.lastRaidMix, this.opts.dronesOnly)] = world.tun['alloc.maxWeight'];
+    // 5. The standing guard: half of each prong of the last raid, the counter type for the neediest post, until each has that many.
+    if (neediest !== null && unmetAt(neediest) > 0) w[counterFor(world, neediest.planned, this.opts.dronesOnly)] = world.tun['alloc.maxWeight'];
+    return finish(placeShips(false));
+  }
+
+  /**
+   * The raid's prongs as posts, largest first (ties to the lower prong): `all` of them, and the `live` ones a defence answers
+   * (not done, and not homebound while another prong is still going out or fighting). With `concentrate` (or before the sim
+   * reports prongs) it is H8's one post at `raid.target`, which is prong 0's, sized by the whole plan.
+   */
+  private prongPosts(raid: RaidStatus): { all: Post[]; live: Post[] } {
+    const size = (c: Readonly<{ thorn: number; spore: number }>): number => c.thorn + c.spore;
+    if (this.opts.concentrate === true || raid.prongs.length === 0) {
+      const one: Post[] = raid.target === null ? [] : [{ node: raid.target, goal: size(raid.planned), planned: { ...raid.planned } }];
+      return { all: one, live: one };
     }
-    return finish(regroup(world, parked, stage));
+    const sorted = raid.prongs.map((p, i) => ({ p, i })).sort((a, b) => size(b.p.planned) - size(a.p.planned) || a.i - b.i);
+    const post = (r: { p: RaidStatus['prongs'][number] }): Post => ({ node: r.p.target, goal: size(r.p.planned), planned: { ...r.p.planned } });
+    const going = sorted.filter((r) => r.p.phase === 'muster' || r.p.phase === 'out' || r.p.phase === 'fight');
+    return { all: sorted.map(post), live: (going.length > 0 ? going : sorted.filter((r) => r.p.phase === 'home')).map(post) };
   }
 
   /**
@@ -468,7 +584,7 @@ export class AdaptiveBot implements FieldBot {
    * if the wave plus the economy floor fits the limit (the Director's rule, extended in round 3): the economy stops
    * growing and Recycles down toward the wave, as for the hive. Null when the pocket can't be the plan.
    */
-  private pocketAssault(world: Readonly<World>, data: SimData, node: number, w: Weights, fit: ShipTypeCounts, stage: number, limit: number, room: number): Input[] | null {
+  private pocketAssault(world: Readonly<World>, data: SimData, node: number, w: Weights, fit: ShipTypeCounts, gather: readonly number[], limit: number, room: number): Input[] | null {
     if (!isGuarded(world, node)) return null;
     // A wave on its way or fighting there is committed: no new plan (its own order already raised wavesSent).
     if (guardianAt(world, node)!.battle !== null || world.ships.some((s) => s.transit !== null && s.transit.to === node)) return [];
@@ -491,7 +607,7 @@ export class AdaptiveBot implements FieldBot {
       w.hauler = 0;
     }
     Object.assign(w, deficitWeights(world, data, mix.fleet));
-    if (covers(fit, mix.fleet)) return exactSend(world, stage, node, mix.fleet);
+    if (covers(fit, mix.fleet)) return exactSendFrom(world, gather, node, mix.fleet);
     // Full of ships this wave can't use (wounded, or other types): scrap one to open a slot.
     const r = w.drone + w.lancer + w.flak > 0 && isFleetFull(world, data) ? this.recycleUnfit(world, data, mix.fleet) : null;
     return r === null ? [] : [r];
@@ -759,8 +875,28 @@ export const adaptiveNoRaids: FieldStrategy = {
   tunables: { 'raid.enabled': 0 },
   make: () => new AdaptiveBot(adaptiveOpts()),
 };
+/**
+ * `adaptive-concentrate` (H9, report only): adaptive, except it answers only prong 0 with every warship and posts its
+ * standing guard only there (H8's rule aimed at prong 0). It measures whether splitting the defence matters.
+ */
+export const adaptiveConcentrate: FieldStrategy = {
+  name: 'adaptive-concentrate',
+  description: 'adaptive, but it answers only prong 0 with every warship and posts its standing guard only there (the control for splitting the defence, report only)',
+  expectedWin: false,
+  make: () => new AdaptiveBot(adaptiveOpts({ concentrate: true })),
+};
+/**
+ * `undefended` (H9, report only): adaptive with the raid response and the standing guard off for the whole run;
+ * offence, pockets and economy are unchanged. It measures what ignoring raids costs (greedy plays adaptive after its first hit).
+ */
+export const undefended: FieldStrategy = {
+  name: 'undefended',
+  description: 'adaptive with the raid response and the standing guard off for the whole run; offence, pockets and economy unchanged (the control for ignoring raids, report only)',
+  expectedWin: false,
+  make: () => new AdaptiveBot(adaptiveOpts({ respond: false })),
+};
 
 /** The strategies the gate expects to win. */
 export const FIELD_WINNERS: readonly string[] = ['adaptive', 'greedy'];
 /** Every non-static strategy, in report order. */
-export const fieldStrategies: readonly FieldStrategy[] = [adaptive, greedy, idle, dronesOnly, adaptiveNoRaids];
+export const fieldStrategies: readonly FieldStrategy[] = [adaptive, greedy, idle, dronesOnly, adaptiveNoRaids, adaptiveConcentrate, undefended];

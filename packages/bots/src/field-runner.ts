@@ -62,6 +62,8 @@ export interface RaidRecord {
   econLost: number;
   /** The planned size by type. */
   planned: { thorn: number; spore: number };
+  /** H9: each prong's result (`lastRaid.prongs`): the rock id it went to, its outcome, and the economy ships it killed. One entry for a raid that did not split. */
+  prongs: { target: string; outcome: string; econLost: number }[];
 }
 
 /** One trace point: economy alive, warships alive, ore in stock, the weights, and the bays running. */
@@ -86,6 +88,8 @@ export interface FieldResult {
   /** Tick the hive fell, or null. */
   hiveTick: number | null;
   raids: { mustered: number; beaten: number; hit: number; turnedBack: number };
+  /** H9 W6: prongs by outcome (`stats.raidProngs`). */
+  raidProngs: { beaten: number; hit: number; turnedBack: number };
   raidLog: RaidRecord[];
   /** Economy ships built and lost, by type. */
   econBuilt: { extractor: number; hauler: number };
@@ -237,7 +241,8 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
       if (open !== null) {
         const outcomeNow = r.hit > prevRaids.hit ? 'hit' : r.beaten > prevRaids.beaten ? 'beaten' : r.turnedBack > prevRaids.turnedBack ? 'turnedBack' : null;
         if (outcomeNow !== null) {
-          raidLog.push({ startTick: open.startTick, endTick: world.tick, outcome: outcomeNow, econLost: econLostTotal(world) - open.lostAtStart, planned: open.planned });
+          const prongs = (world.lastRaid?.prongs ?? []).map((p) => ({ target: world.nodes[p.target]!.id, outcome: p.outcome, econLost: p.lostEcon.extractor + p.lostEcon.hauler }));
+          raidLog.push({ startTick: open.startTick, endTick: world.tick, outcome: outcomeNow, econLost: econLostTotal(world) - open.lostAtStart, planned: open.planned, prongs });
           open = null;
         } else if (world.raid === null) open = null;
       }
@@ -262,6 +267,7 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
     ticks: world.tick,
     hiveTick: world.capturedTick,
     raids: { ...s.raids },
+    raidProngs: { ...s.raidProngs },
     raidLog,
     econBuilt: { ...st.econBuilt },
     econLost: { ...st.econLost },
