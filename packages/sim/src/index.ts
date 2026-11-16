@@ -306,8 +306,8 @@ export {
   worstHauls,
 } from './data.ts';
 export type { BuildType, EconType, FieldMap, RunMode } from './data.ts';
-export { haulersHeld, isRaidable, launchMix, nextProngs, raidKeep, raidMix, raidMixAt, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
-export type { ProngOutcome, ProngPhase, ProngResult, ProngStatus, Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
+export { dealCounts, haulersHeld, isRaidable, launchMix, nextProngs, prongCount, prongOutcome, raidFightsAt, raidKeep, raidMix, raidMixAt, raidProngs, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
+export type { Prong, ProngOutcome, ProngPhase, ProngResult, ProngStatus, Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
 export {
   econAlive,
   econAtByType,

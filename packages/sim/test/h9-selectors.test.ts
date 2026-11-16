@@ -209,11 +209,11 @@ describe('rockStatus: extractorSet, extCap, raidMix and raidNext', () => {
 });
 
 describe('fieldSummary.raidProngs', () => {
-  it('reads stats.raidProngs (zeros until h9-raids counts prongs, raids or not)', () => {
+  it('reads stats.raidProngs (h9-raids counts one hit prong for the one-prong raid; a fresh world has zeros)', () => {
     const w = raidField();
     playRaid(w);
     expect(w.stats.raids.hit).toBe(1);
-    expect(fieldSummary(w).raidProngs).toEqual({ beaten: 0, hit: 0, turnedBack: 0 });
+    expect(fieldSummary(w).raidProngs).toEqual({ beaten: 0, hit: 1, turnedBack: 0 });
     w.stats.raidProngs = { beaten: 2, hit: 1, turnedBack: 4 };
     expect(fieldSummary(w).raidProngs).toEqual({ beaten: 2, hit: 1, turnedBack: 4 });
     expect(createWorld(1, D).stats.raidProngs).toEqual({ beaten: 0, hit: 0, turnedBack: 0 });
