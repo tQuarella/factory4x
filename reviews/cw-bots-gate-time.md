@@ -39,3 +39,31 @@ Main's code returns 28 in both cases. The battle memo inherits the stale key too
 3. **Re-run the gates.** Report the bots time (it must stay under 80 s) and confirm the report is still identical to main's.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-16
+
+I reviewed 591ea28 against round 1 (23bb566 and 591ea28).
+
+**Required change 1 (the stale key): met.** The world and tick cache is still there, but `tunKey` now reuses the cached key only if every tunable name and value matches a snapshot taken when the key was made. That is an in-order loop of integer compares with no allocation, and the key is rebuilt on any difference. Tuning a world in place now changes the key at once.
+
+The field-map hash is now recomputed on each cache miss instead of being kept per map object. A map edited in place on the same tick would still be missed until the next tick. That is acceptable: no caller edits `data.map` in place, since probes build new data, and the code comment says so.
+
+**Required change 2 (the test): met.** "the estimate follows a tunable changed in place" does three things:
+- it asserts the tuning really changes the answer;
+- it checks `fieldMix` on the same tick against a fresh, equally tuned world;
+- it does the same for `fieldSingle`.
+
+This is my round-1 scenario, and it would fail on 77b3e47.
+
+**Required change 3 (gates and identity): met.** I ran `npm run gates -- --base main` on 591ea28 and every gate passed:
+- typecheck, lint, and protected-files (7 files, none protected);
+- test: 51 files, 1075 tests;
+- determinism: final cdbdea56.
+
+The bots gate passed in 56.4 s ("Runs 55.4 s"), against 97 s on main and under the 80 s target. I compared the run with my main baseline from round 1. `bots-latest.md` is identical once timings are masked, and all 18 runs have the same `outcome` and `finalHash`.
+
+**Small point, not required:** the DECISIONS.md entry still says the key is "computed once per world and tick (tunables only change inside `step`)". The code comment is now correct, but append one line to the log when convenient so the reason stays true.
+
+Required changes: none.
+
+VERDICT: APPROVE
