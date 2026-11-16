@@ -65,11 +65,14 @@ export function waveWins(base: Readonly<World>, node: number, fleet: Readonly<Sh
   throw new Error('battle did not end');
 }
 
+/** A battle test: `waveWins`, or a memo of it (the field estimate shares results across searches on one base). */
+export type WinsFn = (base: Readonly<World>, node: number, fleet: Readonly<ShipTypeCounts>, data: SimData) => boolean;
+
 const only = (type: ShipType, n: number): ShipTypeCounts => ({ drone: 0, lancer: 0, flak: 0, [type]: n });
 
 /** The smallest single-type wave that wins, or null within `max`. */
-export function minSingle(base: Readonly<World>, node: number, type: ShipType, data: SimData, max = SEARCH_MAX): number | null {
-  for (let n = 1; n <= max; n++) if (waveWins(base, node, only(type, n), data)) return n;
+export function minSingle(base: Readonly<World>, node: number, type: ShipType, data: SimData, max = SEARCH_MAX, wins: WinsFn = waveWins): number | null {
+  for (let n = 1; n <= max; n++) if (wins(base, node, only(type, n), data)) return n;
   return null;
 }
 
@@ -87,6 +90,7 @@ export function minMix(
   allowed: readonly ShipType[],
   upTo: number,
   data: SimData,
+  wins: WinsFn = waveWins,
 ): { total: number; fleet: ShipTypeCounts } | null {
   const canL = allowed.includes('lancer');
   const canF = allowed.includes('flak');
@@ -97,13 +101,13 @@ export function minMix(
       const room = (best === null ? upTo : best - 1) - l - f;
       if (room < 0) continue;
       const dMax = canD ? room : 0;
-      if (!waveWins(base, node, { drone: dMax, lancer: l, flak: f }, data)) continue;
+      if (!wins(base, node, { drone: dMax, lancer: l, flak: f }, data)) continue;
       // The fewest drones that still win (monotone): binary search in [0, dMax].
       let lo = 0;
       let hi = dMax;
       while (lo < hi) {
         const mid = (lo + hi) >> 1;
-        if (waveWins(base, node, { drone: mid, lancer: l, flak: f }, data)) hi = mid;
+        if (wins(base, node, { drone: mid, lancer: l, flak: f }, data)) hi = mid;
         else lo = mid + 1;
       }
       best = l + f + lo;
@@ -115,7 +119,7 @@ export function minMix(
       const f = best - d - l;
       if (f < 0 || (f > 0 && !canF)) continue;
       const fleet = { drone: d, lancer: l, flak: f };
-      if (waveWins(base, node, fleet, data)) return { total: best, fleet };
+      if (wins(base, node, fleet, data)) return { total: best, fleet };
     }
   }
   throw new Error('minMix: the minimum total was not found again');
