@@ -255,12 +255,12 @@ describe('change 1: the defence splits across prongs (a two-prong world: a5 THOR
 
 describe('raid.prongsMax 1: the bot decides as H8 did (v15, seed 1)', () => {
   const opts = { capTicks: 20 * MIN, softlockTicks: 5 * MIN, tunables: { 'raid.prongsMax': 1 } as const };
-  // Hashes of the H8 bots (field-strategies.ts at 12924fa, before this task) over a 20 minute cap on v15, seed 1, with raid.prongsMax 1 set (the tunable is in the hash).
+  // Hashes of the H8 bots (field-strategies.ts at 12924fa, before this task) on the h9-raids sim, over a 20 minute cap on v15, seed 1, with raid.prongsMax 1 set (the tunable is in the hash).
   // They hold while the data is v15; the equality with `adaptive-concentrate` below is data-independent.
   const pins: [FieldStrategy, string, number][] = [
-    [adaptive, '20773e61', 28591],
-    [greedy, '53746c46', 28351],
-    [dronesOnly, '19f912bb', 36000],
+    [adaptive, 'ae732e36', 28591],
+    [greedy, '964a3c11', 28351],
+    [dronesOnly, '7baddb4a', 36000],
   ];
   for (const [s, hash, ticks] of pins) {
     it(`${s.name} reproduces H8's run`, () => {

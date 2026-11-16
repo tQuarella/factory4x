@@ -11,6 +11,7 @@ import {
   isWon,
   oreCost,
   SHIP_TYPES,
+  raidProngs,
   rockStatus,
   step,
   worldHash,
@@ -181,8 +182,10 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
         inputs = [...first.splice(0), ...inputs];
       }
       // A warship standing at the raid's target as the tick begins (the shield's premise).
-      const raidNode = world.raid === null ? null : world.raid.target;
-      const guardedNow = raidNode !== null && world.ships.some((s) => s.at === raidNode);
+      // H9: every prong still going has a warship at its target (losses are not attributed per prong, so a prong with no
+      // warship at its rock, while another is held, is a legitimate loss and does not count).
+      const live = world.raid === null ? [] : raidProngs(world.raid).filter((p) => p.phase !== 'done');
+      const guardedNow = live.length > 0 && live.every((p) => world.ships.some((s) => s.at === p.target));
       const lostBefore = econLostTotal(world);
       const t0 = performance.now();
       step(world, data, inputs);
@@ -237,7 +240,7 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
       // Raids: a muster opens a record, the stats counter that moves closes it with its outcome. A muster
       // cancelled by a battle at the hive (R6) ends with no counter and leaves no record.
       const r = world.stats.raids;
-      if (open === null && world.raid !== null) open = { startTick: world.tick, lostAtStart: econLostTotal(world), planned: { ...world.raid.planned } };
+      if (open === null && world.raid !== null) open = { startTick: world.tick, lostAtStart: econLostTotal(world), planned: raidProngs(world.raid).reduce((a, p) => ({ thorn: a.thorn + p.planned.thorn, spore: a.spore + p.planned.spore }), { thorn: 0, spore: 0 }) };
       if (open !== null) {
         const outcomeNow = r.hit > prevRaids.hit ? 'hit' : r.beaten > prevRaids.beaten ? 'beaten' : r.turnedBack > prevRaids.turnedBack ? 'turnedBack' : null;
         if (outcomeNow !== null) {
