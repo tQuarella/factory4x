@@ -543,6 +543,76 @@ test.describe('375x667 portrait, two prongs', () => {
     await expect(page.locator('#result .stat-line', { hasText: 'Raid prongs' })).toContainText(/\d+: \d+ beaten · \d+ hit · \d+ turned back/);
   });
 
+  test('one prong beaten while the other is still out: its badge, leg, mix and raid line are gone, and the other prong badge, leg, countdown, banner and chip still show', async ({ page }) => {
+    test.setTimeout(150_000);
+    await ready(page);
+    await pause(page);
+    await toTwoProngMuster(page, 60);
+    const r0 = await raid2(page);
+    const [first, second] = r0.prongs as [Prong, Prong];
+    // The first prong's rock gets a guard big enough to beat it, parked before the raid arrives.
+    await page.evaluate(([n]) => window.__factory4x!.debugParkShips(n as number, { drone: 12, lancer: 4 }), [first.target] as const);
+    const map = async (): Promise<{ prongs: Array<{ target: number; marker: boolean; countdown: string }> }> => JSON.parse(await page.evaluate(() => window.__factory4x!.mapField()));
+    const badges = async (): Promise<number[]> => JSON.parse(await page.evaluate(() => window.__factory4x!.raidBadges())) as number[];
+    // One tick at a time, until the first prong is done and the second is not.
+    let r = r0;
+    for (let i = 0; i < 3000 && !(r.prongs[0]!.phase === 'done' && r.prongs[1]!.phase !== 'done'); i++) {
+      await page.evaluate(() => window.__factory4x!.advanceTicks(1));
+      r = await raid2(page);
+      if (r.phase === 'none') break;
+    }
+    expect(r.prongs[0]!.phase, 'the first prong is done').toBe('done');
+    expect(r.prongs[0]!.outcome).toBe('beaten');
+    expect(r.prongs[1]!.phase, 'the second prong is still in play').not.toBe('done');
+    const nFirst = await name(page, first.target);
+    const nSecond = await name(page, second.target);
+    const check = async (what: string): Promise<void> => {
+      await settled(page);
+      // Map: one badge (the live prong's rock) and one leg (its own marker or fight line); nothing for the done prong.
+      expect(await badges(), `${what}: only the live prong wears a badge`).toEqual([second.target]);
+      const m = await map();
+      expect(m.prongs.map((p) => p.target), `${what}: only the live prong has a leg`).toEqual([second.target]);
+      // The done prong's rock: no mix, no target flag, and no raid line on its sheet.
+      const done = await rock(page, first.target);
+      expect(done.raidMix, `${what}: no mix on the done prong's rock`).toBeNull();
+      expect(done.raidTarget).toBe(false);
+      // The live prong's rock still carries its raiders.
+      const live = await rock(page, second.target);
+      expect(live.raidMix, `${what}: the live prong keeps its mix`).not.toBeNull();
+      expect(live.raidTarget).toBe(true);
+      // The chip names the soonest time or the fight, with no "· 2" now that one prong is left.
+      await expect(page.locator('#chip-raid')).toContainText(/Raid/);
+      await expect(page.locator('#chip-raid')).not.toContainText('· 2');
+    };
+    // Phase A: the second prong is still flying (when it is): its marker and countdown show, and there is no banner.
+    const live = r.prongs[1]!;
+    if (live.phase === 'out') {
+      await check('second prong out');
+      const m = await map();
+      expect(m.prongs[0]!.marker).toBe(true);
+      expect(m.prongs[0]!.countdown).toMatch(/^\d+s$/);
+      await expect(page.locator('#chip-raid')).toContainText(/Raid \d+:\d\d/);
+      await expect(page.locator('#banner .bline.raid')).toHaveCount(0);
+      await page.screenshot({ path: 'test-results/h9-one-done-out.png' });
+      // The done rock's sheet has no raid line; the live rock's does.
+      await openRock(page, nFirst.toLowerCase());
+      await expect(page.locator('#sheet .rock-note .raid')).toHaveText('');
+      await page.locator('#sheet .close').click();
+      await openRock(page, nSecond.toLowerCase());
+      await expect(page.locator('#sheet .rock-note .raid')).toHaveText(/^Raid coming: /);
+      await page.locator('#sheet .close').click();
+      // Phase B: it arrives and fights; the banner names only its rock.
+      await stepSimUntil(page, async () => (await raid2(page)).prongs[1]!.phase === 'fight' || (await raid2(page)).phase === 'none', 3000, 'the second prong fighting', false);
+    }
+    const now = await raid2(page);
+    if (now.phase === 'fight') {
+      await check('second prong fighting');
+      await expect(page.locator('#banner .bline.raid')).toHaveText(new RegExp(`^Raid at ${nSecond}: [0-9]+ left$`));
+      await expect(page.locator('#chip-raid')).toContainText('Raid on');
+      await page.screenshot({ path: 'test-results/h9-one-done-fight.png' });
+    }
+  });
+
   test('before the raid, the rank line shows on both rocks a split would hit and on no other', async ({ page }) => {
     test.setTimeout(150_000);
     await ready(page);

@@ -1699,3 +1699,10 @@ Raids stop when the hive falls (8010), so items (g)–(n) are placed before the 
 **What `adaptive` meets on v15 (for h9-design-data):** (traced on seeds 1 to 3, identical, since the field is the same)
 - Adaptive's raids: #1 at tick 4862 (econ 6, 3 raiders, 1 prong), #2 at 9573 (econ 6, 3), #3 at 14191 (econ 11, 6), #4 at 18745 (econ 12, 6), #5 at 23556 (econ 14, 7), #6 at 27871 (econ 17, 9: **2 prongs**, 2T3S + 1T3S). It wins before a seventh.
 - So the first 2-prong raid musters at econ 17 (a raid of 9; with `raid.econPerRaider` 2 a size of 8 comes from econ 15), at game minute 15.5, and there is exactly **one** on adaptive: calibration target 1 (at least 2 split raids in the run) is unmet on the shipped data. Greedy has two (#5 at 23401, econ 15, 2T2S + 1T3S; #6 at 27936, econ 16).
+
+## 2026-11-16 · Engineer · h9-client: the map-height rule counts the Recycle section
+
+The H8 rule "the map keeps at least H8's height behind the rock sheet" was measured at 185 px (wide font) with no ships parked at the rock.
+- **What the two-prong test found.** On a prong's rock with a ship parked there (a held hauler, say), the sheet also shows H8's Recycle section, 51 px tall. The map then measures 136 px.
+- **The call.** 136 + 51 = 187, so the extractor row, haulers line and raid lines cost the map nothing against H8. The smoke test asserts `stage + Recycle section height >= 185`, and the no-Recycle states still assert 185 (wide font) and 210 (normal font) directly. The Recycle section is H8's and is not changed here.
+- **Why not shrink it.** Hiding or folding Recycle away would change an H8 control the spec does not touch.
