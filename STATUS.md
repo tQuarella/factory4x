@@ -44,6 +44,8 @@ Launches: 10 / 12.
 | r17 | engineer | h8-client | resume | Final round: merged design-data + main (b2a091d); gates green, smoke x5 1370/1370 |
 | r18 | critic | h8-client | resume | Final round: APPROVE (e717b91), merge conditional on green branch CI on e717b91 |
 
+Branch CI on e717b91 (run 43754926621, after the repo went public, Q23): green. Gates job 6m35s of 20 (33%), deploy job 4m46s of 15 (32%).
+
 **Blocked (2026-11-15):** GitHub Actions won't start any job ("recent account payments have failed or your spending limit needs to be increased"); every run since 2026-11-14 23:25 failed in 2–4 s, on main too. h8-client can't merge (needs green branch CI) and main can't deploy. Owner step: Q23 in QUESTIONS.md. Then re-run CI on e717b91 (`gh run rerun 43754926621`), record the gates and deploy job times, `npm run merge-task -- h8-client`, release-gates, push main, /handoff, /retro (launch 11).
 
 ## Iteration 7 ledger
