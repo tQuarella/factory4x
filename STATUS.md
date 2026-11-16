@@ -19,6 +19,9 @@ Launches: 3 / 12.
 | r1 | designer | H9 spec + task split | resume | Spec and split (80c6aef); Director rulings 2ceada1 |
 | 2 | core-engineer | h9-sim | launch | Build: extractor dial X1–X4, data v15, H9 selector stubs, replay (a)–(f) |
 | 3 | engineer | cw-bots-gate-time | launch | Build in parallel with h9-sim; lands on main before h9-bots |
+| r2 | critic | cw-bots-gate-time | resume | Review round 1: REJECT (1716871): cached tunables key goes stale on in-place tuning |
+| r3 | engineer | cw-bots-gate-time | resume | Fix round 1 (591ea28): snapshot-checked key, new test |
+| r4 | critic | cw-bots-gate-time | resume | Review round 2: APPROVE (436d64e); merged 97b84f2, bots gate 97 s → about 60 s |
 
 ## Iteration 8 ledger
 
