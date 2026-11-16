@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 8 ledger
 
-Launches: 10 / 12.
+Launches: 11 / 12. Resumes: 18. Iteration 8 closed: build-20261116-1 handed off, retro done.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -43,6 +43,8 @@ Launches: 10 / 12.
 | r16 | critic | h8-design-data | resume | Review round 1: APPROVE (35a4db7); ships on v14 |
 | r17 | engineer | h8-client | resume | Final round: merged design-data + main (b2a091d); gates green, smoke x5 1370/1370 |
 | r18 | critic | h8-client | resume | Final round: APPROVE (e717b91), merge conditional on green branch CI on e717b91 |
+
+| 11 | retrospective | retro after build-20261116-1 | launch | designer rule walk and calibration guard, engineer replay check, PROCESS Critic resume, stack hold, CI billing; Can wait cw-bots-gate-time |
 
 Branch CI on e717b91 (run 43754926621, after the repo went public, Q23): green. Gates job 6m35s of 20 (33%), deploy job 4m46s of 15 (32%).
 
@@ -290,7 +292,7 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-Awaiting owner feedback on build-20261116-1 (H8, Hold the front): https://factory4x.pages.dev, commit c72eb04, data v14. Merged c72eb04 after green branch CI on e717b91; main CI run 43791219333 green (gates 9m36s of 20, deploy 5m22s of 15). Handoff block is at the top of QUESTIONS.md. When feedback arrives: log it verbatim in PLAYTEST_LOG.md, then Designer triage. Iteration 8 retro: launch 11.
+Awaiting owner feedback on build-20261116-1 (H8, Hold the front): https://factory4x.pages.dev, commit c72eb04, data v14. Merged c72eb04 after green branch CI on e717b91; main CI run 43791219333 green (gates 9m36s of 20, deploy 5m22s of 15). Handoff block is at the top of QUESTIONS.md. When feedback arrives: log it verbatim in PLAYTEST_LOG.md, then Designer triage. Iteration 8 retro done (launch 11). Can wait: cw-bots-gate-time.
 
 ## Moving to another machine
 

@@ -1498,3 +1498,37 @@ The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not h
 
 GitHub Actions stopped starting jobs on 2026-11-14: the private repo had used the Free plan's 2,000 Actions minutes for November (about 270 runs, at about 12 min per branch push and about 20 min per push to main). The owner chose to make the repo public, which gives unlimited free minutes on standard runners. Before the switch, the Director scanned the full history for token and key patterns and found none. "No secrets in the repo" now matters more: anything committed is world-readable.
 
+
+## 2026-11-16 · Retrospective · build-20261116-1 (M2 H8, Hold the front)
+
+Scope: `git log build-20261114-1..build-20261116-1` (81 commits), `reviews/h8-*.md`, the "Iteration 8 ledger" in `STATUS.md`, `BACKLOG.md` (iteration 8), `PROCESS.md`, `.claude/agents/*.md`, the entries above since the last retro, `reports/gates-latest.json`, and the Director's notes.
+
+**Went well**
+- **The five-task stack landed in one merge through h8-client (c72eb04), and nothing was parked.** This was an iteration about one and a half times H7's size (A and B together). It used 10 launches plus this retro (11 of 12) and 18 resumes. Critics and builders were resumed across rounds and tasks.
+- **Last retro's CI fix paid off.** cw-smoke-sim-time ran first, in parallel with h8-sim, as planned. The gates job went from 15.5–17.5 to 6m35s of 20 minutes, and the deploy job from 13–14 to 4m46s of 15 (run 43754926621). No CI job was cancelled for time.
+- **Building the repro first and measuring found spec gaps early.** h8-sim's repro commit (0291294) came before any rule change. Its measured opening (first hauler at 3:13) and its 25 extractors for 13 slots surfaced the H1 and H4b gaps before any Critic round.
+- **The Director's calls were made by the team, logged, and kept quality.** The H1 amendment, committed extractors, H4b, the H10 hold end, bot change 1's exceptions, staying on v14, and the stack-only reject ruling each have an entry. The owner was asked only Q22 (the hypothesis, theirs) and Q23 (their GitHub account). Both had to be them.
+- **Gates and the Critic caught real problems.** h8-sim r1: the replay never reached the new opening rules. h8-bots r1: greedy's handoff lost the wipe latch, a padding `typeof` test, and a "never" in the acceptance the code didn't keep. h8-client r1: the map shrank to 135 px behind the rock sheet.
+
+**Didn't go well**
+- **Four spec gaps showed up only in the build** (H1 opening, no surplus extractors, the H10 hold through `home`, bot change 1 at the fleet limit). Each cost a Director ruling and, for two, part of a reject. The common cause: the spec walked bot *strategies* through edge states (last retro's rule) but not each new *rule*: the opening, every phase of the raid it reads, the limits behind "never", and the sibling type with the same complaint.
+- **h8-sim r1 was rejected for a replay that didn't reach the amendments.** Its DECISIONS entries said "determinism final b8d34d88, unchanged" twice. That was the signal, and nobody read it as one.
+- **A calibration met its target by flipping the strategy order.** v15 (`guard.spore.damage` 2) moved adaptive from 15:53 to 25:54 while greedy stayed at 15:57. The Designer reported the problem as a finding but still committed v15 as the shipped value. The Director reverted it (78b27ae), which cost a round trip.
+- **One wasted launch.** A new Critic was launched for h8-client round 2 instead of a resume, then stopped (launch 10).
+- **A top-of-stack round spent on waiting.** h8-client round 2 (94757b1) rejected only for the stack, which raised a deadlock-rule question (5a47198).
+- **CI stopped for about a day, and nothing watched the cause.** The private repo used up its 2,000 Actions minutes (about 270 runs). The owner made it public (Q23).
+- **The bots gate grew** from about 78–86 s to 96–117 s (101.7 s in the latest run). Every builder and Critic pays that on each gates run.
+
+**Changes made**
+1. **`.claude/agents/designer.md`:**
+   - Walk every new rule through its edge states and write the walk under the rule: the opening against the last build's numbers, every state-machine phase it reads (where it starts and ends), each "never" or "always" at the fleet limit, at zero and when full, and the sibling types. Evidence: 8739109, ec04b17, a068a4c / a5a4a6d, 140553c.
+   - A calibration value that changes which strategy finishes first, or moves a winner by more than 10%, is reported to the Director with the reword option, not committed as shipped. Evidence: 2158606, then 78b27ae.
+2. **`.claude/agents/engineer.md`** (also used by core-engineer, faction-ai and art-direction): a sim behavior change that leaves the determinism final unchanged means the replay doesn't reach it. Add replay items and a test that the replay enters the new state, including for mid-task amendments. Evidence: h8-sim round 1 (43236ca).
+3. **`PROCESS.md`:**
+   - "Launching agents": check the ledger and resume a Critic before launching one (launch 10).
+   - Stacks: hold the top task's next round until every lower task is approved. The record now carries the Director's ruling that a stack-only reject doesn't count toward the deadlock rule (5a47198). A reject that asks for code or test changes still counts.
+   - "Reading the CI result": a run whose jobs fail within seconds is read from its annotations. A billing message is an owner step. If the repo is private again, check minutes at each handoff (Q23).
+   - "Watch CI headroom": current job times added (6m35s and 4m46s).
+4. **`BACKLOG.md` Can wait:** new `cw-bots-gate-time` (bots gate back under 80 s with bot decisions unchanged). The Director is told.
+
+**Not changed:** no gate, guardrail, threshold or protected file, and nothing in `critic.md`. The deadlock rule itself is unchanged. The new text records the Director's existing ruling and adds a scheduling rule that avoids the case. The 12-launch budget stays (11 used, for a larger-than-usual iteration). There is no Actions-minutes watcher task, because a public repo has unlimited standard-runner minutes. If the repo goes private again, the PROCESS line covers it.
