@@ -225,8 +225,8 @@ export function syncExtractors(world: World): void {
  * F5, extractors. First, an extractor bound to a node that is no longer mineable (its mark was turned off) is
  * unbound. Then every unbound extractor that is parked (idle at the probe, at the node it was unbound from, or
  * just built), in id order, is dispatched to the mineable node nearest the probe whose bound plus free extractors
- * are below its `extCap` (H9 X2: the dial's count, else the slots; ties to the lower index), and binds to it at once. With no such node it flies home and parks
- * at the probe as idle. An unbound extractor in flight finishes its leg first and is dispatched from where it lands.
+ * are below its `extCap` (H9 X2: the dial's count, else the slots; ties to the lower index), and binds to it at
+ * once. With no such node it flies home and parks at the probe as idle. An unbound extractor in flight finishes its leg first and is dispatched from where it lands.
  */
 export function runExtractors(world: World): void {
   const f = fieldOf(world);
@@ -312,8 +312,8 @@ export function haulRoundTrip(world: Readonly<World>, node: number): number {
  * (docked or on their way), plus the committed extractors, at the node F5 would send them to now. Committed means
  * the one in the probe's bay and a full extractor share (it starts in F3 as soon as the bay is free). They fill the
  * mineable nodes nearest the probe with a free slot under `extCap` (H9 X2), ties to the lower index, as F5
- * dispatches; with no free slot they count nowhere. Without them, the landing's first 40 ore all go to extractor shares before any extractor
- * launches (tick 120), and the first hauler waits for probe mining (h8-sim, DECISIONS.md).
+ * dispatches; with no free slot they count nowhere. Without them, the landing's first 40 ore all go to extractor
+ * shares before any extractor launches (tick 120), and the first hauler waits for probe mining (h8-sim, DECISIONS.md).
  */
 export function staffCounts(world: Readonly<World>): number[] {
   const f = fieldOf(world);
@@ -427,8 +427,8 @@ export function haulerShortfall(world: Readonly<World>): number {
 /**
  * No surplus extractors (Director, 2026-11-14, with hauler.autoNeed 1): the free extractor slots. Σ over mineable
  * (Mine-marked, unguarded) nodes of max(0, extCap − free extractors − extractor ships bound there, docked or on
- * their way; H9 X2: extCap is the dial's count, else the slots), minus the unbound extractor ships (idle at the probe or flying home: F5 puts them in the next slot that
- * opens), minus an extractor in the bay. A full share is not subtracted: it is what the bay would build.
+ * their way; H9 X2: extCap is the dial's count, else the slots), minus the unbound extractor ships (idle at the
+ * probe or flying home: F5 puts them in the next slot that opens), minus an extractor in the bay. A full share is not subtracted: it is what the bay would build.
  */
 export function extractorShortfall(world: Readonly<World>): number {
   const f = fieldOf(world);
