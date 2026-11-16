@@ -11,11 +11,14 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 9 ledger
 
-Launches: 1 / 12.
+Launches: 3 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
-| 1 | designer | triage build-20261116-1 owner playtest; H9 candidates | launch | Plan (9ac9a8a); waiting on the owner's pick (Q24) |
+| 1 | designer | triage build-20261116-1 owner playtest; H9 candidates | launch | Plan (9ac9a8a); owner picked A, wider front (d3ff938) |
+| r1 | designer | H9 spec + task split | resume | Spec and split (80c6aef); Director rulings 2ceada1 |
+| 2 | core-engineer | h9-sim | launch | Build: extractor dial X1–X4, data v15, H9 selector stubs, replay (a)–(f) |
+| 3 | engineer | cw-bots-gate-time | launch | Build in parallel with h9-sim; lands on main before h9-bots |
 
 ## Iteration 8 ledger
 
@@ -300,7 +303,7 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-Owner feedback on build-20261116-1 is logged (1f8adb8) and triaged (9ac9a8a). Waiting on the owner's H9 pick, Q24 in QUESTIONS.md (A wider front recommended; extractor dial rides along with any option). When answered: Designer resume to spec, then split and /iterate.
+Iteration 9 (H9, A wider front) is building: h9-sim (core-engineer) and cw-bots-gate-time (engineer) in parallel. Then a Critic for each (resume an existing Critic per PROCESS). After h9-sim is approved: h9-raids, h9-bots and h9-client in parallel; then h9-design-data; `merge-task h9-client` lands the stack.
 
 ## Moving to another machine
 
