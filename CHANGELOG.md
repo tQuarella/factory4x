@@ -6,6 +6,12 @@ Player-facing changes per build. Three plain lines per build, written by the Dir
 
 Nothing yet.
 
+## build-20261116-1 (2026-11-15, commit c72eb04) · Milestone 2, H8: Hold the front
+
+- Move ships by hand: drag from one rock to another to send its warships there. Long-press, then drag, to send half. Your warships now shield the rock they sit on: a raid must beat them before it can touch your mining ships, and haulers wait out the fight instead of flying in.
+- Haulers are staffed by need: each mined rock gets as many as it needs, spares go home and are reassigned, and the probe stops building extras. Tap a rock to set its hauler count yourself (or leave it on Auto). A Mine mode marks several rocks quickly, and each weight row shows its share of your income.
+- The raid's target rock now carries a badge. Tap the Fleet chip for a fleet panel showing every ship type, with Recycle to scrap ships you no longer need and free fleet slots.
+
 ## build-20261114-1 (2026-11-14, commit f565c11) · Milestone 2, H7: One field, live enemy
 
 - One asteroid field, one run: no overworld for now. The probe builds Extractor ships that mine a rock and Hauler ships that fly the ore home. Tap a rock and choose "Mine this rock" or "Stop mining". You land with economy only, so the first minute is about mining.

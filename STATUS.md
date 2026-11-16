@@ -290,7 +290,7 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-Iteration 8 (H8) is approved end to end and waits only on GitHub Actions billing (Q23). When the owner says it's fixed: re-run CI on task/h8-client e717b91, then merge-task h8-client, release-gates, push main, verify the deploy, /handoff, /retro.
+Awaiting owner feedback on build-20261116-1 (H8, Hold the front): https://factory4x.pages.dev, commit c72eb04, data v14. Merged c72eb04 after green branch CI on e717b91; main CI run 43791219333 green (gates 9m36s of 20, deploy 5m22s of 15). Handoff block is at the top of QUESTIONS.md. When feedback arrives: log it verbatim in PLAYTEST_LOG.md, then Designer triage. Iteration 8 retro: launch 11.
 
 ## Moving to another machine
 

@@ -4,6 +4,30 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
+## Build build-20261116-1 is ready (2026-11-15): H8, Hold the front
+
+Play: https://factory4x.pages.dev (on your phone, portrait). Your old save is from data v13, so the game starts fresh.
+
+What changed:
+- Move ships by hand: drag from one rock to another to send its warships there. Long-press, then drag, to send half. Your warships now shield the rock they sit on: a raid must beat them before it can touch your mining ships, and haulers wait out the fight instead of flying in.
+- Haulers are staffed by need: each mined rock gets as many as it needs, spares go home and are reassigned, and the probe stops building extras. Tap a rock to set its hauler count yourself (or leave it on Auto). A Mine mode marks several rocks quickly, and each weight row shows its share of your income.
+- The raid's target rock now carries a badge. Tap the Fleet chip for a fleet panel showing every ship type, with Recycle to scrap ships you no longer need and free fleet slots.
+
+Try this: when the first raid banner shows (about 2:40), drag your warships from the probe to the rock with the raid badge. Try a long-press drag to send half. Later, open the Fleet panel and recycle haulers you don't need to free slots for warships before you push for the hive.
+
+Fun questions (the H8 hypothesis):
+1. When a raid came, did you drag ships to meet it? Did moving ships feel quick, and did you use the long-press half move?
+2. Did keeping warships on a rock feel like holding a front worth the slots, or like a chore?
+3. Did you set any rock's hauler count, or did Auto get it right?
+
+Known from the team (not hidden from you):
+- Drag and long-press were tested only in an emulated phone browser, not on a real phone. If a drag scrolls or misfires, say so; in the tuning panel, set "Move ships by" to 0 to switch to tap Move, then tap the target.
+- A guard half the raid's size may still win (6 ships beat a full raid of 12, losing 3). If defending feels too easy, tell us; fun question 2 is where it shows.
+- The bots that ignore raids finish about as fast as the ones that defend, so racing the economy may not feel risky yet.
+
+Also open: Q18 (pillar 1 wording, only if a fleet cap ships). The fleet limit has shipped since H7, so it's worth a look now.
+Protected files changed this build: none.
+
 ## Q23 (Blocking, 2026-11-15): GitHub Actions won't run
 
 GitHub refuses to start any CI job on `tQuarella/factory4x`: "The job was not started because recent account payments have failed or your spending limit needs to be increased." Every run since 2026-11-14 23:25 failed in 2–4 s, including on main. Without CI, the H8 build can't merge or deploy. It's otherwise done: every task is Critic-approved, the gates pass, and the phone and desktop smoke runs pass 1370 of 1370.
