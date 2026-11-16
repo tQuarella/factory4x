@@ -148,14 +148,35 @@ test.describe('375x667 portrait, the extractor dial', () => {
   });
 
   test('lowering a rock: an extractor leaves, the rock\'s haulers drop after their next trip home, and no extractor is built for it', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     await ready(page);
     await pause(page);
-    const a1 = await page.evaluate(() => window.__factory4x!.nodeIndex('a1'));
-    await stepSimUntil(page, async () => (await rock(page, a1)).docked >= 2 && (await rock(page, a1)).haulers >= 1, 12_000, 'two extractors and a hauler at a1', false);
+    // Raids off, so no raid kills a ship in the window and the ship count is the dial's alone.
+    await tune(page, 'raid.enabled', 0);
+    const ids = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'];
+    let id = 'a1';
+    // The premise: every marked rock is at its cap with nothing in flight, so H4b holds the extractor share and the surplus has nowhere to go.
+    const everyRockFull = async (): Promise<boolean> => {
+      for (const x of [...ids, 'p1', 'p2', 'heart']) {
+        const r = await rock(page, await page.evaluate((y) => window.__factory4x!.nodeIndex(y), x)).catch(() => null);
+        if (r !== null && r.mine && (r.bound !== r.extCap || r.inFlight > 0)) return false;
+      }
+      return true;
+    };
+    // The rock under test is one that needs two haulers (a far, rich one), so lowering it makes a real drop.
+    const busy = async (): Promise<string | null> => {
+      for (const x of ids) {
+        const r = await rock(page, await page.evaluate((y) => window.__factory4x!.nodeIndex(y), x));
+        if (r.mine && r.docked >= 2 && r.haulers >= 2) return x;
+      }
+      return null;
+    };
+    await stepSimUntil(page, async () => (await busy()) !== null && (await everyRockFull()), 30_000, 'every marked rock full, and a rock with two extractors and two haulers', false);
+    id = (await busy())!;
+    const a1 = await page.evaluate((y) => window.__factory4x!.nodeIndex(y), id);
     const before = await rock(page, a1);
     expect(before.docked).toBeGreaterThanOrEqual(2);
-    await openRock(page, 'a1');
+    await openRock(page, id);
     const sheet = page.locator('#sheet');
     // Lower the dial to 1 with the − button.
     const less = sheet.locator('.e-step', { hasText: '−' });
@@ -163,6 +184,7 @@ test.describe('375x667 portrait, the extractor dial', () => {
     expect((await inputs(page)).slice(-1)[0]).toEqual({ type: 'setExtractors', node: a1, count: 1 });
     await page.locator('#sheet .close').click();
     const ships0 = await extractorShips(page);
+    const haulersAtLowering = (await rock(page, a1)).haulers;
     // An extractor leaves: a1 keeps one, whatever the probe builds meanwhile.
     await stepSimUntil(page, async () => (await rock(page, a1)).docked === 1, 3000, 'the surplus extractors leaving a1', false);
     expect((await rock(page, a1)).docked).toBe(1);
@@ -173,14 +195,15 @@ test.describe('375x667 portrait, the extractor dial', () => {
       expect(r.bound, `bound at a1 at +${t} ticks`).toBeLessThanOrEqual(1);
       expect(r.docked).toBeLessThanOrEqual(1);
     }
-    expect(await extractorShips(page), 'the surplus went to other rocks or home; none was built for a1').toBeLessThanOrEqual(ships0 + 1);
+    expect(await extractorShips(page), 'exactly the same extractor ships: the surplus went home, and none was built').toBe(ships0);
     // The haulers follow the need of what is mined: after their next trip home a1 has no more than its target.
     const target = (await rock(page, a1)).haulerTarget;
     await stepSimUntil(page, async () => (await rock(page, a1)).haulers <= target, 3000, 'a1\'s haulers falling to the target', false);
     expect((await rock(page, a1)).haulers).toBeLessThanOrEqual(target);
     expect(target, 'the target fell with the extractors').toBeLessThanOrEqual(before.haulerTarget);
+    expect(haulersAtLowering, 'a1 had more haulers than the new target when it was lowered, so the drop is real').toBeGreaterThan(target);
     // The sheet says so: the haulers line is the read-only target.
-    await openRock(page, 'a1');
+    await openRock(page, id);
     await expect(sheet.locator('.haulers-line')).toHaveText(`Haulers ${target} (auto)`);
     await expect(sheet.locator('.ext-lbl')).toHaveText(/^Extractors 1 \/ 1$/);
   });
@@ -255,6 +278,7 @@ test.describe('375x667 portrait, the extractor dial', () => {
     console.log(`rock sheet open with the hauler stepper, wide font: map (stage) ${fit.stage} px, sheet ${fit.client} px`);
     await page.screenshot({ path: 'test-results/h9-rock-sheet-stepper.png' });
     expect(fit.scroll, 'no scrolling with both rows').toBeLessThanOrEqual(fit.client + 1);
+    expect(fit.stage, 'the map keeps at least 140 px with both rows (measured 141)').toBeGreaterThanOrEqual(140);
     await expectControlsFit(page, '#sheet', 'the extractor and hauler rows');
     // Back off: with the stepper off again the read-only line shows the kept count: "Haulers 2 (set 2)".
     await page.locator('#sheet .close').click();

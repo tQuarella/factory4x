@@ -1633,3 +1633,15 @@ Profile of one `npm run bots` run (`node --cpu-prof`, seeds 1): the metrics were
 
 The entry above says the estimate key is computed "once per world and tick (tunables only change inside `step`)". That was round 1 and was rejected: tests and probe scripts change tunables in place. As merged (591ea28, approved 436d64e), the key is reused only while every tunable value still equals a snapshot taken with it, and the map hash is rebuilt with the key. A map edited in place within one tick is still missed until the next tick; no caller does that. The bots gate went from 97 s to about 56–64 s with identical results.
 
+
+## 2026-11-16 · Engineer · h9-client: two client calls the spec left open
+
+**The raid banner always has two lines of room.** DESIGN.md H9 allowed either one line at 375 px under the wide font, or a fixed two-line height whenever raids are on.
+- **Why not one line.** "Raid gathering in 15 s → A5 2T 4S · A6 1T 4S" is about 44 characters, so it cannot fit one line under the wide font. Even H7's one-prong text needs two lines there.
+- **What it does.** Every raid line (muster and fight, one prong or several) keeps `min-height: 2lh`, wraps and clamps at two lines. The map below never moves when a second prong appears or when the muster gives way to the fight.
+- **Cost.** A one-prong raid banner is now two lines tall in a normal font too, and about 15 px of map goes while it shows. It shows only while a raid musters or fights.
+- **Left behind.** With `raid.prongsMax` 3 under the wide font a long muster line is clamped (ellipsis). Normal fonts fit three prongs in two lines.
+
+**The rank line is hidden on a rock that shows its raid line.** The spec says the rank line shows when `raidNext` is true.
+- **Why hide it.** On a rock whose prong is already mustering or out, "raid coming: ..." says the same thing sooner, as in H8. Showing both would need a fourth reserved note line, and the rock sheet's map is at H8's height only by a few pixels (187 px wide-font, against 185).
+- **Result.** The rank line shows on every `raidNext` rock without a raid line, so before a raid it appears on both rocks a split would hit.
