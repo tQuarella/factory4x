@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { expectControlsFit, settled } from './helpers.ts';
+import { expectControlsFit, settled, stepSimUntil } from './helpers.ts';
 
 /**
  * H7 client, the economy part: a run lands in the field, the probe sheet (radar and five rows), the rock sheet (Mine / Stop), the map's
@@ -295,8 +295,9 @@ test.describe('375x667 portrait, by touch', () => {
       await tap(page, plus('flak'));
       await expect(sheet.locator('.fp-row[data-type="lancer"] .fp-state')).toHaveText('needs crystal pocket');
       await expect(sheet.locator('.fp-row[data-type="flak"] .fp-state')).toHaveText('needs ice pocket');
-      // Run until warships and economy ships are parked at the probe (the rally point), so Recycle shows.
-      for (let i = 0; i < 40 && !(await sheet.locator('.recycle-btn').isVisible()); i++) await page.evaluate(() => window.__factory4x!.advanceTicks(60));
+      // The premise is stated, not left to the opening economy (H8 staffs haulers by need, so nothing idles at the probe on its own):
+      // the drone weight is at the top, so a finished drone parks at the probe, the rally point, and Recycle shows.
+      await stepSimUntil(page, () => sheet.locator('.recycle-btn').isVisible(), 14_400, 'a ship parked at the probe', false);
       await expect(sheet.locator('.recycle-btn')).toBeVisible();
       await settled(page);
       const fit = await page.evaluate(() => {
@@ -388,6 +389,13 @@ test.describe('375x667 portrait, by touch', () => {
     const hauler = page.locator('#sheet .fp-row[data-type="hauler"]');
     const w = Number(await hauler.locator('.fp-w').textContent());
     for (let i = 0; i < w; i++) await tap(page, hauler.locator('.fp-step', { hasText: '−' }));
+    await tap(page, page.locator('#sheet .close'));
+    // H8: the weight only stops new haulers, and raids no longer kill the one already built (the shield), so the premise is stated:
+    // a1's hauler count is set to 0, so its buffer fills and stays full.
+    await tapNode(page, 'a1');
+    const less = page.locator('#sheet .h-step', { hasText: '−' });
+    for (let i = 0; i < 6 && (await less.isEnabled()); i++) await tap(page, less);
+    await expect(less).toBeDisabled();
     await tap(page, page.locator('#sheet .close'));
     const a1 = await page.evaluate(() => window.__factory4x!.nodeIndex('a1'));
     await stepUntil(page, async () => (await rock(page, a1)).backedUp, 12000, 'a full buffer at a1');

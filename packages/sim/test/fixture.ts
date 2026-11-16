@@ -17,6 +17,8 @@ import raw from './fixtures/sim-v4.json' with { type: 'json' };
 import rawV8 from './fixtures/sim-v8.json' with { type: 'json' };
 import rawV10 from './fixtures/sim-v10.json' with { type: 'json' };
 import rawV12 from './fixtures/sim-v12.json' with { type: 'json' };
+import rawV13 from './fixtures/sim-v13.json' with { type: 'json' };
+import rawV14 from './fixtures/sim-v14.json' with { type: 'json' };
 import { defaultData, parseSimData, withRunMode, type SimData } from '../src/index.ts';
 
 export const fixtureData: SimData = parseSimData(raw);
@@ -52,6 +54,21 @@ export const fixtureV10: SimData = parseSimData(rawV10);
  * ones (data-h7.test.ts checks that; calibration changes only guard counts and values).
  */
 export const fixtureV12: SimData = parseSimData(rawV12);
+
+/**
+ * h8-sim: data/sim.json as it shipped at dataVersion 13 (h7-design-data's calibration), frozen in
+ * fixtures/sim-v13.json for the hauler repro and the hauler.autoNeed 0 comparison. Like the older fixtures it
+ * carries the H8 keys at H7's behaviour: hauler.autoNeed 0, raid.shieldEcon 0 and raid.haulersHold 0 (the others at
+ * their spec defaults), so every older rule test keeps playing the rules it was written for.
+ */
+export const fixtureV13: SimData = parseSimData(rawV13);
+
+/**
+ * h8-sim: data/sim.json as it shipped at dataVersion 14 (the v13 values plus every H8 key at its spec default),
+ * frozen in fixtures/sim-v14.json and never retuned. The H8 rule tests run on it, so h8-design-data's calibration
+ * changes none of them.
+ */
+export const fixtureV14: SimData = parseSimData(rawV14);
 
 /**
  * h7-sim: the shipped data with `run.mode` "campaign" (DESIGN.md H7 "What is parked, and how"). Tests that built

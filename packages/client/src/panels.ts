@@ -3,7 +3,7 @@ import { FIELD_PARKED_KEYS, SHIP_TYPES, areaStatus, campaignSummary, fieldSummar
 import { btn, h, setText, toggleClass, type Btn } from './dom.ts';
 import { buildNote } from './feedback.ts';
 import { clampInt, mmss, shortVersion, stepFor, ticksText } from './format.ts';
-import type { Settings } from './persist.ts';
+import { CLIENT_SETTING_KEYS, type ClientKey, type Settings } from './persist.ts';
 import { iconCanvas } from './icons.ts';
 import { drawProbeCore } from './placeholders.ts';
 import { hiveTimeText, raidsText, typesText } from './fieldreport.ts';
@@ -66,6 +66,15 @@ export const TUNE_LABEL: Readonly<Record<string, string>> = {
   'field.fleetCap': 'Fleet limit (0 = none)',
   'fleet.countsEconomy': 'Economy ships count (0 = warships only)',
   'raid.enabled': 'Raids (0 = off)',
+  'hauler.autoNeed': 'Haulers by need (0 = H7 haulers)',
+  'hauler.needPct': 'Hauler need %',
+  'rock.haulerMax': 'Most haulers per rock',
+  'raid.shieldEcon': 'Warships shield the economy (0 = off)',
+  'raid.haulersHold': 'Haulers wait out a raid (0 = off)',
+  'move.splitPct': 'Long-press split %',
+  'client.longPressMs': 'Long-press time, ms',
+  'client.dragSlopPx': 'Drag distance, px',
+  'client.moveGesture': 'Move ships by (1 = drag, 0 = tap Move, tap)',
   'alloc.maxWeight': 'Weight steps (radar scale)',
   'fleet.recycleRefundPct': 'Recycle refund %',
   'fleet.relayStep': 'Relay limit step',
@@ -112,13 +121,13 @@ export class TuningPanel {
   }
 
   private value(m: TunableMeta): number {
-    return m.scope === 'client' ? this.host.settings.autosaveSec : this.host.app.session.world.tun[m.key as keyof typeof this.host.app.session.world.tun];
+    return m.scope === 'client' ? this.host.settings[CLIENT_SETTING_KEYS[m.key as ClientKey]] : this.host.app.session.world.tun[m.key as keyof typeof this.host.app.session.world.tun];
   }
 
   private setValue(m: TunableMeta, raw: number): void {
     const v = clampInt(raw, m.min, m.max);
     if (m.scope === 'client') {
-      this.host.settings.autosaveSec = v;
+      this.host.settings[CLIENT_SETTING_KEYS[m.key as ClientKey]] = v;
       this.host.settingsChanged();
     } else {
       this.host.send({ type: 'setTunable', key: m.key, value: v });

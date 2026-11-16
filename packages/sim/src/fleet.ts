@@ -1,6 +1,7 @@
 import { commandedBands, maxCommandedBands } from './campaign.ts';
 import { BUILD_TYPES, ECON_TYPES, SHIP_TYPES, type BuildType, type SimData } from './data.ts';
-import type { EconTypeCounts, ShipTypeCounts, World } from './world.ts';
+import { recycleOrder } from './orders.ts';
+import { PROBE, type EconTypeCounts, type ShipTypeCounts, type World } from './world.ts';
 
 /**
  * The fleet limit (DESIGN.md H5 "Fleet cap", H6 "Fleet limit, relays and band
@@ -106,6 +107,20 @@ export interface FleetStatus {
   /** H7: economy ships alive (anywhere) and being built (0 or 1 each), by type; 0 in a campaign. */
   econByType: EconTypeCounts;
   econBuildingByType: EconTypeCounts;
+  /** H8: the fleet panel's rows, one per BUILD_TYPES type (all zero in a campaign world). */
+  types: Record<BuildType, FleetTypeRow>;
+}
+
+/** H8 `fleetStatus.types`: one fleet-panel row. */
+export interface FleetTypeRow {
+  /** Ships of the type alive, anywhere. */
+  alive: number;
+  /** At the probe: idle economy ships (no node), or warships parked there. */
+  idle: number;
+  /** 1 while the probe's bay builds one (the building dot), else 0. */
+  building: number;
+  /** Ships `recycleFleet` can take now (recycleOrder: not at a living guarded node or a fighting raid's target). */
+  recyclable: number;
 }
 
 /** The fleet chip, the probe sheet header and the bots. Works on the overworld too (count 0; the limit the next landing gets). */
@@ -119,6 +134,22 @@ export function fleetStatus(world: Readonly<World>, data: SimData): FleetStatus 
   if (world.field !== null) {
     for (const s of world.field.econ) econByType[s.type] += 1;
     for (const t of ECON_TYPES) if (world.field.bays[t].ticksLeft > 0) econBuildingByType[t] = 1;
+  }
+  const types = {} as Record<BuildType, FleetTypeRow>;
+  for (const t of BUILD_TYPES) types[t] = { alive: 0, idle: 0, building: 0, recyclable: 0 };
+  if (world.field !== null) {
+    for (const s of world.ships) {
+      types[s.type].alive += 1;
+      if (s.at === PROBE) types[s.type].idle += 1;
+    }
+    for (const s of world.field.econ) {
+      types[s.type].alive += 1;
+      if (s.at === PROBE && s.target === null) types[s.type].idle += 1;
+    }
+    for (const t of BUILD_TYPES) {
+      types[t].building = bayBusy(world, t) ? 1 : 0;
+      types[t].recyclable = recycleOrder(world, t).length;
+    }
   }
   const cap = fleetCap(world, data);
   const building = shipsBuilding(world);
@@ -137,5 +168,6 @@ export function fleetStatus(world: Readonly<World>, data: SimData): FleetStatus 
     countsEconomy: world.tun['fleet.countsEconomy'] >= 1,
     econByType,
     econBuildingByType,
+    types,
   };
 }

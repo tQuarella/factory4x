@@ -312,7 +312,9 @@ function fight(world: World, raid: Raid): void {
   // Both sides strike from the start-of-round state: the pools are sized before the warships' damage lands.
   const pools = guardPools(world.tun, raid.guards);
   playerDamage(world.tun, raid.guards, byType);
-  const kills = guardStrike(pools, warships, econ);
+  // H9: with a warship at the node when the round starts, the raiders strike warships only and the overflow is lost.
+  const shielded = world.tun['raid.shieldEcon'] === 1 && warships.length > 0;
+  const kills = guardStrike(pools, warships, shielded ? [] : econ);
   for (const s of kills.ships) {
     raid.lostShips[s.type] += 1;
     world.stats.shipsLost[s.type] += 1;
@@ -398,6 +400,36 @@ export function raidWither(world: World): void {
   finish(world, 'withered');
 }
 
+/**
+ * DESIGN.md H8 H10 ("Haulers hold", `raid.haulersHold`): true while haulers whose node is `node` hold for a raid.
+ * `runHaulers` (F6) asks it for a hauler at the probe (true: it stays there and keeps its assignment) and for a
+ * hauler at its node (true: it loads min(buffer, cargo) and leaves at once); a hauler flying out finishes its leg
+ * and is then asked at the node. `rockStatus.haulersHeld` reads it too.
+ *
+ * True from launch (phase `out`) through the fight, for the raid's current target (R6's retarget
+ * moves it), when raid.haulersHold is 1. Not during the muster, and false from the tick the outcome is decided (the raid leaves the target for home, or ends), whatever the outcome.
+ */
+export function haulersHeld(world: Readonly<World>, node: number): boolean {
+  const r = world.raid;
+  return r !== null && (r.phase === 'out' || r.phase === 'fight') && r.target === node && world.tun['raid.haulersHold'] === 1;
+}
+
+/** `rockStatus.raidTarget`: true from the raid's muster to its end, for the node it targets (R5/R6). */
+export function isRaidTargetNode(world: Readonly<World>, node: number): boolean {
+  return world.raid !== null && world.raid.target === node;
+}
+
+/** `raidStatus.holding`: the haulers H10 holds now, waiting at the probe with a held node as their target. */
+function haulersHolding(world: Readonly<World>): number {
+  const f = world.field;
+  if (f === null || world.raid === null) return 0;
+  let n = 0;
+  for (const s of f.econ) {
+    if (s.type === 'hauler' && s.transit === null && s.at === PROBE && s.target !== null && haulersHeld(world, s.target)) n += 1;
+  }
+  return n;
+}
+
 /** `raidStatus` (DESIGN.md H7 "Selectors"). */
 export interface RaidStatus {
   /** `raid.enabled` is 1 (the client hides the chip when it isn't). */
@@ -422,6 +454,8 @@ export interface RaidStatus {
   ticksToNextAllowed: number;
   /** The last finished raid, or null. */
   last: RaidResult | null;
+  /** H10: haulers held at the probe for this raid (0 when none, or `raid.haulersHold` is 0). */
+  holding: number;
 }
 
 /** Field mode only (throws in a campaign world). */
@@ -440,5 +474,6 @@ export function raidStatus(world: Readonly<World>): RaidStatus {
     nextRaidAtEcon: world.tun['raid.firstAtEcon'],
     ticksToNextAllowed: Math.max(0, world.nextRaidTick - world.tick),
     last: world.lastRaid,
+    holding: haulersHolding(world),
   };
 }

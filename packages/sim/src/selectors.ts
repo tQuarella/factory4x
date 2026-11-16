@@ -18,10 +18,27 @@ import {
   type Tunables,
 } from './data.ts';
 import { designResearched, extractPct, yardBuildTicks } from './campaign.ts';
-import { bayOf, boundCounts, assignedHaulers, isDocked, isEconType, isMineable, isTypeUnlocked, oreCost, resourceCost, type ResourceCost } from './field.ts';
-import { raidRank } from './factions/index.ts';
+import {
+  bayOf,
+  boundCounts,
+  assignedHaulers,
+  haulerNeed,
+  haulerSetOf,
+  haulerTarget,
+  extractorsWanted,
+  haulersWanted,
+  isDocked,
+  isEconType,
+  isMineable,
+  isTypeUnlocked,
+  oreCost,
+  resourceCost,
+  type ResourceCost,
+} from './field.ts';
+import { haulersHeld, isRaidTargetNode, raidRank } from './factions/index.ts';
 import { isCountedType, isFleetFull } from './fleet.ts';
 import { shipsAtByType } from './inputs.ts';
+import { moveCounts, type MovePart } from './orders.ts';
 import { counterPct, deliveredInWindow, perExtractorPerMin, prizeInWindow, reservedOre } from './step.ts';
 import {
   capEff,
@@ -814,8 +831,11 @@ export function runSummary(world: Readonly<World>): RunSummary {
  * building; "building 40%"), else 'off' (weight 0), 'locked' (needs crystal or ice first delivered), and with a full
  * share 'waitingResource' (the stock lacks the crystal or ice) or 'fleetFull' (a counted type at the limit), else
  * 'filling' ("saving 12/20"). The bay checks the resource before the limit (F3), and so does the state.
+ * H8 H4: 'enough' ("enough haulers"), the Hauler with a weight above 0 and an idle bay while no rock is short of
+ * haulers (hauler.autoNeed 1): it takes no ore and its share is kept. It comes after 'building' and 'off'. The
+ * Extractor is 'enough' the same way while no Mine-marked rock has a free slot (Director, 2026-11-14).
  */
-export type AllocState = 'off' | 'locked' | 'filling' | 'waitingResource' | 'fleetFull' | 'building';
+export type AllocState = 'off' | 'locked' | 'filling' | 'waitingResource' | 'fleetFull' | 'building' | 'enough';
 
 export interface AllocRow {
   type: BuildType;
@@ -830,6 +850,11 @@ export interface AllocRow {
   /** The build's length: max(ticksLeft, ship.<type>.buildTicks). */
   totalTicks: number;
   state: AllocState;
+  /**
+   * H8: the share of income this weight asks for: floor(weight × 100 ÷ Σ the weights of the unlocked types with a
+   * weight above 0); 0 for a type that is off or locked. The rows can sum to below 100 (each is rounded down).
+   */
+  incomePct: number;
 }
 
 export interface AllocStatus {
@@ -846,6 +871,10 @@ export interface AllocStatus {
 export function allocStatus(world: Readonly<World>, data: SimData): AllocStatus {
   const f = fieldOrThrow(world);
   const full = isFleetFull(world, data);
+  const wanted = haulersWanted(world);
+  const extractorsOk = extractorsWanted(world);
+  let weightSum = 0;
+  for (const t of BUILD_TYPES) if (f.alloc[t] > 0 && isTypeUnlocked(world, t)) weightSum += f.alloc[t];
   const rows = BUILD_TYPES.map((type): AllocRow => {
     const bay = bayOf(world, type);
     const ore = oreCost(world, type);
@@ -856,11 +885,14 @@ export function allocStatus(world: Readonly<World>, data: SimData): AllocStatus 
     let state: AllocState;
     if (bay.ticksLeft > 0) state = 'building';
     else if (f.alloc[type] === 0) state = 'off';
+    else if (type === 'hauler' && !wanted) state = 'enough';
+    else if (type === 'extractor' && !extractorsOk) state = 'enough';
     else if (!unlocked) state = 'locked';
     else if (f.share[type] >= ore && resource !== null && world.stock[resource.res] < resource.amount) state = 'waitingResource';
     else if (f.share[type] >= ore && isCountedType(world, type) && full) state = 'fleetFull';
     else state = 'filling';
-    return { type, weight: f.alloc[type], share: f.share[type], cost: { ore, resource }, unlocked, building, ticksLeft: bay.ticksLeft, totalTicks, state };
+    const incomePct = f.alloc[type] > 0 && unlocked ? Math.floor((f.alloc[type] * 100) / weightSum) : 0;
+    return { type, weight: f.alloc[type], share: f.share[type], cost: { ore, resource }, unlocked, building, ticksLeft: bay.ticksLeft, totalTicks, state, incomePct };
   });
   return { rows, maxWeight: world.tun['alloc.maxWeight'], stockOre: world.stock.ore, incomePerMin: incomePerMin(world) };
 }
@@ -896,6 +928,16 @@ export interface RockStatus {
    * nodes (Mine-marked, with a docked extractor or an assigned hauler). 0 if the rock is not raidable.
    */
   raidRank: number;
+  /** H8 H1: the need (haulers this rock needs at its yield and distance); 0 when the rock is not haulable. */
+  haulerNeed: number;
+  /** H8 H7: the count the player set (capped at rock.haulerMax), or null for Auto. Kept while the rock is unmarked. */
+  haulerSet: number | null;
+  /** H8 H1: the set count, else the need; 0 when the rock is not haulable. */
+  haulerTarget: number;
+  /** H8: true from the raid's muster to its end at this rock. */
+  raidTarget: boolean;
+  /** H8 H10: true while this rock's haulers hold for a raid (factions `haulersHeld`). */
+  haulersHeld: boolean;
 }
 
 /** H7: one rock's sheet. Field mode only (throws in a campaign world). */
@@ -927,7 +969,21 @@ export function rockStatus(world: Readonly<World>, node: number): RockStatus {
     backedUp: n.buffer >= cap,
     deliveredPerMin: delivered,
     raidRank: raidRank(world, node),
+    haulerNeed: haulerNeed(world, node),
+    haulerSet: haulerSetOf(world, node),
+    haulerTarget: haulerTarget(world, node),
+    raidTarget: isRaidTargetNode(world, node),
+    haulersHeld: haulersHeld(world, node),
   };
+}
+
+/**
+ * H8: the warship counts a `moveShips` from `from` would carry now (H6; zeros for a bad node index). The client uses
+ * it for the drag ghost and to decide whether a drag can start.
+ */
+export function movePreview(world: Readonly<World>, from: number, part: MovePart): ShipTypeCounts {
+  if (!Number.isInteger(from) || from < 0 || from >= world.nodes.length) return { drone: 0, lancer: 0, flak: 0 };
+  return moveCounts(world, from, part);
 }
 
 /** A count per build type (BUILD_TYPES keys). */

@@ -7,7 +7,6 @@ import {
   YARD_ROTATION,
   type ShipType,
   type SimData,
-  type Tunables,
 } from './data.ts';
 import { designResearched, extractPct, reclaimActive, shipments, yardBuildTicks } from './campaign.ts';
 import { allocate, captureField, fieldStats, moveEcon, recordDelivery, runBays, runExtractors, runHaulers, syncExtractors } from './field.ts';
@@ -29,6 +28,7 @@ import {
   guardianAt,
   heartIndex,
   nodeDistance,
+  perExtractorPerMin,
   routeFrom,
   ticksPerMin,
   type Battle,
@@ -95,13 +95,8 @@ function construction(world: World): void {
   }
 }
 
-/** Units per minute one extractor at a node of this kind yields (0 for nodes that never extract). */
-export function perExtractorPerMin(t: Readonly<Tunables>, kind: World['nodes'][number]['kind']): number {
-  if (kind === 'asteroid') return t['extractor.orePerMin'];
-  if (kind === 'pocket') return t['pocket.resourcePerMin'];
-  if (kind === 'heart') return t['heart.orePerMin'];
-  return 0;
-}
+// h8-sim: moved to world.ts so field.ts (H8 H1, the hauler need) can use it without an import cycle.
+export { perExtractorPerMin };
 
 /**
  * Rule 3. H4 Extraction research: a node's accumulator (units·ticks/min × 100)

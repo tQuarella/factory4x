@@ -1156,37 +1156,339 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 4. Q18 (pillar 1 wording) goes in the H8 handoff, not now.
 **Why:** both CI jobs are past 80% of their limits (retro after build-20261114-1), and h8-client adds smoke tests; the two tasks share no files.
 
+## 2026-11-14 · Core Engineer · h8-sim: the hauler repro (acceptance 1), on the v13 rules
+
+**Result: reproduced.** The owner's "A2 just got a third hauler. A1 has no haulers." fails as a rule test on H7's F6, before any H8 change (`packages/sim/test/hauler-repro.test.ts`, frozen fixture `fixtures/sim-v13.json`, the shipped data at dataVersion 13).
+
+- **(a), A1 worked by docked extractors, 0 haulers:** passes. The next hauler goes to A1 (ratio 0 beats A2's 2/2).
+- **(a), A1 worked by its buffer only (no docked extractor, buffer 10), 0 haulers, A2 with 2 haulers and 2 extractors:** **fails**. The next hauler goes to A2. Cause: H7's F6 reading (h7-sim, "F6 ratio with 0 working extractors") ranks a worked node with no working extractor after *every* node with one, whatever its hauler count. The H7 test "a node with a buffer but no working extractor ranks after every node with one" pins that order.
+- **(b), the shipped opening for 6 game minutes, no inputs:** passes (no violation in 6 minutes; I also ran it for 15 minutes as a probe, with none).
+- **(b), the same opening with one Stop of A1 at 3:00 and its re-mark at 3:05:** **fails**, twice: "tick 8160: hauler 47 → a1 (1 haulers, 1 extractors, buffer 1) while a3 (0 haulers, 0 extractors, buffer 3)" and "tick 9390: hauler 49 → a1 (2 haulers, …) while a3 (0 haulers, 0 extractors, buffer 3)". How it got there (traced): in the opening, extractors fill a1–a4 first (nearest the probe), so the first raid targets a1 (the nearest *mined* rock to the hive). The Stop retargeted it (R6) to a3, which it hit: it killed a3's hauler and its one extractor, leaving a3 worked by a buffer of 3, Mine-marked, with 0 haulers. New haulers then went to a1, which already had haulers, for the next 3 minutes, until a new extractor docked at a3.
+
+**So the state that produces the observation in play is "a raid (or a recycle, or a Stop then re-mark) leaves a marked rock with ore in its buffer, no docked extractor and no hauler".** The opening's first raids land on a1, so A1 is the rock most likely to be in it. Two more states make the owner's words true without any rule fault: a marked rock whose extractors are still flying in with an empty buffer (not worked, so nothing to haul yet), and a rock that is Stopped (only Mine-marked rocks get haulers, Director 2026-11-14).
+
+**Fix:** H2 (assignment by shortfall) gives every haulable rock a target of at least 1 (`max(1, …)` in H1), so a buffer-only rock with 0 haulers has shortfall 1 and ranks by shortfall, not after every producing rock. The H8 commit shows both failing tests pass under H2 (`hauler.autoNeed` 1). Under `hauler.autoNeed` 0 the order stays as H7 had it, because H5 asks for H7's F6 exactly and the H7 hauler tests to pass unchanged (one of them pins this order).
+
+## 2026-11-14 · Core Engineer · h8-sim: staffing by need, fleet orders, data v14
+
+**Finding for the Director (a rule finding, not a calibration):** on shipped data with no inputs, H1 and H4 as written delay the first hauler by about 3 minutes. At the landing no rock is worked yet, because the extractors are still flying, so every target is 0 and the Hauler is ineligible. The 40 starting ore all goes to extractor shares. Once a1 docks (tick 185) the Hauler becomes eligible, but its share then fills only from probe mining at 2/5 of 12 ore/min.
+
+| v14, seed 1, no inputs | First hauler built | First ore delivered | Ore delivered by minute 1–10 |
+| --- | --- | --- | --- |
+| `hauler.autoNeed` 1 | tick 5790 (3:13) | tick 6051 | 0, 0, 0, 20, 68, 136, 204, 284, 384, 507 |
+| `hauler.autoNeed` 0 (H7) | tick 90 | tick 1035 | 8, 20, 40, 60, 88, 124, 153, 189, 241, 297 |
+
+These numbers are from a scratch run of this branch's code. No value fixes it, because the Hauler is ineligible whatever its weight. It is also why `tests/smoke/h7-economy.spec.ts:286` goes red: that test raises the warship weights at once and waits up to 2400 ticks for a ship parked at the probe. I implemented the spec as written. One amendment, for the Designer to judge: count a Mine-marked rock with extractors *bound* (docked or flying in) as haulable for H1. Then the landing has a need of 1 at a1 and a2 before the first dock.
+
+**Repro, after the rule change:**
+- Under H2 (`hauler.autoNeed` 1), every case in `hauler-repro.test.ts` passes, including the two that failed on the v13 rules.
+- Under `hauler.autoNeed` 0, the same file pins H7's outcomes. The buffer-only hauler goes to A2, and the Stop and re-mark run gives the same two violations, word for word.
+- The repro entry above names a recycle and a Stop then re-mark as other ways into the state. Both now have tests (the last `describe` in that file).
+- Under H8, a Stop and re-mark doesn't leave A1 empty at all. The hauler that dropped A1 idles, because A2 is at its target, and it takes A1 back on the tick A1 is re-marked.
+
+**Architecture (packages/sim):**
+1. **H1–H4 are derived, never stored.** `haulerNeed`, `haulerTarget`, `haulerShortfall` and `haulersWanted` (field.ts) read nodes, economy ships and tunables each time. The only new state is `field.haulerSet`, which is saved and hashed. *Rejected:* a cached per-node target. It would need invalidating on every dock, raid kill, capture and live tuning, for the same reason h7-sim derived `node.extractors`.
+2. **New module `orders.ts`** holds `moveCounts` (H6), and `recycleOrder` and `applyRecycleFleet` (H8). It imports no rule module, so `fleet.ts` (fleetStatus) can read `recycleOrder` without an import cycle. Like `recycleEcon`, `applyRecycleFleet` takes `recycleRefundEach` as a callback, and `inputs.ts` runs `syncExtractors` after it. For the same reason, `shipsAtByType` moved to `ships.ts` and `perExtractorPerMin` to `world.ts`. Both are re-exported where they were, so no caller changed.
+3. **The H10 stub** `haulersHeld(world, node)` is in `factions/index.ts` and returns false. `runHaulers` asks it in two places, so h8-raids only writes the predicate:
+   - at the probe: held means stay, keep the node, and skip the rebalance;
+   - at the node: held means load what is there and leave.
+
+   This makes an import cycle between field.ts and factions, which the backlog's placement forces. It is safe, because neither module calls the other while loading. *Rejected:* a callback passed from step.ts, which would move the call site out of `runHaulers`, against the backlog.
+4. **Cost:** the bots gate on this branch (18 runs, 45 game minutes cap) reports a tick p95 of at most 0.0109 ms (final run; 0.0094 ms on the run before), against the 2.0 ms budget. `haulersWanted` is read once per F2 call, not once per ore moved.
+
+**Spec readings (calls the spec doesn't make):**
+- **H4 also gates the bay start, not only F2 eligibility.** Otherwise a full Hauler share, filled while a rock was short, would start a hauler after the shortfall closed, which breaks "the probe never builds a hauler that no rock needs". The share is kept, as the spec says.
+- **H3's "on arrival" is F6's at-probe pass,** the tick after the hauler reaches the probe and unloads in F7. A hauler with a node sits at the probe only on that pass (or while held), so nothing else is rebalanced.
+- **Order at the probe:**
+  1. drop a node that isn't haulable (H7);
+  2. keep a held node (H10);
+  3. rebalance (H3);
+  4. pick (H2);
+  5. stay if the picked node is held.
+- **`rock.haulerMax` tuned below a set count:** the target is capped at the new max when read (`haulerSetOf`), and `rockStatus.haulerSet` shows the capped value. The stored count is kept, so raising the max restores it. This follows the way `alloc.maxWeight` caps the weights, without rewriting saved state.
+- **`setHaulers` stays valid under `hauler.autoNeed` 0.** The count is stored and ignored, so the player's counts survive switching the A/B back.
+- **`recycleFleet` groups:**
+  - "Idle at the probe" is a warship parked at the probe, or an economy ship at the probe with no node. An economy ship at the probe with a node (a hauler that just arrived, or one held by H10) ranks with "parked at a node", at index 0.
+  - "At a guarded node in battle" is read as "at a living guarded node", the nodes `recycleShips` already refuses.
+  - "At a raid's target in its fight phase" is `raid.phase === 'fight'` and `at === raid.target`. Ships flying to or from the target stay eligible.
+- **The need table:** "1 each for p1 and p2 once taken" is with the free extractor only. With a second extractor docked, p1 needs 2. The captured hive with its free extractor needs 4. All of these are pinned in `h8-haulers.test.ts`.
+- **`allocStatus`:**
+  - The state order is building, off, enough, locked, waitingResource, fleetFull, filling.
+  - An `enough` Hauler still counts in the `incomePct` sum. The spec sums the unlocked types with a weight above 0, and the weight is now a priority.
+- **`rockStatus`:**
+  - `haulerNeed` and `haulerTarget` are computed under `hauler.autoNeed` 0 too; the client hides the stepper then.
+  - `raidTarget` is a literal false for h8-raids to fill; `haulersHeld` reads the stub.
+- **`fleetStatus.types`** gives alive, idle, building (0 or 1) and recyclable per type. It is all zero in a campaign world, where `recycleFleet` is never valid.
+
+**Fixtures:**
+- `sim-v13.json` is the shipped data at v13, frozen in the repro commit. `sim-v14.json` is the shipped data as this task leaves it.
+- The older fixtures (v4, v8, v10, v12) and v13 carry the nine new keys, with `hauler.autoNeed`, `raid.shieldEcon` and `raid.haulersHold` at 0. So every older rule test keeps its rules, as h6-sim did with `overworld.bandLock`.
+- `h8-autoneed-off.test.ts` shows that `hauler.autoNeed` 0 is H7. It plays 6 game minutes of the v13 opening, with a Stop, a re-mark, a weight change and a recycle, and matches the v13 code's state hash at every 600th tick. The pinned hashes came from running the same loop against 0291294's `packages/sim/src`.
+
+**Reference replay:** `hauler.autoNeed` is set to 0 at tick 0, so the H7 items keep their timings. The H8 items run after the hive falls at 8010, with `hauler.autoNeed` back to 1 from 8100:
+- a rebalance and need-based picks;
+- the `enough` state;
+- `setHaulers` lowering a count;
+- `moveShips` split (including the 1-ship fallback) and all;
+- `recycleFleet` of a docked extractor and of haulers in every group, ending with one in transit.
+
+*Rejected:* `hauler.autoNeed` 1 throughout. That moves every H7 timing (the first muster goes from tick 95 to 150), p2 is no longer taken, and ice is no longer delivered on the script's weights, so the H7 script and its tests would need rewriting. Running both modes also puts the comparison mode in the gate. Determinism: 30 checkpoints over 9000 ticks, final b8d34d88 (was df9ea7c5).
+
+**Test changes outside the new files (all in packages/sim/test; none loosened):**
+- `data-h7.test.ts`: the dataVersion pin moved to `data-h8.test.ts` (14). The H7 key slice now ends at `hauler.autoNeed` instead of `stats.throughputWindowSec`.
+- `field-selectors.test.ts` and `fleet.test.ts`: the exact `rockStatus` and `fleetStatus` `toEqual`s gain the new fields, with exact values.
+- `reference-replay.test.ts`:
+  - `allocChanges` is 9: the 6 from before, plus the three at tick 8100;
+  - `econRecycled` is `{extractor: 2, hauler: 4}`: the `{1, 0}` from before, plus the recycleFleet;
+  - the input types add `moveShips`, `recycleFleet` and `setHaulers`;
+  - six H8 tests are added, and every H7 test is unchanged.
+
+**Edits outside the file list:**
+- `packages/client/src/fieldreport.ts` (compile-only): `allocStateText` switches over every `AllocState`, so it needs a case for the new `enough`. The case returns the spec's "enough haulers" and is reachable only in that state.
+- `packages/client/test/h7-client.test.ts` (compile-only): the test's `AllocRow` and `RockStatus` literals gain the new required fields: `incomePct: 0`, and `haulerNeed: 0, haulerSet: null, haulerTarget: 0, raidTarget: false, haulersHeld: false`. This test file is outside the backlog's list. Without the change the typecheck gate is red, and acceptance 7 needs it green. Every assertion is unchanged.
 ## 2026-11-14 · Director · H8 H1 amendment: rocks with extractors on their way are staffed
 
 **Decision:** for hauler staffing, a Mine-marked rock with an extractor bound for it (docked or on its way) counts as needing haulers; see DESIGN.md "H1 amendment". h8-sim implements it before its Critic round.
 **Why:** h8-sim built H1 as written and measured the first hauler at 3:13 on v14 and no ore delivered before minute 4 (H7: first hauler at tick 90, first delivery at tick 1035). The owner's first note on H7 praised starting on mining; a three-minute dead opening would undo that. No data value fixes it, so it is a rule fix, not calibration.
 
+## 2026-11-14 · Core Engineer · h8-sim: the H1 amendment (staffed rocks)
+
+**What the amendment says (DESIGN.md, Director, 8739109), built as written:**
+- A rock is **staffed** if it is Mine-marked and either haulable or has an extractor ship bound for it. Bound means docked there or flying in.
+- Need, target, shortfall, the pick and the Hauler bay all use staffed rocks.
+- `yieldPerMin` counts bound extractors plus free extractors.
+- A hauler at a staffed rock that isn't worked yet waits there.
+
+**A call the amendment doesn't make: committed extractors count as staffing.**
+- *As written it doesn't meet its own acceptance.* At the landing no extractor ship exists until the first bay finishes (tick 120). By then the 40 opening ore have all gone to extractor shares, because no rock is staffed at tick 0. On v14, seed 1, no inputs: first hauler at tick 5640, first delivery at tick 5901, ore by minutes 1–10 of 0, 0, 0, 20, 68, 136, 212, 292, 400, 528 (scratch run of the amendment exactly as written).
+- *What I added.* `staffCounts` also counts the committed extractors: the one in the probe's bay, and a full extractor share (which starts in F3 as soon as the bay is free). Each counts at the rock F5 would send it to now: the mineable rock nearest the probe with a free slot, ties to the lower index. With no free slot, it counts nowhere. An extractor share with weight 0 doesn't count.
+- *F2 rereads the shortfall* when the extractor share fills, so the tick-0 split is 20 ore to the extractor and 15 to the Hauler. That is what H7 did.
+- *Rejected:* staffing every Mine-marked rock at the landing. That gives a need of 1 at each of seven rocks while only two extractors are coming, and builds haulers no extractor will feed.
+- *Rejected:* counting the extractor share at any fill level. A part-filled share is not yet an extractor.
+
+**Second call: when a hauler at an unworked rock is released.** It waits while an extractor is docked there or bound for it, as long as the rock is marked and not held. It leaves with what is there once no extractor is docked or inbound (every bound extractor lost), or on Stop. The amendment says the "no longer worked" release applies once the rock *has been* worked. I read "an extractor docked or inbound" as standing in for that, so no per-rock history needs saving. The two readings differ in one case only: a rock that was worked, lost its extractors, and has a replacement flying in. My version waits for the replacement; the literal one leaves with what is in the buffer. Under `hauler.autoNeed` 0 the H7 rule is unchanged (tested).
+
+**Opening, v14, seed 1, no inputs (final code; pinned in `h8-haulers.test.ts` on the frozen v14 fixture):**
+
+| | First hauler built | First delivery | Ore delivered by minute 1–10 |
+| --- | --- | --- | --- |
+| `hauler.autoNeed` 1 | tick 90 | tick 1035 | 8, 24, 52, 80, 112, 172, 248, 344, 464, 592 |
+| `hauler.autoNeed` 0 | tick 90 | tick 1035 | 8, 20, 40, 60, 88, 124, 153, 189, 241, 297 |
+
+`data-h8.test.ts` checks the relative version on shipped data, which any calibration must keep:
+- the first hauler comes no later than H7's plus one build;
+- the first delivery comes no later than H7's;
+- ore by minutes 1–3 is at least H7's.
+
+"No surplus" is checked in `h8-haulers.test.ts` over 6 game minutes: every Hauler bay start keeps haulers alive plus the new one within Σ of the staffed targets.
+
+**Seen, not acted on:** in 10 minutes with no inputs, H8 builds 25 extractors where H7 builds 13. There are 13 asteroid slots, so the rest idle at the probe. Fewer haulers leave more ore for the extractor weight, and extractor eligibility has no slot cap, in H7 or here. This is a calibration or rule question for h8-design-data, not part of the amendment.
+
+**Smoke `h7-economy.spec.ts:286` still fails, on both projects and both fonts, and it belongs to h8-client.**
+- *What the test needs.* It raises Drone to 5 and Lancer and Flak to 1, then waits up to 2400 ticks for something parked at the probe.
+- *Why it passed under H7.* In node, with 7 ticks of play before the weight change, the probe never builds a warship within 2400 ticks under either mode: the drone share reaches 12 of 18 (H7) and 15 of 18 (H8). What H7 parks at the probe at tick 120 is the first hauler. It idles there because a1's extractor is still flying in.
+- *Why it fails under H8.* With the amendment, that hauler goes straight to the staffed a1, which is the behaviour the amendment asks for. Nothing is ever parked at the probe, so Recycle never shows.
+- *What h8-client should do.* Build the test's premise explicitly.
+
+**Cost:** `staffCounts` is computed once per shortfall, pick and F6 pass. The bots gate reports a tick p95 of at most 0.0131 ms against the 2.0 ms budget, and 78.1 s for the suite (final gates run).
+
+**Files:** the logic is in field.ts (`staffCounts`, `isStaffed`, and `yieldPerMin`, `haulerNeed` and `haulerTarget`, `needPick`, `haulerShortfall`, `allocate`, `runHaulers`), plus the index.ts header and exports. Tests are in `h8-haulers.test.ts` (staffed rocks, the opening pins, no surplus) and `data-h8.test.ts` (the shipped-data check). `field-selectors.test.ts`'s exact `rockStatus` now has need and target 2 for a5. Bound extractors count there: one docked and one flying in, 20 × 530 × 110 = 1166000 → 2. The value was recomputed, not loosened.
 ## 2026-11-14 · Director · H8 rulings on h8-sim's amendment report
 
 1. **Committed extractors staff a rock: accepted.** The extractor in the probe's bay, and a full extractor share, count at the rock F5 would send them to (nearest mineable rock with a free slot, then lower index). Without this the amendment as written misses its own acceptance (first hauler at tick 5640). With it, the opening matches H7 to the tick (first hauler 90, first delivery 1035) and delivers more by minute 3 (52 against 40).
 2. **A hauler waits at a staffed rock while an extractor is docked there or on its way: accepted.** It needs no per-rock history, and waiting for a replacement extractor is what a player would expect.
 3. **No surplus extractors (new, added to h8-sim).** With no inputs, H8 builds 25 extractors in 10 minutes against 13 asteroid slots, so 12 idle at the probe taking fleet slots. That is the same complaint the owner made about haulers ("the extra haulers sitting around feel much worse"). The Extractor bay does not start when no Mine-marked rock has a free slot (counting docked, bound and committed extractors); its row shows the `enough` state, and its share is spent elsewhere as the Hauler's is.
 
+## 2026-11-14 · Core Engineer · h8-sim: no surplus extractors (Director's addition)
+
+**Rule, as built (under `hauler.autoNeed` 1 only):**
+- `extractorShortfall` = Σ over mineable rocks (Mine-marked, unguarded) of max(0, slots − free extractors − extractor ships bound there, docked or on their way), minus the unbound extractor ships, minus an extractor in the bay.
+  - The unbound ships are the ones idle at the probe or flying home. F5 puts them in the next slot that opens.
+  - A full share is not subtracted, because the share is what the bay would build. So the "committed" count the Director named is the bay's extractor.
+- While the shortfall is 0 or less, the Extractor gets no ore in F2 and its counter is 0. Its share is kept, its bay doesn't start, and `allocStatus` shows it as `enough`.
+- Marking a rock, capturing a pocket or losing an extractor (a raid, a recycle) opens a slot, so the shortfall comes back above 0.
+
+**Calls:**
+- **One switch, not two.** Surplus extractors and surplus haulers are the same complaint, and `hauler.autoNeed` 0 is already the switch for "the economy staffs itself". A second switch would let the comparison mix H7 haulers with H8 extractors, which no one asked to compare. Under 0, nothing changes: the `hauler.autoNeed` 0 hash test still passes.
+- **Unbound extractors count against the free slots**, so an idle extractor at the probe isn't joined by another one built for the same slot.
+- **Client text (compile-only file):** `allocStateText` now returns "enough extractors" for the Extractor row and "enough haulers" for the Hauler row. Before this change, the Extractor row would have read "enough haulers".
+
+**Measured, v14, seed 1, no inputs, 10 game minutes (final code):**
+- **Extractors:** 19 built, 6 lost to raids, 13 alive, all bound, 0 idle. 13 is the marked asteroid slots. Before this rule, 25 were built.
+- **Haulers:** 13 built, 0 idle.
+- **H7 (`hauler.autoNeed` 0), same run:** 13 extractors built, 8 alive.
+
+**The opening didn't get worse.** First hauler at tick 90 and first delivery at tick 1035, as before. Ore by minutes 1–10 is 8, 24, 52, 80, 112, 172, 248, 344, 465, 593; before this rule, minutes 9 and 10 were 464 and 592. The pinned curve in `h8-haulers.test.ts` is updated to those two values.
+
+**Tests:** `h8-haulers.test.ts`, "no surplus extractors":
+- the shortfall's arithmetic;
+- the `enough` state with its share kept, a full share waiting, and a new mark reopening the bay;
+- `hauler.autoNeed` 0 unchanged;
+- a real raid fight killing the docked extractor, after which the bay restarts and the slot is refilled;
+- a 6-minute run where every Extractor bay start keeps extractors alive plus the one in the bay within the marked slots.
+
+**Gates:** all green. The bots gate's tick p95 is at most 0.0137 ms (budget 2.0 ms). The determinism final is b8d34d88, unchanged, because the replay's H8 items run with the extractor weight at 0.
 ## 2026-11-14 · Director · cw-smoke-sim-time merged; h7-art gallery wait kept; H8 spec updated
 
 - cw-smoke-sim-time merged (66c9581) after green CI 43647913292 on 86bf159; main had moved by DECISIONS.md and STATUS.md only (docs-only exception). The h7-art gallery wait was left in real time: it waits on canvas drawing in the dev gallery, not on sim time, so `advanceTicks` can't replace it (Critic note). Folding `h7-economy.spec.ts`'s local `stepUntil` into `stepSimUntil` is a small Can wait cleanup.
 - DESIGN.md H8 now carries the committed-extractor and waiting-hauler rulings and "H4b. No surplus extractors", replacing "Extractors don't need this rule", so h8-client and h8-design-data build from the spec (h8-sim Critic note).
 
+## 2026-11-14 · Core Engineer · h8-sim round 2: the replay exercises staffed rocks and the Extractor's enough
+
+**Required change (reviews/h8-sim.md, round 1): the reference replay's new items.** All run with `hauler.autoNeed` 1, after the existing H8 items:
+- **8660:** p2 and the hive are unmarked, and the Extractor weight goes to 3.
+  - The bay builds for a2's free slot (a2 lost an extractor to the 8488 recycle).
+  - The share refills to 5 (full), because p1 still has a free slot.
+- **8670:** p1 is unmarked.
+  - Every marked slot is now docked, bound or in the bay.
+  - From 8690 the Extractor is `enough`: weight 3, bay idle, share kept at 5.
+- **8720:** a4 is marked, `field.fleetCap` goes to 45, and `ship.hauler.cargo` to 2.
+  - The bay starts again that tick, using the full share.
+  - Haulers are picked for a4 while it is staffed (committed, then bound) but not haulable. They wait there empty.
+  - The extractor docks at 8875. The first hauler picked loads 2 and leaves at 8965.
+  - The fleet cap rise keeps the bay off the fleet limit. The cargo change gets the first load in before tick 9000.
+
+`reference-replay.test.ts` asserts each of these, in three new tests:
+- **(a)** The first pick at a4 is at tick 8720, with `isStaffed` true and `isHaulable` false. Its hauler waits at a4 on every tick from its arrival to the tick before the dock. It loads 2 after the dock.
+- **(b)** Every `enough` tick has weight 3 and an idle bay. Before 8720 the share is 5 on every such tick.
+- **(c)** The bay restarts at 8720, on the `setMine`, after `enough` at 8719, and the share goes into it.
+
+The Critic's probe, re-run over the 9000 ticks: 499 node-ticks staffed but not haulable, 125 hauler-ticks waiting at an unworked rock, 280 ticks with the Extractor `enough`.
+
+**Determinism:** 30 checkpoints over 9000 ticks, final **958a2f1d** (was b8d34d88).
+
+**Existing replay assertions, kept as strong as before:**
+- `allocChanges` is 10 (9 before, plus the extractor weight at 8660).
+- p1's "Mine-marked with its free extractor" is now checked at its capture, because the script unmarks it at 8670.
+- The H2 pick check now takes its baseline from the targets F6 saw: the targets after the tick, minus the haulers assigned before F6. The old baseline was the start of the tick, and F2 can raise a target within the tick when an extractor share fills, which made a correct pick at 8661 look short of 0. The assertion itself is unchanged: every pick takes the largest shortfall, above 0.
+
+**A rule change found by the replay (logged for the Director):** a hauler at a staffed, unworked rock now waits while any extractor counted by `staffCounts` is there. That includes committed extractors, the one in the bay and a full share, not only ships docked or on their way.
+- *Why:* with the bay held by the fleet limit, the haulers sent for a4's committed extractor flew there, found no ship bound, and flew home empty, over and over.
+- *Consistency:* the accepted committed-extractors ruling already lets a committed extractor staff a rock, so the wait now follows the same count.
+- *Release:* unchanged. A hauler still leaves on Stop, or once nothing is docked, bound or committed there.
+- *Opening, v14 fixture, seed 1, no inputs:* first hauler at tick 90 and first delivery at tick 1035, unchanged. Ore by minutes 1–10 is 8, 24, 52, 80, 112, 172, 248, 344, 468, 592; before this change minutes 9 and 10 were 465 and 593. Minute 10 is 1 ore lower, and minutes 1–3 are unchanged. The pinned curve is updated.
+- *10 minutes, `hauler.autoNeed` 1, same run:* 19 extractors built, 13 alive, 0 idle; 13 haulers built, 0 idle.
+
+**Optional notes, both taken:**
+- `isEligible`'s two extra parameters are now required. Its only caller, F2, reads them once.
+- `staffCounts` has a comment on why unbound extractors aren't placed before committed ones.
+
+**Gates:** all green. The bots gate's tick p95 is at most 0.0133 ms, and the suite runs in 79.3 s. The smoke suite (main's sped-up version) has 228 passed and the 4 known failures at `h7-economy.spec.ts:286`, which belong to h8-client.
 ## 2026-11-14 · Director · h8-sim round 2: haulers also wait for committed extractors
 
 **Decision:** accepted. A hauler at a staffed, not-yet-worked rock waits while any extractor staffs it, committed ones included; it leaves on Stop or when nothing docked, bound or committed remains. DESIGN.md updated.
 **Why:** the new replay showed haulers flying empty round trips to a rock whose committed extractor was held by the fleet limit. Waiting costs one ore at minute 10 on the v14 opening; minutes 1–3, the first hauler and the first delivery are unchanged.
 
+## 2026-11-14 · Engineer · h8-client: calls made in the build
+
+- **The Mine button is in the control bar at the top, not a "bottom bar".** The game has no bottom bar (the sheet sits there), and the top bar's `b-world` slot is empty in a field run. The button is a 44 px square with the mine badge as its icon, pressed state `on`, `aria-pressed`. It adds one 46 px button to the row (seven fit 375 px); the HUD tests measure nothing moving when it toggles.
+- **A drag from a node is judged at release by what is on top of the canvas.** `elementFromPoint` must be the canvas for a drop to count, so a sheet, a toast, the HUD or a modal over the point is "no target" and the drop cancels, as the spec says. A drop on the source is also no target.
+- **The slop is measured from the press, not along the path.** A finger that wanders and returns inside the slop is still a tap. The long press is read both from a timer and from the time of the first move past the slop, so a late timer can't turn a held press into an all-drag.
+- **A press that travelled past the slop is never a tap in Mine mode or during a tap-Move-tap order,** even when drags are off. Without it a finger dragged across the map would mark or send to the rock it was lifted over (the click after a drag lands there). With drags on, the same rule is the gesture's own click suppression. A plain sheet tap with `client.moveGesture` 0 is unchanged.
+- **The drop tag's Strong/Even/Weak is the tag of the carried type with the most ships** (ties go to the first in type order), because the sim's tags are per ship type and a mixed group has no single tag. The Attack toast and the line colour don't depend on it.
+- **The raid badge reads the raid's phase as well as `rockStatus.raidTarget`.** h8-sim returns `raidTarget` false until h8-raids fills it, so the client treats a rock as the target when either says so (muster, out or fight). Once h8-raids merges the two agree and the fallback is redundant. The "Haulers waiting at the probe" line reads `rockStatus.haulersHeld` only, so its smoke test comes with the h8-raids merge; the reserved room for it is already in the rock sheet's note box and the fit test covers the room.
+- **The rock sheet shows "Raid here: ..." in the fight and "Raid coming: ..." before it, and drops the rank line while a raid targets the rock** (the rank line says the same thing sooner). The note box's reserved height is sized for backed up + rank + held, so none of them moves what is below.
+- **Tap-Move-tap closes the sheet when it starts** and shows a banner row with a Cancel button above the map (`#movebar`, in the notices strip). The map grows back to full height for the target tap. The count on it is `movePreview`'s for that part, so "Move half" on 4 ships reads "2 ships". The order ends by itself if the ships it would carry leave.
+- **The weight column keeps `.fp-w` as the bare number** and adds `.fp-pct` after it ("3" then " · 30%"), so the H7 smoke tests that read the weight still read it. The line under the radar and the column cost about 30 px; the rows lost 1 px of padding each and the note is 11 px, to keep the map at its 195 px behind the probe sheet (H7's check).
+- **No new palette keys.** The badge, line, ghost, highlight and pulse use existing keys (`thorn`, `spore`, `bloom`, `ship`, `starBright`, `laneClosed`), so ART_STYLE.md's palette table doesn't change; the H8 entities section lists the draws.
+- **Test hook `debugParkShips(node, counts)`** parks warships without an input, so the every-pair drag test doesn't depend on the economy. The live world no longer matches its replay after it (the same kind of hook as `debugHudFrame`). It is used only by smoke tests.
+- **The probe-sheet fit in `h7-economy.spec.ts:286` now states its premise** (the drone weight is at the top, so a drone parks at the probe and Recycle shows), stepping the sim up to 14400 ticks until Recycle is visible. Under need staffing nothing idles at the probe in the opening, which is what made the old 40 x 60 ticks run out. Every assertion in it is unchanged.
+## 2026-11-14 · Faction AI · h8-raids: the shield (H9), haulers hold (H10), and what the spec left open
+
+**What was built:** `fight` in `factions/index.ts` passes no economy ships to `guardStrike` when `raid.shieldEcon` is 1 and at least one warship is `at` the target when the round starts, so every pool's overflow is lost. `haulersHeld(world, node)` is true for the raid's current target from phase `out` to the raid's end (not in `muster`) when `raid.haulersHold` is 1. `rockStatus.raidTarget`, `rockStatus.haulersHeld` and `raidStatus.holding` read the raid. No data value changed. Tests: `packages/sim/test/raids-h8.test.ts`, and the reference replay.
+
+**Calls the spec did not cover:**
+1. **The hold lasts through `home`.** Spec: "from `out` to the end". The raiders flying home still belong to the raid, so haulers wait until `world.raid` is null (beaten, hit, turned back; a withered raid also frees them).
+2. **The hold follows R6's retarget.** `haulersHeld` reads `raid.target`, so after the one retarget the new target is held and the old rock is not. A hauler that left the probe for the new target before the retarget finishes its leg, and is then asked at the node, as the spec says for a hauler flying out.
+3. **`raidStatus.holding` counts haulers waiting at the probe** with a held node as their target (not haulers flying out or at the node, which leave at once). It is 0 with `raid.haulersHold` 0 and with no raid. `rockStatus.raidTarget` is true from muster to the end, for the raid's current target, whatever `raid.haulersHold` is.
+4. **A warship that arrives on the round tick counts.** The shield is read from the ships `at` the node when the round runs (F8), after F7 moved them. A warship landing between rounds counts from the next round, as the spec says; one that lands on the round's own tick is already there at its start. This is R7's existing reading ("warships that arrive mid-raid join from the next round" already used `world.ships` at the round tick).
+5. **A hauler arriving on a round tick can be struck.** F6 (the hold's load-and-leave) runs the tick after the arrival, so a held hauler that reaches the target on a round tick is at the node for that round. The shield protects it only if a warship stands. Not changed: the spec says the hauler "finishes its leg, then loads and leaves".
+
+**Files changed outside the task's list (all minimal):**
+- `packages/sim/src/selectors.ts`: the `raidTarget` line, the import of `isRaidTargetNode`, and two doc comments that said "false until h8-raids". No other line.
+- `packages/sim/test/raids.test.ts`: `raidStatus`'s exact-shape assertion gained `holding: 0` (the new field; the test is otherwise unchanged, and the whole file runs on the v12 fixture, where both keys are 0, so it is the "H7 exactly" check for acceptance 1 and 2).
+- `packages/sim/test/h8-haulers.test.ts` (h8-sim's): the 10-minute opening curve test sets `raid.haulersHold` 0 in its helper. The shipped v14 fixture carries H10 at 1, and a raid at minute 4 held the haulers, which moved both curves (the H7 curve read 66/86/121/149 for minutes 4-7 instead of 60/88/124/153, and 236/296 for minutes 9-10 instead of 241/297). The test compares the H1 need rule with H7's pick, so H10 is another rule. Its pinned numbers are unchanged.
+- `packages/sim/test/reference-replay.test.ts`: see the replay entry.
+
+**The reference replay (items and re-baselines).** Added: `sendShips` of 1 Drone from p2 to p1 at 4100; raiders' damage raised to 6 at 4250 and back to 1 at 4330 (raid 2's first round, 4290, kills the lone Drone with overflow to spare; the extractor survives it and dies in round 2, 4320); `recycleShips` of 1 Flak at p1 at 8440. The shipped data has both keys at 1, so raids 1-3 now run with the shield and the hold (raid 1's p1 haulers are held; raid 2's wait at the probe from launch to 4565 and leave at the tick after it ends).
+- *Why the 8440 recycle:* the Drone's death at 4290 frees a fleet place that the Flak weight fills, so p1 holds two Flak at 8450 and the h8-sim item "1-ship fallback sends the lone Flak" would have sent half of two. Recycling one Flak at 8440 restores the premise. It adds no field input type.
+- *Re-baselined by the hold alone (before my replay items, measured on the unchanged script):* the first hauler pick for a4 is at 8750, not 8720 (the haulers' cycle moved by 30 ticks after raids 1-2 held them). The test pins 8750. Its later assertion "the first hauler picked loads at a4" no longer holds by identity (hauler 93, picked first, waits at a4 and hauler 88, a lower id, loads first at 8965, after the extractor docks at 8880); the test now asserts the first load at a4 by any hauler, which is after the dock with a cargo of 2. The waiting assertions for the first picked hauler are unchanged.
+- *recycle test:* `recycle` is now recorded for the `recycleShips` at node 2 only (tick 900); the new one at 8440 would otherwise overwrite it.
+- *Not shown in the replay:* a held hauler loading a partial cargo at the node (the one hauler at p1 during raid 2's hold left with a full cargo of 4). The partial load is in `raids-h8.test.ts`.
+
+**Numbers the Designer asked for (shipped v14, default `bots` suite, seeds 1-3; the runs are identical across seeds, copied from `runField`):**
+- *Full-economy raid at adaptive's peak:* adaptive's peak economy is 17 (`peakEcon`). `raid.econPerRaider` 2 gives `ceil(17 / 2)` = 9 wanted; the hive's keep caps it, and the largest planned raid in adaptive's runs is 7 (the fifth raid, at tick 23556).
+- *Greedy's first hit under H10:* the first raid (muster 4862, planned 3) is a hit that kills 2 economy ships (2 extractors), on all three seeds. Flag 2 reads "greedy first hit killed 2, won ok" in the bots gate output of this branch.
 ## 2026-11-14 · Director · H10 hold ends when the fight ends, not when raiders get home
 
 **Decision:** haulers held by H10 resume as soon as the raid's outcome is decided (beaten, hit, turned back or withered), not when `world.raid` goes null after the raiders fly home. DESIGN.md H10 amended; h8-raids makes the change before it is merged into the stack.
 **Why:** the Critic noted haulers sit at the probe through the raiders' flight home. The rock is no longer under attack then, and idle haulers are exactly what the owner called "rough" in the build-20261114-1 playtest.
 
+## 2026-11-14 · Faction AI · h8-raids: the hold ends at the outcome (Director's change)
+
+**What changed:** `haulersHeld` is true only in raid phases `out` and `fight`. It ends on the tick the outcome is decided: beaten (the last raider dies), hit or turned back (the raiders leave the target for home, `goHome`), or withered. The raiders' flight home no longer holds anyone. This replaces call 1 of the h8-raids entry above ("the hold lasts through `home`"), and `raidStatus.holding` and `rockStatus.haulersHeld` are 0 and false in `home`. `rockStatus.raidTarget` is unchanged (true until the raid ends).
+**Tests:** `raids-h8.test.ts` (hold ends at the decision for each outcome with the raiders still flying home for hit and turned back; a hauler leaves the tick after the raid turns for home; selectors in `home`). Replay: raid 2's outcome is decided at tick 4350 (it leaves p1 for home; it lands at 4565), and p1's haulers leave the probe within a tick of 4350.
+**Replay re-baseline:** with the shorter hold the first hauler pick for a4 is back at 8720 and the first picked hauler loads first, so h8-sim's two original assertions are restored exactly (call 6's 8750 and the "first load by any hauler" edit are reverted). The 8440 Flak recycle stays.
+**Determinism:** `Determinism PASS: 30 checkpoints over 9000 ticks, final cdbdea56` (was f9325835). Gates all green; flag 2 still "greedy first hit killed 2" on three seeds.
+
+## 2026-11-14 · Engineer · h8-client round 1 fixes
+
+- **Rock sheet compacted to keep the map's room (H7 rule).** With the raid out and the hold shown (the tallest state) the map was 135 px at the normal font. Changes: the Rally button moves into the sheet head beside the title as "Rally here" / "Rally set" (as the probe sheet does), and Buffer and Delivered share one line. The map is now **210 px at the normal font and 185 px at the wide font** (sheet 297 and 322 px), against 135 and 110 before. The probe sheet is unchanged (its H7 check, 195 px, still passes). The hauler row and its stepper stay on two lines on purpose: one line would wrap when the value reads "3 · set (Auto 2)", moving the buttons under a finger.
+- **The raid badge and the rock sheet read `rockStatus.raidTarget` only** (h8-raids merged; the `raidStatus` phase fallbacks are gone). `raidTarget` also holds during the raiders' flight home, so the sheet reads "Raid leaving: ..." then.
+- **Two palette keys after all:** `ghostFill` and `attackFill` replace the raw `rgba(...)` fills; both have Palette rows in ART_STYLE.md, and the H8 section no longer says "no new keys".
+- **Drop highlight bound restated, not redrawn:** within r + 7 px (an 8 px halo stroke at r + 3), which is 1.32 r at the smallest reach the game passes (22 px) and 1.14 r at 50. Tested at 22, 30 and 50.
+- **An armed split draws its ghost** with the half counts, as the spec's state 3 says.
+## 2026-11-14 · Engineer · h8-bots: bot changes 1-3, staffing metrics, calls made
+
+- **Change 1 (Hauler weight by shortfall).** `economyWeights` keeps the Hauler weight on while any rock has `haulerTarget > haulers` (new `haulerShortfall`), and off only with no shortfall and a hauler per slot. `limitEconomy` gives a taken pocket's shortfall a hauler always (its deliveries unlock the type; blocking it stalled adaptive with 500+ ore for 10 minutes in a traced run). An asteroid's shortfall gets one only while `economy + max(smallest hive wave, the wave being built for) < cap`, and never while economy ships are being Recycled toward a wave. Reason: without those guards the bot built a hauler, recycled one, and built one again (traced on the v12 pocket-recycle test). At the limit, adaptive's last wave (14:12 to 15:39 on v14) runs with Hauler 0 and a shortfall of 1 at a5. That is the slot trade, not an idle.
+- **Change 2 (wipe).** `Backstops` is shared by adaptive, drones-only, adaptive-no-raids and greedy. It latches only after the economy has once had 2 ships, so tick 0 is not a wipe. It releases at `econ >= raid.firstAtEcon - 1`.
+- **Change 3 (nothing to build).** "No bay starts for 2 minutes" is read as "no bay running": a busy bay at any tick restarts the clock. Once triggered it holds while the strategy's own weights stay 0, and lets go when they do not. Greedy is covered before its first hit, as the spec table says, so greedy may now build Drones (weight 1) after 2 idle minutes. The old test that forbade any warship was changed to allow only that.
+- **drones-only dead end.** The spec table says it keeps building drones up to the limit; it did not (raid responses reset change 3's clock, ore piled to 1850). It now sets Drone to max in the dead-end branch. It still cannot win (flag 5).
+- **Runner measures:** idle haulers, backed-up seconds with target met, economy lost in a tick that began with a warship at the raid target, the longest run with ore for a warship + room + no bay running, and a 15/30/45 trace. The no-idle measure excludes a full fleet (a limit wait, not a bot idle).
+- **Result on v14 with h8-raids merged:** bots gate PASS; adaptive wins 15:53, greedy 15:45; all seven flags MET; static does not win (best shape drone-heavy, loses 15 of 29 economy ships), so flag 1 holds and there is no finding for the Director. Flag 2 holds narrowly: greedy's first hit kills exactly 2. Economy lost under a guard is 0 in every run.
 ## 2026-11-14 · Director · h8-bots change 1 amended: two fleet-limit exceptions
 
 **Decision:** the bot's Hauler weight may be 0 with a shortfall only (a) at the fleet limit, for an asteroid shortfall, when economy plus the wave being built would not fit, and (b) while recycling economy ships toward a wave, except for a taken pocket with no hauler. DESIGN.md bot change 1 amended. The whole-run test must count zero ticks outside these exceptions, not "under 120 s".
 **Why:** the Critic (h8-bots round 1) found the code contradicted the spec's "never". The engineer's guards prevent a build-recycle-build loop at the limit, which is the same slot trade H7's recycle rule makes; that is a sound bot rule, so the spec follows the code, but the exception must be exact.
 
+## 2026-11-14 · Engineer · h8-bots round 1 fixes
+
+- **Change 1 pinned exactly.** `AdaptiveBot` now records why its final Hauler weight is 0 with a shortfall (`haulerBlock`: 'limit' for (a), 'recycling' for (b)). The whole-run test checks every decide on the world the bot saw: zero ticks outside (a) and (b) for adaptive and greedy, with (a) requiring no pocket shortfall and economy + reserve >= the limit, and (b) requiring no taken pocket with 0 haulers. The 8:00 muster window falls under (a). A first version of the check flagged 2 ticks at 9:29 and 10:08 that were a post-step reading: a pocket was captured during the step, so the shortfall appeared after the bot decided. The test now checks the decide-time world.
+- **Greedy handoff.** The inner AdaptiveBot takes greedy's `Backstops`, so a first hit that wipes the economy is still recovered from; tested.
+- **Shield asserted** (0 economy ships lost under a guard, adaptive and greedy, whole runs). Stale report text fixed. Unused import removed.
+- **Bots gate time.** `haulerShortfall` in the bot reads `haulerTarget` and the hauler assignment directly instead of building a `rockStatus` per rock each tick. The bots run takes 96-98 s (86 s before h8-bots; the rest is the per-tick staffing metrics and the backstops' `allocStatus` read).
+
+## 2026-11-15 · Designer · h8-design-data: data v15 (`guard.spore.damage` 2, p1 0 / 3)
+
+**Decision:**
+- `guard.spore.damage` goes from 1 to 2, and the p1 guards from 0 / 4 to 0 / 3. `dataVersion` is 15.
+- Every H7 and H8 calibration target and all seven flags are met on v15 (`reports/archive/h8-design-data-v15.md`).
+
+**Why:**
+- **v14 missed exactly one target: "a token guard isn't enough".** A half-size matched defence (2 lancers + 4 flak) beat the full-economy raid (4 Thorns and 8 Spores) and lost 3.
+- **No raid value can move that.** At a full economy (24 ships) the raid is `ceil(24 ÷ 2)` = 12 whatever `raid.maxSize` or `raid.hiveKeepPct` say. `raid.econPerRaider` 1 would double every raid from the first.
+- **Of four guard values tried one at a time, only `guard.spore.damage` 2 flips the fight** ("Values tried from v14" in the report). It pushed p1 to 7 drones against the target of at most 6, so p1 drops a Spore.
+- **The order check moved nothing.** The min-waves and the a5 fights were rerun in a second order with the same results.
+
+**For the Director (findings, not tuned around):**
+1. **This is a broad combat change.** Every Spore fight hits twice as hard: raids, pockets and the hive, whose best mix goes from 16 to 18 with exactly 2 slots spare. The narrower alternative is to keep v14 and reword the target to "a defence under half the raid's size is beaten", which v14 already met (5 of 12 loses).
+2. **Greedy now takes the hive 10 minutes before adaptive** (15:57 against 25:54; on v14 they were 8 s apart). Adaptive's partial defences lose more fights (6 hits against greedy's 4). That cuts against "maxing the economy is the risky line". It may come from the bots' defence rule rather than the field, and no bot defends with a force sized to the raid's mix.
+
+## 2026-11-15 · Director: h8-design-data stays on v14
+
+*(Recorded by the Designer, as the Director ruled.)*
+
+**Decision:**
+- Data v15 (`guard.spore.damage` 2, p1 0 / 3; the entry above) is **not shipped**. H8 stays on data v14.
+- The target "a defence of half the raid's size is beaten" becomes **"a defence under half the raid's size is beaten, then the raid hits"**. v14 meets it: 5 ships (2 lancers + 3 flak) against the raid of 12 are beaten, and the raid kills 3 extractors. 6 ships win, losing 3.
+- The v15 exploration stays in `reports/archive/h8-design-data-v15.md`, marked "values tried, not shipped". The shipped result is `reports/archive/h8-design-data-v14.md`.
+
+**Why:**
+- **v15 turns the strategies upside down.** It moves adaptive's win from 15:53 to 25:54 while greedy stays where it was (15:57). That makes defending the costly line and ignoring raids the safe one, the opposite of pillar 2 and of the H7/H8 claim.
+- **It is too broad for one target.** It doubles every Spore fight (pockets, hive, raids) to meet a single target.
+- **The owner's ask is already met.** "Fight through the military first" is answered by the shield rule (H9), not by Spore damage.
+
+**Watch item (a later iteration, not this one).** On v14, greedy and adaptive finish 8 s apart (15:45 and 15:53), so the bots don't yet show that maxing the economy is the risky line. No bot builds a defence matched to the raid.
 ## 2026-11-14 · Director · h8-client: a reject held only for the stack doesn't count toward the deadlock rule
 
 **Decision:** h8-client round 2 (94757b1) rejected only because acceptance 11–12 wait on h8-bots and h8-design-data; the Critic asked for no code or test changes. That reject does not count as a rework round under PROCESS.md's deadlock rule. The next round is the final, stack-integration round. If it rejects for rework, that counts as the third and the rule applies as written.

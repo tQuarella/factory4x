@@ -38,6 +38,8 @@ const roles: Record<keyof typeof palette, string> = {
   laneOpen: 'Open lane',
   laneOwned: 'Owned lane',
   econ: 'Economy ship hull',
+  ghostFill: 'Drag chip and tag panel',
+  attackFill: 'Attack tag panel',
 };
 
 function tableRows(): Map<string, string> {

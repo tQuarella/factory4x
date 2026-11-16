@@ -21,6 +21,7 @@
           <button type="button" class="ctl area-only campaign-only" id="b-world" aria-label="Overworld" title="Overworld">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="2.4" /><circle cx="5" cy="18" r="2.4" /><circle cx="19" cy="18" r="2.4" /><path d="M10.9 7.1 6.1 15.9M13.1 7.1l4.8 8.8M7.6 18h8.8" /></svg>
           </button>
+          <button type="button" class="ctl area-only field-only" id="b-mine" aria-label="Mine mode" aria-pressed="false" title="Mine mode: tap rocks to mine or stop"></button>
           <button type="button" class="ctl area-only" id="b-pause" aria-label="Pause">
             <svg class="i-pause" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><rect x="6" y="5" width="4.5" height="14" rx="1" /><rect x="13.5" y="5" width="4.5" height="14" rx="1" /></svg>
             <svg class="i-play" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
@@ -42,6 +43,7 @@
         <div id="notices">
           <div id="hint" hidden><span id="hint-text">Your probe has arrived. Tap Landfall, then Land.</span><button type="button" id="hint-x" aria-label="Dismiss hint">✕</button></div>
           <div id="banner" hidden></div>
+          <div id="movebar" hidden><span id="move-text"></span><button type="button" id="move-cancel">Cancel</button></div>
           <div id="toast" role="button" tabindex="0" aria-label="Notice, tap to dismiss" hidden></div>
         </div>
         <div id="stage">
@@ -61,6 +63,7 @@
     <section class="overlay modal" id="win" hidden aria-label="The new probe launches"></section>
     <section class="overlay modal" id="sendpanel" hidden aria-label="Choose ships to send"></section>
     <section class="overlay modal" id="recyclepanel" hidden aria-label="Recycle ships"></section>
+    <section class="overlay modal" id="fleetpanel" hidden aria-label="Fleet"></section>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

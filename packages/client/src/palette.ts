@@ -39,4 +39,7 @@ export const palette = {
   laneOwned: '#ffd27a',
   // H7 additions
   econ: '#f0a83a',
+  // H8 additions
+  ghostFill: 'rgba(11, 22, 38, 0.94)',
+  attackFill: 'rgba(70, 12, 36, 0.95)',
 } as const;

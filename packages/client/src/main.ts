@@ -14,9 +14,12 @@ import {
   defaultData,
   isCaptured,
   isField,
+  isGuarded,
   isReclaimed,
+  isValidInput,
   isWon,
   landingEffects,
+  movePreview,
   replayHashes,
   RESOURCES,
   SHIP_TYPES,
@@ -41,7 +44,10 @@ import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { shortVersion } from './format.ts';
 import { Hud, OverworldHud } from './hud.ts';
 import { FeedbackPanel, TuningPanel, confirmModal, showAreaResult, showFieldResult, showWin, type PanelHost } from './panels.ts';
-import { FIELD_HINT, fieldFleetFullNotice, fieldUnlockNotice, raidEndText, raidFightLine, raidMusterLine } from './fieldreport.ts';
+import { FIELD_HINT, MINE_MODE_TOAST, fieldFleetFullNotice, fieldUnlockNotice, moveBannerText, movedText, raidEndText, raidFightLine, raidMusterLine } from './fieldreport.ts';
+import { FleetPanel } from './fleetpanel.ts';
+import { MoveGestureControl } from './gesturectl.ts';
+import { mineBadgeIcon } from './icons.ts';
 import { loadSave, loadSettings, saveSettings, writeSave } from './persist.ts';
 import {
   bannerLines,
@@ -105,10 +111,13 @@ const sheet = new Sheet($('sheet'), {
   sendAll,
   choose: (from, to) => sendPanel.open(from, to),
   recycle: (node) => recyclePanel.open(node),
+  startMove: (from, part) => startMove(from, part),
+  moveGesture: () => settings.moveGesture,
   close: () => closeSheet(),
 });
 const sendPanel = new SendPanel($('sendpanel'), { world: () => app.session.world, sendAll });
 const recyclePanel = new RecyclePanel($('recyclepanel'), { world: () => app.session.world, sendAll, notice: (text: string) => toast.show(text) });
+const fleetPanel = new FleetPanel($('fleetpanel'), { world: () => app.session.world, data: () => app.session.data, sendAll, notice: (text: string) => toast.show(text) });
 const worldHost = {
   get session() {
     return app.session;
@@ -162,6 +171,18 @@ canvas.addEventListener('click', (ev) => {
   const r = canvas.getBoundingClientRect();
   const x = ev.clientX - r.left;
   const y = ev.clientY - r.top;
+  if (isField(app.session.world) && !app.session.onOverworld) {
+    // H8: the click that ends a drag or a cancelled gesture is not a tap. Mine mode and the tap-Move-tap order take the next tap.
+    if (gestureCtl.consumeClick()) return;
+    if (mineMode) {
+      if (!gestureCtl.consumeTravel()) mineTap(x, y);
+      return;
+    }
+    if (pendingMove !== null) {
+      if (!gestureCtl.consumeTravel()) moveTap(x, y);
+      return;
+    }
+  }
   if (app.session.onOverworld) {
     // The click that ends a drag is not a tap; a tap during the step moment skips it (and does nothing else).
     if (worldView.consumeDrag()) return;
@@ -190,6 +211,92 @@ canvas.addEventListener('click', (ev) => {
   }
 });
 
+// --- H8: Mine mode, drag to move, and the tap-Move-tap fallback --------------------------
+
+/** Mine mode (the Mine button): a tap on a rock toggles its mark and opens no sheet; drags are off. */
+let mineMode = false;
+function setMineMode(on: boolean): void {
+  if (on && (!isField(app.session.world) || app.session.onOverworld)) return;
+  if (mineMode === on) return;
+  mineMode = on;
+  if (on) {
+    cancelMove();
+    toast.show(MINE_MODE_TOAST);
+  }
+  toggleClass($('b-mine'), 'on', on);
+  $('b-mine').setAttribute('aria-pressed', String(on));
+}
+mineBadgeIcon($('b-mine'), 24);
+$('b-mine').addEventListener('click', () => setMineMode(!mineMode));
+
+/** One tap in Mine mode: marks or unmarks the rock under it (any rock the sim lets be marked), with a badge pop. Taps elsewhere do nothing. */
+function mineTap(x: number, y: number): void {
+  const node = view.hitTest(x, y);
+  if (node === null) return;
+  const w = app.session.world;
+  const on = !rockStatus(w, node).mine;
+  const input: Input = { type: 'setMine', node, on };
+  if (!isValidInput(w, sd(), input)) return;
+  send(input);
+  view.popMine(node, on);
+}
+
+/** The tap-Move-tap order (`client.moveGesture` 0), between its first tap (Move all / Move half on a sheet) and the target tap. */
+let pendingMove: { from: number; part: 'all' | 'split' } | null = null;
+function startMove(from: number, part: 'all' | 'split'): void {
+  setMineMode(false);
+  pendingMove = { from, part };
+  closeSheet();
+  refreshUi();
+}
+function cancelMove(): void {
+  if (pendingMove === null) return;
+  pendingMove = null;
+  refreshUi();
+}
+function moveTap(x: number, y: number): void {
+  const p = pendingMove;
+  if (p === null) return;
+  const node = view.hitTest(x, y);
+  pendingMove = null;
+  if (node !== null && node !== p.from) commitMove(p.from, node, p.part);
+  refreshUi();
+}
+
+/** Sends a move (a drop, or the target tap) and says what it did: "Moved 6 → A5", "Sent 6 to attack P2". */
+function commitMove(from: number, to: number, part: 'all' | 'split'): void {
+  const w = app.session.world;
+  const c = movePreview(w, from, part);
+  const n = c.drone + c.lancer + c.flak;
+  const attack = isGuarded(w, to);
+  const name = shortName(w.nodes[to]!, true);
+  if (!app.session.send({ type: 'moveShips', from, to, part })) return;
+  if (!settings.hintDismissed) dismissHint();
+  refreshUi();
+  toast.show(movedText(n, name, attack));
+}
+
+/** The drag gesture on the field canvas (gesture.ts). Off in Mine mode, during a tap-Move-tap order and with `client.moveGesture` 0. */
+const gestureCtl = new MoveGestureControl({
+  canvas,
+  enabled: () => isField(app.session.world) && !app.session.onOverworld && settings.moveGesture === 1 && !mineMode && pendingMove === null,
+  hit: (x, y) => {
+    // Something over the canvas at that point (a sheet, a panel, the HUD) is not a node: the drop would cancel.
+    if (x < 0 || y < 0 || x > canvas.clientWidth || y > canvas.clientHeight) return null;
+    const r = canvas.getBoundingClientRect();
+    if (document.elementFromPoint(r.left + x, r.top + y) !== canvas) return null;
+    return view.hitTest(x, y);
+  },
+  carry: (from, part) => {
+    const c = movePreview(app.session.world, from, part);
+    return c.drone + c.lancer + c.flak;
+  },
+  slopPx: () => settings.dragSlopPx,
+  longPressMs: () => settings.longPressMs,
+  commit: commitMove,
+});
+view.gesture = gestureCtl.gesture;
+
 // --- panels ---------------------------------------------------------------------
 const panelHost: PanelHost = {
   app,
@@ -213,6 +320,9 @@ function adopt(session: Session): void {
   closeWorldSheets();
   sendPanel.close();
   recyclePanel.close();
+  fleetPanel.close();
+  pendingMove = null;
+  setMineMode(false);
   toast.hide();
   $('result').hidden = true;
   $('win').hidden = true;
@@ -308,6 +418,11 @@ $('b-world').addEventListener('click', () => {
 // --- HUD ----------------------------------------------------------------------------------
 $('version').textContent = shortVersion(fullVersion);
 const hud = new Hud($('chips'));
+// H8: the Fleet chip opens the fleet panel (a field run's; the parked campaign's chip stays a readout).
+hud.onFleet = () => {
+  if (isField(app.session.world) && !app.session.onOverworld) fleetPanel.open();
+};
+$('move-cancel').addEventListener('click', () => cancelMove());
 const owHud = new OverworldHud($('ow-stats'));
 const el = {
   app: $('app'),
@@ -486,6 +601,16 @@ function refreshUi(): void {
     el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
   }
 
+  // H8: the tap-Move-tap banner. The order ends by itself if the ships it would carry are gone, or the run changed.
+  if (pendingMove !== null) {
+    const c = movePreview(w, pendingMove.from, pendingMove.part);
+    const n = c.drone + c.lancer + c.flak;
+    if (!field || onWorld || n === 0) pendingMove = null;
+    else setText($('move-text'), moveBannerText(n));
+  }
+  setHidden($('movebar'), pendingMove === null);
+  if (!field || onWorld) setMineMode(false);
+
   if (!onWorld) {
     // Battle reports: every battle that ended since the last look, at any guarded node, oldest first.
     const ended: BattleResult[] = [];
@@ -546,6 +671,7 @@ function refreshUi(): void {
     sheet.update();
     sendPanel.update();
     recyclePanel.update();
+    fleetPanel.update();
   }
   tuning.update();
 }
@@ -719,6 +845,21 @@ window.__factory4x = {
   raidFlight: () => {
     const r = app.session.world.raid;
     return JSON.stringify(r === null ? null : { phase: r.phase, from: r.from, target: r.target, ticksLeft: r.ticksLeft, flightTicks: r.flightTicks });
+  },
+  /** H8: what the last frame drew for the drag (JSON, or "null"), the raid badge's node (-1 for none), and the gesture's counters. */
+  mapDrag: () => JSON.stringify(view.drawnH8().drag),
+  raidBadge: () => view.drawnH8().raidBadge,
+  gestureState: () => JSON.stringify({ phase: gestureCtl.gesture.phase, ...gestureCtl.counts }),
+  fleetTypes: () => JSON.stringify(fleetStatus(app.session.world, sd()).types),
+  mineMode: () => mineMode,
+  pendingMove: () => (pendingMove === null ? 'null' : JSON.stringify(pendingMove)),
+  /** Test hook: parks warships at a node, outside the replay (the replay no longer matches the live world after it). */
+  debugParkShips: (node, counts) => {
+    const w = app.session.world;
+    for (const t of SHIP_TYPES) {
+      for (let i = 0; i < (counts[t] ?? 0); i++) w.ships.push({ id: w.nextId++, type: t, hp: w.tun[`ship.${t}.hp`], at: node, transit: null, engagedIn: -1 });
+    }
+    refreshUi();
   },
   advanceTicks: (n) => {
     // Test hook: pauses, then steps exactly n ticks (so a raid's short phases can be looked at one by one).

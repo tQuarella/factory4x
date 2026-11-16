@@ -89,7 +89,9 @@ function fieldOk(f: unknown, nodes: number | null): boolean {
     perNode(f.free) &&
     (f.free as unknown[]).every((v) => isInt(v) && v >= 0) &&
     perNode(f.rockBuckets) &&
-    (f.rockBuckets as unknown[]).every((ring) => Array.isArray(ring) && ring.length > 0 && ring.every((v: unknown) => isInt(v) && v >= 0))
+    (f.rockBuckets as unknown[]).every((ring) => Array.isArray(ring) && ring.length > 0 && ring.every((v: unknown) => isInt(v) && v >= 0)) &&
+    perNode(f.haulerSet) &&
+    (f.haulerSet as unknown[]).every((v) => v === null || (isInt(v) && v >= 0))
   );
 }
 

@@ -4,15 +4,26 @@
  * placeholders.ts get pixel radii, so line widths and sprites stay crisp at any
  * map scale. Ships and pods interpolate between ticks using session.alpha.
  */
-import { activeBattles, guardianStatus, heartIndex, isCaptured, isField, isGuarded, isRootCut, lastBattle, nodeStatus, rockStatus, rootIndex, shipCounts, type EconShip, type Node, type World } from '@factory4x/sim';
+import { SHIP_TYPES, activeBattles, guardianStatus, heartIndex, isCaptured, isField, isGuarded, isRootCut, lastBattle, movePreview, nodeStatus, raidStatus, rockStatus, rootIndex, shipCounts, type EconShip, type Node, type ShipType, type World } from '@factory4x/sim';
 import { palette } from './palette.ts';
+import type { MoveGesture } from './gesture.ts';
 import {
+  GHOST_H,
   drawAsteroid,
+  drawDragGhost,
+  drawDragLine,
+  drawDropHighlight,
+  drawDropTag,
   drawExtractor,
   drawGuardRing,
   drawHauler,
   drawMineBadge,
+  drawRaidBadge,
   drawRaidMarker,
+  drawSplitPulse,
+  ghostWidth,
+  type DragAim,
+  type GhostEntry,
   drawHitFlash,
   drawPocket,
   drawPod,
@@ -29,6 +40,7 @@ import {
   drawWiltingThorn,
 } from './placeholders.ts';
 import { isBackedUp } from './report.ts';
+import { shortName } from './sheet.ts';
 import { fitMap, type Fit } from './fit.ts';
 import { lerp, podTotalTicks, progressFrac } from './interp.ts';
 import type { Session } from './session.ts';
@@ -67,6 +79,38 @@ export function guardSpotR(rr: number, count: number): number {
 /** Radius that a tap on a guarded node may land in: the whole guard ring, and at least a 44 px target. */
 export function guardedReach(rr: number, count: number, individuals = true): number {
   return Math.max(MIN_HIT, guardRingOuter(rr, count, individuals) + 3);
+}
+
+/** What the last frame drew for a drag in progress (the test hook `mapDrag`), canvas px. */
+export interface DragDrawn {
+  from: number;
+  part: 'all' | 'split';
+  armed: boolean;
+  finger: { x: number; y: number };
+  ghost: { x: number; y: number; w: number; counts: GhostEntry[] } | null;
+  target: number | null;
+  aim: DragAim;
+  tag: string | null;
+}
+
+/** The ghost chip's rise above the finger, px: the thumb doesn't hide it. */
+export const GHOST_RISE = 48;
+/** The Mine badge pop, ms. */
+const POP_MS = 320;
+const TAG_WORD = { strong: 'Strong', even: 'Even', weak: 'Weak' } as const;
+
+/** Short on-map name for the drop tag ("A5", "Hive"). */
+const nodeName = shortName;
+
+/**
+ * The raiders on the badge, or null when the rock is not a raid's target. `flag` is `rockStatus.raidTarget`: true from the muster to
+ * the raid's end. The ring shows the planned mix while it musters, then who is out.
+ */
+export function raidBadgeMix(world: Readonly<World>, flag: boolean): { thorn: number; spore: number } | null {
+  if (!flag) return null;
+  const r = raidStatus(world);
+  const out = r.raiders.thorn + r.raiders.spore;
+  return out > 0 && r.phase !== 'muster' ? { ...r.raiders } : { ...r.planned };
 }
 
 interface WiltAnim {
@@ -119,6 +163,22 @@ export class MapView {
   /** H7 test hook: what the last frame drew for the economy (Mine badges, haul lines, hulls docked, idle at the probe, waiting, moving). */
   drawnField(): { mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number }; raid: { pulse: boolean; line: boolean; marker: boolean; raided: number; countdown: string; from: number; to: number; frac: number } } {
     return { mine: [...this.drawn.mine], haul: [...this.drawn.haul], econ: { ...this.drawn.econ }, raid: { ...this.drawn.raid } };
+  }
+
+  /** The move gesture being shown (set by main.ts): drawn over everything while it is armed or dragging. */
+  gesture: MoveGesture | null = null;
+  /** H8: Mine badge pops: a rock just marked grows in, one just unmarked fades out (client only). */
+  private readonly pops = new Map<number, { start: number; on: boolean }>();
+  /** H8 test hook: what the last frame drew for the raid badge and the drag. */
+  private readonly drawnNew: { raidBadge: number; drag: DragDrawn | null } = { raidBadge: -1, drag: null };
+
+  drawnH8(): { raidBadge: number; drag: DragDrawn | null } {
+    return { raidBadge: this.drawnNew.raidBadge, drag: this.drawnNew.drag === null ? null : { ...this.drawnNew.drag } };
+  }
+
+  /** Starts the badge pop of a rock whose Mine mark just changed. */
+  popMine(node: number, on: boolean): void {
+    this.pops.set(node, { start: performance.now(), on });
   }
 
   drawnBackedUp(node: number): { badge: boolean; route: boolean } {
@@ -175,6 +235,12 @@ export class MapView {
     return { x: this.sx(n.x), y: this.sy(n.y) };
   }
 
+  /** How far from a node's centre a tap still lands on it, px (at least a 44 px target; the whole guard ring on a guarded node). */
+  reachOf(n: Node): number {
+    const g = guardedKind(n) ? guardianStatus(this.session.world, n.index) : null;
+    return g && g.alive ? guardedReach(this.nodeR(n), g.total, n.kind !== 'pocket') : Math.max(MIN_HIT, this.nodeR(n) + 4);
+  }
+
   /** The node under a tap at canvas-relative (px, py), or null. Nearest center wins among nodes in reach. */
   hitTest(px: number, py: number): number | null {
     let best: number | null = null;
@@ -183,8 +249,7 @@ export class MapView {
       const dx = px - this.sx(n.x);
       const dy = py - this.sy(n.y);
       const d = Math.sqrt(dx * dx + dy * dy);
-      const g = guardedKind(n) ? guardianStatus(this.session.world, n.index) : null;
-      const reach = g && g.alive ? guardedReach(this.nodeR(n), g.total, n.kind !== 'pocket') : Math.max(MIN_HIT, this.nodeR(n) + 4);
+      const reach = this.reachOf(n);
       if (d <= reach && d < bestD) {
         best = n.index;
         bestD = d;
@@ -205,6 +270,8 @@ export class MapView {
     this.drawn.haul.clear();
     this.drawn.econ = { docked: 0, idle: 0, waiting: 0, moving: 0 };
     this.drawn.raid = { pulse: false, line: false, marker: false, raided: -1, countdown: '', from: -1, to: -1, frac: -1 };
+    this.drawnNew.raidBadge = -1;
+    this.drawnNew.drag = null;
     ctx.fillStyle = palette.space;
     ctx.fillRect(0, 0, w, h);
     for (const st of this.stars) {
@@ -373,11 +440,32 @@ export class MapView {
       if (field) {
         // H7: the Mine badge (a pick) on a rock marked for mining, and the "!" while its buffer is full.
         const rs = rocks.get(n.index);
+        const pop = this.pops.get(n.index);
+        const popAge = pop === undefined ? Infinity : nowMs - pop.start;
+        if (pop !== undefined && popAge >= POP_MS) this.pops.delete(n.index);
+        const grow = popAge < POP_MS ? 1 - popAge / POP_MS : 0;
         if (rs?.mine) {
           this.drawn.mine.add(n.index);
           ctx.save();
           ctx.translate(x + rr * 0.95, y + rr * 0.7);
-          drawMineBadge(ctx, Math.max(7, rr * 0.34));
+          // A fresh mark pops: it starts a size larger and settles.
+          drawMineBadge(ctx, Math.max(7, rr * 0.34) * (1 + 0.7 * grow));
+          ctx.restore();
+        } else if (grow > 0 && pop !== undefined && !pop.on) {
+          // A mark just taken off: the badge swells and fades.
+          ctx.save();
+          ctx.globalAlpha = grow;
+          ctx.translate(x + rr * 0.95, y + rr * 0.7);
+          drawMineBadge(ctx, Math.max(7, rr * 0.34) * (1 + 0.7 * (1 - grow)));
+          ctx.restore();
+        }
+        // H8: the raid-target badge, lower left (the Mine badge is lower right), from the muster to the raid's end.
+        const raidMix = rs === undefined ? null : raidBadgeMix(world, rs.raidTarget);
+        if (raidMix !== null) {
+          this.drawnNew.raidBadge = n.index;
+          ctx.save();
+          ctx.translate(x - rr * 0.95, y + rr * 0.7);
+          drawRaidBadge(ctx, Math.max(8, rr * 0.4), raidMix);
           ctx.restore();
         }
         if (rs?.backedUp && rs.mine) {
@@ -424,6 +512,70 @@ export class MapView {
       drawShip(ctx, 6, Math.atan2(b.y - a.y, b.x - a.x), s.type);
       ctx.restore();
     }
+    this.drawGesture(world, t, nowMs);
+  }
+
+  /** H8: the split-armed pulse on the source, and while dragging: the dashed line, the drop-target highlight and tag, and the ghost chip. */
+  private drawGesture(world: Readonly<World>, t: number, nowMs: number): void {
+    const g = this.gesture;
+    if (g === null || (g.phase !== 'armed' && g.phase !== 'dragging') || !isField(world)) return;
+    const { ctx } = this;
+    const src = world.nodes[g.from];
+    if (src === undefined) return;
+    const sp = this.nodePos(g.from);
+    const srcR = this.nodeR(src) + 8;
+    if (g.phase === 'armed') {
+      ctx.save();
+      ctx.translate(sp.x, sp.y);
+      drawSplitPulse(ctx, srcR, t);
+      ctx.restore();
+    }
+    // The ghost shows what the drop would carry, from the same selector the sim uses (a split's halves while armed or split-dragging).
+    const carried = movePreview(world, g.from, g.part);
+    const entries: GhostEntry[] = SHIP_TYPES.filter((s) => carried[s] > 0).map((s) => ({ type: s, count: carried[s] }));
+    const target = g.phase === 'dragging' ? g.target : null;
+    const guarded = target !== null && isGuarded(world, target);
+    const aim: DragAim = target === null ? 'none' : guarded ? 'attack' : 'move';
+    let tag: string | null = null;
+    if (g.phase === 'dragging') {
+      drawDragLine(ctx, sp.x, sp.y, g.x, g.y, aim, (nowMs / 40) % 15);
+      if (target !== null) {
+        const tn = world.nodes[target]!;
+        const tp = this.nodePos(target);
+        const reach = this.reachOf(tn);
+        ctx.save();
+        ctx.translate(tp.x, tp.y);
+        drawDropHighlight(ctx, reach, guarded, t);
+        ctx.restore();
+        if (guarded) {
+          // The Strong/Even/Weak tag of the type that makes up most of what is carried.
+          const lead = entries.reduce((a, e) => (e.count > a.count ? e : a), entries[0]!);
+          const gs = guardianStatus(world, target);
+          tag = `Attack · ${TAG_WORD[gs.tags[lead.type as ShipType].tag]}`;
+        }
+        const label = nodeName(tn, true);
+        // The tag sits above the node, or below it where the canvas's top edge is in the way.
+        const above = tp.y - reach - 16 >= 12;
+        ctx.save();
+        ctx.translate(Math.min(this.w - 60, Math.max(60, tp.x)), above ? tp.y - reach - 14 : tp.y + reach + 14);
+        drawDropTag(ctx, label, tag);
+        ctx.restore();
+      }
+    }
+    let ghost: DragDrawn['ghost'] = null;
+    // Armed or dragging: the ghost shows what a release would carry (the half counts once a split is armed).
+    if (entries.length > 0) {
+      ctx.save();
+      // Measure first (the width centres the clamp), then draw 48 px above the finger.
+      const w = ghostWidth(ctx, entries);
+      const gx = Math.min(this.w - w / 2 - 4, Math.max(w / 2 + 4, g.x));
+      const gy = Math.max(GHOST_H / 2 + 4, g.y - GHOST_RISE);
+      ctx.translate(gx, gy);
+      drawDragGhost(ctx, entries, aim);
+      ctx.restore();
+      ghost = { x: gx, y: gy, w, counts: entries };
+    }
+    this.drawnNew.drag = { from: g.from, part: g.part, armed: g.phase === 'armed', finger: { x: g.x, y: g.y }, ghost, target, aim, tag };
   }
 
   /**

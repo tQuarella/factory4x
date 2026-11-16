@@ -7,6 +7,7 @@ import {
   fleetCap,
   fleetStatus,
   guardianAt,
+  haulerTarget,
   heartIndex,
   isGuarded,
   isTypeUnlocked,
@@ -130,14 +131,79 @@ const searchMax = (world: Readonly<World>, data: SimData): number => fleetCap(wo
 
 // ---- The economy ----------------------------------------------------------------------------------------------
 
+/** Haulers the rocks still lack: the sum over the rocks of `haulerTarget - haulers`, where positive (rockStatus; H8 H1-H4). */
+export function haulerShortfall(world: Readonly<World>, kind: 'any' | 'pocket' = 'any'): number {
+  // The same numbers as rockStatus(...).haulerTarget and .haulers, read without building a whole sheet per rock (this runs every tick).
+  const assigned = world.nodes.map(() => 0);
+  for (const s of world.field!.econ) if (s.type === 'hauler' && s.target !== null) assigned[s.target] = assigned[s.target]! + 1;
+  let n = 0;
+  for (const node of world.nodes) {
+    if (node.kind === 'probe' || (kind === 'pocket' && node.kind !== 'pocket')) continue;
+    n += Math.max(0, haulerTarget(world, node.index) - assigned[node.index]!);
+  }
+  return n;
+}
+
 /**
- * Economy weights: extractors until every open slot has one, haulers until there is one per slot, each type at
- * 0 once full (an extra extractor would idle at the probe). `lean` (offence) drops both to 1.
+ * Economy weights: extractors until every open slot has one, 0 once full (an extra extractor would idle at the
+ * probe). The Hauler weight (H8 change 1) never reaches 0 while a rock has a shortfall (`haulerTarget > haulers`);
+ * H4 makes the sim stop building haulers by itself when there is none. With no shortfall it is 0 only once there
+ * is a hauler per slot. `lean` (offence) drops both to 1.
  */
 export function economyWeights(world: Readonly<World>, data: SimData, lean: boolean): Pick<Weights, 'extractor' | 'hauler'> {
   const slots = openSlots(world);
   const c = econCounts(world, data);
-  return { extractor: c.extractor >= slots ? 0 : lean ? 1 : world.tun['alloc.start.extractor'] || 3, hauler: c.hauler >= slots ? 0 : lean ? 1 : world.tun['alloc.start.hauler'] || 2 };
+  const haulerOn = haulerShortfall(world) > 0 || c.hauler < slots;
+  return { extractor: c.extractor >= slots ? 0 : lean ? 1 : world.tun['alloc.start.extractor'] || 3, hauler: !haulerOn ? 0 : lean ? 1 : world.tun['alloc.start.hauler'] || 2 };
+}
+
+// ---- The backstops (H8 changes 2 and 3) ------------------------------------------------------------------------
+
+/** Game minutes with no bay running before "nothing to build" can apply (DESIGN.md H8 "Bots (H8)" change 3). */
+const IDLE_BAYS_MIN = 2;
+
+/**
+ * The two H8 backstops, kept in a bot's closure. `apply` runs after a strategy has chosen its weights:
+ *  - change 2, the economy wiped: economy ships alive plus in the bays below 2 (after the economy has once had 2)
+ *    puts Extractor and Hauler back at their `alloc.start.*` weights until `econ` reaches `raid.firstAtEcon - 1`;
+ *  - change 3, nothing to build: no bay running for 2 game minutes, ore for the dearest unlocked warship in stock
+ *    and every warship weight at 0 puts the counter type (a Drone before a pocket is taken) at 1. It holds while
+ *    the strategy's own rules still want no warship, and lets go once they do.
+ */
+export class Backstops {
+  private recovering = false;
+  private hadEcon = false;
+  private lastBusy = 0;
+  private nothing = false;
+  constructor(private readonly dronesOnly: boolean) {}
+
+  apply(world: Readonly<World>, data: SimData, w: Weights): void {
+    const rows = allocStatus(world, data).rows;
+    if (rows.some((r) => r.ticksLeft > 0)) this.lastBusy = world.tick;
+
+    // Change 3 reads the strategy's own warship weights, so it comes before change 2 edits anything.
+    if (w.drone + w.lancer + w.flak > 0) this.nothing = false;
+    else {
+      if (!this.nothing && world.tick - this.lastBusy >= IDLE_BAYS_MIN * 60 * data.tickRate) {
+        const dearest = Math.max(0, ...rows.filter((r) => WARSHIPS.includes(r.type as ShipType) && r.unlocked && (!this.dronesOnly || r.type === 'drone')).map((r) => r.cost.ore));
+        if (dearest > 0 && world.stock.ore >= dearest) this.nothing = true;
+      }
+      if (this.nothing) {
+        const counter = hiveCounter(world).type;
+        w[!this.dronesOnly && isTypeUnlocked(world, counter) ? counter : 'drone'] = 1;
+      }
+    }
+
+    const e = econCounts(world, data);
+    const have = e.extractor + e.hauler;
+    if (have >= 2) this.hadEcon = true;
+    if (this.hadEcon && have < 2) this.recovering = true;
+    if (this.recovering && econAliveNow(world, data) >= world.tun['raid.firstAtEcon'] - 1) this.recovering = false;
+    if (this.recovering) {
+      w.extractor = world.tun['alloc.start.extractor'] || 3;
+      w.hauler = world.tun['alloc.start.hauler'] || 2;
+    }
+  }
 }
 
 // ---- The adaptive rules ---------------------------------------------------------------------------------------
@@ -253,13 +319,29 @@ export class AdaptiveBot implements FieldBot {
   private standAt: number = PROBE;
   /** The rally this bot last set (no selector reports it). */
   private rally: number = PROBE;
+  /** True while this tick's plan Recycles economy ships toward a wave: haulers must not be built back (limitEconomy). */
+  private shrinking = false;
+  /** The size of the wave this tick builds for (a pocket's or the hive's), 0 with none: the room the economy must leave. */
+  private waveTotal = 0;
+  /** The room a wave needs the economy to leave this tick: max(smallest hive wave, the wave being built for), 0 when not in offence at a limit. */
+  private reserve = 0;
+  /** Why this tick's final Hauler weight is 0 while a rock has a shortfall (DESIGN.md H8 change 1 amendment): 'limit' (a), 'recycling' (b), or null. */
+  haulerBlock: 'limit' | 'recycling' | null = null;
+  /** The economy ships plus the reserve while haulerBlock is 'limit' (for tests: (a) says it is at least the fleet limit). */
+  blockLoad = 0;
+  private readonly backstops: Backstops;
   respond: boolean;
-  constructor(private readonly opts: AdaptiveOptions) {
+  constructor(private readonly opts: AdaptiveOptions, backstops?: Backstops) {
+    this.backstops = backstops ?? new Backstops(opts.dronesOnly);
     this.respond = opts.respond;
   }
 
   decide(world: Readonly<World>, data: SimData): Input[] {
     const heart = heartIndex(world);
+    this.shrinking = false;
+    this.waveTotal = 0;
+    this.reserve = 0;
+    this.haulerBlock = null;
     const rs = raidStatus(world);
     const raid = rs.phase === 'none' ? null : rs;
     const parked = parkedWarships(world);
@@ -291,6 +373,12 @@ export class AdaptiveBot implements FieldBot {
     /** Every branch ends here: the trade in slots in offence, then the weights. */
     const finish = (extra: Input[]): Input[] => {
       this.limitEconomy(world, data, w, types, limit);
+      this.backstops.apply(world, data, w);
+      if (w.hauler === 0 && haulerShortfall(world) > 0) {
+        this.haulerBlock = this.shrinking ? 'recycling' : 'limit';
+        const e = econCounts(world, data);
+        this.blockLoad = e.extractor + e.hauler + Math.max(this.reserve, this.waveTotal);
+      }
       return [...inputs, ...extra, ...weightInputs(world, data, w)];
     };
 
@@ -326,6 +414,7 @@ export class AdaptiveBot implements FieldBot {
       }
       const extra: Input[] = regroup(world, parked, stage);
       if (plan !== null) {
+        this.waveTotal = plan.total;
         Object.assign(w, deficitWeights(world, data, plan.fleet));
         // The fleet is full of ships the plan can't use (wounded, or a type it doesn't need): scrap one to open a slot.
         const missing = w.drone + w.lancer + w.flak > 0;
@@ -336,6 +425,8 @@ export class AdaptiveBot implements FieldBot {
       } else {
         // The dead end (the Director's rule): no hive plan fits fleetCap minus the economy. A player can (a) take
         // the other pocket if that unlocks a mix that fits, else (b) Recycle economy ships until the wave fits.
+        // `drones-only` has no plan that fits by design (flag 5) and no other pocket: as a control it keeps building drones up to the limit (DESIGN.md H8 table).
+        if (this.opts.dronesOnly) w.drone = world.tun['alloc.maxWeight'];
         const other = this.otherPocket(world, data, counter, types, limit);
         const e = other === null ? null : this.pocketAssault(world, data, other, w, fit, stage, limit, room);
         if (e !== null) extra.push(...e);
@@ -367,6 +458,7 @@ export class AdaptiveBot implements FieldBot {
     if (guardianAt(world, node)!.battle !== null || world.ships.some((s) => s.transit !== null && s.transit.to === node)) return [];
     const mix = waveFor(world, data, node, ['drone'], limit, guardsAtHome(world, node));
     if (mix === null) return null;
+    this.waveTotal = mix.total;
     const cap = fleetCap(world, data);
     const counted = cap !== null && world.tun['fleet.countsEconomy'] >= 1;
     if (mix.total > room) {
@@ -437,11 +529,12 @@ export class AdaptiveBot implements FieldBot {
    * the economy is above the floor. One order per RECYCLE_EVERY ticks. Null when nothing needs to or can go.
    */
   private recycleEconToward(world: Readonly<World>, data: SimData, need: number, room: number): Input | null {
-    if (world.tick % RECYCLE_EVERY !== 0) return null;
     const cap = fleetCap(world, data);
     if (cap === null || world.tun['fleet.countsEconomy'] < 1) return null;
     const floor = this.econFloor(world);
     if (need <= room || need + floor > cap || econAliveNow(world, data) <= floor) return null;
+    this.shrinking = true;
+    if (world.tick % RECYCLE_EVERY !== 0) return null;
     const heart = heartIndex(world);
     const nodes = world.nodes
       .filter((n) => !isGuarded(world, n.index))
@@ -497,12 +590,21 @@ export class AdaptiveBot implements FieldBot {
     const withCounter = this.opts.dronesOnly || types.includes(counter.type) ? types : [...types, counter.type];
     const smallest = this.smallestHiveWave(world, data, withCounter, limit);
     const e = econCounts(world, data);
+    this.reserve = smallest ?? 0;
     if (smallest !== null && e.extractor + e.hauler + ECON_MARGIN + smallest <= cap) return;
     w.extractor = 0;
     w.hauler = 0;
-    if (this.opts.dronesOnly || economyWeights(world, data, true).hauler === 0) return;
-    // A taken pocket with no hauler yields nothing: one hauler each (the first delivery unlocks its type).
-    for (const node of world.nodes) if (node.kind === 'pocket' && !isGuarded(world, node.index) && rockStatus(world, node.index).haulers === 0) w.hauler = 1;
+    // While economy ships are being Recycled toward a wave, only a taken pocket with no hauler yields one back (its
+    // first delivery unlocks its type): building haulers the plan is recycling would thrash.
+    if (this.shrinking) {
+      if (this.opts.dronesOnly) return;
+      for (const node of world.nodes) if (node.kind === 'pocket' && !isGuarded(world, node.index) && rockStatus(world, node.index).haulers === 0) w.hauler = 1;
+      return;
+    }
+    // H8 change 1: a rock with a shortfall gets its haulers; H4 stops the sim building more than the need. A taken
+    // pocket always does (its deliveries pay for the type it unlocks). An asteroid does not into the room the wave
+    // being built for needs: a hauler built there would only be Recycled again.
+    if (haulerShortfall(world, 'pocket') > 0 || (haulerShortfall(world) > 0 && e.extractor + e.hauler + Math.max(smallest ?? 0, this.waveTotal) < cap)) w.hauler = 1;
   }
 }
 
@@ -521,10 +623,20 @@ const adaptiveOpts = (over: Partial<AdaptiveOptions> = {}): AdaptiveOptions => (
  */
 class GreedyBot implements FieldBot {
   private inner: AdaptiveBot | null = null;
+  private readonly backstops = new Backstops(false);
+  get haulerBlock(): 'limit' | 'recycling' | null {
+    return this.inner === null ? null : this.inner.haulerBlock;
+  }
+  get blockLoad(): number {
+    return this.inner === null ? 0 : this.inner.blockLoad;
+  }
   decide(world: Readonly<World>, data: SimData): Input[] {
-    if (this.inner === null && fieldSummary(world).raids.hit >= 1) this.inner = new AdaptiveBot(adaptiveOpts());
+    // The inner bot takes over greedy's backstops, so a wipe by the first hit is still recovered from.
+    if (this.inner === null && fieldSummary(world).raids.hit >= 1) this.inner = new AdaptiveBot(adaptiveOpts(), this.backstops);
     if (this.inner !== null) return this.inner.decide(world, data);
-    return weightInputs(world, data, { ...ZERO, ...economyWeights(world, data, false) });
+    const w: Weights = { ...ZERO, ...economyWeights(world, data, false) };
+    this.backstops.apply(world, data, w);
+    return weightInputs(world, data, w);
   }
 }
 

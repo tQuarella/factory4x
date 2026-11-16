@@ -50,6 +50,8 @@ Flat, readable vector shapes on deep space. Think engineering schematic meets bi
 | Open lane | `#9fb4d4` |
 | Owned lane | `#ffd27a` |
 | Economy ship hull | `#f0a83a` |
+| Drag chip and tag panel | `rgba(11, 22, 38, 0.94)` |
+| Attack tag panel | `rgba(70, 12, 36, 0.95)` |
 
 Contrast check: every entity color must read against `#05070d` at 4.5:1 or better.
 
@@ -211,3 +213,22 @@ Rules:
 - **Amber.** The economy hull is `econ`, not the probe amber; the radar fill is the probe amber (it is the player's allocation). Neither hull uses player blue or any mob colour (tested). The mine badge is teal with no amber, so it is not the lock (amber shackle) or the "!" (amber pill).
 - **Callers.** A docked extractor sits on its rock's upper arc with its drill toward the rock (about 6.5 px), idle ships wait in a row under the probe, a loaded hauler wears a teal dot, the mine badge sits at the rock's lower right, the raid marker rides a dashed `mob` line from the hive to its target with its seconds under it, and the hive pulses with a `mob` ring while a raid musters.
 
+
+## H8 entities
+
+Hold the front: the raid-target badge, the drag (line, ghost chip, drop highlight and tag), the split-armed pulse and the Mine button. Draw functions are in `packages/client/src/placeholders.ts`, shown in the gallery (a 24 px strip in colour and greyscale, then each at three sizes), and bounded in `packages/client/test/h8-art.test.ts` (recording context) and the gallery's pixel scan. **Two new palette keys**, `ghostFill` (the dark panel of the ghost chip and the name tag) and `attackFill` (the dark pink panel of the attack tag); both are in the Palette table. Everything else reuses existing keys (`thorn`, `spore`, `bloom`, `bloomHi`, `ship`, `starBright`, `laneClosed`, `asteroidOre`).
+
+| Entity | Draw | Look | 24 px read |
+| --- | --- | --- | --- |
+| Raid badge | `drawRaidBadge(ctx, r, mix)` | the raiders' ring (Thorn arc `thorn`, Spore arc `spore`, each its share of the circle, starting at the top) round a dark disc with two crossed `bloom` blades. No chevron and no amber | pink X in a two-colour ring |
+| Drag line | `drawDragLine(ctx, x0, y0, x1, y1, aim, phase)` | a 3 px dashed line from the source to the finger with a dot at the finger: `ship` blue to a node, `bloom` at an enemy node, `laneClosed` grey over nothing | dashed line |
+| Ghost chip | `drawDragGhost(ctx, entries, aim)` | a dark rounded panel (the toast's colour) edged in the aim colour, holding each carried type's icon and count; 30 px high, drawn 48 px above the finger | panel with ship icons and counts |
+| Drop highlight | `drawDropHighlight(ctx, r, attack, t)` | a 3 px ring at the node's reach with a pulsing wider halo: `starBright` for a move, `bloom` for an attack | bright ring round a node |
+| Drop tag | `drawDropTag(ctx, name, attackText)` | a pill with the node's name; on a guarded node it reads "Hive · Attack · Even" on a dark pink pill edged `bloom` | name pill |
+| Split pulse | `drawSplitPulse(ctx, r, t)` | the source's ring in `ship` blue with two rings spreading out from it, a beat apart | blue ripples |
+| Mine button | `drawMineBadge(ctx, r)` | the H7 mine badge, unchanged, drawn 24 px in the control bar's button | round teal pick |
+
+Rules:
+- **Bounds.** The raid badge stays within r (like the marker and the mine badge); the drop highlight within r + 7 px (its halo is a 8 px stroke at r + 3; that is 1.32 r at the smallest reach the game passes, 22 px, and under 1.15 r from 50 px up), the split pulse within 1.5 r (tested, and measured in the gallery).
+- **Told apart.** The raid badge is a ring with an X, so it isn't the marker (a chevron that rides the line), the "!" (an amber pill) or the mine badge (a teal pick); the Raid badge and the Mine badge sit on opposite sides of a rock (lower left and lower right). The attack colour is `bloom` on the line, the highlight and the tag, so a pink line always ends on a pink ring.
+- **Callers.** The badge is `max(8, 0.4 r)` px, from the muster to the raid's end. During a drag the highlight sits on the node the release would hit (the same hit test as a tap), the ghost chip 48 px above the finger (clamped inside the canvas), the tag above the target or below it near the top edge. The pulse sits 8 px outside the source rock while a split is armed.

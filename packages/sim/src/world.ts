@@ -164,6 +164,11 @@ export interface FieldState {
   free: number[];
   /** Per node: units delivered by haulers per game second, the same ring as stats.deliveredBuckets (rockStatus). */
   rockBuckets: number[][];
+  /**
+   * H8 H7 (`setHaulers`): per node, the hauler count the player set, or null for Auto (the H1 need). Kept while the
+   * rock is unmarked; read through `haulerSetOf`, which caps it at rock.haulerMax.
+   */
+  haulerSet: (number | null)[];
 }
 
 export interface Guard {
@@ -469,6 +474,14 @@ export function routeFrom(world: Readonly<World>, from: number): Route | null {
 /** Ticks per game minute. */
 export function ticksPerMin(world: Readonly<World>): number {
   return world.tickRate * 60;
+}
+
+/** Units per minute one extractor at a node of this kind yields (0 for nodes that never extract). Moved from step.ts (h8-sim). */
+export function perExtractorPerMin(t: Readonly<Tunables>, kind: NodeKind): number {
+  if (kind === 'asteroid') return t['extractor.orePerMin'];
+  if (kind === 'pocket') return t['pocket.resourcePerMin'];
+  if (kind === 'heart') return t['heart.orePerMin'];
+  return 0;
 }
 
 function indexOfKind(world: Readonly<World>, kind: NodeKind): number {
@@ -782,6 +795,7 @@ function landField(world: World, data: SimData): void {
     mine: world.nodes.map((n) => fm.mine.includes(n.id)),
     free: world.nodes.map(() => 0),
     rockBuckets: world.nodes.map(() => new Array<number>(window).fill(0)),
+    haulerSet: world.nodes.map(() => null),
   };
   world.rally = PROBE;
 }

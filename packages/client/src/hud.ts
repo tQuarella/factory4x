@@ -34,6 +34,8 @@ export class Hud {
   private readonly fleet: Chip & { icon: HTMLCanvasElement; full: boolean; numbers: HTMLElement };
   /** H7: the raid chip, "Raid 0:12"; hidden in a campaign and when raid.enabled is 0. */
   private readonly raid: Chip;
+  /** H8: the Fleet chip was tapped (field mode; the campaign's fleet chip has no panel). */
+  onFleet: (() => void) | null = null;
 
   constructor(root: HTMLElement) {
     // Two rows, so the fleet chip always sits with the ship chips it counts: resources, then ships and the fleet.
@@ -50,6 +52,16 @@ export class Hud {
     const chip = makeChip(shipRow, 'chip-fleet', 'Fleet limit', (p) => (icon = fleetIcon(p, 26, false)), false);
     chip.el.classList.add('fleet');
     chip.el.hidden = true;
+    // H8: the chip opens the fleet panel. Its tap area is padded out to 44 px in CSS.
+    chip.el.setAttribute('role', 'button');
+    chip.el.tabIndex = 0;
+    chip.el.addEventListener('click', () => this.onFleet?.());
+    chip.el.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        this.onFleet?.();
+      }
+    });
     // "Fleet " and "9/12" are separate spans (the text stays "Fleet 9/12"), so the narrow landscape column can drop the
     // word and keep the icon and the numbers, as the ship chips do.
     chip.count.textContent = '';
