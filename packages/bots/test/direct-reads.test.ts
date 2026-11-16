@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BUILD_TYPES, allocStatus, createWorld, defaultData, fleetStatus, heartIndex, rockStatus, step } from '@factory4x/sim';
 import { fieldMix } from '../src/field-estimate.ts';
-import { adaptive, anyBayRunning, econAliveNow, econCounts, openSlots, weightInputs, type Weights } from '../src/field-strategies.ts';
+import { adaptive, anyBayRunning, econAliveNow, econCounts, openSlots, weightInputs } from '../src/field-strategies.ts';
+import type { Weights } from '../src/field-runner.ts';
 import { minMix } from '../src/waves.ts';
 
 /**
