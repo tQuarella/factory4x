@@ -14,6 +14,7 @@ import {
   replayHashes,
   rockStatus,
   step,
+  worldHash,
   type Input,
   type World,
 } from '../src/index.ts';
@@ -65,6 +66,17 @@ describe('reference replay (field mode)', () => {
   let raid2End = -1;
   let raid2Held = 0;
   let raid1HeldTicks = 0;
+  // h9-sim: the extractor dial items (a)-(f).
+  let a1AtUnmark: ReturnType<typeof rockStatus> | null = null;
+  const dials: Array<{ tick: number; node: number; count: number | null; markedBefore: boolean; boundBefore: number; boundAfter: number; extCap: number; slots: number; unbound: Array<{ id: number; docked: boolean; target: number | null; to: number | null }>; bayBefore: number; bayAfter: number }> = [];
+  const extFates = new Map<number, { dockedAt: number | null; idleAt: number | null; tick: number }>();
+  const h9Ext: Array<{ tick: number; state: string; bay: number; share: number; built: number }> = [];
+  const remarks: Array<{ tick: number; node: number; set: number | null; boundAfter: number; slots: number }> = [];
+  const hArrive = new Map<number, number>();
+  const h9Leaves: Array<{ tick: number; id: number; from: number; to: number | null; arrived: number; assignedBefore: number; target: number }> = [];
+  const invalidChecks: Array<{ tick: number; same: boolean; inputs: number }> = [];
+  const a1Docks: Array<{ tick: number; id: number; built: number }> = [];
+  let a1Docked = new Set<number>();
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
     const probe = inputs.length > 0 ? clone(w) : w;
@@ -93,7 +105,58 @@ describe('reference replay (field mode)', () => {
         }
       : null;
     const extBefore = { bay: f.bays.extractor.ticksLeft, share: f.share.extractor };
+    // h9-sim: the dial inputs (valid ones are applied in order; each is recorded against the state before the tick).
+    const dialIns = inputs.filter((i): i is Extract<Input, { type: 'setExtractors' }> => i.type === 'setExtractors' && isValidInput(w, data, i));
+    const dialBefore = dialIns.map((i) => ({
+      i,
+      marked: f.mine[i.node] === true,
+      ids: f.econ.filter((s) => s.type === 'extractor' && s.target === i.node).map((s) => ({ id: s.id, docked: s.at === i.node && s.transit === null })),
+    }));
+    const remarkIns = inputs.filter((i): i is Extract<Input, { type: 'setMine' }> => i.type === 'setMine' && i.on && t > 0 && f.extractorSet[i.node] !== null);
+    const remarkSets = remarkIns.map((i) => f.extractorSet[i.node] ?? null);
+    const hBefore = new Map(f.econ.filter((s) => s.type === 'hauler').map((s) => [s.id, { target: s.target, toProbe: s.transit !== null && s.transit.to === PROBE }]));
+    const assignedBefore = w.nodes.map((n) => f.econ.filter((s) => s.type === 'hauler' && s.target === n.index).length);
+    const invalidIns = inputs.filter((i) => i.type === 'setExtractors' && !isValidInput(w, data, i));
+    const without = invalidIns.length > 0 ? clone(w) : null;
     step(w, data, inputs);
+    if (without !== null) {
+      step(without, data, inputs.filter((i) => !invalidIns.includes(i)));
+      invalidChecks.push({ tick: t, same: worldHash(without) === worldHash(w), inputs: invalidIns.length });
+    }
+    if (t === 600) a1AtUnmark = rockStatus(w, 1);
+    for (const d of dialBefore) {
+      const unbound = d.ids
+        .filter((x) => f.econ.find((s) => s.id === x.id)!.target !== d.i.node)
+        .map((x) => {
+          const s = f.econ.find((y) => y.id === x.id)!;
+          extFates.set(x.id, { dockedAt: null, idleAt: null, tick: t });
+          return { id: x.id, docked: x.docked, target: s.target, to: s.transit?.to ?? null };
+        });
+      const r = rockStatus(w, d.i.node);
+      dials.push({ tick: t, node: d.i.node, count: d.i.count, markedBefore: d.marked, boundBefore: d.ids.length, boundAfter: r.bound, extCap: r.extCap, slots: r.slots, unbound, bayBefore: extBefore.bay, bayAfter: f.bays.extractor.ticksLeft });
+    }
+    remarkIns.forEach((i, k) => remarks.push({ tick: t, node: i.node, set: remarkSets[k]!, boundAfter: rockStatus(w, i.node).bound, slots: w.nodes[i.node]!.slots }));
+    for (const [id, fate] of extFates) {
+      const s = f.econ.find((x) => x.id === id);
+      if (s === undefined || fate.dockedAt !== null || fate.idleAt !== null) continue;
+      if (s.transit === null && s.at !== null && s.at === s.target) fate.dockedAt = s.at;
+      else if (s.transit === null && s.at === PROBE && s.target === null) fate.idleAt = t;
+    }
+    if (t >= 8760) {
+      const now = new Set(f.econ.filter((s) => s.type === 'extractor' && s.transit === null && s.at === 1 && s.target === 1).map((s) => s.id));
+      for (const id of now) if (!a1Docked.has(id)) a1Docks.push({ tick: t, id, built: w.stats.econBuilt.extractor });
+      a1Docked = now;
+      const ex = allocStatus(w, data).rows.find((r) => r.type === 'extractor')!;
+      h9Ext.push({ tick: t, state: ex.state, bay: f.bays.extractor.ticksLeft, share: f.share.extractor, built: w.stats.econBuilt.extractor });
+      for (const s of f.econ) {
+        if (s.type !== 'hauler') continue;
+        const b = hBefore.get(s.id);
+        if (b !== undefined && b.toProbe && s.at === PROBE && s.transit === null) hArrive.set(s.id, t);
+        if (b !== undefined && b.target !== null && b.target !== s.target) {
+          h9Leaves.push({ tick: t, id: s.id, from: b.target, to: s.target, arrived: hArrive.get(s.id) ?? -1, assignedBefore: assignedBefore[b.target]!, target: rockStatus(w, b.target).haulerTarget });
+        }
+      }
+    }
     if (p1Captured === null && w.stats.captures.length > 0) p1Captured = rockStatus(w, 8);
     if (t >= 8100) {
       // Each hauler pick against the shortfalls F6 saw: the targets after the tick (nothing after F6 changes them:
@@ -227,9 +290,10 @@ describe('reference replay (field mode)', () => {
   });
 
   it('a setMine off (a1, tick 600) unbinds every extractor bound there', () => {
-    // a1 has 2 slots, both filled by then.
+    // a1 has 2 slots, both filled by then. (h9-sim marks a1 again at 8761 for the dial items, so its state is read
+    // on the tick of the unmark rather than at the end of the run.)
     expect(unboundAtUnmark.length).toBe(2);
-    expect(rockStatus(w, 1)).toMatchObject({ mine: false, bound: 0 });
+    expect(a1AtUnmark).toMatchObject({ mine: false, bound: 0 });
   });
 
   it('the drones take the ice pocket p1 (then p2); its ice unlocks the Flak, which is built paying ice', () => {
@@ -430,8 +494,91 @@ describe('reference replay (field mode)', () => {
   });
 
   it('uses every field input type it needs, with no input ignored', () => {
-    expect([...typesApplied].sort()).toEqual(['moveShips', 'recycleFleet', 'recycleShips', 'sendShips', 'setAlloc', 'setHaulers', 'setMine', 'setRally', 'setTunable']);
-    expect(ignored).toEqual([]);
+    expect([...typesApplied].sort()).toEqual(['moveShips', 'recycleFleet', 'recycleShips', 'sendShips', 'setAlloc', 'setExtractors', 'setHaulers', 'setMine', 'setRally', 'setTunable']);
+    // h9-sim item (f): the only inputs ignored are the invalid setExtractors (checked below).
+    expect(ignored.every((x) => x.includes('"setExtractors"'))).toBe(true);
+    expect(ignored).toHaveLength(4);
+  });
+
+  // h9-sim (DESIGN.md H9 "Save, data version and replay", items (a)-(f)): the extractor dial, from tick 8760.
+  const dialAt = (tick: number) => dials.find((d) => d.tick === tick)!;
+  const lowerToA1 = 8761;
+  const raise = 8800;
+  const lowerIdle = 8880;
+
+  it('H9 (a): setExtractors a2 1 lowers a docked rock: its highest-id docked extractor re-dispatches to a1, the marked rock with room', () => {
+    const d = dials.find((x) => x.tick === lowerToA1 && nodeId(x.node) === 'a2')!;
+    expect([d.count, d.boundBefore, d.boundAfter, d.extCap, d.slots]).toEqual([1, 2, 1, 1, 2]);
+    expect(d.unbound).toHaveLength(1);
+    expect(d.unbound[0]).toMatchObject({ docked: true, target: 1, to: 1 });
+    expect(extFates.get(d.unbound[0]!.id)!.dockedAt).toBe(1);
+  });
+
+  it('H9 (a): setExtractors a1 1 lowers a1 when no marked rock has room: the surplus flies home and parks idle', () => {
+    const d = dialAt(lowerIdle);
+    expect([nodeId(d.node), d.count, d.boundBefore, d.boundAfter, d.extCap]).toEqual(['a1', 1, 2, 1, 1]);
+    expect(d.unbound).toHaveLength(1);
+    expect(d.unbound[0]).toMatchObject({ docked: true, target: null, to: PROBE });
+    const fate = extFates.get(d.unbound[0]!.id)!;
+    expect([fate.dockedAt, fate.idleAt !== null]).toEqual([null, true]);
+    const idleAtEnd = w.field!.econ.filter((s) => s.type === 'extractor' && s.target === null && s.at === PROBE && s.transit === null).map((s) => s.id);
+    expect(idleAtEnd).toEqual([d.unbound[0]!.id]);
+  });
+
+  it('H9 (b): after each lowering the Extractor is enough with weight 3: its share is held, the bay stays idle and no extractor is built', () => {
+    for (const [from, to] of [[lowerToA1, raise], [lowerIdle, 9000]] as const) {
+      const span = h9Ext.filter((e) => e.tick >= from && e.tick < to);
+      expect(span.length).toBe(to - from);
+      for (const e of span) expect([e.tick, e.state, e.bay, e.share, e.built]).toEqual([e.tick, 'enough', 0, span[0]!.share, span[0]!.built]);
+    }
+    // After the first lowering a1 (set 1) and a2 (set 1) each have a slot under their slots: H4b reads extCap.
+    expect([rockStatus(w, 2).slots, rockStatus(w, 2).extCap, rockStatus(w, 1).slots, rockStatus(w, 1).extCap]).toEqual([2, 1, 2, 1]);
+  });
+
+  it("H9 (c): a1's target drops with the lowering, and a hauler over it leaves a1 at its next delivery (the tick after it reaches the probe)", () => {
+    const fromA1 = h9Leaves.filter((l) => nodeId(l.from) === 'a1' && l.tick > lowerIdle);
+    expect(fromA1).toHaveLength(1);
+    const l = fromA1[0]!;
+    expect(l.tick).toBe(l.arrived + 1);
+    expect(l.assignedBefore).toBeGreaterThan(l.target);
+    expect(l.to).toBeNull();
+    // No hauler left a1 before the lowering.
+    expect(h9Leaves.filter((x) => nodeId(x.from) === 'a1' && x.tick <= lowerIdle)).toEqual([]);
+    expect(rockStatus(w, 1)).toMatchObject({ haulerTarget: 2, haulers: 2 });
+  });
+
+  it('H9 (d): setExtractors a1 null (All) reopens H4b on that tick: the bay starts, and the extractor it builds docks at a1', () => {
+    const d = dialAt(raise);
+    expect([nodeId(d.node), d.count, d.extCap, d.bayBefore]).toEqual(['a1', null, 2, 0]);
+    expect(d.bayAfter).toBe(w.tun['ship.extractor.buildTicks']);
+    const before = h9Ext.find((e) => e.tick === raise - 1)!;
+    expect(before.state).toBe('enough');
+    // Docks at a1 after 8760: the re-dispatched one from a2 (built before), then the one this bay built, before the next lowering.
+    expect(a1Docks.map((x) => [x.id, x.built])).toEqual([
+      [dials.find((x) => x.tick === lowerToA1 && nodeId(x.node) === 'a2')!.unbound[0]!.id, before.built],
+      [dialAt(lowerIdle).unbound[0]!.id, before.built + 1],
+    ]);
+    expect(a1Docks[1]!.tick).toBeGreaterThan(raise);
+    expect(a1Docks[1]!.tick).toBeLessThan(lowerIdle);
+  });
+
+  it('H9 (e): a count set on unmarked a1 (8760) is kept and applies when a1 is marked again (8761): one extractor, not its two slots', () => {
+    const d = dials.find((x) => x.tick === 8760 && nodeId(x.node) === 'a1')!;
+    expect([d.markedBefore, d.count, d.boundBefore, d.boundAfter]).toEqual([false, 1, 0, 0]);
+    expect(remarks).toEqual([{ tick: lowerToA1, node: 1, set: 1, boundAfter: 1, slots: 2 }]);
+  });
+
+  it('H9 (f): invalid setExtractors (a guarded pocket and the guarded hive at tick 1, 0 and above the slots at 8760) are ignored and change nothing', () => {
+    expect(ignored).toEqual([
+      '1 {"type":"setExtractors","node":9,"count":1}',
+      '1 {"type":"setExtractors","node":10,"count":1}',
+      '8760 {"type":"setExtractors","node":2,"count":0}',
+      '8760 {"type":"setExtractors","node":2,"count":3}',
+    ]);
+    expect(invalidChecks).toEqual([
+      { tick: 1, same: true, inputs: 2 },
+      { tick: 8760, same: true, inputs: 2 },
+    ]);
   });
 
   it('is deterministic: two runs give the same 30 checkpoint hashes', () => {

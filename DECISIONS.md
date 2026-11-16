@@ -1580,3 +1580,42 @@ Spec: DESIGN.md "H9 (Milestone 2, iteration 9, spec ready): A wider front". Spli
 2. **`cw-bots-gate-time` runs now, in parallel with h9-sim, and lands on main before h9-bots starts.** h9-bots can't start until h9-sim is approved, and the two tasks don't overlap (`packages/bots` against `packages/sim`), so this costs no time. h9-bots then adds two report-only strategies onto a faster base. h9-bots acceptance 6 is tightened: the bots gate may not grow by more than the cost of the two new strategies' runs, with before and after times reported.
 3. **h9-raids changes the raid save shape without its own `dataVersion` bump:** confirmed. h9-sim bumps to v15 in the same stack, nothing ships between the two, and `merge-task h9-client` lands them together. A v14 save is discarded on load as usual, and save.ts validates the new shape.
 
+
+## 2026-11-16 · Core Engineer · h9-sim: the extractor dial, data v15 and the H9 selector stubs
+
+Spec: DESIGN.md "H9 (Milestone 2, iteration 9, spec ready): A wider front", X1–X4, data v15, "Selectors" and replay items (a)–(f). Task: BACKLOG.md "### h9-sim".
+
+**Architecture:**
+- **`extCap(world, node)`** (field.ts) is the one place the dial is read: `extractorSet[node]`, else the slots (a `min` with the slots keeps it in range for any state). F5's dispatch, H4b's free slots (`extractorShortfall`) and the committed extractors (`staffCounts`) read it where H7 and H8 read the slots. Nothing else changed in those rules.
+- **Lowering runs in the input (`applySetExtractors`, rule 1), not in F5.** So F2 and F3 on the same tick already see the surplus as unbound: H4b counts it as an unbound extractor and doesn't build for the slot it left. Rejected: an "over the cap" pass at the top of F5. F2 and F3 would see the old bound count for that tick, and it would repeat X3's order inside every F5 for a state that only an input can create (only `setExtractors` lowers `extCap`).
+- **The raid stubs live in `factions/index.ts`** (the two exceptions the task allows): `RaidStatus.prongs` and `nextProngs` (`prongsOf`, the exported `nextProngs`), `RaidResult.prongs` (written by `finish`, so it is in `world.lastRaid` and saved), and `raidMixAt`. `ProngStatus`, `ProngResult`, `ProngPhase` and `ProngOutcome` are the final types. `selectors.ts` reads `nextProngs` and `raidMixAt` for `rockStatus`.
+- **`RaidResult.prongs[].outcome` is typed `RaidOutcome`**, which includes `withered`. W6's limits say every prong withers when the hive falls, so the per-prong record needs it. `ProngStatus.outcome` (a live prong) is `beaten | hit | turnedBack | null`.
+
+**Readings of the spec:**
+- **An in-flight extractor unbound by X3 finishes its leg first.** X3 says each unbound extractor "re-dispatches by F5 from where it is", and F5 as built dispatches an unbound extractor in flight from where it lands. So it lands at the rock it was flying to, not docked, and leaves from there the next tick. Rejected: turning it around mid-flight. That is a new movement rule, and the spec names F5.
+- **`extractorMinCount` is `max(1, free)` for every kind.** An asteroid has no free extractors, so this is 1 there, as X1 says.
+- **`stats.raidProngs` stays at zero in h9-sim.** The BACKLOG table says "(zeros)", and counting per prong is W6 (h9-raids). `fieldSummary.raidProngs` reads it.
+- **The stub's prong outcome** is decided when the raid leaves its target for home: `hit` if it killed an economy ship, else `turnedBack`. A beaten raid ends at once (`world.raid` null), so the stub never shows a live `beaten` prong. `last.prongs` has it.
+- **`raidMix`** is non-null for the same span as `raidTarget` (muster until the raid ends, so through `home`). It shows the plan while mustering and the raiders away after that. The client decides what to show while a prong is home-bound.
+- **`nextProngs` (stub)** is 1 when R3 would muster now apart from the gap, the economy threshold, a raid in progress and a battle at the hive. So raids must be on, the hive alive, a raidable rock present, and R4's size from today's economy at least 1. Otherwise it is 0.
+- **`raidNext`** is `raidRank ≥ 1` (raidable, so Mine-marked), Mine-marked, and `raidRank ≤ nextProngs`. Without `≥ 1`, every non-raidable rock (rank 0) would read true.
+- **The save check:** `extractorSet` entries are null or an integer ≥ 1 (not checked against slots, like `haulerSet` against `rock.haulerMax`). `stats.raidProngs` has three integers. `lastRaid.prongs` is an array (h9-raids tightens its shape).
+- **Fixtures.** `fixtures/sim-v15.json` is the shipped v15, frozen. It is v14 plus the H9 keys, and data-h9.test.ts checks that. Every older fixture gets the H9 keys at H8 behaviour: `raid.prongsMax` 1 (W8), `raid.prongMinSize` 4 and `client.haulerStepper` 1. These follow the pattern h8-sim used for the H8 keys.
+
+**Acceptance 4 (the opening is H8's), how it was checked:** I exported main at 2ceada1 (`git archive 2ceada1 packages/sim data`) and ran the same loop there on its v14 data and here on v15 (fixture v15, equal to the shipped data). The loop runs 6 game minutes with no inputs:
+- every tick, it chains a hash over the tick, warships, economy ships, stock, delivered, both economy bays, the warship bays and the shares;
+- every 600 ticks, it hashes the whole world without dataVersion, `raid.prongsMax`, `raid.prongMinSize`, `field.extractorSet`, `stats.raidProngs` and `lastRaid.prongs`.
+
+Both runs gave the same values (chain a48e6bea). They are pinned in data-h9.test.ts, so the hashes differ only by the version and the new keys. The run includes two finished raids (both `hit`).
+
+**Tests outside the task's file list, or changed (strength kept):**
+- `packages/client/test/h7-client.test.ts`: the `RockStatus` and `FieldSummary` fakes gain the new required fields. This is compile-only. No `packages/client/src` or `packages/bots/src` edit was needed beyond `reference-replay.ts`.
+- `packages/client/test/h8-client.test.ts`: the client-key list gains `client.haulerStepper` with its default and range. The device-settings count stays 4 until h9-client stores the key.
+- `data-h8.test.ts`: the dataVersion pin moved to data-h9.test.ts (15). The client-key order check is bounded to the H8 keys.
+- `fleet-off.test.ts` and `h8-autoneed-off.test.ts`: their "without what later tasks added" projections also drop the H9 additions. The golden hashes are unchanged.
+- `field-selectors.test.ts` and `raids.test.ts`: the exact `toEqual`s gain the new fields with derived values.
+- `reference-replay.test.ts`: "a setMine off (a1, tick 600) unbinds every extractor" read a1's `rockStatus` at the end of the run. The H9 items mark a1 again at 8761, so it is now read on the tick of the unmark, which is the state the check is about. "No input ignored" became "only the four invalid setExtractors of item (f) are ignored", and they are listed exactly.
+
+**The replay.** Items (a)–(f) run from 8760 on a1 and a2, after the H8 a4 item's extractor has launched (8750). `ship.speedSu` 20 at 8760 makes the dial's extractor flights short; the in-flight a4 extractor keeps its transit. Item (f)'s guarded-pocket input is at tick 1, while p2 and the hive are guarded. reference-replay.test.ts checks each item. The determinism final goes from cdbdea56 (main, 2ceada1) to 2141b502.
+
+**For h9-raids (risk):** the replay now uses the window up to 8880, and raids end when the hive falls at 8010. So items (g)–(n) can't go at the tail. They need raids before 8010, which moves the H7/H8 raid timings the replay test pins, or a tail where the hive is not yet captured. This is a replay restructure, not something to tune.

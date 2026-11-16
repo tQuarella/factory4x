@@ -59,6 +59,20 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - 8440: recycleShips of one Flak at p1. The Drone's fall at 4290 freed a place in the fleet limit that the Flak weight
  *     filled, so p1 held two Flak by 8450 and the 1-ship fallback below would not have been exercised.
  *
+ * h9-sim (DESIGN.md H9 "Save, data version and replay", the extractor dial, items (a)-(f)); reference-replay.test.ts
+ * checks each:
+ *   - 1 (f): setExtractors on the guarded pocket p2 and the guarded hive: invalid, ignored, nothing changes.
+ *   - 8760: ship.speedSu 20 (after a4's extractor launched at 8750, so the H8 a4 item keeps its timing; it makes the dial's
+ *     extractor flights short). (e) setExtractors a1 1 while a1 is unmarked: kept. (f) setExtractors a2 0 and a2 3 (above
+ *     its 2 slots): invalid, ignored, nothing changes.
+ *   - 8761: a1 marked again with setExtractors a2 1. (a) a2's highest-id docked extractor is unbound and re-dispatches
+ *     to a1, the marked rock with room; (e) a1 takes one (its kept count), not its two slots; (b) the Extractor stays
+ *     enough, its share held and its bay idle, with a1 and a2 each one under their slots. a2 keeps its hauler (set 1).
+ *   - 8800: (d) setExtractors a1 null (All): the bay starts that tick, and the extractor docks at a1 (need 3 haulers).
+ *   - 8880: (a) setExtractors a1 1: the new extractor finds no marked rock with room, flies home and parks idle;
+ *     (b) the Extractor is enough again; (c) a1's target drops from 3 to 2 and the first of its haulers home leaves it
+ *     at that delivery and parks idle.
+ *
  * Node indices are the field's nodes in frame order: 0 probe, 1-7 a1-a7, 8 p1 (ice), 9 p2 (crystal), 10 heart.
  * It runs on the shipped data, so a calibration that changes the field's guards can break the script
  * (packages/sim/test/reference-replay.test.ts says so); the tunables it depends on are set at tick 0 to keep that
@@ -68,6 +82,7 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
 const at = (tick: number, ...inputs: Input[]) => inputs.map((input) => ({ tick, input }));
 const tun = (key: Extract<Input, { type: 'setTunable' }>['key'], value: number): Input => ({ type: 'setTunable', key, value });
 const mine = (node: number, on: boolean): Input => ({ type: 'setMine', node, on });
+const ext = (node: number, count: number | null): Input => ({ type: 'setExtractors', node, count });
 const alloc = (shipType: Extract<Input, { type: 'setAlloc' }>['shipType'], weight: number): Input => ({ type: 'setAlloc', shipType, weight });
 
 export const referenceReplay: Replay = {
@@ -107,6 +122,7 @@ export const referenceReplay: Replay = {
       mine(7, false),
       { type: 'setRally', node: 8 },
     ),
+    ...at(1, ext(9, 1), ext(10, 1)), // h9-sim (f): guarded, so invalid
     ...at(280, alloc('extractor', 0), alloc('hauler', 0)),
     ...at(400, mine(3, true)),
     ...at(450, alloc('drone', 3), alloc('flak', 2)),
@@ -129,5 +145,10 @@ export const referenceReplay: Replay = {
     ...at(8660, mine(9, false), mine(10, false), alloc('extractor', 3)),
     ...at(8670, mine(8, false)),
     ...at(8720, mine(4, true), tun('field.fleetCap', 45), tun('ship.hauler.cargo', 2)),
+    // h9-sim: the extractor dial (see above).
+    ...at(8760, tun('ship.speedSu', 20), ext(1, 1), ext(2, 0), ext(2, 3)),
+    ...at(8761, mine(1, true), ext(2, 1)),
+    ...at(8800, ext(1, null)),
+    ...at(8880, ext(1, 1)),
   ],
 };
