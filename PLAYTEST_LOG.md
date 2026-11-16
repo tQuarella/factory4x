@@ -281,3 +281,48 @@ QUESTIONS.md Q22 asks the owner to pick. The H7 handoff's fun questions are mark
 
 **Action:** Designer triage and H9 candidates.
 
+**Interpretation (Designer, 2026-11-15, iteration 9 triage; all quotes are the owner's):** **H8 is partly supported: the controls hold, the decision doesn't.** The two halves the build added to make the front easy to run both worked. Drag is fast ("Moving ships felt quick"), and staffing by need is right ("Auto got it right"). But the claim was that the decision becomes "where do my warships stand, and how many", and it is fun. The "where" half failed in the exact words the spec gave for its disproof: "only need to defend one asteroid", with nothing to decide. The owner: "Since there is only ever one raid target, it wasn't much of a choice." Beating a raid is still fun ("It did feel good to repel the first raid"), as it was in H7. The "how many" half has no evidence from the owner, and the team's own watch items say it is cheap. A guard of 6 beats the full raid of 12, losing 3 (DESIGN.md "Calibration result (h8-design-data, data v14)"), and greedy, which ignores raids, finishes 8 s ahead of adaptive (15:45 against 15:53, same source). So the owner's "not much of a choice" and the bots agree: holding the front costs too little and asks nothing.
+
+*Success criteria (DESIGN.md H8):*
+
+| # | Criterion | Score | Evidence |
+| --- | --- | --- | --- |
+| 1 | No haulers in the wrong place, no extra haulers | **Met** | "Auto got it right." No hauler complaint, against about a third of the H7 dictation. |
+| 2 | Drags ≥ 3 times, one long-press half move; no misfire, no tap turned into a move | **Partly met** | "Moving ships felt quick." No misfire reported. The count isn't stated, and the long-press half move isn't mentioned. |
+| 3 | A raid beaten with no economy ship lost, and they notice warships protected the economy | **Partly met** | "It did feel good to repel the first raid." Nothing says whether they saw the shield at work. |
+| 4 | Mine mode used, or marking called quick enough | **Not answered** | |
+| 5 | Checks the fleet panel or recycles from it | **Not answered** | See "Why they wanted fewer extractors" below: the panel couldn't do what they wanted at the end. |
+| 6 | Can say what a weight of 3 does | **Not answered** | No question about the weights this time, against "kind of unclear how this one to five… works" in H7. Weak evidence that the % column helped. |
+| 7 | Raids not called a timer or a punishment | **Met** | No such language. |
+| 8 | The sheets and the fleet panel fit; nothing in the HUD shifts | **Not answered** | No layout complaint. |
+
+*Fun questions (H8):*
+1. **Did you drag ships to meet a raid? Quick? Long-press?** **Answered: quick.** "Moving ships felt quick." The long-press half move is unanswered.
+2. **Holding a front worth the slots, or a chore?** **Answered: neither. It wasn't a choice.** "Since there is only ever one raid target, it wasn't much of a choice. It did feel good to repel the first raid." This is the disproof line.
+3. **Did you set a hauler count, or did Auto get it right?** **Answered: Auto.** The control they wanted is the other one: "I wanted to reduce extractor count on specific rocks but couldn't."
+
+*Why they wanted fewer extractors, and why they couldn't.*
+- **What blocked them.** The rock sheet's Recycle can scrap an extractor at a rock, but H4b reopens the Extractor share the moment one is recycled, so the probe builds a new one for the free slot. The only way to have fewer extractors on a rock was Stop mining, which takes them all. So "couldn't" is accurate: no rule lets the player say "fewer here".
+- **Why at the end.** They don't say whether they took the hive, but "at the end" is most likely the hive push. In H7 the same moment was "I have to, like, pull economy way back… Recycling haulers now". My reading is that they wanted fleet slots for the wave and chose to trim per rock rather than drop whole rocks. Two other reasons fit as well: trimming shrinks raids (R4 sizes them by economy ships), and trimming the exposed rocks lowers what a raid can kill. A per-rock extractor count serves all three, so I don't ask which it was.
+- **"Wouldn't the haulers balance to the new extraction count?"** Yes. H1's need is the rock's extractors × rate × round trip, and H3 sends a surplus hauler on to another rock, or home to park, on its next delivery. With the probe's H4 and H4b rules counting the lowered number, nothing gets rebuilt. This is the owner's design and it fits the rules as built: the extractor count is the one number the player sets, and the haulers follow.
+
+*Likes (keep):*
+- Drag to move ("felt quick").
+- Staffing by need ("Auto got it right").
+- Repelling a raid ("It did feel good"), now liked in two builds running.
+
+*Rule gaps:*
+1. **One raid target, so no choice** (fun question 2). R5 always aims at the mined rock nearest the hive, so the front is a single rally point. A single raid aimed somewhere else wouldn't fix it either: warning time for a5 is about 593 ticks (DESIGN.md H7, "Warning time"), and warships at `ship.speedSu` 4 cross between any two front rocks (a5, a6, a7) in at most 165 ticks (660 su from a6 to a7, from the coordinates in `data/sim.json`). One mobile reserve covers any single target with time to spare. A choice needs **threats at more than one rock at once**, or a stake in what defending earns.
+2. **Defending costs little and earns little** (the team's two watch items). A half-size guard wins, and ignoring raids doesn't slow the bots. Beating a raid also buys nothing lasting: at `hive.regrowPct` 200 the hive regrows a Spore every 40 ticks and a Thorn every 120 (`guard.<type>.regrowTicks` × 2), so the 8 Spores and 4 Thorns of a beaten full raid are back in about 480 ticks, or 16 s.
+3. **No per-rock extractor count** (above). Recycled extractors are rebuilt.
+
+*Feature requests:*
+- **A per-rock extractor count**, in place of the hauler count: "If I could dial extractors instead of haulers, wouldn't the haulers balance to the new extraction count?"
+
+**Action:** DESIGN.md H8 marked tested. DESIGN.md "H9 candidates (iteration 9)":
+- a ride-along for any option: the per-rock extractor dial, replacing the hauler stepper on the rock sheet;
+- A, "A wider front" (recommended): at a full economy a raid splits and hits the two mined rocks nearest the hive at once;
+- B, "Every nest raids": the pockets raid the rocks nearest them, so the front starts at home and moves out as you take nests;
+- C, "Strike back": a beaten raid leaves the hive open for a while, so defending pays. It's small, and it can join A.
+
+QUESTIONS.md Q24 asks the owner to pick. DECISIONS.md logs the calls. No spec and no BACKLOG change until the pick.

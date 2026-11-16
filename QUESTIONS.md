@@ -20,6 +20,8 @@ Fun questions (the H8 hypothesis):
 2. Did keeping warships on a rock feel like holding a front worth the slots, or like a chore?
 3. Did you set any rock's hauler count, or did Auto get it right?
 
+**Answered (owner, 2026-11-15):** 1, quick ("Moving ships felt quick"); the long-press half move isn't mentioned. 2, not much of a choice, because there's only ever one raid target, though repelling the first raid felt good. 3, Auto got it right; they wanted to dial extractors per rock instead. Scored against the success criteria in PLAYTEST_LOG.md (build-20261116-1).
+
 Known from the team (not hidden from you):
 - Drag and long-press were tested only in an emulated phone browser, not on a real phone. If a drag scrolls or misfires, say so; in the tuning panel, set "Move ships by" to 0 to switch to tap Move, then tap the target.
 - A guard half the raid's size may still win (6 ships beat a full raid of 12, losing 3). If defending feels too easy, tell us; fun question 2 is where it shows.
@@ -27,6 +29,17 @@ Known from the team (not hidden from you):
 
 Also open: Q18 (pillar 1 wording, only if a fleet cap ships). The fleet limit has shipped since H7, so it's worth a look now.
 Protected files changed this build: none.
+
+## Q24. Which way should the next build (H9) widen the front? (2026-11-15, Designer)
+
+H8's controls worked: drag felt quick and Auto staffed the haulers right. But one raid target meant no choice, as you said. **Whatever you pick, this comes with it:** an extractor count per rock (−/+ on the rock sheet), replacing the hauler count. Haulers follow it on their own, as you expected.
+
+Pick one:
+- **A (recommended): a wider front.** Once your economy is big, a raid splits and hits the two mined rocks nearest the hive at once. You hold both, mine fewer exposed rocks, or let one go.
+- **B: every nest raids.** The ice and crystal pockets raid the rocks nearest them too, so the front starts at home and moves out as you take each nest. About one and a half builds.
+- **C: strike back.** Beating a raid leaves the hive short of those guards for about 90 s, so defending well opens a window to attack. Small, and it can join A.
+
+Answer like "A", "A, plus C" (about a third of a build more), "B" or "C". Details: DESIGN.md → "H9 candidates (iteration 9)". Default if unanswered: A.
 
 ## Q23 (Blocking, 2026-11-15): GitHub Actions won't run
 

@@ -432,13 +432,135 @@ H5 (build-20261108-4, spec below) added a fleet limit per area (12, raised to 18
 
 H6 (build-20261108-5, spec below) opened the overworld to 10 areas in four bands, with command relays that raise the fleet limit and open the next band, and the combat amendment (guards strike their counter first). The Root was removed.
 
-H7 (build-20261114-1, spec below) is the current build. Data `run.mode` `"field"` parks the overworld, research and relays. A run is one field:
+H7 (build-20261114-1, spec below) made the run one field. Data `run.mode` `"field"` parks the overworld, research and relays. A run is one field:
 - Extractor and Hauler ships built at the probe; Mine marks; haulers assigned by haulers ÷ extractors;
 - an allocation of weights 0–5 per type, shown as a radar, in place of the build queue and yards;
 - hive raids paced by your economy ships and aimed at the mined rock nearest the hive;
 - a shared fleet limit of 30 that counts economy ships.
 
+H8 (build-20261116-1, spec below) is the current build, on data v14:
+- haulers staffed by need, rebalancing at home, and no surplus haulers or extractors;
+- a per-rock hauler count (Auto by default);
+- drag (or long-press, then drag, for half) to move warships between nodes;
+- warships shield the economy ships at a raided rock, and haulers wait out the fight;
+- a raid-target badge, a fleet panel with Recycle, Mine mode, and income shares on the weights.
+
 ## Hypotheses
+
+### H9 candidates (iteration 9, awaiting the owner's pick)
+
+*Iteration 9, 2026-11-15. The triage is in PLAYTEST_LOG.md (build-20261116-1, 2026-11-15). **H8 is partly supported.** The controls hold: "Moving ships felt quick" and "Auto got it right". The decision doesn't: "Since there is only ever one raid target, it wasn't much of a choice", which is H8's own disproof wording. Repelling a raid is still fun ("It did feel good to repel the first raid"). The team's watch items say the same from the numbers: a guard of 6 beats the full raid of 12, and greedy, which ignores raids, finishes 8 s ahead of adaptive ("Calibration result (h8-design-data, data v14)" below). QUESTIONS.md Q24 asks for the pick. No spec until then.*
+
+**What any H9 has to fix.** A single raid at a single rock can't make a choice, wherever it aims. Warning time for a5 is about 593 ticks (H7, "Warning time"). Warships at `ship.speedSu` 4 cross between any two front rocks in at most 165 ticks (a6 to a7 is 660 su, from the coordinates in `data/sim.json`). So one mobile reserve that follows the badge covers every single raid. "Raids retarget to the weakest rock" fails for the same reason, so it isn't proposed. A choice needs **threats at more than one place at once** (A, B), or **a payoff for defending that a greedy player gives up** (C).
+
+#### Ride-along (ships with A, B or C): the extractor dial
+
+The owner: "I wanted to reduce extractor count on specific rocks but couldn't. If I could dial extractors instead of haulers, wouldn't the haulers balance to the new extraction count?" They couldn't, because a recycled extractor reopens the Extractor share (H4b) and the probe rebuilds it. The only way to have fewer was Stop mining, which takes them all.
+
+- **Input `setExtractors(node, count | null)`.** It is valid for an asteroid, or a captured pocket or the captured hive. `count` runs from 1 to the node's slots, and null means "all slots", the default. 0 isn't a count: Stop mining already means that. For a pocket or the hive, the lowest count is its free extractors, which aren't ships.
+- **The cap.** `extCap(n)` = `extractorSet[n]` if set, else the slots. F5 dispatches to a node only while its bound plus free extractors are below `extCap`. H4b counts free slots against `extCap`, so a lowered rock doesn't make the probe build.
+- **Lowering.** The surplus docked extractors (highest id first) unbind on that tick and re-dispatch by F5: to the nearest marked rock with room, or idle at the probe. The fleet panel recycles idle ships first. So "fewer here" is one tap, and "fewer ships" is one more tap in the fleet panel.
+- **Haulers follow, as the owner expected.** H1's need uses the rock's extractors, so it drops. H3 moves the surplus hauler on, or parks it, at its next delivery (9–21 s at 1x on the field's rocks). H4 then stops building haulers. Raids shrink too, because R4 sizes them by economy ships alive.
+- **The rock sheet.** The "Haulers" stepper row becomes "Extractors 2 / 3", with −, + and All buttons (44 px each). Haulers become a read-only line: "Haulers 1 (auto)". The setting is kept while the rock is unmarked, like `haulerSet`.
+- **`setHaulers` stays in the sim** (replays and tests use it). Only its stepper goes, behind `client.haulerStepper`.
+
+Edge walk:
+- **Opening.** Every count starts null, so the opening is H8's to the tick.
+- **Raid phases.** Lowering a raid's target during `fight` moves extractors out of the fight. Stop mining already allows that evacuation; this is a finer grain of it, not a new one.
+- **Limits.** At the fleet limit, lowering frees no slot until the idle extractors are recycled. At the lowest count the rock is still mined and can still be a raid target. Raising the count reopens H4b, like marking a rock.
+- **Sibling.** This is the hauler stepper's twin. Both on one sheet would be two knobs for the same throughput, so the hauler one is hidden.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `client.haulerStepper` | 0 | 0–1 | client. 0: extractors are the dial, haulers are a readout / 1: H8's hauler stepper comes back beside it |
+
+Cost: a small sim change (F5 and H4b read `extCap`), one input, a rock-sheet row and replay items. About a fifth of an iteration.
+
+#### A. A wider front (recommended)
+
+- **Claim:** when a full-size raid splits and hits the two mined rocks nearest the hive at once, the player has to choose: hold both, mine fewer exposed rocks, or let one fall. "Where do my warships stand" becomes a real decision, and holding the front is fun.
+- **The smallest mechanics:**
+  - **Prongs (R4 and R5 change).** `prongs = min(raid.prongsMax, mined targets, max(1, floor(size ÷ raid.prongMinSize)))`. The targets are that many distinct mined nodes, nearest the hive first (ties by lower index). So the front stays where the owner liked it ("hit the things closest to it first… You can kind of build a front").
+  - **The split.** Raiders are dealt to the prongs one at a time, Thorns first, then Spores, starting at the nearest target. A full raid of 12 (4 Thorns, 8 Spores) becomes two prongs of 2 Thorns and 4 Spores.
+  - **Each prong is its own fight.** It flies and fights at its target under R6, R7, the shield (H9) and the hold (H10), exactly as a raid does now. A prong whose target is no longer mined retargets once, to the nearest mined node no other prong holds, or else flies home.
+  - **Pacing.** The raid ends when every prong has an outcome, and the gap (R8) runs from the last one. The stats count each prong's outcome.
+  - **Readout.** Each target gets its own badge, and the banner names both ("Raid coming: a5 2T 4S · a6 2T 4S").
+- **What the owner would do differently:** decide whether mining a6 or a7 is worth a second front; split warships with the long-press half move (unused in H8) to cover two rocks; and sometimes leave a rock to the raid to hold the richer one.
+- **Edge walk:**
+  - *Opening:* the first raid (3 raiders at 2:42) is below 2 × `raid.prongMinSize`, so it stays one prong. The early game is H8's.
+  - *Phases:* each prong reads muster, out, fight and home on its own. The hold (H10) applies to each prong's target until that prong's outcome.
+  - *Limits:* with one mined rock it is H8. `raid.prongsMax` 1 is H8 exactly, the in-build comparison.
+  - *Siblings:* captured pockets are targets under R5, so they can take a prong too.
+- **Cost:** about one iteration, smaller than H8. Most of it is Faction AI turning `world.raid` into a raid with prongs. Then: the client's badges and banner, a bot rule for adaptive to split its defence by prong size, and a recalibration.
+- **How it would be disproved:**
+  - The owner still says there's nothing to decide: they park an equal guard on both front rocks and forget it.
+  - It feels like a chore or a punishment ("I can't save both, so why try").
+  - Or the bots show splitting doesn't matter: greedy still finishes within 10% of an adaptive that defends each prong.
+- **New calibration targets:**
+  - A guard under half its prong's size is beaten, then the prong hits.
+  - A guard matched to its prong wins, losing at most 2.
+  - Greedy (ignoring raids) finishes at least 10% slower than adaptive. This makes the watch item a target. If values alone can't meet it, that's a rule finding for the Director, not a number to force.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `raid.prongsMax` | 2 | 1–3 | 1: H8, one target (the comparison) / 3: a5, a6 and a7 hit at once; the whole wing is the front |
+| `raid.prongMinSize` | 4 | 2–12 | 2: even small raids split, so early fronts are thin / 12: only the largest raids split |
+
+At v14 a raid reaches 8 raiders (two prongs of 4) at 15 economy ships (R4: `ceil(econ ÷ 2)`), so splitting starts in the middle game.
+
+#### B. Every nest raids
+
+- **Claim:** when every guarded node raids the mined rocks nearest it, the front is wherever the nests are. Taking a pocket quiets a flank and pushes the front toward the hive, so holding and advancing the front is the game.
+- **The smallest mechanics:**
+  - R1–R9 run per raiding node (the hive and each uncaptured pocket), each with its own state and gap. A pocket raids the mined rock nearest to it (p1's is a1 at 171 su; p2's is a2) and stops when captured.
+  - Pocket raids are sized by R4 with `raid.pocketKeepPct` in place of `raid.hiveKeepPct`. Pocket guard counts go up in calibration: at v14's 4 and 3 guards, a pocket raid would be 1 or 2 raiders.
+- **What the owner would do differently:** defend the home rocks (a1, a2) from early on; choose which pocket to take first by which flank it frees; and watch the front move out as they advance. Two nests can raid at once.
+- **Edge walk (the risks):**
+  - *Opening:* raids could reach the home rocks before any warship type is unlocked. The first-raid gate (`raid.firstAtEcon`) applies to every nest.
+  - *Phases:* two raids can be out at once, which the shield and the hold handle per target.
+  - *Siblings:* this applies "Guardians have factories" to every guardian, so p1's and p2's fights and min-waves change.
+- **Cost:** about one and a half iterations: per-source raid state, pocket guard counts and min-waves, the opening, the bots and the client, and a full-field recalibration.
+- **How it would be disproved:**
+  - Early pocket raids feel like a timer, or like a punishment for mining at home.
+  - Or the owner takes both pockets first and the game falls back to H8's single front.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `raid.pockets` | 1 | 0–1 | 0: only the hive raids (H8, the comparison) / 1: every uncaptured pocket raids too |
+| `raid.pocketKeepPct` | 50 | 25–90 | 25: pocket raids are big, and the pocket is easy afterwards / 90: pocket raids are a token |
+
+#### C. Strike back
+
+- **Claim:** when beating a raid leaves the hive open for a while, defending pays. "Repel, then strike" makes the economy-against-force decision a beat, and the greedy line (ignore raids, then one big wave) becomes the slower one.
+- **The smallest mechanics:**
+  - **The window.** Raiders that die don't regrow at the hive for `hive.reopenTicks` after the raid's outcome. At v14 they come back in about 16 s: a Spore every 40 ticks and a Thorn every 120 at `hive.regrowPct` 200, so the 8 Spores and 4 Thorns of a full raid return in about 480 ticks. Today, beating a raid buys nothing lasting.
+  - **Readout.** During the window the hive carries an "Open" badge with a countdown and its live guard count. Its Strong/Even/Weak tag reads against the guards there now, so dragging a force onto it shows whether it can win.
+- **What the owner would do differently:** after repelling a raid, push the warships on to the hive while it's thin, rather than wait for one bigger wave. Defending well shortens the run.
+- **Pillar 4 check:** the window is a reward that ends, not pressure that grows. Waiting never leaves the hive stronger than before the raid, so it stays within "Pressure, not a clock".
+- **Cost:** about half an iteration: one rule in the hive's regrowth, a badge with a countdown, a bot rule (adaptive attacks in the window when its parked force wins), and a recalibration. It doesn't touch "one raid target", so on its own it doesn't answer fun question 2. **It can join A** ("A, plus C") for about a third of an iteration more.
+- **How it would be disproved:** the owner doesn't notice or use the window; or it reads as a timer ("I had to rush"); or adaptive still finishes within 10% of greedy.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `hive.reopenTicks` | 2700 (90 s) | 0–9000 | 0: H8; the hive refills in about 16 s / 9000: a beaten raid leaves it open for 5 minutes, and defending is the whole strategy |
+
+#### Recommendation
+
+**A, with the extractor dial.** A answers the owner's one complaint about the decision ("only ever one raid target") with the smallest rule change. It keeps the nearest-first front they liked, and it gives the long-press half move a reason to exist. Both team watch items become calibration targets rather than notes.
+
+B is the bigger, more ambitious version of the same answer. It's worth it later if A's two-rock front still feels static, but it reopens the opening and both pockets at once.
+
+C answers the watch items rather than the owner's complaint. It's the right add, as "A, plus C", if the owner wants defending to pay.
+
+#### VISION impact (VISION.md is protected; flagged, not edited)
+
+| Option | Impact |
+| --- | --- |
+| A | None. Prongs scale with economy ships, never with time (pillar 4). Far rocks are both richer and more exposed (pillar 2). |
+| B | None in wording. It is pillar 3 ("Guardians… raid what you build") for every guardian. |
+| C | None. The window is a reward that ends, not escalation (pillar 4). |
+| Dial | None. It serves pillar 1 directly: the player sets extraction, and logistics follow. |
+| All | **Q18 (pillar 1 wording) is still open.** The fleet limit has shipped since H7, and Q18's text still mentions research, which field mode doesn't have. As with Q22, I leave it out of Q24 so Q24 stays one reply. |
 
 ### H8 candidates (iteration 8): A and B picked
 
@@ -556,7 +678,9 @@ Draft fun questions:
 | C | Restores the "one long game" fixed decision and brings pillar 5 back into play. No edit. |
 | All | **Q18 (pillar 1 wording) is ripe.** The owner endorsed the shared limit ("That's good"), and Q18's answer was "revisit after play". Its proposed text mentions a limit "raised by research", which field mode doesn't have. Rewording it is the Director's call when bundling. I don't add it to Q22, to keep that question one reply. |
 
-### H8 (Milestone 2, iteration 8, spec ready): Hold the front
+### H8 (Milestone 2, iteration 8, tested on build-20261116-1): Hold the front
+
+*Tested 2026-11-15: partly supported. Drag and staffing by need worked ("Moving ships felt quick", "Auto got it right"). The decision failed on its own disproof line: "Since there is only ever one raid target, it wasn't much of a choice." See PLAYTEST_LOG.md (build-20261116-1) and "H9 candidates (iteration 9)" above.*
 
 The owner picked B (QUESTIONS.md Q22: "B, can we tap and drag to move ships?  Long-tap then drag to move half?"), then added A ("Do A at the same time"). The Director logged both in DECISIONS.md (048156b, 756a237). So H8 is **A and B together, with every ride-along**. The background is "H8 candidates" above. Where they differ, this spec wins, and where this spec and BACKLOG.md differ, the spec wins.
 
