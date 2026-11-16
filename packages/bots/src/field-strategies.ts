@@ -1,15 +1,16 @@
 import {
   BUILD_TYPES,
   PROBE,
-  allocStatus,
   econAtByType,
   fieldSummary,
   fleetCap,
-  fleetStatus,
+  isFleetFull,
   guardianAt,
   haulerTarget,
   heartIndex,
   isGuarded,
+  isMineable,
+  oreCost,
   isTypeUnlocked,
   isValidInput,
   nodeDistance,
@@ -52,16 +53,32 @@ const EMPTY: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
 
 // ---- Reading the world ----------------------------------------------------------------------------------------
 
-/** Economy ships alive and in the bays, by type (fleetStatus). */
+// The reads below are the numbers `fleetStatus`, `allocStatus` and `rockStatus` report, taken straight from the
+// world without building a whole sheet (`fleetStatus` sorts every ship for its recycle counts, `rockStatus` ranks
+// the raids): they run several times a tick, and were a fifth of the bots gate (cw-bots-gate-time).
+
+/** Economy ships alive and in the bays, by type (fleetStatus.econByType + econBuildingByType; `data` is unused, kept for the call sites). */
 export function econCounts(world: Readonly<World>, data: SimData): { extractor: number; hauler: number } {
-  const f = fleetStatus(world, data);
-  return { extractor: f.econByType.extractor + f.econBuildingByType.extractor, hauler: f.econByType.hauler + f.econBuildingByType.hauler };
+  void data;
+  const f = world.field!;
+  let extractor = f.bays.extractor.ticksLeft > 0 ? 1 : 0;
+  let hauler = f.bays.hauler.ticksLeft > 0 ? 1 : 0;
+  for (const s of f.econ) {
+    if (s.type === 'extractor') extractor++;
+    else hauler++;
+  }
+  return { extractor, hauler };
 }
 
 /** Economy ships alive (R2's `econ`: the ships in the bays are not counted). */
 export function econAliveNow(world: Readonly<World>, data: SimData): number {
-  const f = fleetStatus(world, data);
-  return f.econByType.extractor + f.econByType.hauler;
+  void data;
+  return world.field!.econ.length;
+}
+
+/** True while any of the five bays is running (allocStatus: a row with ticksLeft above 0). */
+export function anyBayRunning(world: Readonly<World>): boolean {
+  return world.field!.bays.extractor.ticksLeft > 0 || world.field!.bays.hauler.ticksLeft > 0 || world.yards.drone.ticksLeft > 0 || world.yards.lancer.ticksLeft > 0 || world.yards.flak.ticksLeft > 0;
 }
 
 /** Extractor slots on the rocks that can be mined now (Mine-marked, not guarded), less the free extractors (rockStatus). */
@@ -69,8 +86,7 @@ export function openSlots(world: Readonly<World>): number {
   let n = 0;
   for (const node of world.nodes) {
     if (node.kind === 'probe') continue;
-    const r = rockStatus(world, node.index);
-    if (r.mineable) n += Math.max(0, r.slots - r.freeExtractors);
+    if (isMineable(world, node.index)) n += Math.max(0, node.slots - world.field!.free[node.index]!);
   }
   return n;
 }
@@ -108,11 +124,12 @@ function unlockedWarships(world: Readonly<World>, dronesOnly: boolean): ShipType
 export function weightInputs(world: Readonly<World>, data: SimData, target: Readonly<Weights>): Input[] {
   const out: Input[] = [];
   const max = world.tun['alloc.maxWeight'];
-  const rows = allocStatus(world, data).rows;
-  BUILD_TYPES.forEach((type, i) => {
+  const alloc = world.field!.alloc;
+  void data;
+  for (const type of BUILD_TYPES) {
     const w = Math.max(0, Math.min(max, target[type]));
-    if (rows[i]!.weight !== w) out.push({ type: 'setAlloc', shipType: type, weight: w });
-  });
+    if (alloc[type] !== w) out.push({ type: 'setAlloc', shipType: type, weight: w });
+  }
   return out;
 }
 
@@ -178,14 +195,13 @@ export class Backstops {
   constructor(private readonly dronesOnly: boolean) {}
 
   apply(world: Readonly<World>, data: SimData, w: Weights): void {
-    const rows = allocStatus(world, data).rows;
-    if (rows.some((r) => r.ticksLeft > 0)) this.lastBusy = world.tick;
+    if (anyBayRunning(world)) this.lastBusy = world.tick;
 
     // Change 3 reads the strategy's own warship weights, so it comes before change 2 edits anything.
     if (w.drone + w.lancer + w.flak > 0) this.nothing = false;
     else {
       if (!this.nothing && world.tick - this.lastBusy >= IDLE_BAYS_MIN * 60 * data.tickRate) {
-        const dearest = Math.max(0, ...rows.filter((r) => WARSHIPS.includes(r.type as ShipType) && r.unlocked && (!this.dronesOnly || r.type === 'drone')).map((r) => r.cost.ore));
+        const dearest = Math.max(0, ...WARSHIPS.filter((t) => isTypeUnlocked(world, t) && (!this.dronesOnly || t === 'drone')).map((t) => oreCost(world, t)));
         if (dearest > 0 && world.stock.ore >= dearest) this.nothing = true;
       }
       if (this.nothing) {
@@ -362,7 +378,7 @@ export class AdaptiveBot implements FieldBot {
     const room = warshipRoom(world, data, limit);
 
     // Where the warships gather: the raid's target while answering one, the standing post otherwise.
-    const stage = raidActive ? raid.target! : this.respond && this.standAt !== PROBE && rockStatus(world, this.standAt).mine ? this.standAt : PROBE;
+    const stage = raidActive ? raid.target! : this.respond && this.standAt !== PROBE && world.field!.mine[this.standAt] === true ? this.standAt : PROBE;
     const inputs: Input[] = [];
     if (this.rally !== stage) {
       inputs.push({ type: 'setRally', node: stage });
@@ -391,7 +407,7 @@ export class AdaptiveBot implements FieldBot {
     if (raidActive) {
       // 2. Answer the raid: the counter for its majority at full weight until the defence matches it, sent to the target.
       const counter = counterFor(world, raid.planned, this.opts.dronesOnly);
-      const defenders = total(fleetStatus(world, data).byType);
+      const defenders = world.ships.length;
       if (defenders < raid.planned.thorn + raid.planned.spore) w[counter] = world.tun['alloc.maxWeight'];
       return finish(regroup(world, parked, stage));
     }
@@ -418,7 +434,7 @@ export class AdaptiveBot implements FieldBot {
         Object.assign(w, deficitWeights(world, data, plan.fleet));
         // The fleet is full of ships the plan can't use (wounded, or a type it doesn't need): scrap one to open a slot.
         const missing = w.drone + w.lancer + w.flak > 0;
-        const r = missing && fleetStatus(world, data).full ? this.recycleUnfit(world, data, plan.fleet) : null;
+        const r = missing && isFleetFull(world, data) ? this.recycleUnfit(world, data, plan.fleet) : null;
         if (r !== null) extra.push(r);
       } else if (!this.opts.dronesOnly && this.lockedTaken(world).length > 0) {
         // Not a dead end: a pocket is taken and its first delivery, which unlocks its type, is on the way.
@@ -477,7 +493,7 @@ export class AdaptiveBot implements FieldBot {
     Object.assign(w, deficitWeights(world, data, mix.fleet));
     if (covers(fit, mix.fleet)) return exactSend(world, stage, node, mix.fleet);
     // Full of ships this wave can't use (wounded, or other types): scrap one to open a slot.
-    const r = w.drone + w.lancer + w.flak > 0 && fleetStatus(world, data).full ? this.recycleUnfit(world, data, mix.fleet) : null;
+    const r = w.drone + w.lancer + w.flak > 0 && isFleetFull(world, data) ? this.recycleUnfit(world, data, mix.fleet) : null;
     return r === null ? [] : [r];
   }
 
@@ -645,8 +661,8 @@ class IdleBot implements FieldBot {
   decide(world: Readonly<World>, data: SimData): Input[] {
     const c = econCounts(world, data);
     // A full share starts its bay next tick, so it counts as built.
-    const rows = allocStatus(world, data).rows;
-    const pending = BUILD_TYPES.filter((t, i) => (t === 'extractor' || t === 'hauler') && rows[i]!.ticksLeft === 0 && rows[i]!.share > 0 && rows[i]!.share >= rows[i]!.cost.ore).length;
+    const f = world.field!;
+    const pending = (['extractor', 'hauler'] as const).filter((t) => f.bays[t].ticksLeft === 0 && f.share[t] > 0 && f.share[t] >= oreCost(world, t)).length;
     const hold = world.tun['raid.firstAtEcon'] - 1;
     const w: Weights = { ...ZERO };
     if (c.extractor + c.hauler + pending < hold) {

@@ -6,7 +6,11 @@ import {
   createWorld,
   fieldSummary,
   fleetStatus,
+  isFleetFull,
+  isTypeUnlocked,
   isWon,
+  oreCost,
+  SHIP_TYPES,
   rockStatus,
   step,
   worldHash,
@@ -185,9 +189,10 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
       let noBay = true;
       for (const t of bayNow) if (t > 0) noBay = false;
       if (noBay && world.stock.ore >= world.tun['ship.drone.cost']) {
-        const rows = allocStatus(world, data).rows;
-        const dearest = Math.max(0, ...rows.filter((r) => r.type !== 'extractor' && r.type !== 'hauler' && r.unlocked).map((r) => r.cost.ore));
-        if (dearest > 0 && world.stock.ore >= dearest && !fleetStatus(world, data).full) {
+        // Read straight from the world: the same numbers as allocStatus rows' cost and unlocked, and fleetStatus.full, without the sheets.
+        let dearest = 0;
+        for (const t of SHIP_TYPES) if (isTypeUnlocked(world, t)) dearest = Math.max(dearest, oreCost(world, t));
+        if (dearest > 0 && world.stock.ore >= dearest && !isFleetFull(world, data)) {
           idleOreRun++;
           if (idleOreRun > idleOreLongest) idleOreLongest = idleOreRun;
         } else idleOreRun = 0;

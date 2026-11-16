@@ -14,7 +14,7 @@ import {
   type SimData,
   type World,
 } from '@factory4x/sim';
-import { minMix, minSingle, waveWins } from './waves.ts';
+import { minMix, minSingle, waveWins, type WinsFn } from './waves.ts';
 
 /**
  * The field's min-wave estimate (DESIGN.md H7 "Bots (H7): strategies": "no pre-send battle simulation beyond the
@@ -46,7 +46,25 @@ const cache = new Map<string, { data: SimData; world: World }>();
 const mixCache = new Map<string, { total: number; fleet: ShipTypeCounts } | null>();
 const singleCache = new Map<string, number | null>();
 
-const tunKey = (world: Readonly<World>, data: SimData): string => `${data.dataVersion}|${fnv1a(JSON.stringify(data.map.field))}|${fnv1a(JSON.stringify(world.tun))}`;
+const fieldHash = new WeakMap<object, string>();
+let lastKey: { world: Readonly<World>; data: SimData; tick: number; key: string } | null = null;
+
+/**
+ * The cache key for a world's tunables and the field map. The tunables only change inside `step` (setTunable), so
+ * the key is computed once per world and tick: the strategies ask several times a tick, and hashing the tunables
+ * each time was a tenth of the bots gate. The map hash is per map object, which is never mutated.
+ */
+const tunKey = (world: Readonly<World>, data: SimData): string => {
+  if (lastKey !== null && lastKey.world === world && lastKey.data === data && lastKey.tick === world.tick) return lastKey.key;
+  let fh = fieldHash.get(data.map);
+  if (fh === undefined) {
+    fh = fnv1a(JSON.stringify(data.map.field));
+    fieldHash.set(data.map, fh);
+  }
+  const key = `${data.dataVersion}|${fh}|${fnv1a(JSON.stringify(world.tun))}`;
+  lastKey = { world, data, tick: world.tick, key };
+  return key;
+};
 
 /** The inert field, with `node`'s guards cut to `counts` when given (the lowest ids of each type stay). Cached per tunables. */
 function baseFor(world: Readonly<World>, data: SimData, node: number, counts: Readonly<GuardCounts> | null): { data: SimData; world: World } {
@@ -67,6 +85,32 @@ function baseFor(world: Readonly<World>, data: SimData, node: number, counts: Re
 
 const guardKey = (c: Readonly<GuardCounts> | null): string => (c === null ? 'full' : `${c.thorn}t${c.spore}s`);
 
+const winsMemo = new Map<string, Map<number, boolean>>();
+
+/**
+ * `waveWins` remembered per base (tunables, node, guards at home) and fleet. The searches for different type sets
+ * and limits on one base test many of the same fleets; a battle's result depends only on the base and the fleet,
+ * so sharing them changes no answer. The memo is dropped whole when it grows large.
+ */
+function winsFor(world: Readonly<World>, data: SimData, node: number, counts: Readonly<GuardCounts> | null): WinsFn {
+  const baseKey = `${tunKey(world, data)}|${node}|${guardKey(counts)}`;
+  let memo = winsMemo.get(baseKey);
+  if (memo === undefined) {
+    if (winsMemo.size > 64) winsMemo.clear();
+    memo = new Map();
+    winsMemo.set(baseKey, memo);
+  }
+  const m = memo;
+  return (base, n, fleet, d) => {
+    const k = (fleet.drone * 1024 + fleet.lancer) * 1024 + fleet.flak;
+    const hit = m.get(k);
+    if (hit !== undefined) return hit;
+    const r = waveWins(base, n, fleet, d);
+    m.set(k, r);
+    return r;
+  };
+}
+
 /** A node's guards at home right now, by type (what a wave sent now would fight). */
 export function guardsAtHome(world: Readonly<World>, node: number): GuardCounts {
   return countGuards(guardianAt(world, node)!);
@@ -86,7 +130,7 @@ export function fieldMix(world: Readonly<World>, data: SimData, node: number, ty
     return hit === null ? null : { total: hit.total, fleet: { ...hit.fleet } };
   }
   const b = baseFor(world, data, node, counts);
-  const m = minMix(b.world, node, types, upTo, b.data);
+  const m = minMix(b.world, node, types, upTo, b.data, winsFor(world, data, node, counts));
   if (mixCache.size > 4000) mixCache.clear();
   mixCache.set(key, m === null ? null : { total: m.total, fleet: { ...m.fleet } });
   return m === null ? null : { total: m.total, fleet: { ...m.fleet } };
@@ -97,7 +141,7 @@ export function fieldSingle(world: Readonly<World>, data: SimData, node: number,
   const key = `${tunKey(world, data)}|${node}|${guardKey(counts)}|${type}|${upTo}`;
   if (singleCache.has(key)) return singleCache.get(key)!;
   const b = baseFor(world, data, node, counts);
-  const n = minSingle(b.world, node, type, b.data, upTo);
+  const n = minSingle(b.world, node, type, b.data, upTo, winsFor(world, data, node, counts));
   if (singleCache.size > 4000) singleCache.clear();
   singleCache.set(key, n);
   return n;
