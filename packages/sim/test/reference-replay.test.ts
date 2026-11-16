@@ -5,10 +5,15 @@ import {
   createWorld,
   defaultData as data,
   fleetStatus,
+  haulersHeld,
   isValidInput,
   isHaulable,
   isStaffed,
+  isRaidable,
   movePreview,
+  nodeDistance,
+  prongOutcome,
+  raidProngs,
   raidStatus,
   recycleOrder,
   replayHashes,
@@ -77,6 +82,15 @@ describe('reference replay (field mode)', () => {
   const invalidChecks: Array<{ tick: number; same: boolean; inputs: number }> = [];
   const a1Docks: Array<{ tick: number; id: number; built: number }> = [];
   let a1Docked = new Set<number>();
+  // h9-raids: the prongs' state at every change (the phases, targets, raiders, losses, outcomes and the holds), items (g)-(n).
+  type ProngSnap = { target: number; phase: string; planned: [number, number]; raiders: [number, number]; retargeted: boolean; outcome: string | null; lost: number; killed: number; shipsLost: number; warships: number };
+  const prongLog: Array<{ tick: number; id: number; phase: string; prongs: ProngSnap[]; held: Record<number, boolean>; status: ReturnType<typeof raidStatus> }> = [];
+  let prongKey = '';
+  const prevRetargeted = new Map<string, boolean>();
+  const retargets: Array<{ tick: number; raid: number; prong: number; to: number; raidable: number[]; others: string[] }> = [];
+  const muster: Array<{ tick: number; id: number; raidable: number[]; prongs: Array<{ target: number; planned: [number, number]; mix: [number, number] | null; next: boolean }>; nextProngs: number }> = [];
+  const endsOf: Array<{ tick: number; last: NonNullable<ReturnType<typeof raidStatus>['last']>; raids: World['stats']['raids']; raidProngs: World['stats']['raidProngs']; nextRaidTick: number }> = [];
+  let lastSeen: unknown = null;
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
     const probe = inputs.length > 0 ? clone(w) : w;
@@ -89,7 +103,8 @@ describe('reference replay (field mode)', () => {
     const zeroing = inputs.find((i): i is Extract<Input, { type: 'setAlloc' }> => i.type === 'setAlloc' && i.weight === 0 && f.share[i.shipType] > 0);
     const before = zeroing ? { share: f.share[zeroing.shipType], stock: w.stock.ore } : null;
     const idle = f.econ.filter((s) => s.type === 'extractor' && s.target === null && s.at === PROBE && s.transit === null).map((s) => s.id);
-    const unmark = inputs.find((i): i is Extract<Input, { type: 'setMine' }> => i.type === 'setMine' && !i.on && t > 0);
+    // (h9-raids unmarks a3 and p2 for its prong items; this check is about a1's unmark at 600.)
+    const unmark = inputs.find((i): i is Extract<Input, { type: 'setMine' }> => i.type === 'setMine' && !i.on && t > 0 && i.node === 1);
     const boundThere = unmark ? f.econ.filter((s) => s.type === 'extractor' && s.target === unmark.node).map((s) => s.id) : [];
     const econBefore = f.econ.length;
     const refundBefore = w.stats.oreRefunded;
@@ -233,6 +248,55 @@ describe('reference replay (field mode)', () => {
         warshipsAtTarget: rst.target === null ? 0 : w.ships.filter((x) => x.at === rst.target).length,
       });
     }
+    // h9-raids: the prongs, at each change of their state.
+    {
+      const r = w.raid;
+      const hold = { 3: haulersHeld(w, 3), 8: haulersHeld(w, 8), 9: haulersHeld(w, 9) };
+      const prongs: ProngSnap[] =
+        r === null
+          ? []
+          : raidProngs(r).map((p) => ({
+              target: p.target,
+              phase: p.phase,
+              planned: [p.planned.thorn, p.planned.spore],
+              raiders: [p.guards.filter((g) => g.type === 'thorn').length, p.guards.filter((g) => g.type === 'spore').length],
+              retargeted: p.retargeted,
+              outcome: prongOutcome(p),
+              lost: p.lostEcon.extractor + p.lostEcon.hauler,
+              killed: p.killed.thorn + p.killed.spore,
+              shipsLost: p.lostShips.drone + p.lostShips.lancer + p.lostShips.flak,
+              warships: w.ships.filter((x) => x.at === p.target).length,
+            }));
+      // W5: each prong's retarget, with the raidable rocks in hive order at that moment.
+      if (r !== null) {
+        raidProngs(r).forEach((p, i) => {
+          const was = prevRetargeted.get(`${r.id}:${i}`) ?? false;
+          if (p.retargeted && !was) {
+            const hive = w.nodes.find((n) => n.kind === 'heart')!.index;
+            const order = w.nodes.filter((n) => isRaidable(w, n.index)).map((n) => n.index).sort((a, b) => nodeDistance(w, hive, a) - nodeDistance(w, hive, b) || a - b);
+            retargets.push({ tick: t, raid: r.id, prong: i, to: p.target, raidable: order, others: raidProngs(r).filter((q) => q !== p).map((q) => `${q.phase}@${q.target}`) });
+          }
+          prevRetargeted.set(`${r.id}:${i}`, p.retargeted);
+        });
+      }
+      const key = JSON.stringify([r === null ? null : r.id, prongs, hold]);
+      if (key !== prongKey) {
+        prongKey = key;
+        const status = raidStatus(w);
+        prongLog.push({ tick: t, id: r === null ? 0 : r.id, phase: status.phase, prongs, held: hold, status });
+        if (r !== null && r.phase === 'muster' && muster.every((m) => m.id !== r.id)) {
+          muster.push({
+            tick: t,
+            id: r.id,
+            raidable: w.nodes.filter((n) => isRaidable(w, n.index)).map((n) => n.index),
+            prongs: raidProngs(r).map((p) => ({ target: p.target, planned: [p.planned.thorn, p.planned.spore], mix: rockStatus(w, p.target).raidMix === null ? null : [rockStatus(w, p.target).raidMix!.thorn, rockStatus(w, p.target).raidMix!.spore], next: rockStatus(w, p.target).raidNext })),
+            nextProngs: status.nextProngs,
+          });
+        }
+      }
+      if (lastSeen !== w.lastRaid && w.lastRaid !== null) endsOf.push({ tick: t, last: clone(w.lastRaid), raids: { ...w.stats.raids }, raidProngs: { ...w.stats.raidProngs }, nextRaidTick: w.nextRaidTick });
+      lastSeen = w.lastRaid;
+    }
     // h8-raids: raid 1's hold at p1 (a beaten raid), raid 2's rounds and hauler departures (H9, H10).
     const rr = w.raid;
     const departed = f.econ.filter((s) => s.type === 'hauler' && s.transit !== null && s.transit.from === PROBE && s.transit.to === 8 && s.transit.ticksLeft + 1 === s.transit.totalTicks).length;
@@ -268,7 +332,7 @@ describe('reference replay (field mode)', () => {
   });
 
   it('changes the allocation nine times; the setAlloc to 0 at tick 280 returns the extractor share to stock', () => {
-    expect(w.stats.allocChanges).toBe(10); // 450 x2, 280 x2, 850, drone 5 at tick 7000, h8-sim's three at 8100 and extractor 3 at 8660
+    expect(w.stats.allocChanges).toBe(14); // 450 x2, 280 x2, 850, drone 5 at tick 7000, h8-sim's three at 8100 and extractor 3 at 8660, and (h9-raids) Flak 0 and Extractor 1 at 4410 and Extractor 0 and Flak 2 at 4500
     expect(shareReturned).not.toBeNull();
     expect(shareReturned!.tick).toBe(280);
     expect(shareReturned!.share).toBeGreaterThan(0);
@@ -375,16 +439,17 @@ describe('reference replay (field mode)', () => {
     expect(Math.min(...departuresAfter)).toBeLessThanOrEqual(raid2End + 1);
   });
 
-  it('the hive is captured (tick 8010) with the third raid out at p1: it withers (removed, not counted as an outcome)', () => {
+  it('the hive is captured (tick 8010) with the last raid (4, one prong) out at p1: it withers (removed, not counted as an outcome)', () => {
     const cap = w.stats.captures.find((c) => nodeId(c.node) === 'heart')!;
     expect(w.capturedTick).toBe(cap.tick);
-    const third = raidLog.filter((e) => e.phase === 'fight')[2]!;
-    expect(third.tick).toBeLessThan(cap.tick);
-    const end = raidLog.find((e) => e.phase === 'none' && e.tick > third.tick)!;
+    // (h9-raids: this was raid 3, at p1 in its fight at 7929. Raid 3 is now a prong raid, over at 6305, and raid 4 is launched at 7854, and out when the hive falls.)
+    const last = raidLog.filter((e) => e.phase === 'out' && e.raids.mustered === 4)[0]!;
+    expect(last.tick).toBeLessThan(cap.tick);
+    const end = raidLog.find((e) => e.phase === 'none' && e.tick > last.tick)!;
     expect(end.tick).toBe(cap.tick);
     expect(w.raid).toBeNull();
-    expect(w.lastRaid).toMatchObject({ id: 3, outcome: 'withered' });
-    expect(w.stats.raids).toEqual({ mustered: 3, beaten: 1, hit: 1, turnedBack: 0 });
+    expect(w.lastRaid).toMatchObject({ id: 4, outcome: 'withered' });
+    expect(w.stats.raids).toEqual({ mustered: 4, beaten: 1, hit: 2, turnedBack: 0 });
     expect(w.guardians.find((g) => nodeId(g.node) === 'heart')!.guards).toEqual([]);
   });
 
@@ -458,7 +523,8 @@ describe('reference replay (field mode)', () => {
     const atA4 = picks.filter((p) => nodeId(p.to) === 'a4');
     expect(atA4.length).toBeGreaterThan(0);
     const first = atA4[0]!;
-    expect([first.tick, first.staffed, first.haulable]).toEqual([8720, true, false]);
+    // (h9-raids: 8750, was 8720. The a3 unmark of the prong items shifted hauler 41's trips, so no hauler is idle at the probe at 8720 and the first free one is at 8750.)
+    expect([first.tick, first.staffed, first.haulable]).toEqual([8750, true, false]);
     const dock = firstDockAt[4]!;
     expect(dock).toBeGreaterThan(first.tick);
     const waited = waits.filter((x) => x.id === first.id && nodeId(x.node) === 'a4');
@@ -466,9 +532,16 @@ describe('reference replay (field mode)', () => {
     // It waited the whole time from its arrival to the dock, without leaving.
     expect(waited[waited.length - 1]!.tick).toBe(dock - 1);
     expect(waited.length).toBe(dock - waited[0]!.tick);
-    const load = loads.find((l) => l.id === first.id && nodeId(l.node) === 'a4')!;
-    expect(load.tick).toBeGreaterThan(dock);
-    expect(load.cargo).toBe(2);
+    // Loads at a4 go in id order, and (h9-raids) the first pick (94, 8750) has a higher id than the second (89, 8760), so 89 loads first
+    // (8970) and 94 only after the 9000 ticks the replay runs. So the check covers every hauler picked for a4 before the dock that loads
+    // in the run: it loads only after the extractor docks, with its full cargo of 2.
+    const pickedBefore = new Set(atA4.filter((p) => p.tick < dock).map((p) => p.id));
+    const loaded = loads.filter((l) => pickedBefore.has(l.id) && nodeId(l.node) === 'a4');
+    expect(loaded.length).toBeGreaterThan(0);
+    for (const load of loaded) {
+      expect(load.tick).toBeGreaterThan(dock);
+      expect(load.cargo).toBe(2);
+    }
   });
 
   it('no surplus extractors (round 2): with weight 3 and every marked slot taken, the Extractor is enough: its bay stays idle and its full share is kept', () => {
@@ -579,6 +652,167 @@ describe('reference replay (field mode)', () => {
       { tick: 1, same: true, inputs: 2 },
       { tick: 8760, same: true, inputs: 2 },
     ]);
+  });
+
+  // h9-raids (DESIGN.md H9 "Save, data version and replay", items (g)-(n)): the prong raids, from tick 4400.
+  const p1 = 8;
+  const p2 = 9;
+  const entry = (tick: number) => prongLog.find((e) => e.tick === tick)!;
+  const at = (tick: number) => [...prongLog].reverse().find((e) => e.tick <= tick)!; // the state in force after `tick`
+  const sumPlanned = (c: [number, number]) => c[0] + c[1];
+  const result = (id: number) => endsOf.find((e) => e.last.id === id)!;
+
+  it('H9 (n): raids 1 and 2 are below the split size (2 x raid.prongMinSize 4), so each stays one prong, though raid 2 has three raidable rocks', () => {
+    const [r1, r2] = [muster.find((m) => m.id === 1)!, muster.find((m) => m.id === 2)!];
+    expect(data.tunables['raid.prongMinSize'].default).toBe(4);
+    expect(r1.tick).toBe(95);
+    expect(r1.raidable.length).toBeGreaterThanOrEqual(1); // one target: only a1 has a docked extractor by then
+    expect(r2.raidable.map(nodeId)).toEqual(['a2', 'a3', 'p1']);
+    for (const m of [r1, r2]) {
+      expect(m.prongs).toHaveLength(1);
+      expect(sumPlanned(m.prongs[0]!.planned)).toBeLessThan(2 * 4);
+      expect(m.nextProngs).toBe(1);
+    }
+    expect(sumPlanned(r2.prongs[0]!.planned)).toBe(3);
+    // Their results have one prong each (the wire shape of last.prongs).
+    expect(result(1).last.prongs.map((p) => [nodeId(p.target), p.outcome])).toEqual([['p1', 'beaten']]);
+    expect(result(2).last.prongs.map((p) => [nodeId(p.target), p.outcome])).toEqual([['p1', 'hit']]);
+  });
+
+  it('H9 (g): raid 3 musters at 5465 with 2 prongs, at p1 and a3 in hive order, its 2 Thorns and 3 Spores dealt 1T 2S and 1T 1S (W2), with both badges\' mixes and the rank flag', () => {
+    const m = muster.find((x) => x.id === 3)!;
+    expect(m.tick).toBe(5465);
+    expect(m.raidable.map(nodeId)).toEqual(['a2', 'a3', 'p1']);
+    expect(m.prongs).toEqual([
+      { target: p1, planned: [1, 2], mix: [1, 2], next: true },
+      { target: 3, planned: [1, 1], mix: [1, 1], next: true },
+    ]);
+    expect(m.nextProngs).toBe(2);
+    const st = entry(5465);
+    expect(st.status.phase).toBe('muster');
+    expect(st.status.prongs.map((p) => [p.target, p.phase, p.planned, p.raiders, p.outcome])).toEqual([
+      [p1, 'muster', { thorn: 1, spore: 2 }, { thorn: 0, spore: 0 }, null],
+      [3, 'muster', { thorn: 1, spore: 1 }, { thorn: 0, spore: 0 }, null],
+    ]);
+    expect(st.status.planned).toEqual({ thorn: 2, spore: 3 });
+    expect(st.status.target).toBe(p1);
+    expect(st.status.ticksToLaunch).toBe(149);
+  });
+
+  it('H9 (h): both prongs launch on the same tick (5614) and fly their own legs; they arrive on different ticks (p1 at 5829, a3 at 5859)', () => {
+    const launch = entry(5614);
+    expect(launch.prongs.map((p) => [p.target, p.phase, p.raiders, p.planned])).toEqual([
+      [p1, 'out', [1, 2], [1, 2]],
+      [3, 'out', [1, 1], [1, 1]],
+    ]);
+    expect(launch.status.prongs.map((p) => p.ticksToArrival)).toEqual([215, 245]); // 645 and 735 su at raid.speedSu 3
+    expect(launch.status.ticksToArrival).toBe(215); // the smallest
+    expect(launch.status.phase).toBe('out');
+    expect(launch.status.raiders).toEqual({ thorn: 2, spore: 3 });
+    expect(launch.held[p1] && launch.held[3]).toBe(true); // the holds start at the launch
+    // Prong 0 arrives and fights at 5829; prong 1 reaches a3 at 5859 (30 ticks later: 735 su against 645).
+    expect(at(5829).prongs.map((p) => p.phase)).toEqual(['fight', 'out']);
+    expect(prongLog.find((e) => e.tick === 5829)!.status.phase).toBe('fight');
+    expect(retargets.find((r) => r.raid === 3)!.tick).toBe(5859);
+  });
+
+  it('H9 (l): a3 is unmarked, so prong 1 retargets once on arrival (5859), skipping p1, the nearest rock but prong 0\'s live target, for p2', () => {
+    const rt = retargets.filter((r) => r.raid === 3);
+    expect(rt).toHaveLength(1);
+    expect(rt[0]).toEqual({ tick: 5859, raid: 3, prong: 1, to: p2, raidable: [p1, p2, 2], others: ['fight@8'] });
+    const after = entry(5859);
+    expect(after.prongs.map((p) => [p.target, p.phase, p.retargeted])).toEqual([
+      [p1, 'fight', false],
+      [p2, 'out', true],
+    ]);
+    // The retarget is per prong: prong 0 never retargets, and two live prongs never share a node.
+    expect(retargets.filter((r) => r.raid === 3 && r.prong === 0)).toEqual([]);
+    for (const e of prongLog.filter((x) => x.id === 3)) {
+      const live = e.prongs.filter((p) => p.phase !== 'done').map((p) => p.target);
+      expect(new Set(live).size).toBe(live.length);
+    }
+  });
+
+  it('H9 (j): the shield holds at p2, where warships stand, while prong 0 strikes the economy at p1, where none do', () => {
+    const round = entry(6060);
+    expect(round.prongs.map((p) => [p.target, p.phase, p.warships, p.lost, p.shipsLost])).toEqual([
+      [p1, 'fight', 0, 1, 0], // no warship at p1: the extractor falls (the first loss, at 6060)
+      [p2, 'done', 2, 0, 0], // the Drone and the Flak stand at p2: the raiders struck them (hp), nothing of the economy, no ship fell
+    ]);
+    // Before that, prong 0 had struck from 5850 on with nothing lost, and prong 1\'s fight (from 6033) cost the defenders no ship.
+    expect(at(6059).prongs[0]!.lost).toBe(0);
+    expect(prongLog.filter((e) => e.id === 3).every((e) => e.prongs.every((p) => p.shipsLost === 0))).toBe(true);
+  });
+
+  it('H9 (i): prong 1 is beaten at p2 while prong 0 hits p1: the raid is a hit, raidProngs counts one of each, and the gap runs from the last prong', () => {
+    const beaten = entry(6060);
+    expect(beaten.prongs[1]).toMatchObject({ phase: 'done', outcome: 'beaten', raiders: [0, 0], killed: 2 });
+    expect(beaten.status.prongs.map((p) => p.outcome)).toEqual([null, 'beaten']);
+    expect(beaten.status.phase).toBe('fight'); // prong 0 still fights
+    const home = entry(6090);
+    expect(home.prongs[0]).toMatchObject({ phase: 'home', outcome: 'hit', lost: 1 });
+    expect(home.status.phase).toBe('home');
+    const res = result(3);
+    expect(res.tick).toBe(6305);
+    expect(res.last).toMatchObject({ outcome: 'hit', target: p1, lostEcon: { extractor: 1, hauler: 0 }, killed: { thorn: 1, spore: 1 } });
+    expect(res.last.prongs.map((p) => [p.target, p.outcome])).toEqual([[p1, 'hit'], [p2, 'beaten']]);
+    expect(res.raids).toEqual({ mustered: 3, beaten: 1, hit: 2, turnedBack: 0 });
+    expect(res.raidProngs).toEqual({ beaten: 2, hit: 2, turnedBack: 0 }); // raids 1 and 2, then this raid's two prongs
+    // The gap (1400 from tick 5000) runs from the tick the last prong landed, and raid 4 musters then.
+    expect(res.nextRaidTick).toBe(res.tick + 1400);
+    expect(muster.find((x) => x.id === 4)!.tick).toBe(res.nextRaidTick);
+    // The raid ended only when the last prong was done: prong 1 was done at 6060, prong 0 at 6305.
+    expect(entry(6305).id).toBe(0);
+  });
+
+  it('H9 (k): the hold at p2 ends at prong 1\'s outcome (6060) while prong 0 still fights; p1\'s ends at its own (6090)', () => {
+    expect(entry(5614).held).toEqual({ 3: true, 8: true, 9: false });
+    expect(entry(5859).held).toEqual({ 3: false, 8: true, 9: true }); // the hold follows the retarget
+    expect(at(6059).held).toEqual({ 3: false, 8: true, 9: true });
+    const resumed = entry(6060);
+    expect(resumed.held).toEqual({ 3: false, 8: true, 9: false });
+    expect(resumed.prongs[0]!.phase).toBe('fight');
+    expect(entry(6090).held).toEqual({ 3: false, 8: false, 9: false });
+  });
+
+  it('H9 (m): raid 4 musters at 7705 with 2 prongs, and a launch that can spare only 2 guards (7854) drops to one, at p1; it is out when the hive falls, and withers', () => {
+    const m = muster.find((x) => x.id === 4)!;
+    expect(m.tick).toBe(7705);
+    expect(m.prongs.map((p) => [p.target, p.planned])).toEqual([[p1, [1, 1]], [3, [0, 2]]]); // 1 Thorn and 3 Spores, dealt Thorn, Spore | Spore, Spore
+    expect(m.prongs.map((p) => p.next)).toEqual([true, true]);
+    expect(entry(7854).prongs.map((p) => [p.target, p.phase, p.planned, p.raiders])).toEqual([[p1, 'out', [1, 1], [1, 1]]]);
+    expect(entry(7854).status.prongs).toHaveLength(1);
+    expect(entry(7854).status.planned).toEqual({ thorn: 1, spore: 1 });
+    // The dropped target's badge clears at the launch (a3 is raidable but no prong aims at it).
+    expect(entry(7854).held).toEqual({ 3: false, 8: true, 9: false });
+    const fall = result(4);
+    expect(fall.last).toMatchObject({ id: 4, outcome: 'withered', target: p1 });
+    expect(fall.last.prongs.map((p) => [p.target, p.outcome])).toEqual([[p1, 'withered']]);
+    expect(fall.raids).toEqual({ mustered: 4, beaten: 1, hit: 2, turnedBack: 0 });
+    expect(fall.raidProngs).toEqual({ beaten: 2, hit: 2, turnedBack: 0 }); // a withered raid counts nothing
+  });
+
+  it('raidStatus keeps its one-prong fields as summaries of the prongs at every change, in a replay that has one and two prongs', () => {
+    let twoProngs = 0;
+    for (const e of prongLog) {
+      const st = e.status;
+      if (e.id === 0) {
+        expect(st.prongs).toEqual([]);
+        expect(st.phase).toBe('none');
+        continue;
+      }
+      if (st.prongs.length === 2) twoProngs++;
+      const phases = st.prongs.map((p) => p.phase);
+      expect(st.phase, `tick ${e.tick}`).toBe(phases.every((p) => p === 'muster') ? 'muster' : phases.includes('fight') ? 'fight' : phases.includes('out') ? 'out' : 'home');
+      expect(st.target).toBe(st.prongs[0]!.target);
+      expect(st.planned.thorn).toBe(st.prongs.reduce((a, p) => a + p.planned.thorn, 0));
+      expect(st.planned.spore).toBe(st.prongs.reduce((a, p) => a + p.planned.spore, 0));
+      expect(st.raiders.thorn + st.raiders.spore).toBe(st.prongs.reduce((a, p) => a + p.raiders.thorn + p.raiders.spore, 0));
+      const flying = st.prongs.filter((p) => p.phase === 'out' || p.phase === 'home').map((p) => p.ticksToArrival);
+      expect(st.ticksToArrival).toBe(flying.length === 0 ? 0 : Math.min(...flying));
+      expect(st.holding).toBe(st.prongs.reduce((a, p) => a + p.holding, 0));
+    }
+    expect(twoProngs).toBeGreaterThan(5);
   });
 
   it('is deterministic: two runs give the same 30 checkpoint hashes', () => {
