@@ -44,7 +44,7 @@ import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { shortVersion } from './format.ts';
 import { Hud, OverworldHud } from './hud.ts';
 import { FeedbackPanel, TuningPanel, confirmModal, showAreaResult, showFieldResult, showWin, type PanelHost } from './panels.ts';
-import { FIELD_HINT, MINE_MODE_TOAST, fieldFleetFullNotice, fieldUnlockNotice, moveBannerText, movedText, raidEndText, raidFightLine, raidMusterLine } from './fieldreport.ts';
+import { FIELD_HINT, MINE_MODE_TOAST, fieldFleetFullNotice, fieldUnlockNotice, moveBannerText, movedText, raidEndProngsText, raidEndText, raidFightLineProngs, raidMusterLineProngs } from './fieldreport.ts';
 import { FleetPanel } from './fleetpanel.ts';
 import { MoveGestureControl } from './gesturectl.ts';
 import { mineBadgeIcon } from './icons.ts';
@@ -113,6 +113,7 @@ const sheet = new Sheet($('sheet'), {
   recycle: (node) => recyclePanel.open(node),
   startMove: (from, part) => startMove(from, part),
   moveGesture: () => settings.moveGesture,
+  haulerStepper: () => settings.haulerStepper,
   close: () => closeSheet(),
 });
 const sendPanel = new SendPanel($('sendpanel'), { world: () => app.session.world, sendAll });
@@ -536,13 +537,19 @@ function transitionPending(): boolean {
 /** H7: the id of the last raid whose end toast was shown, per world (a resumed save doesn't announce an old raid). */
 const raidSeen: { world: unknown; id: number } = { world: null, id: 0 };
 
-/** The banner lines of a raid: the muster ("Raid gathering: ...") and the fight at the target ("Raid at A5: 3 left"). */
+/**
+ * The banner lines of a raid: the muster ("Raid gathering: ..."; H9 names every prong) and the fight at the targets ("Raid at A5: 3 left").
+ * They are the raid's own lines (class `raid`), which keep two lines of room whatever the font (style.css).
+ */
 function raidLines(w: World): string[] {
   const r = raidStatus(w);
-  if (r.target === null) return [];
-  const name = shortName(w.nodes[r.target]!, true);
-  if (r.phase === 'muster') return [raidMusterLine(r.planned, name, r.ticksToLaunch, w.tickRate)];
-  if (r.phase === 'fight') return [raidFightLine(name, r.raiders.thorn + r.raiders.spore)];
+  if (r.target === null || r.prongs.length === 0) return [];
+  const name = (n: number): string => shortName(w.nodes[n]!, true);
+  if (r.phase === 'muster') return [raidMusterLineProngs(r.prongs.map((p) => ({ target: name(p.target), planned: p.planned })), r.ticksToLaunch, w.tickRate)];
+  if (r.phase === 'fight') {
+    const fighting = r.prongs.filter((p) => p.phase === 'fight');
+    return [raidFightLineProngs(fighting.map((p) => ({ target: name(p.target), left: p.raiders.thorn + p.raiders.spore })))];
+  }
   return [];
 }
 
@@ -556,7 +563,10 @@ function raidToast(w: World): void {
   }
   if (last === null || last.id === raidSeen.id) return;
   raidSeen.id = last.id;
-  const text = raidEndText(last, shortName(w.nodes[last.target]!, true));
+  const text =
+    last.prongs.length > 1 && last.outcome !== 'withered'
+      ? raidEndProngsText(last.prongs.map((p) => ({ ...p, target: shortName(w.nodes[p.target]!, true) })))
+      : raidEndText(last, shortName(w.nodes[last.target]!, true));
   toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`, () => sheet.open(last.target));
 }
 
@@ -592,13 +602,22 @@ function refreshUi(): void {
   }
   setHidden(el.paused, onWorld || !s.paused);
 
-  const lines = onWorld ? [] : [...(field ? raidLines(w) : []), ...bannerLines(w)];
+  const raidOnes = onWorld || !field ? [] : raidLines(w);
+  const lines = onWorld ? [] : [...raidOnes, ...bannerLines(w)];
   const showBanner = lines.length > 0 || forceBanner;
   setHidden(el.banner, !showBanner);
   if (lines.length === 0 && forceBanner) lines.push('HEART · 10 Thorn 14 Spore · strip 0.8/s · 6 lost', 'P4 · 6 Thorn 4 Spore · strip 0.8/s · 2 lost');
   if (showBanner && el.banner.dataset.text !== lines.join('|')) {
     el.banner.dataset.text = lines.join('|');
-    el.banner.replaceChildren(...lines.map((l) => h('div', 'bline', l)));
+    el.banner.replaceChildren(
+      ...lines.map((l, i) => {
+        if (i >= raidOnes.length) return h('div', 'bline', l);
+        // A raid line keeps two lines of room (style.css) and centres its text in it.
+        const box = h('div', 'bline raid');
+        h('span', '', l, box);
+        return box;
+      }),
+    );
   }
 
   // H8: the tap-Move-tap banner. The order ends by itself if the ships it would carry are gone, or the run changed.
@@ -849,6 +868,7 @@ window.__factory4x = {
   /** H8: what the last frame drew for the drag (JSON, or "null"), the raid badge's node (-1 for none), and the gesture's counters. */
   mapDrag: () => JSON.stringify(view.drawnH8().drag),
   raidBadge: () => view.drawnH8().raidBadge,
+  raidBadges: () => JSON.stringify(view.drawnH8().raidBadges),
   gestureState: () => JSON.stringify({ phase: gestureCtl.gesture.phase, ...gestureCtl.counts }),
   fleetTypes: () => JSON.stringify(fleetStatus(app.session.world, sd()).types),
   mineMode: () => mineMode,

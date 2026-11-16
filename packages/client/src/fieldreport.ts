@@ -59,10 +59,9 @@ export function radarLabel(rows: readonly Pick<AllocRow, 'type' | 'weight'>[]): 
   return `Allocation: ${rows.map((r) => `${BUILD_NAME[r.type]} ${r.weight}`).join(', ')}`;
 }
 
-/** The rock sheet's extractor line, "2/3 extractors (1 on the way)". */
-export function pipText(r: Readonly<RockStatus>): string {
-  const docked = r.docked + r.freeExtractors;
-  return `${docked}/${r.slots}${r.inFlight > 0 ? ` (+${r.inFlight} on the way)` : ''}`;
+/** The rock sheet's pip row text: "+1 on the way" while extractors are in flight, else nothing (the count is in the Extractors row). */
+export function onTheWayText(r: Readonly<Pick<RockStatus, 'inFlight'>>): string {
+  return r.inFlight > 0 ? `+${r.inFlight} on the way` : '';
 }
 
 /** "Backed up: add haulers": the buffer is full and extractors are idling. */
@@ -85,6 +84,12 @@ export function typesText(c: Readonly<BuildTypeCounts>): string {
 export function raidsText(r: Readonly<FieldSummary['raids']>): string {
   if (r.mustered === 0) return 'none';
   return `${r.mustered}: ${r.beaten} beaten · ${r.hit} hit · ${r.turnedBack} turned back`;
+}
+
+/** H9: "6: 3 beaten · 2 hit · 1 turned back" for the prongs (`fieldSummary.raidProngs`), or "none". */
+export function raidProngsText(p: Readonly<FieldSummary['raidProngs']>): string {
+  const total = p.beaten + p.hit + p.turnedBack;
+  return total === 0 ? 'none' : `${total}: ${p.beaten} beaten · ${p.hit} hit · ${p.turnedBack} turned back`;
 }
 
 /** The result panel's headline time, "12:40" (or "-"). */
@@ -132,9 +137,27 @@ export function clockText(ticks: number, tickRate: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-/** The muster banner: "Raid gathering: 4 Spores, 1 Thorn → A5 in 15 s". */
+/** The muster banner for one prong: "Raid gathering: 4 Spores, 1 Thorn → A5 in 15 s" (H7's text, unchanged). */
 export function raidMusterLine(planned: Readonly<{ thorn: number; spore: number }>, target: string, ticksToLaunch: number, tickRate: number): string {
   return `Raid gathering: ${raidMixText(planned)} → ${target} in ${secsText(ticksToLaunch, tickRate)}`;
+}
+
+/** One prong's segment of the banner: "A5 2T 4S" (a type with none is left out). */
+export function prongSegment(target: string, c: Readonly<{ thorn: number; spore: number }>): string {
+  const parts = [c.thorn > 0 ? `${c.thorn}T` : '', c.spore > 0 ? `${c.spore}S` : ''].filter((x) => x !== '');
+  return [target, ...parts].join(' ');
+}
+
+/** H9: the muster banner for several prongs: "Raid gathering in 15 s → A5 2T 4S · A6 1T 4S". One prong keeps H7's text. */
+export function raidMusterLineProngs(prongs: ReadonlyArray<{ target: string; planned: Readonly<{ thorn: number; spore: number }> }>, ticksToLaunch: number, tickRate: number): string {
+  if (prongs.length === 1) return raidMusterLine(prongs[0]!.planned, prongs[0]!.target, ticksToLaunch, tickRate);
+  return `Raid gathering in ${secsText(ticksToLaunch, tickRate)} → ${prongs.map((p) => prongSegment(p.target, p.planned)).join(' · ')}`;
+}
+
+/** H9: the fight banner for several prongs: "Raid at A5: 3 left · A6: 4 left". One prong keeps H7's "Raid at A5: 3 left". */
+export function raidFightLineProngs(prongs: ReadonlyArray<{ target: string; left: number }>): string {
+  if (prongs.length === 1) return raidFightLine(prongs[0]!.target, prongs[0]!.left);
+  return `Raid at ${prongs.map((p) => `${p.target}: ${p.left} left`).join(' · ')}`;
 }
 
 /** The battle line at the target: "Raid at A5: 3 left". */
@@ -150,15 +173,18 @@ interface RaidChipInput {
   ticksToLaunch: number;
   ticksToArrival: number;
   ticksToNextAllowed: number;
+  /** H9: the prongs still in play (0 or 1 add nothing); "Raid 0:12 · 2" with 2. */
+  prongsLive?: number;
 }
 
 /** The top bar's raid chip text, or null when raids are off. */
 export function raidChipText(r: Readonly<RaidChipInput>, tickRate: number): string | null {
   if (!r.enabled) return null;
-  if (r.phase === 'muster') return `Raid ${clockText(r.ticksToLaunch, tickRate)}`;
-  if (r.phase === 'out') return `Raid ${clockText(r.ticksToArrival, tickRate)}`;
-  if (r.phase === 'fight') return 'Raid on';
-  if (r.phase === 'home') return 'Raid leaving';
+  const many = (r.prongsLive ?? 0) > 1 ? ` · ${r.prongsLive}` : '';
+  if (r.phase === 'muster') return `Raid ${clockText(r.ticksToLaunch, tickRate)}${many}`;
+  if (r.phase === 'out') return `Raid ${clockText(r.ticksToArrival, tickRate)}${many}`;
+  if (r.phase === 'fight') return `Raid on${many}`;
+  if (r.phase === 'home') return `Raid leaving${many}`;
   if (r.econ < r.nextRaidAtEcon) return `Raids at ${r.nextRaidAtEcon} ships`;
   return r.ticksToNextAllowed > 0 ? `Next raid ${clockText(r.ticksToNextAllowed, tickRate)}` : 'Raids ready';
 }
@@ -186,6 +212,26 @@ export function raidEndText(r: Readonly<RaidLastInput>, target: string): string 
   add(r.lostShips.lancer, 'lancer', 'lancers');
   add(r.lostShips.flak, 'flak', 'flak');
   return `Raid hit ${target}: lost ${parts.length > 0 ? parts.join(', ') : 'nothing'}`;
+}
+
+/** One prong's loss list: "2 extractors, 1 hauler" (economy ships and warships), or "nothing". */
+function lostParts(r: Readonly<{ lostEcon: { extractor: number; hauler: number }; lostShips: { drone: number; lancer: number; flak: number } }>): string {
+  const parts: string[] = [];
+  const add = (n: number, one: string, many: string): void => void (n > 0 && parts.push(`${n} ${n === 1 ? one : many}`));
+  add(r.lostEcon.extractor, 'extractor', 'extractors');
+  add(r.lostEcon.hauler, 'hauler', 'haulers');
+  add(r.lostShips.drone, 'drone', 'drones');
+  add(r.lostShips.lancer, 'lancer', 'lancers');
+  add(r.lostShips.flak, 'flak', 'flak');
+  return parts.length > 0 ? parts.join(', ') : 'nothing';
+}
+
+
+/** H9: the end toast of a raid with several prongs: "Raid: A5 beaten · A6 hit, 2 extractors lost". */
+export function raidEndProngsText(prongs: ReadonlyArray<RaidLastInput & { target: string }>): string {
+  const seg = (p: RaidLastInput & { target: string }): string =>
+    p.outcome === 'beaten' ? `${p.target} beaten` : p.outcome === 'turnedBack' ? `${p.target} turned back` : p.outcome === 'withered' ? `${p.target} withered` : `${p.target} hit, ${lostParts(p)} lost`;
+  return `Raid: ${prongs.map(seg).join(' · ')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -232,4 +278,18 @@ export const MINE_MODE_TOAST = 'Tap rocks to mine or stop. Tap Mine to finish.';
 /** The fleet panel's recycle button, "Recycle 3 (+24 ore)", or "Recycle" with nothing chosen. */
 export function recycleFleetText(total: number, ore: number): string {
   return total > 0 ? `Recycle ${total} (+${ore} ore)` : 'Recycle';
+}
+
+// ---------------------------------------------------------------------------
+// H9: the extractor dial and the haulers line on the rock sheet.
+
+/** The Extractors row's label and count: "Extractors 2 / 3" (docked here, free ones included, over the count the rock takes). */
+export function extractorRowText(r: Readonly<Pick<RockStatus, 'docked' | 'freeExtractors' | 'extCap'>>): string {
+  return `Extractors ${r.docked + r.freeExtractors} / ${r.extCap}`;
+}
+
+/** The read-only haulers line: "Haulers 1 (auto)", or "Haulers 2 (set 2)" once a count is kept. Without staffing by need, just the count. */
+export function haulersLineText(r: Readonly<Pick<RockStatus, 'haulers' | 'haulerSet' | 'haulerTarget'>>, byNeed: boolean): string {
+  if (!byNeed) return `Haulers ${r.haulers}`;
+  return r.haulerSet === null ? `Haulers ${r.haulerTarget} (auto)` : `Haulers ${r.haulerSet} (set ${r.haulerSet})`;
 }

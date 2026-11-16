@@ -625,9 +625,10 @@ test.describe('375x667 portrait, weights and the hauler count', () => {
     await expect(page.locator('#view')).toHaveCSS('touch-action', 'none');
   });
 
-  test('the rock sheet shows the hauler count; − and + set it, Auto clears it; it is hidden with hauler.autoNeed 0', async ({ page }) => {
+  test('with client.haulerStepper 1 the rock sheet shows the hauler count; − and + set it, Auto clears it; it is hidden with hauler.autoNeed 0', async ({ page }) => {
     await ready(page);
     await pause(page);
+    await tune(page, 'client.haulerStepper', 1);
     const a1 = await nodeOf(page, 'a1');
     await stepSimUntil(page, async () => (await rock(page, a1)).haulers >= 1, 9000, 'a hauler at a1', false);
     const p = await nodePt(page, a1);
@@ -747,6 +748,7 @@ test.describe('375x667 portrait, the fleet panel', () => {
   test('the Fleet chip opens the panel: five rows, and Recycle sends recycleFleet for an idle hauler', async ({ page }) => {
     await ready(page);
     await pause(page);
+    await tune(page, 'client.haulerStepper', 1);
     // The premise is stated: a hauler idles at the probe because its rock's count is set to 0 (it parks when no rock is short).
     const a1 = await nodeOf(page, 'a1');
     await stepSimUntil(page, async () => (await rock(page, a1)).haulers >= 1, 9000, 'a hauler at a1', false);

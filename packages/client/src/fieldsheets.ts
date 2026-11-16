@@ -3,7 +3,7 @@
  * haulers, buffer, delivered, raid rank). Built once when a node is selected; `update()` refreshes text, bars and enabled states in
  * place, as the other sheets do. Every number comes from `allocStatus` and `rockStatus`.
  */
-import { BUILD_TYPES, allocStatus, econAtByType, isValidInput, raidStatus, rockStatus, shipCounts, type BuildType, type Input, type SimData, type World } from '@factory4x/sim';
+import { BUILD_TYPES, allocStatus, econAtByType, extractorMinCount, isValidInput, raidStatus, rockStatus, shipCounts, type BuildType, type Input, type SimData, type World } from '@factory4x/sim';
 import { bar, btn, h, setHidden, setText, toggleClass } from './dom.ts';
 import {
   BACKED_UP_TEXT,
@@ -14,9 +14,11 @@ import {
   allocCostText,
   allocStateText,
   deliveredText,
+  extractorRowText,
   haulerRowText,
+  haulersLineText,
+  onTheWayText,
   pctText,
-  pipText,
   radarLabel,
   raidRockText,
 } from './fieldreport.ts';
@@ -28,6 +30,8 @@ export interface FieldSheetHost {
   send(input: Input): void;
   /** Opens the Recycle panel for the ships parked at `node`. */
   recycle(node: number): void;
+  /** H9 `client.haulerStepper` is 1: H8's hauler stepper shows under the extractor row. */
+  haulerStepper(): boolean;
   close(): void;
 }
 
@@ -123,10 +127,25 @@ export function buildRockSheet(root: HTMLElement, host: FieldSheetHost, node: nu
   const pips: HTMLElement[] = [];
   for (let i = 0; i < n.slots; i++) pips.push(h('span', 'pip', '', pipRow));
   const pipLabel = h('span', 'pip-text', '', pipRow);
+  // H9: the extractor dial. "Extractors 2 / 3" with -, + and All (each 44 px) sets `extractorSet`; All clears it. The row is greyed on a
+  // rock that isn't marked, but its buttons work (X1 keeps the setting for when it is).
+  const ext = h('div', 'ext-row', '', sec);
+  const extLabel = h('span', 'ext-lbl', '', ext);
+  const setExt = (to: number | null): void => host.send({ type: 'setExtractors', node, count: to });
+  // Each tap reads the count as it is now, so a stale tap never overshoots.
+  const extNow = (): number => rockStatus(host.world(), node).extCap;
+  const extLess = btn(ext, '−', () => setExt(extNow() - 1), 'e-step');
+  extLess.el.setAttribute('aria-label', 'Fewer extractors');
+  const extMore = btn(ext, '+', () => setExt(extNow() + 1), 'e-step');
+  extMore.el.setAttribute('aria-label', 'More extractors');
+  const extAll = btn(ext, 'All', () => setExt(null), 'e-all');
+  extAll.el.setAttribute('aria-label', 'Extractors: All');
+  // The haulers follow the extractors. A read-only line says how many; H8's stepper (client.haulerStepper 1) replaces it.
+  const haulersLine = h('div', 'haulers-line', '', sec);
   const haulers = h('div', 'row haulers-row', '', sec);
   h('span', 'lbl', 'Haulers', haulers);
   const haulersVal = h('span', 'val', '', haulers);
-  // H8: the per-rock hauler count. −, + and Auto (each 44 px) set `haulerSet`; Auto clears it. Hidden when haulers aren't staffed by need.
+  // H8: the per-rock hauler count. -, + and Auto (each 44 px) set `haulerSet`; Auto clears it. Hidden when haulers aren't staffed by need.
   const stepper = h('div', 'hstep', '', sec);
   const setCount = (to: number | null): void => host.send({ type: 'setHaulers', node, count: to });
   // Each tap reads the count as it is now, so a stale tap never overshoots.
@@ -171,9 +190,22 @@ export function buildRockSheet(root: HTMLElement, host: FieldSheetHost, node: nu
       toggleClass(p, 'on', i < docked);
       toggleClass(p, 'queued', i >= docked && i < docked + st.inFlight);
     });
-    setText(pipLabel, pipText(st));
+    setText(pipLabel, onTheWayText(st));
+    // The dial: the count it takes (the set count, else the slots), the least the sim accepts, and the slots.
     const byNeed = w.tun['hauler.autoNeed'] === 1;
-    setHidden(stepper, !byNeed);
+    const minCount = extractorMinCount(w, node);
+    setText(extLabel, extractorRowText(st));
+    toggleClass(ext, 'dim', !st.mine);
+    extLess.set('−', st.extCap > minCount);
+    extMore.set('+', st.extCap < st.slots);
+    extAll.set('All', true);
+    toggleClass(extAll.el, 'on', st.extractorSet === null);
+    extAll.el.setAttribute('aria-pressed', st.extractorSet === null ? 'true' : 'false');
+    const stepperOn = host.haulerStepper();
+    setHidden(haulersLine, stepperOn);
+    setText(haulersLine, haulersLineText(st, byNeed));
+    setHidden(haulers, !stepperOn);
+    setHidden(stepper, !stepperOn || !byNeed);
     setText(haulersVal, byNeed ? haulerRowText(st) : String(st.haulers));
     if (byNeed) {
       const cur = st.haulerSet ?? st.haulerNeed;
@@ -186,11 +218,11 @@ export function buildRockSheet(root: HTMLElement, host: FieldSheetHost, node: nu
     setText(bufText, `${st.buffer}/${st.bufferCap}`);
     setText(deliveredVal, deliveredText(st));
     const backedMsg = st.backedUp && st.mine ? BACKED_UP_TEXT : '';
-    const rs = raidStatus(w);
-    const raidOn = st.raidTarget;
-    const raidMix = rs.phase === 'muster' ? rs.planned : rs.raiders.thorn + rs.raiders.spore > 0 ? rs.raiders : rs.planned;
-    const raidMsg = raidOn ? raidRockText(rs.phase, raidMix) : '';
-    const rankMsg = st.raidRank === 1 && st.mine && !raidOn ? RAID_RANK_TEXT : '';
+    // H9: the prong aimed at this rock (its own phase and mix); the rank line shows on every rock a raid now would hit.
+    const prong = raidStatus(w).prongs.find((p) => p.target === node);
+    const raidOn = st.raidTarget && st.raidMix !== null && prong !== undefined;
+    const raidMsg = raidOn ? raidRockText(prong.phase === 'done' ? 'home' : prong.phase, st.raidMix!) : '';
+    const rankMsg = st.raidNext && st.mine && raidMsg === '' ? RAID_RANK_TEXT : '';
     const heldMsg = st.haulersHeld ? RAID_HELD_TEXT : '';
     setText(backed, backedMsg);
     setText(rank, rankMsg);

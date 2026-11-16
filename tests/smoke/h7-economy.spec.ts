@@ -354,9 +354,10 @@ test.describe('375x667 portrait, by touch', () => {
     const st = await rock(page, a1);
     await expect(sheet.locator('.pips .pip')).toHaveCount(st.slots);
     await expect(sheet.locator('.pips .pip.on')).toHaveCount(st.docked);
-    await expect(sheet.locator('.pip-text')).toContainText(`${st.docked}/${st.slots}`);
+    // H9: the count is the Extractors row's, over the slots (the dial is at All); the pip row only says what is on the way.
+    await expect(sheet.locator('.ext-lbl')).toHaveText(`Extractors ${st.docked} / ${st.slots}`);
     await expect(sheet.locator('.pips .pip.queued')).toHaveCount(st.inFlight);
-    await expect(sheet.locator('.lbl', { hasText: 'Haulers' })).toBeVisible();
+    await expect(sheet.locator('.haulers-line')).toHaveText(/^Haulers \d+ \(auto\)$/);
     await expect(sheet.locator('.lbl', { hasText: 'Buffer' })).toBeVisible();
     await expect(sheet.locator('.lbl', { hasText: 'Delivered' })).toBeVisible();
     await expectControlsFit(page, '#sheet', 'the rock sheet controls');
@@ -383,6 +384,7 @@ test.describe('375x667 portrait, by touch', () => {
   test('acceptance 3: a full buffer says "Backed up: add haulers" and holds its room; the note never moves the controls below it', async ({ page }) => {
     await ready(page, PHONE);
     await pause(page);
+    await tune(page, 'client.haulerStepper', 1);
     await tune(page, 'node.bufferCap', 10);
     await tapNode(page, 'probe');
     // No haulers: switch the hauler weight to 0 so the buffers fill and stay full.

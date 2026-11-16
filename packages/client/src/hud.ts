@@ -88,7 +88,7 @@ export class Hud {
       }
     }
     const rs = isField(world) ? raidStatus(world) : null;
-    const chipText = rs === null ? null : raidChipText(rs, world.tickRate);
+    const chipText = rs === null ? null : raidChipText({ ...rs, prongsLive: rs.prongs.filter((p) => p.phase !== 'done').length }, world.tickRate);
     setHidden(this.raid.el, chipText === null);
     if (rs !== null && chipText !== null) {
       setText(this.raid.count, chipText);

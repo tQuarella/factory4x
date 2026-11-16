@@ -100,6 +100,8 @@ interface Window {
     mapDrag(): string;
     /** H8: the node that wore the raid badge in the last frame, or -1. */
     raidBadge(): number;
+    /** H9: every node that wore a raid badge in the last frame (one per prong target), as JSON text, in node order. */
+    raidBadges(): string;
     /** H8: the gesture's phase and how many moves, cancels and split arms it has seen, as JSON text. */
     gestureState(): string;
     /** H8: fleetStatus(...).types (alive, idle, building, recyclable per build type) as JSON text. */

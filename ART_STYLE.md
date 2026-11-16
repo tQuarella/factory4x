@@ -232,3 +232,12 @@ Rules:
 - **Bounds.** The raid badge stays within r (like the marker and the mine badge); the drop highlight within r + 7 px (its halo is a 8 px stroke at r + 3; that is 1.32 r at the smallest reach the game passes, 22 px, and under 1.15 r from 50 px up), the split pulse within 1.5 r (tested, and measured in the gallery).
 - **Told apart.** The raid badge is a ring with an X, so it isn't the marker (a chevron that rides the line), the "!" (an amber pill) or the mine badge (a teal pick); the Raid badge and the Mine badge sit on opposite sides of a rock (lower left and lower right). The attack colour is `bloom` on the line, the highlight and the tag, so a pink line always ends on a pink ring.
 - **Callers.** The badge is `max(8, 0.4 r)` px, from the muster to the raid's end. During a drag the highlight sits on the node the release would hit (the same hit test as a tap), the ghost chip 48 px above the finger (clamped inside the canvas), the tag above the target or below it near the top edge. The pulse sits 8 px outside the source rock while a split is armed.
+
+## H9 entities
+
+No new art and no new colour. The wider front reuses what H7 and H8 drew.
+
+- **Prong badges.** Each prong's target wears its own `drawRaidBadge` (lower left, `max(8, 0.4 r)` px) with that prong's mix, from the muster to that prong's end. A finished prong leaves nothing on its rock.
+- **Prong legs.** Each prong's raiders ride their own dashed `mob` line with `drawRaidMarker` and their own countdown. The two legs share the hive end, so two lines fan out from it.
+- **Extractor row.** The −, + and All buttons are the text buttons of the hauler stepper, with no icon. An unmarked rock's row is dimmed with opacity only (`--dim` for its label, 0.6 for its buttons), so it adds no colour. The pressed All button uses `.btn.on`, the same teal fill as the pressed Mine button.
+- **Banner.** The raid line keeps two lines of room in the existing `bloom`-edged banner, so a second prong adds no height.

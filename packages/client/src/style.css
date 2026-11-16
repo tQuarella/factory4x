@@ -65,6 +65,10 @@ body { font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   background: rgba(70, 12, 36, 0.92); border: 1px solid var(--bloom); font-size: 12px; text-align: center;
 }
 #banner .bline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* H9: a raid line may name several prongs, so it always has two lines of room (it wraps, and never grows past two), whatever the font:
+   the map below doesn't move when a second prong appears, or when the muster gives way to the fight. */
+#banner .bline.raid { white-space: normal; display: flex; align-items: center; justify-content: center; min-height: 2lh; }
+#banner .bline.raid span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 #hint {
   display: flex; align-items: center; gap: 6px;
   background: rgba(17, 27, 46, 0.95); border: 1px solid var(--gold); border-radius: 10px; padding: 0 0 0 12px; color: var(--gold);
@@ -419,6 +423,15 @@ section.send > .send-btn.all { flex: 1 1 100%; }
 .hstep { display: flex; gap: 6px; margin: 0 0 2px; }
 .btn.h-step { width: 44px; padding: 0; font-size: 20px; flex: 0 0 auto; }
 .btn.h-auto { flex: 1 1 0; width: auto; min-width: 44px; padding: 0 8px; }
+/* ---- H9: the extractor dial (label, then -, + and All, 44 px each) and the read-only haulers line. Same height as H8's hauler rows. ---- */
+.ext-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ext-row .ext-lbl { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+.ext-row.dim .ext-lbl { color: var(--dim); }
+.ext-row.dim .btn { opacity: 0.6; }
+.ext-row.dim .btn:disabled { opacity: 0.35; }
+.btn.e-step { width: 44px; padding: 0; font-size: 20px; flex: 0 0 auto; }
+.btn.e-all { width: auto; min-width: 44px; padding: 0 10px; flex: 0 0 auto; }
+.haulers-line { font-size: 13px; min-height: 24px; display: flex; align-items: center; color: var(--dim); }
 .rock-note .backed:empty, .rock-note .rank:empty, .rock-note .raid:empty, .rock-note .held:empty { display: none; }
 /* A rock's sheet (the hauler row, the raid lines) is as tall as the probe's, and tighter, so it doesn't scroll on a phone. */
 #sheet.rk { max-height: 62dvh; max-height: 62vh; padding-bottom: calc(4px + var(--safe-b)); }
