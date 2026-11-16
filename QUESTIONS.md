@@ -10,7 +10,7 @@ GitHub refuses to start any CI job on `tQuarella/factory4x`: "The job was not st
 
 **One step for you:** on GitHub, open Settings → Billing and plans and fix the failed payment, or raise the Actions spending limit. Then tell the Director "billing fixed".
 
-**Answer:**
+**Answer (owner, 2026-11-15):** "Make repo public". The free 2,000 private-repo minutes for November were used up (about 270 runs). The Director scanned the full git history for secrets (none found), made `tQuarella/factory4x` public, and re-ran CI on e717b91.
 
 ## Build build-20261114-1 is ready (2026-11-14): H7, One field, live enemy
 

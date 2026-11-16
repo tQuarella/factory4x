@@ -1191,3 +1191,8 @@ Scope: `git log build-20261108-5..build-20261114-1`, `reviews/h7-*.md`, the "Ite
 
 **Decision:** h8-client round 2 (94757b1) rejected only because acceptance 11–12 wait on h8-bots and h8-design-data; the Critic asked for no code or test changes. That reject does not count as a rework round under PROCESS.md's deadlock rule. The next round is the final, stack-integration round. If it rejects for rework, that counts as the third and the rule applies as written.
 **Why:** the deadlock rule exists to stop an author looping on the same defects. A round that only waits for other tasks isn't a loop, and parking the top of the stack would block the whole build for no quality gain. In future, the Director holds a top-of-stack Critic round until the lower tasks are approved, rather than spend a round on it.
+
+## 2026-11-15 — Director: repo made public so CI can run (Q23)
+
+GitHub Actions stopped starting jobs on 2026-11-14: the private repo had used the Free plan's 2,000 Actions minutes for November (about 270 runs, at about 12 min per branch push and about 20 min per push to main). The owner chose to make the repo public, which gives unlimited free minutes on standard runners. Before the switch, the Director scanned the full history for token and key patterns and found none. "No secrets in the repo" now matters more: anything committed is world-readable.
+
