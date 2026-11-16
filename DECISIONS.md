@@ -1573,3 +1573,10 @@ Spec: DESIGN.md "H9 (Milestone 2, iteration 9, spec ready): A wider front". Spli
 **For the Director to rule on:**
 1. **Calibration target 5's greedy half** ("greedy at least 10% slower than adaptive", as asked) may be impossible by values, because greedy turns into adaptive at its first hit. The spec measures `undefended` beside it. I propose that, if h9-design-data reports the greedy half unmet, the target reads "measured on `undefended`", with greedy reported only.
 2. **`cw-bots-gate-time`** touches `packages/bots/src/**`, the same files as h9-bots. Run it before h9-bots starts, fold it into h9-bots, or leave it for later.
+
+## 2026-11-16 — Director: rulings on the H9 spec (80c6aef)
+
+1. **Greedy half of calibration target 5:** accepted as the Designer proposed. `GreedyBot` plays adaptive's rules after its first hit, which on v14 is the first raid, so no data value can separate them by much. If h9-design-data can't meet "greedy at least 10% slower than adaptive", the target is measured on `undefended` and greedy is only reported. Making greedy a real economy-first line is a bot-definition change for a later iteration.
+2. **`cw-bots-gate-time` runs now, in parallel with h9-sim, and lands on main before h9-bots starts.** h9-bots can't start until h9-sim is approved, and the two tasks don't overlap (`packages/bots` against `packages/sim`), so this costs no time. h9-bots then adds two report-only strategies onto a faster base. h9-bots acceptance 6 is tightened: the bots gate may not grow by more than the cost of the two new strategies' runs, with before and after times reported.
+3. **h9-raids changes the raid save shape without its own `dataVersion` bump:** confirmed. h9-sim bumps to v15 in the same stack, nothing ships between the two, and `merge-task h9-client` lands them together. A v14 save is discarded on load as usual, and save.ts validates the new shape.
+
