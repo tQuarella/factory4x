@@ -26,6 +26,10 @@ Launches: 6 / 12.
 | 4 | faction-ai | h9-raids | launch | Build prongs W1–W8 from task/h9-sim; may restructure the replay tail (Director ruling in brief: no assertion loosened, moved values logged) |
 | 5 | engineer | h9-bots | launch | Build from task/h9-sim; merges h9-raids when approved |
 | 6 | engineer | h9-client | launch | Build from task/h9-sim (top of stack); merges h9-raids, then h9-design-data |
+| r6 | engineer | h9-client | resume | Pre-raids rulings (6982899): exact lowering test, stepper-variant map ≥ 140 px, DECISIONS entry |
+| r7 | critic | h9-raids | resume | Review round 1: APPROVE (a34be08); determinism 9a2e957c; replay restructured, one a4 check narrowed (accepted) |
+| r8 | engineer | h9-bots | resume | Merge h9-raids; per-prong shield metric; whole-run checks on real prongs |
+| r9 | engineer | h9-client | resume | Merge h9-raids; draw every prong; two-prong smoke |
 
 ## Iteration 8 ledger
 
