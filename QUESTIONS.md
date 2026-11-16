@@ -41,6 +41,8 @@ Pick one:
 
 Answer like "A", "A, plus C" (about a third of a build more), "B" or "C". Details: DESIGN.md → "H9 candidates (iteration 9)". Default if unanswered: A.
 
+**Answer (owner, 2026-11-16, in chat):** "A, wider front". C is not included.
+
 ## Q23 (Blocking, 2026-11-15): GitHub Actions won't run
 
 GitHub refuses to start any CI job on `tQuarella/factory4x`: "The job was not started because recent account payments have failed or your spending limit needs to be increased." Every run since 2026-11-14 23:25 failed in 2–4 s, including on main. Without CI, the H8 build can't merge or deploy. It's otherwise done: every task is Critic-approved, the gates pass, and the phone and desktop smoke runs pass 1370 of 1370.
