@@ -30,6 +30,9 @@ Launches: 6 / 12.
 | r7 | critic | h9-raids | resume | Review round 1: APPROVE (a34be08); determinism 9a2e957c; replay restructured, one a4 check narrowed (accepted) |
 | r8 | engineer | h9-bots | resume | Merge h9-raids; per-prong shield metric; whole-run checks on real prongs |
 | r9 | engineer | h9-client | resume | Merge h9-raids; draw every prong; two-prong smoke |
+| r10 | engineer | h9-client | resume | One-prong-done smoke test (ea946b5); map-height rule with Recycle logged; waiting for h9-design-data |
+| r11 | critic | h9-bots | resume | Review round 1: REJECT (72d23c9): shield metric blind in split raids; record why adaptive 15:53 → 20:46 (prong returns mid hive battle); gate time alone |
+| r12 | engineer | h9-bots | resume | Fix round 1 started, then stopped at once: owner said "Pause this work" (2026-11-16 08:23) |
 
 ## Iteration 8 ledger
 
@@ -314,7 +317,15 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-h9-raids, h9-bots and h9-client are building in parallel from task/h9-sim (12924fa). When h9-raids is approved, tell h9-bots and h9-client to merge it. Then h9-design-data (Designer resume) on approved h9-bots, then h9-client's final round, then `merge-task h9-client`.
+**Paused by the owner (2026-11-16 08:23, "Pause this work").** Nothing is running. Resume only when the owner says so.
+
+Where H9 stands:
+- Merged on main: cw-bots-gate-time (97b84f2).
+- Approved: h9-sim (12924fa), h9-raids (a34be08).
+- task/h9-bots: REJECT round 1 (review 72d23c9). The fix is not started (or partly started; check the worktree `.claude/worktrees/agent-af63892eea98f7a23` for uncommitted edits). Resend the fix brief: (1) an exact per-prong shield metric at 0 with a two-prong test; (2) the Director ruling that the bots' raid-window hive wave counts a prong as away only if the wave lands before that prong's earliest return, otherwise it holds; log the ruling and the trace; (3) the bot gate time measured alone, with a breakdown. The staffing bound under 0.25 is accepted.
+- task/h9-client: pre-design-data work done (ea946b5); waiting for h9-design-data.
+- Then h9-design-data (Designer resume): targets 1, 4 and 5 all miss on v15.
+- Then h9-client final round, CI, and `merge-task h9-client`.
 
 ## Moving to another machine
 
