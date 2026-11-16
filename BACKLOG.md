@@ -1056,6 +1056,202 @@ No data value changes. If one is needed, report it rather than making it.
 11. **Smoke time:** new smoke tests step the sim with `advanceTicks` and never wait in real time (engineer.md). Report the CI job times. Past 80% of a limit, `cw-smoke-sim-time` goes first.
 12. **The stack:** merge `task/h8-raids` once it is approved, then `task/h8-design-data`. Before the final Critic round, merge every lower task's approving review commit. Run the gates and the full smoke on the final data at desktop and phone sizes with `--repeat-each 5`. Branch CI must be green on the exact commit merged.
 
+## Milestone 2, iteration 9: H9 A wider front (spec in `DESIGN.md` → "H9 (Milestone 2, iteration 9, spec ready): A wider front")
+
+The owner picked A without C (Q24). Where this backlog and the spec differ, the spec wins.
+
+**Four build tasks, plus a Designer calibration resume.** No art task: prong badges and markers reuse H7/H8 art, folded into h9-client.
+
+**One stack, topped by `h9-client`, the same shape as H8.**
+- h9-sim is small and keeps shipped behaviour unchanged: every `extractorSet` is null, and the stubs mirror today's single raid. So the bots gate should stay green on it.
+- h9-raids changes raids on shipped data (`raid.prongsMax` 2). From there the bots gate, client tests and `tests/smoke/h7-raids.spec.ts` / `h8-client.spec.ts` may go red until h9-bots and h9-client.
+- So nothing below the top merges alone. **`merge-task h9-client` lands the whole stack** once every task in it is approved. Before h9-client's final Critic round, merge the approving review commits of h9-sim, h9-raids, h9-bots and h9-design-data into `task/h9-client` (PROCESS "Gates that wait on calibration"). Per the last retro, hold the top task's final round until every lower task is approved.
+
+**Order (at most three builders at once, with no file overlap):**
+1. **Now:** `h9-sim` (core-engineer).
+2. **After h9-sim has Critic approval, in parallel:**
+   - `h9-raids` (faction-ai);
+   - `h9-bots` (engineer), which merges `task/h9-raids` once that is approved;
+   - `h9-client` (engineer), which builds the dial and the per-prong UI against h9-sim's stubbed selectors, then merges `task/h9-raids`.
+3. **After h9-bots has Critic approval:** `h9-design-data` (Designer resume), stacked on `task/h9-bots`.
+4. **Last:** h9-client merges `task/h9-design-data`, re-runs the gates and the full smoke on the final data, gets its final Critic approval and lands the stack.
+
+`reference-replay.ts` is touched by h9-sim, then by h9-raids. That's sequential, so nothing overlaps.
+
+**Browser-facing:** h9-client only. It needs green branch CI on the exact commit merged, with the Critic's verdict committed before that CI run (PROCESS "Before merging"). h9-sim may make compile-only client edits (listed in DECISIONS.md). The tasks below the top don't deploy alone.
+
+**Gate expectations below the top:**
+- On h9-sim, every gate is green, the bots gate included, because shipped behaviour is unchanged.
+- On h9-raids, typecheck, lint, the sim tests and determinism are green. The bots gate may be red, and is judged green on h9-design-data.
+- Client tests and smoke may be red from h9-raids until h9-client.
+
+**Planned launches (12):**
+- Designer: triage, 1 (done). The spec and h9-design-data are resumes.
+- Builders: 4 (core-engineer, faction-ai, engineer ×2).
+- Critics: 2 launches, each resumed across the tasks it reviews.
+- Retrospective: 1.
+
+That's 8 of 12, with 4 spare for rework, a Can wait task (`cw-bots-gate-time` fits here; it touches `packages/bots/src/**`, so run it before h9-bots or fold it in) or a broken `main`.
+
+| Id | Task | Owner | Depends on | Browser-facing | Status |
+| --- | --- | --- | --- | --- | --- |
+| h9-sim | Extractor dial: `setExtractors`, `extCap` in F5, H4b and committed extractors, lowering (X1–X4); data v15 with every H9 key; `extractorSet`, `stats.raidProngs` (zeros); every H9 selector field, stubbed for one prong; replay items (a)–(f) | core-engineer | none | no | Ready |
+| h9-raids | Prongs W1–W8 in `factions/`: count and targets, the deal, flight, per-prong fight, shield, hold and retarget, outcomes and pacing; fill the stubbed selectors; the per-prong recycle exclusion; the save shape; replay items (g)–(n) | faction-ai | h9-sim Critic-approved (stacked) | no | Blocked |
+| h9-bots | Split defence (change 1), `adaptive-concentrate` and `undefended` (report only), the no-plan-fits table, per-prong report columns, flags on v15 | engineer | h9-sim Critic-approved (stacked); merges h9-raids when approved | no | Blocked |
+| h9-design-data | Probe on v15; calibrate to "Calibration targets (H9)"; v16 if any value changes; findings to the Director | designer (resume) | h9-bots Critic-approved (stacked) | no | Blocked |
+| h9-client | Extractor row and haulers line, `client.haulerStepper`, per-prong badges and markers, banner and chip, rock-sheet raid and rank lines, per-prong report, phone checks, smoke tests. **Top of the stack** | engineer | h9-sim Critic-approved; merges h9-raids, then h9-design-data | **yes** | Blocked |
+
+### h9-sim (core-engineer)
+
+**Files:**
+- `packages/sim/**` (tests included), except `packages/sim/src/factions/**`. Two exceptions in `factions/index.ts`, and only these:
+  - the stubbed `RaidStatus.prongs`, `nextProngs` and `RaidResult.prongs` fields, filled from the single raid;
+  - a `raidMixAt(world, node)` stub for `rockStatus.raidMix`;
+- `data/sim.json`;
+- `packages/bots/src/reference-replay.ts`;
+- **compile-only** edits in `packages/client/src` and `packages/bots/src` if a widened type breaks the build, with no change in behaviour (list them in DECISIONS.md);
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Data v15:**
+   - `raid.prongsMax`, `raid.prongMinSize` and `client.haulerStepper` with their defaults and ranges (the `client.*` key client-scoped, like `client.autosaveSec`);
+   - `extractorSet` in the field state, saved;
+   - `stats.raidProngs` at zero;
+   - the `dataVersion` pin is 15.
+2. **X1–X3,** each with unit tests on shipped `map.field`:
+   - **valid range:** 1..slots for an asteroid; `max(1, free)`..slots for a captured pocket and the hive;
+   - **invalid:** 0, above the slots, a guarded pocket, the probe;
+   - **kept while unmarked**, and applied on re-mark;
+   - **F5** never dispatches past `extCap`;
+   - **H4b** holds the Extractor share (`enough`) while every marked rock is at its `extCap`;
+   - **committed extractors** pick by `extCap`;
+   - **lowering:** unbinds in-flight extractors before docked ones, highest id first; the surplus re-dispatches to another rock with room, or parks idle; the buffer stays;
+   - **raising, or All,** reopens dispatch and H4b on the same tick;
+   - **null, or the slots,** behave the same for every rule.
+3. **X4 (no new rule; prove it):** after a lowering, the rock's `haulerNeed` and `haulerTarget` drop, a hauler over target leaves at its next delivery, and H4 builds no hauler. A kept `haulerSet` wins over the dial.
+4. **The opening is H8's:** on v15 with no inputs, every tick of the first 6 game minutes matches v14 in ships, ore delivered and bays (or the determinism hashes differ only by the version and the new keys; say which and how it was checked).
+5. **Selectors, in their final shape:**
+   - `rockStatus.extractorSet`, `extCap`, `raidMix` and `raidNext`;
+   - `raidStatus.prongs`, `nextProngs` and `last.prongs`;
+   - `fieldSummary.raidProngs`.
+
+   The raid fields are stubs that mirror today's single raid (one prong), with a test that pins the stub's mapping, so h9-raids can replace it.
+6. **The reference replay** adds items (a)–(f) from the spec, with a test that the replay enters each state. The determinism final changes.
+7. **Gates:** all green, the bots gate included. Name any red test outside your files.
+
+### h9-raids (faction-ai; stacked on `task/h9-sim` after its Critic approval)
+
+**Files:**
+- `packages/sim/src/factions/**`;
+- `packages/sim/test/raids*.test.ts` (a new `raids-h9.test.ts`);
+- `packages/sim/src/save.ts` (the raid shape check only);
+- `packages/sim/src/orders.ts` (the `recycleFleet` raid exclusion only);
+- the raid fields of `rockStatus` in `selectors.ts` (`raidTarget`, `haulersHeld`, `raidMix`, `raidNext`; only those lines);
+- `packages/bots/src/reference-replay.ts` (the raid items);
+- `DECISIONS.md`.
+
+No data value changes. If one is needed, report it rather than making it.
+
+**Acceptance:**
+1. **W1:**
+   - the prong count formula at each limit (no target, 1 target, a size below the split, the size at the split, `raid.prongsMax` 3);
+   - targets in hive order, with the tie a6/a7 going to a6;
+   - captured pockets can be targets; the hive and the probe never are.
+2. **W2:** the deal examples in the spec (4T 8S → 2T 4S + 2T 4S; 3T 8S → 2T 4S + 1T 4S); the re-deal at launch; a trimmed launch dropping to 1 prong.
+3. **W3–W5:**
+   - per-prong flight and arrival;
+   - per-prong R7, shield and hold;
+   - the hold ends at its own prong's outcome while the other fights;
+   - two live prongs never share a node;
+   - W5 skips the other prong's live target, or goes home.
+4. **W6:**
+   - the per-prong outcome and the done states;
+   - the raid ends when every prong is done, and the gap runs from the last one;
+   - the overall outcome rule (hit / beaten / turned back);
+   - `stats.raids` by overall outcome, and `stats.raidProngs` per prong;
+   - the wither covers every prong.
+5. **W8:** with `raid.prongsMax` 1, every H7 and H8 raid test passes unchanged.
+6. **The sibling rules:** the `recycleFleet` exclusion covers any prong in `fight`; the save check accepts the new shape and rejects a malformed one.
+7. **Selectors:** replace h9-sim's stubs. Test each `raidStatus` field (prong list, totals, `phase` summary, `ticksToArrival` minimum, `nextProngs`) and `rockStatus` field at each prong phase.
+8. **The reference replay** adds items (g)–(n), with a test that the replay enters each state. The determinism final changes.
+9. **Determinism and gates:** as h9-sim. Report, for h9-design-data:
+   - the raid sizes and prong splits that `adaptive` meets on v15;
+   - the econ at which its first 2-prong raid musters.
+
+### h9-bots (engineer; stacked on `task/h9-sim` after its Critic approval, then merges `task/h9-raids`)
+
+**Files:**
+- `packages/bots/src/**` except `reference-replay.ts`;
+- `packages/bots/test/**`;
+- `reports/`;
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Change 1 (split defence),** each part with a unit test on a two-prong world:
+   - production goes to the largest unmet prong's counter;
+   - placement goes largest prong first, and counts guards already at a target;
+   - no prong gets a guard under `ceil(goal ÷ 2)`;
+   - the standing guard is half of each prong;
+   - a guard follows a W5 retarget.
+
+   With `raid.prongsMax` 1 the bot's decisions match H8's on v15. Test it on a seed.
+2. **`adaptive-concentrate` and `undefended`:** registered as report-only strategies, with the descriptions from the spec and a unit test each for what they don't do.
+3. **The no-plan-fits table:** each cell has a test, or is shown in a traced shipped-data run in the report. No winner idles with resources growing over a whole run.
+4. **The report** adds, per strategy:
+   - raids by prong count;
+   - prong outcomes (`raidProngs`);
+   - economy ships lost per prong target;
+   - the win time against adaptive (%).
+
+   It lists what no bot exercises: `setExtractors`, drag, `setHaulers`, `recycleFleet`, Mine mode.
+5. **Flags 1–7** are reported as in H8. Two new report lines (not gate flags until h9-design-data says they hold): "splitting matters" (calibration target 4) and "ignoring raids costs" (target 5).
+6. **Gates:** the bots gate is judged on the stacked h9-design-data branch, and may be red here. Everything else is green. Report the bots gate time against `cw-bots-gate-time`'s 80 s goal.
+
+### h9-design-data (designer, resume; stacked on `task/h9-bots` after its Critic approval)
+
+**Files:**
+- `data/sim.json` (values only);
+- `DESIGN.md`, `DECISIONS.md`;
+- the `dataVersion` pin test (the version line and title only);
+- `reports/archive/h9-*`.
+
+**Acceptance:**
+1. **First,** commit the probe report on v15.
+2. Calibrate to "Calibration targets (H9)", values only, under the designer.md guard (no committed value that flips the strategy order or moves a winner by more than 10%). A rule finding goes to the Director, including a greedy half of target 5 that values can't meet. No value may make the hive or the probe refill faster (spec, "No faster refill").
+3. If any value changed, bump `dataVersion` to 16. Then update the pin and every H9 table, and recompute every derived claim (prong sizes, the split econ, flag 6's sums).
+4. Rerun every per-prong fight and the min-waves in a second order.
+5. Re-run the suite and the gates; the bots gate must be green here. Say which flags and targets hold, and what no bot exercises.
+6. Merge h9-bots' approving review commit into this branch before the Critic round.
+
+### h9-client (engineer; branched from `task/h9-sim` after its Critic approval; top of the stack)
+
+**Files:**
+- `packages/client/**` (tests included; `placeholders.ts`, `icons.ts`, `gallery.ts` and `palette.ts` only if art changes);
+- `tests/smoke/**`;
+- `ART_STYLE.md`;
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **The extractor row** on the rock sheet:
+   - "Extractors d / cap", with −, + and All (44 px), sending `setExtractors`, and stopping at `minCount` and the slots;
+   - All pressed while null;
+   - "+1 on the way";
+   - greyed but enabled on an unmarked rock;
+   - the read-only "Haulers N (auto)" / "(set N)" line;
+   - with `client.haulerStepper` 1, H8's hauler row under it.
+
+   A smoke test lowers a rock and sees, after stepping with `advanceTicks`: an extractor leave, the rock's haulers drop after their next trip home, and no new extractor built.
+2. **Per-prong raids on the map:** a badge per target with `raidMix`, and the in-flight markers per prong. Tested with `raid.firstAtEcon` 2, `raid.musterTicks` 0 and `raid.prongMinSize` 2, as in H7 and H8.
+3. **Banner and chip:** the multi-prong muster text, H7's text unchanged for one prong, and the chip's "· 2". Plus the fit rule: one line at 375 px under the wide font, or a fixed two-line height whenever raids are on.
+4. **Rock sheet raid lines:** per-rock `raidMix`, and the rank line on every rock with `raidNext`.
+5. **The raid report and result panel** per prong, and `raidProngs`.
+6. **Fit and stability:**
+   - the rock sheet (extractor row, haulers line, raid line, rank line; and with `client.haulerStepper` 1) and the two-prong banner each fit 375x667 without scrolling under the wide-font stress;
+   - two badges, the banner and the chip suffix shift nothing in the HUD (measured).
+7. **Tuning:** `client.haulerStepper` is tagged "this device", and `raid.prongsMax` and `raid.prongMinSize` are listed.
+8. **Smoke time:** new smoke tests step the sim and never wait in real time. Report the CI job times. Past 80% of a limit, say so before the final round.
+9. **The stack:** merge `task/h9-raids` once it is approved, then `task/h9-design-data`. Before the final Critic round, merge every lower task's approving review commit. Run the gates and the full smoke on the final data at desktop and phone sizes with `--repeat-each 5`. Branch CI must be green on the exact commit merged.
+
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-smoke-sim-time** (engineer; added by the Retrospective after build-20261114-1; do this first): both CI jobs that run the smoke suite are past 80% of their limits (gates job 15.5–17.5 of 20 minutes, deploy job with the live smoke 13–14 of 15; runs 43630983499, 43635034312, 43638281605), so the next browser-facing task that adds smoke tests can cancel CI or the production deploy. Replace real-time waits with sim stepping (`advanceTicks` to a predicate with a tick cap, as `stepUntil` in `tests/smoke/h7-economy.spec.ts`): `boot.spec.ts` (`waitForTimeout` and 30 s polls on game state), `overworld.spec.ts` (lines ~398–407), `buffer-warning.spec.ts` (polls of up to 120 s), the remaining `setSpeed(4)` loop in `h7-economy.spec.ts`, and the gallery wait in `h7-art.spec.ts` (up to 100 s per project). Waits for motion to settle (`helpers.ts`) stay as they are. Acceptance: no assertion loosened and no test dropped; full smoke `--repeat-each 5` green; the CI gates job under 14 minutes and the deploy job under 11, with the run ids in the report.

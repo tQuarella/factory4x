@@ -447,7 +447,9 @@ H8 (build-20261116-1, spec below) is the current build, on data v14:
 
 ## Hypotheses
 
-### H9 candidates (iteration 9, awaiting the owner's pick)
+### H9 candidates (iteration 9): A picked
+
+*The owner picked A, without C (QUESTIONS.md Q24, d3ff938). The spec is "H9 (Milestone 2, iteration 9, spec ready): A wider front" below. Where they differ, the spec wins.*
 
 *Iteration 9, 2026-11-15. The triage is in PLAYTEST_LOG.md (build-20261116-1, 2026-11-15). **H8 is partly supported.** The controls hold: "Moving ships felt quick" and "Auto got it right". The decision doesn't: "Since there is only ever one raid target, it wasn't much of a choice", which is H8's own disproof wording. Repelling a raid is still fun ("It did feel good to repel the first raid"). The team's watch items say the same from the numbers: a guard of 6 beats the full raid of 12, and greedy, which ignores raids, finishes 8 s ahead of adaptive ("Calibration result (h8-design-data, data v14)" below). QUESTIONS.md Q24 asks for the pick. No spec until then.*
 
@@ -561,6 +563,366 @@ C answers the watch items rather than the owner's complaint. It's the right add,
 | C | None. The window is a reward that ends, not escalation (pillar 4). |
 | Dial | None. It serves pillar 1 directly: the player sets extraction, and logistics follow. |
 | All | **Q18 (pillar 1 wording) is still open.** The fleet limit has shipped since H7, and Q18's text still mentions research, which field mode doesn't have. As with Q22, I leave it out of Q24 so Q24 stays one reply. |
+
+### H9 (Milestone 2, iteration 9, spec ready): A wider front
+
+The owner picked A without C (QUESTIONS.md Q24: "A, wider front", d3ff938). So H9 is **A, "A wider front", with the extractor dial**. The background is "H9 candidates" above. Where they differ, this spec wins, and where this spec and BACKLOG.md differ, the spec wins.
+
+Everything not mentioned here is H8 as built (data v14): staffing by need, drag and long-press moves, the shield (H9 of H8) and the hold (H10 of H8), the fleet panel, Mine mode, the weights, raids R1–R9 and the client. Rule names below are prefixed W (wider front) and X (extractor dial), so they don't collide with H8's H1–H10, H7's F1–F14 or R1–R9.
+
+#### Claim
+
+**When a full-size raid splits and hits the two mined rocks nearest the hive at once, where the player's warships stand becomes a real choice, and holding that wider front is fun.** The choice is to hold both rocks, mine fewer exposed rocks, or let one fall to save the other.
+
+Secondary: one extractor count per rock is the only economy dial the player needs, and the haulers follow it.
+
+What would disprove it:
+- The owner still says there is nothing to decide: "only one place to defend", or they park an equal guard on both front rocks and forget it.
+- Split raids feel like a chore or a punishment ("I can't save both, so why try").
+- The bots show the split doesn't matter: `adaptive-concentrate`, which defends only the nearest prong, loses no more economy ships than `adaptive`, or ignoring raids costs under 10% of the run (see "Calibration targets (H9)").
+- Lowering a rock's extractors leaves haulers in the wrong place or extra haulers, or the probe rebuilds what the player removed.
+
+#### The smallest mechanics that test it
+
+1. **Prongs (W1–W8).** A raid of at least 2 × `raid.prongMinSize` raiders splits into up to `raid.prongsMax` prongs. Each prong goes to a different mined rock, nearest the hive first, and is its own fight. Below that size a raid is H8's, so the opening is unchanged.
+2. **The extractor dial (X1–X4).** The rock sheet sets how many extractors a rock takes (1 to its slots, or All). The probe never rebuilds what the dial removed, and the surplus goes to other rocks or home. The haulers follow by H8's need rules.
+3. **Readability:**
+   - one badge per prong target, with that prong's mix;
+   - the banner and raid chip name both rocks;
+   - the rock sheet's "raids come here next" line covers every rock a split would hit;
+   - the raid report gives each prong's outcome.
+
+New input: `setExtractors`. There are no others.
+
+#### Rules (field mode): changes to H8
+
+`T` = 1800 ticks per game minute. All integer, fixed orders, no RNG. Type order: extractor, hauler, drone, lancer, flak. Guard order: thorn, spore. "Raidable" is R5's test as built (`isRaidable`: Mine-marked, with a docked extractor or an assigned hauler). The "hive order" of nodes is by distance to the hive, ties to the lower node index (R5, `raidRank`).
+
+**W1. Prong count and targets (at muster; R3–R5 amendment).**
+- At muster, after R4 has fixed `size` and the mix, take the raidable nodes in hive order. Let `k` be how many there are (R3 already requires `k ≥ 1`).
+- `prongs = min(raid.prongsMax, k, max(1, floor(size ÷ raid.prongMinSize)))`.
+- The targets are the first `prongs` nodes in hive order. Prong 0 is the nearest.
+- Targets are fixed for the raid, as in H7, except for W5's retarget.
+
+*Walk.*
+- **Opening.** The first raid on v14 musters at 2:42 with 3 raiders (DESIGN.md "Calibration result (h8-design-data, data v14)"). `floor(3 ÷ 4)` is 0, so it is 1 prong. R4 gives `size = ceil(econ ÷ 2)`, so a raid has at least 8 raiders, and can split, only from 15 economy ships. Every raid before that is H8's to the tick.
+- **Phases.** W1 runs at muster only. A muster cancelled by a battle at the hive (R6) discards the prongs with the raid.
+- **Limits.**
+  - At zero: no raidable node means no muster (R3, unchanged).
+  - With one raidable node, it is 1 prong whatever the size.
+  - At full: `raid.prongsMax` 3 at a raid of 12 gives 3 prongs of 4, at a5, a6 and a7 on the default marks.
+  - `raid.prongsMax` 1 is H8 exactly; that is the in-build comparison.
+  - The fleet limit doesn't enter W1.
+- **Siblings.** Captured pockets are raidable under R5, so they can take a prong. The hive is never a target (it is the source). The probe is never raidable.
+
+**W2. The deal (at muster for the plan, again at launch for the raiders).**
+- Raiders are dealt to the prongs one at a time, by a single pointer that starts at prong 0 and cycles 0, 1, …, prongs − 1. Thorns are dealt first, then Spores, without resetting the pointer.
+- Examples: 4 Thorns and 8 Spores into 2 prongs gives 2T 4S each. 3T and 8S gives 2T 4S to prong 0 and 1T 4S to prong 1. The nearest rock never gets the smaller prong.
+- At muster, the planned counts are dealt this way: each prong's `planned`, shown on its badge.
+- At launch, R6 takes the raiders out of the hive and may trim them (`launchMix`, unchanged). Then:
+  - the prong count is recomputed as `min(prongs, max(1, floor(launched ÷ raid.prongMinSize)))`, keeping the nearest targets;
+  - the launched raiders are dealt again by the same rule, lowest id of each type first.
+
+*Walk.*
+- **Opening:** 1 prong takes everything, as in H8.
+- **Phases:** muster (plan) and launch (raiders) only.
+- **Limits:** a trimmed launch can drop from 2 prongs to 1. That prong keeps target 0, and the dropped target's badge clears at launch. No prong is ever empty, because each needs at least `raid.prongMinSize` raiders.
+- **Sibling:** the mix rule per type is R4's, unchanged. W2 only splits it.
+
+**W3. Flight.**
+- Every prong launches on the same tick. Each flies from the hive to its own target at `raid.speedSu`, with its own `ticksLeft`, `flightTicks` and `from`.
+- Each prong is processed in prong order every tick.
+
+*Walk.* A prong is in `out` from launch to arrival, as H7's raid was. Its `ticksToArrival` is per prong (see "Selectors").
+
+**W4. The fight, per prong (R7, the shield and the hold, per target).**
+- R7 runs for each prong at its own target, on round ticks, in prong order. "Player ships at the node", the shield (H8's H9) and the hold (H8's H10) all read **that prong's target**.
+- The rules in full:
+  - A round that starts with no player ship at the target sends that prong home.
+  - The shield applies while a warship is at that target.
+  - Haulers bound to that target hold from its prong's launch until its prong's outcome.
+- Two live prongs never share a target (W1 targets are distinct; W5 skips live targets), so no round has two raider pools at one node.
+
+*Walk.*
+- **Phases.** The hold starts at launch, as in H8, and ends at **that prong's** outcome (beaten, hit or turned back), not the raid's. So a held rock's haulers resume while the other prong may still be fighting. This keeps H8's amended end ("until the raid's outcome is decided") per prong.
+- **Limits.** A warship that moves between two targets mid-raid leaves one fight and joins the other from the next round, as in H7.
+- **Siblings.** H8's `recycleFleet` excludes "ships at a raid's target while that raid is in its fight phase". This becomes ships at the target of any prong in `fight`. It is the same rule, per prong; `orders.ts` reads it today from `world.raid.target`.
+
+**W5. Retarget, per prong (R6 amendment).**
+- A prong arriving at a target that is no longer raidable retargets once. It takes the nearest raidable node in hive order that isn't the target of another prong in `out` or `fight`.
+- If there is none, it flies home. A prong's retarget is its own: `retargeted` is per prong.
+
+*Walk.* Limits: if the player unmarks every rock, both prongs fly home and the raid ends turned back. If a prong's only alternative is the other prong's live target, it goes home rather than double up.
+
+**W6. Outcomes and pacing (R8 amendment).**
+- Each prong ends with its own outcome, by H7's definitions applied to that prong's kills and losses:
+  - **beaten:** all its raiders died;
+  - **hit:** it killed at least one economy ship;
+  - **turned back:** otherwise.
+
+  A prong's **outcome** is decided when it is beaten or leaves its target. It is **done** when it is beaten, or when its raiders reach the hive and rejoin the guard list (R8).
+- The **raid** ends when every prong is done. Then `world.raid = null`, and `nextRaidTick = tick + raid.gapTicks`, so the gap runs from the last prong.
+- The raid's overall outcome is: **hit** if any prong hit; else **beaten** if every prong was beaten; else **turned back**. `stats.raids` (`mustered`, `beaten`, `hit`, `turnedBack`) keeps counting raids by this overall outcome, so H7 and H8's readers keep their meaning.
+- New: `stats.raidProngs` = `{ beaten, hit, turnedBack }`, counted per prong.
+
+*Walk.*
+- **Phases:** a beaten prong is done at once. A prong that hit or was turned back flies home and is done on arrival.
+- **Limits:** if the hive is captured while prongs are out, every prong withers (R9), and the raid ends `withered`.
+- **Sibling:** greedy switches to adaptive's rules on `fieldSummary.raids.hit ≥ 1`. Under the overall-outcome rule, a raid where one prong hit counts as hit, which is what greedy reads as "I've been hurt".
+
+**W7. Hive regrowth (R9, unchanged in rule).** Raiders away count against the hive's caps across every prong (`raidersOut` sums them). The wither removes every prong's raiders.
+
+**W8. `raid.prongsMax` 1 is H8.** With 1, W1 always gives 1 prong and W2–W6 reduce to R4–R8 as built. Every H8 raid test must pass unchanged under it.
+
+---
+
+**X1. `setExtractors`** (`node`, `count: number | null`).
+- Valid for an asteroid, or a captured pocket or the captured hive.
+- `count` is null ("All", the default) or an integer from `minCount(n)` to the node's slots:
+  - `minCount` is 1 for an asteroid;
+  - for a captured pocket or the hive it is `max(1, free extractors)`, because free extractors aren't ships and can't be sent away.
+- 0 is not a count: Stop mining means that.
+- It sets `extractorSet[node]`. The setting is kept while the rock is unmarked and applies again when it is re-marked, as `haulerSet` does.
+- Setting the count to the slots is the same as null for every rule, but the sheet shows it as set.
+
+**X2. The cap (F5 and H4b amendment).**
+- `extCap(n)` = `extractorSet[n]` if set, else the node's slots.
+- **F5** dispatches an extractor to a mineable node only while its bound plus free extractors are below `extCap(n)`, where H7 used the slots.
+- **H4b** counts free slots against `extCap`, so the probe doesn't start an Extractor for a rock dialled down.
+- **H8's committed-extractor rule** (the H1 amendment rulings) picks its rock by the same `extCap` test as F5.
+
+*Walk.*
+- **Opening:** every `extractorSet` starts null, so `extCap` = slots and the opening is H8's to the tick (the replay checks it).
+- **Limits.**
+  - *At the fleet limit:* X2 builds nothing, so the limit can only be reached more slowly, never passed.
+  - *When full:* a rock at its cap is skipped by F5, as a full rock is now.
+  - *At the lowest count:* the rock still yields and is still raidable.
+- **Sibling:** the hauler need (H8's H1) reads the docked extractors, which X3 lowers. So the need and target fall by themselves (X4).
+
+**X3. Lowering.**
+- When `setExtractors` leaves a node with more bound extractors than `extCap(n)`, the surplus is unbound on that tick:
+  1. extractors still on their way first, highest id first;
+  2. then docked ones, highest id first.
+- Each unbound extractor re-dispatches by F5 from where it is: to the mineable node nearest the probe with room under its own `extCap`, or else it flies to the probe and parks idle.
+- A docked extractor that leaves takes nothing with it. The rock's buffer stays for its haulers.
+- **Raising** a count, or setting All, reopens dispatch and H4b on that tick, exactly as marking a rock does.
+
+*Walk.*
+- **Opening:** no effect.
+- **Phases:**
+  - Lowering a raid target's count during a prong's `fight` moves those extractors out of the fight. Stop mining already allows that evacuation, so this is not new.
+  - The rock stays raidable while any extractor or hauler is bound to it, so the prong's target holds.
+  - X3 never reads raid state.
+- **Limits.**
+  - *Idle surplus at the fleet limit:* idle extractors at the probe are what the fleet panel recycles first (H8's H8), so freeing slots is one more tap.
+  - *Lowering to below the docked count while the bay holds a committed extractor:* the committed one re-picks by X2 when it launches.
+- **Sibling:** haulers aren't unbound by X3. H8's H3 rebalances them at their next delivery.
+
+**X4. Haulers follow (no new rule; H8's H1–H4 as built).**
+- With fewer docked extractors, `yieldPerMin`, `need` and `target` drop.
+- At its next delivery a hauler over target leaves and picks again, or parks idle (H3).
+- H4 stops building haulers while there is no shortfall.
+
+  This is the owner's own reading ("wouldn't the haulers balance to the new extraction count?").
+- R4 counts economy ships alive, so a dialled-down field that recycles its idle ships gets smaller raids, and fewer prongs.
+
+*Walk.* Limits: a rock with a set hauler count (`haulerSet`, kept in the sim) keeps that count under the dial, as H8's H1 says. Only the sheet hides it (`client.haulerStepper` 0). A player who set hauler counts in H8 starts fresh anyway (data v15 discards saves).
+
+#### Save, data version and replay
+
+- **`dataVersion` 15** (h9-sim). It adds:
+  - `raid.prongsMax`, `raid.prongMinSize` and `client.haulerStepper` (below);
+  - `extractorSet` in the field state;
+  - `stats.raidProngs`.
+
+  h9-raids changes the shape of `world.raid` (prongs) without a version bump, because it lands in the same stack before any release. The save check (`save.ts`) validates the new shape. Old saves are discarded with the existing toast.
+- **The reference replay must reach these states.** Each task adds a test that the replay enters every new state it lists, and the determinism final must change at each task's commit (engineer.md).
+  - **h9-sim (the dial):**
+    - (a) `setExtractors` lowers a docked rock: one surplus re-dispatches to another marked rock with room, and one parks idle because none has room;
+    - (b) after lowering, the Extractor share is held (`enough`) and the probe doesn't rebuild;
+    - (c) a hauler over its new target leaves at its next delivery;
+    - (d) raising the count (or All) reopens H4b, and an extractor is built and docks;
+    - (e) a count set on an unmarked rock applies when it is re-marked;
+    - (f) an invalid `setExtractors` (0, above the slots, a guarded pocket) changes nothing.
+  - **h9-raids (prongs):**
+    - (g) a muster with 2 prongs and the W2 deal;
+    - (h) both prongs launched, and arriving at different ticks;
+    - (i) one prong beaten while the other hits, so the overall outcome is `hit`, with `raidProngs` counting one of each;
+    - (j) the shield at one target while the other's economy ships are struck;
+    - (k) the hold ending at one prong's outcome while the other still fights;
+    - (l) a W5 retarget that skips the other prong's live target;
+    - (m) a trimmed launch that drops to 1 prong;
+    - (n) a raid below the split size that stays 1 prong.
+
+  To reach (g)–(m) on shipped data without waiting for a 15-ship economy, the replay may use `setTunable` (for example `raid.prongMinSize` 2) as an input, recorded like any other.
+
+#### Tunables (H9, data v15, all integers)
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `raid.prongsMax` | 2 | 1–3 | 1: H8, one target (the comparison) / 3: a5, a6 and a7 hit at once; the whole wing is the front |
+| `raid.prongMinSize` | 4 | 2–12 | 2: even small raids split, and early fronts are thin / 12: only the largest raid can split, and only at `raid.maxSize` 24 or more |
+| `client.haulerStepper` | 0 | 0–1 | client, this device. 0: extractors are the dial, and haulers are a readout / 1: H8's hauler stepper comes back under the extractor row |
+
+The `client.*` key follows `client.autosaveSec`: it is in data, shows in the tuning panel tagged "this device", is stored in settings, and never reaches the sim.
+
+#### Selectors (sim, read-only)
+
+- **`raidStatus`** gains:
+  - `prongs`: one entry per prong, in prong order, empty when there is no raid. Each entry has:
+    - `target`;
+    - `phase`: `muster`, `out`, `fight`, `home` or `done`;
+    - `planned`, the W2 deal of the plan;
+    - `raiders`, this prong's raiders away now (zeros while mustering);
+    - `ticksToArrival`;
+    - `outcome`: null until decided, then `beaten`, `hit` or `turnedBack`;
+    - `holding`, the haulers H10 holds for this prong.
+  - `nextProngs`: how many prongs a raid would have if it mustered now (W1 with today's `econ`, R4's size and today's raidable nodes); 0 when R3 would not muster for lack of size or target. It ignores the gap and the economy threshold, so the client can say where raids will land before they come.
+- **Existing `raidStatus` fields keep their meaning for one prong**, and are defined for several:
+  - `phase` is `muster` while mustering; afterwards it is `fight` if any prong fights, else `out` if any is out, else `home`;
+  - `target` is prong 0's target (the nearest);
+  - `planned` and `raiders` are totals;
+  - `ticksToArrival` is the smallest over prongs in `out` or `home`;
+  - `holding` is the total.
+- **`raidStatus.last`** (`RaidResult`) gains `prongs`: `{ target, outcome, lostEcon, lostShips, killed }` per prong. Its `outcome` is W6's overall outcome, and its `target` is prong 0's.
+- **`rockStatus`** gains:
+  - `extractorSet` (null, or the count);
+  - `extCap` (X2);
+  - `raidMix`: the guard counts of the prong aimed at this rock (its plan while mustering, then its raiders), or null;
+  - `raidNext`: true when the rock is mined and its `raidRank` ≤ `raidStatus.nextProngs`.
+
+  `raidTarget` is true from muster until that rock's prong is done (W6). `haulersHeld` is per prong (W4).
+- **`fieldSummary.raids`** is unchanged in meaning (overall outcomes). `fieldSummary.raidProngs` is new.
+
+**Stub for parallel work.** h9-sim lands every selector field above in its final shape, filled from today's single raid: one prong that mirrors `world.raid`, and `nextProngs` = 1 when a raid could muster, else 0. h9-raids then fills them for real. This is the same pattern as H8's `haulersHeld` stub, and it lets h9-bots and h9-client build against the final types in parallel with h9-raids.
+
+#### Client: phone UI (H9)
+
+The H1–H8 rules hold: 375 px portrait, no hover, targets ≥ 44 px, at most 2 taps per action from its screen, and nothing in the HUD shifts.
+
+**Rock sheet: the extractor dial.**
+- The H8 "Haulers" stepper row becomes **"Extractors 2 / 3"**, with −, + and **All** (44 px each). It sends `setExtractors`.
+  - − stops at `minCount`, and + stops at the slots.
+  - All sends null and is shown as pressed while the count is null.
+  - The left number is the docked count (with "+1 on the way" when one is in flight), and the right is `extCap`.
+- Under it, a read-only line: **"Haulers 1 (auto)"**, or "Haulers 2 (set 2)" when a `haulerSet` is kept from a replay or the tuning A/B.
+- With `client.haulerStepper` 1, H8's hauler row comes back under the extractor row. Both fit 375x667.
+- On an unmarked rock the row shows the kept setting, greyed, with the buttons enabled (X1 keeps it).
+
+**Raids on the map.**
+- Each prong target gets its own raid badge (`drawRaidBadge`), with that prong's `raidMix`.
+- Each prong's raiders are drawn in flight on their own leg, as H7's single raid marker is.
+- Nothing new is drawn for a prong that is done.
+
+**Banner and raid chip.**
+- While mustering, H7's banner ("Raid gathering: 4 Spores, 1 Thorn → A5 in 15 s") names every prong: "Raid gathering in 15 s → A5 2T 4S · A6 1T 4S" (one segment per prong, with the counts from `planned`). With one prong it is H7's text unchanged.
+- It must fit one line at 375 px under the wide-font stress. If it can't, the banner reserves a fixed two-line height whenever raids are on, so nothing below it moves when a second prong appears.
+- The raid chip shows the soonest prong's time, plus "· 2" when there are 2 prongs.
+- Tapping the banner opens prong 0's rock, as now.
+
+**Rock sheet raid lines.**
+- "Raid coming: 2 Thorns, 4 Spores" is read from `raidMix`, per rock.
+- The H8 rank line ("Raids come here next") shows when `raidNext` is true, so it appears on both rocks a split would hit.
+
+**Raid report.**
+- The battle report and the result panel list each prong: "A5 beaten · A6 hit, 2 extractors lost".
+- The result panel adds `raidProngs` beside the raid counts.
+
+**Phone checks.**
+- Each of these fits 375x667 without scrolling under the wide-font stress:
+  - the rock sheet with the extractor row, the haulers line, a raid line and the rank line;
+  - the same with `client.haulerStepper` 1;
+  - the banner with two prongs.
+- Two badges, the two-prong banner and the chip suffix shift nothing in the HUD (measured, as in the H6 bug tests).
+
+#### Art needs (folded into h9-client, within ART_STYLE.md)
+
+None new. Prong badges reuse `drawRaidBadge`, and in-flight prongs reuse the raid marker. If the extractor row needs an icon, it reuses `drawMineBadge`, as Mine mode does. Any new colour gets a palette key and an ART_STYLE.md row.
+
+#### Bots (H9): changes only where the new rules need them
+
+Bots keep H8's strategies and selectors. None uses `setExtractors` (they stay on All), the drag, `setHaulers` or `recycleFleet`. Sim tests and the replay cover those, and the report says so.
+
+**Changes:**
+1. **Defence is split across prongs** (`adaptive`, and `greedy` after its first hit). Today the bot answers a raid with its counter type at full weight until its warships match the raid, gathers them at `raid.target`, and keeps a standing guard of half the last raid at the last target. Under H9 it works per prong:
+   - **Goal per prong:** the prong's planned size, in the counter type for that prong's majority (`counterFor` on the prong's `planned`).
+   - **Production:** the counter type of the largest unmet prong goes to full weight while the sum of the goals exceeds the warships alive.
+   - **Placement**, in order of prong size (largest first, ties to prong 0):
+     - first, warships already at a prong's target count toward its goal;
+     - then warships at the probe or the standing posts go to the prong with the largest unmet goal, one `sendShips` per prong;
+     - a prong left uncovered once the warships run out gets none. The bot doesn't split below `ceil(goal ÷ 2)` per prong, because a guard under half its prong loses (calibration target).
+   - **Standing guard:** half of each prong of the last raid, at that prong's target, while that rock is still mined.
+2. **New strategy `adaptive-concentrate`** (report only, a control). It is adaptive, except it answers only prong 0 with every warship (H8's rule aimed at prong 0) and posts its standing guard only there. It measures whether splitting matters.
+3. **New strategy `undefended`** (report only, a control). It is adaptive with raid responses and the standing guard off for the whole run. Offence, pockets and economy are unchanged. It measures what ignoring raids costs. Greedy can't measure that, because it plays adaptive's rules after its first hit (`field-strategies.ts`, `GreedyBot`), which on v14 comes at the first raid.
+
+**What each strategy does when no plan fits** (designer.md), walked for H9:
+
+| State | `adaptive` | `greedy` | `adaptive-concentrate` | `undefended` | `static`, `idle`, `drones-only`, `adaptive-no-raids` |
+| --- | --- | --- | --- | --- | --- |
+| Two prongs, warships cover only one goal | covers the larger prong at ≥ half its goal, leaves the other | as adaptive after its first hit; before it, no defence | covers prong 0 only (by design) | no defence (by design) | as H8 (static keeps its shape; idle doesn't defend; drones-only and no-raids as H8) |
+| Both prongs' goals met and ore piling up | builds for the hive (H8's step 4) | as adaptive | as adaptive | as adaptive | as H8 |
+| A prong retargets mid-flight (W5) | its guard follows the new target next tick | as adaptive | only if it is prong 0 | n/a | as H8 |
+| The economy is wiped by a two-prong hit | H8 change 2 (rebuild to `raid.firstAtEcon − 1`) | as adaptive | as adaptive | as adaptive | as H8 |
+| The hive wave doesn't fit with guards standing on two rocks | recycles economy ships, as H8; standing guards don't move for a wave unless the wave is launched into a raid window | as adaptive | as adaptive | n/a (no guards) | as H8 |
+
+**Inherited assumptions, checked:**
+- **The standing guard and the hive wave.** In H8 the standing guard was half of one raid. With two prongs it is half of each, about the same total, on two rocks. Flag 6's sums don't change, because they count the hive's best mix and economy ships, not guards.
+- **Flag 2** (greedy's first hit kills ≥ 2 economy ships): the first raid is 1 prong (W1 walk), so it is unchanged.
+- **Flag 4** (the counter-attack window) reads "a full-size raid out". Prongs don't change how many raiders are away, so the window is the same.
+- **`raidAwayAtEcon`** in the bots' estimate sums raiders away and doesn't read targets, so it is unchanged.
+- **No new order dependence.** W2's deal depends only on the counts and the prong order. Each prong's fight is H8's fight at one node, which h8-design-data showed to be order-independent. The two prongs never share a node (W4). The calibration reruns the per-prong fights in the second order anyway.
+
+#### Calibration targets (H9, h9-design-data)
+
+H8's targets carry over with the same values, except that "an undefended full-economy raid on a5" becomes "per prong" (below). New or changed targets:
+1. **Splits happen in play.** On `adaptive`, at least 2 raids in the run have 2 prongs. Otherwise the hypothesis never shows up for the bots, and probably not for the owner either.
+2. **An undefended prong hurts.** At a full economy (the raid of 12 split 6 and 6, at a5 and a6), each undefended prong kills at least 2 economy ships at its target.
+3. **A token guard isn't enough, per prong.** A guard under half its prong's size (2 ships against 6) is beaten, then the prong hits. A guard matched to its prong (6 against 6) wins, losing at most 2.
+4. **Splitting matters.** Over the run, `adaptive-concentrate` loses at least 2 more economy ships to raids than `adaptive`, on every seed.
+5. **Ignoring raids costs.**
+   - `greedy` finishes at least 10% slower than `adaptive` (the Director's ask).
+   - `undefended` finishes at least 10% slower than `adaptive`, or doesn't win within the cap.
+   - Both are reported. On v14 greedy finished 8 s ahead of adaptive, and greedy becomes adaptive after its first hit. So if the greedy half can't be met by values, that is a rule finding about the greedy bot, not the field. It goes to the Director with the reword "measured on `undefended`" (see DECISIONS.md).
+6. **Pace:** adaptive 15–30 game minutes, greedy ≤ 40, as H7 and H8. The first raid still musters at 2–6 minutes.
+
+**No faster refill (the owner's direction note, PLAYTEST_LOG.md 2026-11-16).** Rebuild already feels near-instant on both sides ("There is no possibility for a war of attrition"). So no H9 value may make the hive or the probe refill faster:
+- `hive.regrowPct` and `guard.<type>.regrowTicks` don't go down;
+- `guard.<type>.repairPerRound` doesn't go up;
+- `ship.<type>.buildTicks` and `ship.<type>.cost` don't go down for any warship.
+
+If a target can only be met that way, report it as a finding rather than tune it.
+
+Flags 1–7 must stay met. The designer.md guard applies: a value that meets one target but changes which strategy finishes first, or moves a winner by more than 10%, goes to the Director with the reword option and isn't committed as shipped. Values only, in `data/sim.json`; `dataVersion` goes to 16 if any value changes.
+
+#### Success criteria (H9; the owner, one 20–30 minute phone session; 4x is fine)
+
+1. They don't say there was only one place to defend, or nothing to decide. They name a moment of choosing between two raided rocks: hold both, hold one, or mine fewer exposed rocks.
+2. They split warships across two rocks at least once: a long-press half move, or a Send from a sheet.
+3. At least one two-prong raid ends with one rock held, and they can say what happened at the other (the report shows each prong).
+4. They use the extractor dial at least once, or say they didn't need it. After a lowering they don't mention haulers in the wrong place, extra haulers, or the probe rebuilding.
+5. They don't call split raids a chore, a timer or a punishment ("can't save both, so why try").
+6. The phone checks hold: the rock sheet and the two-prong banner fit, and nothing in the HUD shifts.
+
+Optional: they try `raid.prongsMax` 1 or 3 and say which they prefer.
+
+#### Fun questions for the handoff (H9)
+
+1. When a raid split across two rocks, how did you decide where your warships stood: both rocks, the richer one, or fewer rocks near the hive?
+2. Did a split raid ever make you stop or dial down a rock near the hive? Was that a good trade?
+3. Did the extractor dial do what you expected, with the haulers following on their own?
+
+#### Left out of H9 (hard limit)
+
+- **The next direction, not this one.** The owner's direction note (PLAYTEST_LOG.md, 2026-11-16) names two things:
+  - **attrition**: beating the hive down over several pushes, rather than finding the one composition that wins in one go. Candidate C (strike back, `hive.reopenTicks`) is the smallest step toward it;
+  - **a logistics layer** ("distilled Factorio") that unlocks advantages for the combat ("distilled Starcraft").
+
+  Both wait for a direction question to the owner after the H9 handoff, with any VISION.md wording for them to approve. Neither is in H9, and no H9 value moves toward or away from them, beyond "No faster refill" above.
+- Every nest raids (candidate B): pockets don't raid.
+- Raids that retarget to the least-defended rock, raids at the probe, and prongs chosen by anything but hive order.
+- Changes to raid size (R4), the gap, the muster time or the shield. Calibration may tune their values; the rules stay.
+- A dial for bots (`setExtractors` in a strategy). Drags that carry economy ships. Removing `setHaulers` from the sim.
+- The overworld, research and new game+, which stay parked. New ship or guard types. Pan or zoom in field mode.
 
 ### H8 candidates (iteration 8): A and B picked
 

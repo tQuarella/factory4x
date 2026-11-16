@@ -1544,3 +1544,32 @@ Scope: `git log build-20261114-1..build-20261116-1` (81 commits), `reviews/h8-*.
 - **The team's two watch items become A's calibration targets** (a guard under half its prong loses; greedy at least 10% slower than adaptive). If values alone can't meet them, that goes to the Director as a rule finding, per designer.md. No calibration was run for this triage. The numbers above are read from data, DESIGN.md and `reports/archive/h8-design-data-v14.md` via DESIGN.md.
 
 **Why:** the owner's one complaint about the decision is the number of raid targets, and the bots' watch items (a cheap guard wins, ignoring raids costs nothing) point the same way. A is the smallest rule change that makes two places matter at once, and it gives the unused long-press half move a job. Q18 is still left out of Q24 so Q24 stays one reply, as with Q22.
+
+## 2026-11-16 · Designer · H9 spec (A, wider front): calls made in the spec
+
+Spec: DESIGN.md "H9 (Milestone 2, iteration 9, spec ready): A wider front". Split: BACKLOG.md "Milestone 2, iteration 9".
+
+**Decisions:**
+- **One raid with prongs, not several raids.** `world.raid` stays a single raid that holds `prongs`. One muster, one gap and one hive keep the pacing rules (R3, R8, R9) as they are, and only fights and flights are per prong. With `raid.prongsMax` 1 the rules reduce to H8 exactly (W8), and every H8 raid test must pass under it.
+- **Overall outcome: `hit` if any prong hit, else `beaten` if every prong was beaten, else `turnedBack`.** `stats.raids` keeps counting raids, so greedy's switch (`raids.hit ≥ 1`) and the flags keep their meaning. Per-prong counts go in a new `stats.raidProngs`.
+- **Legacy `raidStatus` fields stay, defined for several prongs:**
+  - `target` is prong 0's;
+  - `phase` summarises the prongs (fight > out > home);
+  - `planned`, `raiders` and `holding` are totals;
+  - `ticksToArrival` is the minimum.
+
+  The client and bots can then move to `prongs` field by field instead of breaking at once.
+- **The hold ends at each prong's own outcome,** not the raid's. This keeps the Director's H8 ruling (ec04b17: hold until the outcome is decided) per prong, so a held rock resumes while the other prong still fights.
+- **The deal uses one pointer across both types, Thorns first, starting at the nearest prong.** So the nearest rock never gets the smaller prong, and the split is stable under the order checks.
+- **h9-sim stubs every H9 selector field in its final shape** (one prong mirroring today's raid), as H8 did with `haulersHeld`. That lets h9-raids, h9-bots and h9-client run in parallel with no file overlap.
+- **The dial's lowest count is 1, and 0 stays "Stop mining".** Two ways to stop a rock would be one too many. Lowering unbinds in-flight extractors before docked ones, so a rock the player just lowered doesn't lose a working extractor while one is still on its way.
+- **Bots don't split a guard below half its prong.** A guard under half its prong loses (calibration target 3), so a thin split would only feed raiders. The bot leaves the smaller prong uncovered instead.
+- **Two report-only control strategies, `adaptive-concentrate` and `undefended`.**
+  - Without `adaptive-concentrate`, nothing measures whether splitting matters (designer.md: flags must show the mechanic being used).
+  - `undefended` exists because greedy can't measure "ignoring raids costs": `GreedyBot` plays adaptive's rules after its first hit, which on v14 is the first raid. That is why greedy and adaptive finished 8 s apart on v14.
+- **No faster refill.** Following the owner's direction note (PLAYTEST_LOG.md, 2026-11-16, 98aeeb9), no H9 calibration value may speed up hive regrowth or repair, or warship build time or cost. Attrition and a logistics layer are named in "Left out of H9" as the next direction, pending a question to the owner after the H9 handoff.
+- **No `dataVersion` bump at h9-raids** for the raid's shape. It lands in the same stack as h9-sim's v15 before any release, and `save.ts` validates the shape.
+
+**For the Director to rule on:**
+1. **Calibration target 5's greedy half** ("greedy at least 10% slower than adaptive", as asked) may be impossible by values, because greedy turns into adaptive at its first hit. The spec measures `undefended` beside it. I propose that, if h9-design-data reports the greedy half unmet, the target reads "measured on `undefended`", with greedy reported only.
+2. **`cw-bots-gate-time`** touches `packages/bots/src/**`, the same files as h9-bots. Run it before h9-bots starts, fold it into h9-bots, or leave it for later.
