@@ -265,3 +265,19 @@ Dictated while playing; full run, hive destroyed.
 - C, "The map returns": the H6 overworld on top of the H7 loop.
 
 QUESTIONS.md Q22 asks the owner to pick. The H7 handoff's fun questions are marked answered. No spec and no BACKLOG change until the pick.
+
+### 2026-11-15 · build build-20261116-1 (M2 H8, Hold the front) · owner
+
+> Moving ships felt quick
+> Since there is only ever one raid target, it wasn't much of a choice.  It did feel good to repel the first raid. 
+> Auto got it right.  At the end though, I wanted to reduce extractor count on specific rocks but couldn't.  If I could dial extractors instead of haulers, wouldn't the haulers balance to the new extraction count?
+
+(Answers to the H8 fun questions 1, 2 and 3, in order.)
+
+**Interpretation (Director's first read; the Designer triages it fully):**
+- **Fun question 1 (drag): supported.** "Moving ships felt quick." No word on the long-press half move.
+- **Fun question 2 (holding a front): half.** Repelling the first raid felt good, but one raid target means no choice. That's the claim's own disproof wording ("only need to defend one asteroid", DESIGN H8), and it points straight at the parked "wider front" idea (raids at more than one rock, or raids that retarget).
+- **Fun question 3 (hauler count): Auto is right, and the per-rock hauler control went unused.** The owner wants the opposite dial: extractors per rock. They're right about the effect: H1's need is the rock's extractors × rate × round trip, so with the count on Auto, fewer extractors means fewer haulers. A per-rock extractor count could replace the hauler stepper as the player's control. Why they wanted it at the end (likely to free fleet slots for the hive push) is for the Designer to read.
+
+**Action:** Designer triage and H9 candidates.
+
