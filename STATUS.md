@@ -9,6 +9,14 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 **Last build:** build-20261114-1 (H7 One field, live enemy), commit f565c11, live (CI 43638281605 gates and deploy green; site shows f565c11 · data v13). Release gates passed locally (232/232 smoke).
 **Last updated:** 2026-11-14, iteration 8 start
 
+## Iteration 9 ledger
+
+Launches: 1 / 12.
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | triage build-20261116-1 owner playtest; H9 candidates | launch | Plan (9ac9a8a); waiting on the owner's pick (Q24) |
+
 ## Iteration 8 ledger
 
 Launches: 11 / 12. Resumes: 18. Iteration 8 closed: build-20261116-1 handed off, retro done.
@@ -292,7 +300,7 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-Awaiting owner feedback on build-20261116-1 (H8, Hold the front): https://factory4x.pages.dev, commit c72eb04, data v14. Merged c72eb04 after green branch CI on e717b91; main CI run 43791219333 green (gates 9m36s of 20, deploy 5m22s of 15). Handoff block is at the top of QUESTIONS.md. When feedback arrives: log it verbatim in PLAYTEST_LOG.md, then Designer triage. Iteration 8 retro done (launch 11). Can wait: cw-bots-gate-time.
+Owner feedback on build-20261116-1 is logged (1f8adb8) and triaged (9ac9a8a). Waiting on the owner's H9 pick, Q24 in QUESTIONS.md (A wider front recommended; extractor dial rides along with any option). When answered: Designer resume to spec, then split and /iterate.
 
 ## Moving to another machine
 
