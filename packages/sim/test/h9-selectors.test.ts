@@ -17,9 +17,9 @@ import { addShips, setGuards } from './helpers.ts';
 import { F, addEcon, quietField } from './field-helpers.ts';
 
 /**
- * h9-sim acceptance 5: every H9 selector field in its final shape. The raid fields are stubs that mirror today's
- * single raid as one prong (DESIGN.md H9 "Stub for parallel work"); these tests pin the stub's mapping so h9-raids
- * can replace it knowingly. On the frozen v15 fixture (raid speed 3: a5 is 430 su from the hive, 144 ticks; muster
+ * h9-sim acceptance 5: every H9 selector field in its final shape. These tests pin the one-prong mapping (one raidable
+ * rock, so W1 gives one prong whatever the size, and the prong mirrors the legacy fields); h9-sim wrote them against
+ * stubs and h9-raids' real prongs keep them passing. Several prongs are in raids-h9.test.ts. On the frozen v15 fixture (raid speed 3: a5 is 430 su from the hive, 144 ticks; muster
  * 450 ticks; keep 50% of the hive's caps).
  */
 const D = fixtureV15;
@@ -40,7 +40,7 @@ function raidField(haulers = 3): World {
   return w;
 }
 
-/** The stub's mapping: no raid, no prongs; else one prong equal to the legacy fields, its outcome decided once it is home-bound. */
+/** The one-prong mapping: no raid, no prongs; else one prong equal to the legacy fields, its outcome decided once it is home-bound. */
 function expectMirror(w: World): ProngStatus | null {
   const s = raidStatus(w);
   const r = w.raid;
@@ -78,7 +78,7 @@ function playRaid(w: World, each: (w: World) => Input[] = () => [], max = 3000):
   throw new Error('the raid did not end');
 }
 
-describe('raidStatus.prongs and last.prongs (stub: one prong mirroring the raid)', () => {
+describe('raidStatus.prongs and last.prongs (one prong mirroring the raid)', () => {
   it('an undefended rock is hit: muster, out, fight, home with outcome hit, and holding per prong; last.prongs mirrors the result', () => {
     const w = raidField();
     expectMirror(w);
@@ -132,7 +132,7 @@ describe('raidStatus.prongs and last.prongs (stub: one prong mirroring the raid)
     expect(raidStatus(w).last!.prongs.map((p) => [p.target, p.outcome])).toEqual([[F.a5, 'withered']]);
   });
 
-  it('the prong count is 1 for any raid size under the stub', () => {
+  it('the prong count is 1 for any raid size with one raidable rock', () => {
     const w = raidField(11);
     for (let i = 0; i < 2000 && w.raid === null; i++) tick(w);
     expect(raidStatus(w).planned.thorn + raidStatus(w).planned.spore).toBeGreaterThanOrEqual(8);
@@ -140,7 +140,7 @@ describe('raidStatus.prongs and last.prongs (stub: one prong mirroring the raid)
   });
 });
 
-describe('raidStatus.nextProngs (stub: 1 when a raid could muster now, else 0)', () => {
+describe('raidStatus.nextProngs (one raidable rock: 1 when a raid could muster now, else 0)', () => {
   it('1 with a raidable rock and a hive that can spare a raider, ignoring the gap, the economy threshold and a raid in progress', () => {
     const w = raidField();
     expect(raidStatus(w).nextProngs).toBe(1);
@@ -196,7 +196,7 @@ describe('rockStatus: extractorSet, extCap, raidMix and raidNext', () => {
     expect(rockStatus(w, F.a5).raidMix).toEqual(away);
   });
 
-  it('raidNext: the raidable rocks with raidRank ≤ nextProngs (1 under the stub); false when unmarked or when no raid could muster', () => {
+  it('raidNext: the raidable rocks with raidRank ≤ nextProngs (1 with one raidable rock); false when unmarked or when no raid could muster', () => {
     const w = raidField();
     w.field!.mine[F.a6] = true;
     addEcon(w, 'extractor', F.a6, F.a6);
@@ -209,11 +209,11 @@ describe('rockStatus: extractorSet, extCap, raidMix and raidNext', () => {
 });
 
 describe('fieldSummary.raidProngs', () => {
-  it('reads stats.raidProngs (zeros until h9-raids counts prongs, raids or not)', () => {
+  it('reads stats.raidProngs (h9-raids counts one hit prong for the one-prong raid; a fresh world has zeros)', () => {
     const w = raidField();
     playRaid(w);
     expect(w.stats.raids.hit).toBe(1);
-    expect(fieldSummary(w).raidProngs).toEqual({ beaten: 0, hit: 0, turnedBack: 0 });
+    expect(fieldSummary(w).raidProngs).toEqual({ beaten: 0, hit: 1, turnedBack: 0 });
     w.stats.raidProngs = { beaten: 2, hit: 1, turnedBack: 4 };
     expect(fieldSummary(w).raidProngs).toEqual({ beaten: 2, hit: 1, turnedBack: 4 });
     expect(createWorld(1, D).stats.raidProngs).toEqual({ beaten: 0, hit: 0, turnedBack: 0 });

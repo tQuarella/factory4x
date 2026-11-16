@@ -258,7 +258,7 @@
  *   raidStatus                      gains prongs (per prong: target, phase incl. 'done', planned, raiders,
  *                                   ticksToArrival, outcome, holding) and nextProngs; last (RaidResult) gains prongs
  *                                   (per prong: target, outcome, lostEcon, lostShips, killed). The legacy fields keep
- *                                   their one-prong meaning. Until h9-raids: one prong mirroring world.raid.
+ *                                   their one-prong meaning. h9-raids: one entry per prong of world.raid (prong 0 is the raid object itself, prongs 1 and up are world.raid.others; raidProngs(raid) lists them).
  *   rockStatus                      gains extractorSet, extCap, raidMix (the prong aimed here: plan, then raiders) and
  *                                   raidNext (raidable with raidRank ≤ nextProngs).
  *   raid.prongsMax / raid.prongMinSize / client.haulerStepper   the v15 keys (the client key never reaches the sim).
@@ -306,8 +306,8 @@ export {
   worstHauls,
 } from './data.ts';
 export type { BuildType, EconType, FieldMap, RunMode } from './data.ts';
-export { haulersHeld, isRaidable, launchMix, nextProngs, raidKeep, raidMix, raidMixAt, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
-export type { ProngOutcome, ProngPhase, ProngResult, ProngStatus, Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
+export { dealCounts, haulersHeld, isRaidable, launchMix, nextProngs, prongCount, prongOutcome, raidFightsAt, raidKeep, raidMix, raidMixAt, raidProngs, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
+export type { Prong, ProngOutcome, ProngPhase, ProngResult, ProngStatus, Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
 export {
   econAlive,
   econAtByType,

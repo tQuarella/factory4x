@@ -54,8 +54,9 @@ type AnyShip = Ship | EconShip;
 function recycleRank(world: Readonly<World>, s: Readonly<AnyShip>): [number, number] | null {
   if (s.at === null) return [2, 0];
   if (isGuarded(world, s.at)) return null;
+  // H9 W4: ships at the target of any prong in its fight phase (prong 0 is the raid itself; `others` holds the rest).
   const raid = world.raid;
-  if (raid !== null && raid.phase === 'fight' && raid.target === s.at) return null;
+  if (raid !== null && [raid, ...(raid.others ?? [])].some((p) => p.phase === 'fight' && p.target === s.at)) return null;
   const econ = s.type === 'extractor' || s.type === 'hauler';
   if (s.at === PROBE && (!econ || s.target === null)) return [0, 0];
   return [1, s.at];
