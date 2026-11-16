@@ -56,18 +56,21 @@ let lastKey: { world: Readonly<World>; data: SimData; tick: number; names: strin
  */
 const tunKey = (world: Readonly<World>, data: SimData): string => {
   const tun = world.tun as unknown as Record<string, number>;
-  const names = Object.keys(tun);
-  if (lastKey !== null && lastKey.world === world && lastKey.data === data && lastKey.tick === world.tick && lastKey.names.length === names.length) {
+  const last = lastKey;
+  if (last !== null && last.world === world && last.data === data && last.tick === world.tick) {
     // Tunables can be tuned in place without a step (tests, the probe scripts), so reuse the key only while every value is the one it was made from.
+    let i = 0;
     let same = true;
-    for (let i = 0; i < names.length; i++) {
-      if (names[i] !== lastKey.names[i] || tun[names[i]!] !== lastKey.values[i]) {
+    for (const name in tun) {
+      if (name !== last.names[i] || tun[name] !== last.values[i]) {
         same = false;
         break;
       }
+      i++;
     }
-    if (same) return lastKey.key;
+    if (same && i === last.names.length) return last.key;
   }
+  const names = Object.keys(tun);
   const fh = fnv1a(JSON.stringify(data.map.field));
   const key = `${data.dataVersion}|${fh}|${fnv1a(JSON.stringify(world.tun))}`;
   lastKey = { world, data, tick: world.tick, names, values: names.map((n) => tun[n]!), key };
