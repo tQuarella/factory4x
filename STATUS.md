@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 9 ledger
 
-Launches: 3 / 12.
+Launches: 6 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -22,6 +22,10 @@ Launches: 3 / 12.
 | r2 | critic | cw-bots-gate-time | resume | Review round 1: REJECT (1716871): cached tunables key goes stale on in-place tuning |
 | r3 | engineer | cw-bots-gate-time | resume | Fix round 1 (591ea28): snapshot-checked key, new test |
 | r4 | critic | cw-bots-gate-time | resume | Review round 2: APPROVE (436d64e); merged 97b84f2, bots gate 97 s → about 60 s |
+| r5 | critic | h9-sim | resume | Review round 1: APPROVE (12924fa); determinism 2141b502; opening identical to H8 |
+| 4 | faction-ai | h9-raids | launch | Build prongs W1–W8 from task/h9-sim; may restructure the replay tail (Director ruling in brief: no assertion loosened, moved values logged) |
+| 5 | engineer | h9-bots | launch | Build from task/h9-sim; merges h9-raids when approved |
+| 6 | engineer | h9-client | launch | Build from task/h9-sim (top of stack); merges h9-raids, then h9-design-data |
 
 ## Iteration 8 ledger
 
@@ -306,7 +310,7 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-Iteration 9 (H9, A wider front) is building: h9-sim (core-engineer) and cw-bots-gate-time (engineer) in parallel. Then a Critic for each (resume an existing Critic per PROCESS). After h9-sim is approved: h9-raids, h9-bots and h9-client in parallel; then h9-design-data; `merge-task h9-client` lands the stack.
+h9-raids, h9-bots and h9-client are building in parallel from task/h9-sim (12924fa). When h9-raids is approved, tell h9-bots and h9-client to merge it. Then h9-design-data (Designer resume) on approved h9-bots, then h9-client's final round, then `merge-task h9-client`.
 
 ## Moving to another machine
 
