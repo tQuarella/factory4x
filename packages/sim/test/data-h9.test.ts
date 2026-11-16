@@ -138,7 +138,7 @@ describe('extractorSet in the field state (saved), and stats.raidProngs', () => 
 
   it('a save without extractorSet, with the wrong length or a bad count, without raidProngs, or with a last raid without prongs is corrupt', () => {
     const w = createWorld(1, fixtureV15);
-    w.lastRaid = { id: 1, outcome: 'hit', target: F.a5, endTick: 0, lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 }, prongs: [] };
+    w.lastRaid = { id: 1, outcome: 'hit', target: F.a5, endTick: 0, lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 }, prongs: [{ target: F.a5, outcome: 'hit', lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 } }] };
     const text = serializeWorld(w);
     type Save = { world: { field: Record<string, unknown>; stats: Record<string, unknown>; lastRaid: Record<string, unknown> } };
     const edits: Array<(s: Save) => void> = [
