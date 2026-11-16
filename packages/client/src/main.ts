@@ -23,6 +23,7 @@ import {
   replayHashes,
   RESOURCES,
   SHIP_TYPES,
+  raidProngs,
   raidStatus,
   rockStatus,
   rootIndex,
@@ -863,7 +864,9 @@ window.__factory4x = {
   raidStatus: () => JSON.stringify(raidStatus(app.session.world)),
   raidFlight: () => {
     const r = app.session.world.raid;
-    return JSON.stringify(r === null ? null : { phase: r.phase, from: r.from, target: r.target, ticksLeft: r.ticksLeft, flightTicks: r.flightTicks });
+    const prongs = r === null ? [] : raidProngs(r).map((p) => ({ phase: p.phase, from: p.from, target: p.target, ticksLeft: p.ticksLeft, flightTicks: p.flightTicks }));
+    // Prong 0's flight at the top (H7's shape), and every prong under `prongs`.
+    return JSON.stringify(r === null ? null : { ...prongs[0], prongs });
   },
   /** H8: what the last frame drew for the drag (JSON, or "null"), the raid badge's node (-1 for none), and the gesture's counters. */
   mapDrag: () => JSON.stringify(view.drawnH8().drag),

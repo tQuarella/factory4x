@@ -154,7 +154,6 @@ test.describe('375x667 portrait, the extractor dial', () => {
     // Raids off, so no raid kills a ship in the window and the ship count is the dial's alone.
     await tune(page, 'raid.enabled', 0);
     const ids = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'];
-    let id = 'a1';
     // The premise: every marked rock is at its cap with nothing in flight, so H4b holds the extractor share and the surplus has nowhere to go.
     const everyRockFull = async (): Promise<boolean> => {
       for (const x of [...ids, 'p1', 'p2', 'heart']) {
@@ -172,7 +171,7 @@ test.describe('375x667 portrait, the extractor dial', () => {
       return null;
     };
     await stepSimUntil(page, async () => (await busy()) !== null && (await everyRockFull()), 30_000, 'every marked rock full, and a rock with two extractors and two haulers', false);
-    id = (await busy())!;
+    const id = (await busy())!;
     const a1 = await page.evaluate((y) => window.__factory4x!.nodeIndex(y), id);
     const before = await rock(page, a1);
     expect(before.docked).toBeGreaterThanOrEqual(2);
@@ -376,5 +375,191 @@ test.describe('375x667 portrait, the raid banner and chip', () => {
     // Tapping the banner opens the first prong's rock.
     await page.locator('#banner').click();
     expect(await page.evaluate(() => window.__factory4x!.selected())).toBe((await raid(page)).target);
+  });
+});
+
+test.describe('375x667 portrait, two prongs', () => {
+  test.use({ viewport: PHONE });
+
+  interface Prong {
+    target: number;
+    phase: string;
+    planned: { thorn: number; spore: number };
+    raiders: { thorn: number; spore: number };
+    outcome: string | null;
+  }
+  interface TwoRaid {
+    phase: string;
+    target: number | null;
+    prongs: Prong[];
+    nextProngs: number;
+    econ: number;
+    last: null | { prongs: Array<{ target: number; outcome: string }> };
+  }
+  const raid2 = async (page: Page): Promise<TwoRaid> => JSON.parse(await page.evaluate(() => window.__factory4x!.raidStatus())) as TwoRaid;
+  const IDS = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'];
+  /** The map's short name of a rock ("A5"). */
+  const name = async (page: Page, node: number): Promise<string> => {
+    const idx = await page.evaluate((l) => l.map((i) => window.__factory4x!.nodeIndex(i)), IDS);
+    return IDS[idx.indexOf(node)]!.toUpperCase();
+  };
+
+  /**
+   * The raid tunables of H7 and H8 (firstAtEcon 2, a short muster) plus raid.prongMinSize 2, as the spec's tests use. Raids stay off while the
+   * economy grows to a size that can split (R4: about half the economy ships) over two raidable rocks, then switch on, so the first raid is
+   * a two-prong one. Stops at its muster, paused.
+   */
+  async function toTwoProngMuster(page: Page, musterTicks: number): Promise<void> {
+    await tune(page, 'raid.enabled', 0);
+    await tune(page, 'raid.firstAtEcon', 2);
+    await tune(page, 'raid.musterTicks', musterTicks);
+    await tune(page, 'raid.prongMinSize', 2);
+    const nodes = await page.evaluate((l) => l.map((i) => window.__factory4x!.nodeIndex(i)), IDS);
+    await stepSimUntil(
+      page,
+      async () => {
+        const ranked = (await Promise.all(nodes.map((n) => rock(page, n)))).filter((r) => r.raidRank > 0).length;
+        return ranked >= 2 && (await raid2(page)).econ >= 10;
+      },
+      30_000,
+      'ten economy ships on two raidable rocks',
+      false,
+    );
+    await tune(page, 'raid.enabled', 1);
+    // One tick at a time near the muster, so a short one is never skipped.
+    for (let i = 0; i < 600 && (await raid2(page)).phase === 'none'; i++) await page.evaluate(() => window.__factory4x!.advanceTicks(1));
+    const r = await raid2(page);
+    expect(r.phase, 'the raid mustered').not.toBe('none');
+    expect(r.prongs, 'two prongs').toHaveLength(2);
+  }
+
+  test('the muster names both rocks, the chip says "· 2", both rocks wear a badge with their own mix, and nothing in the HUD moves', async ({ page }) => {
+    test.setTimeout(150_000);
+    await ready(page);
+    await pause(page);
+    const hud0 = await hudBoxes(page);
+    await toTwoProngMuster(page, 600);
+    const r = await raid2(page);
+    expect(r.phase).toBe('muster');
+    const [p0, p1] = r.prongs as [Prong, Prong];
+    expect(p0.target).not.toBe(p1.target);
+    const n0 = await name(page, p0.target);
+    const n1 = await name(page, p1.target);
+    await settled(page);
+    // The banner: one segment per prong, with the counts from `planned`, and two lines of room.
+    const seg = (n: string, c: { thorn: number; spore: number }): string => [n, c.thorn > 0 ? `${c.thorn}T` : '', c.spore > 0 ? `${c.spore}S` : ''].filter((x) => x !== '').join(' ');
+    const banner = page.locator('#banner .bline.raid');
+    await expect(banner).toHaveText(new RegExp(`^Raid gathering in \\d+ s → ${seg(n0, p0.planned)} · ${seg(n1, p1.planned)}$`));
+    const lines = await banner.evaluate((e) => Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight)));
+    expect(lines, 'two lines of room under the wide font').toBe(2);
+    const bannerBox = await page.locator('#banner').boundingBox();
+    expect(bannerBox!.x + bannerBox!.width, 'the banner stays on screen').toBeLessThanOrEqual(PHONE.width);
+    // The chip: the soonest time, plus "· 2".
+    await expect(page.locator('#chip-raid')).toContainText(/Raid \d+:\d\d · 2/);
+    expect(await hudBoxes(page), 'two prongs, the banner and the chip suffix shift nothing in the HUD').toBe(hud0);
+    // Two badges, one per prong target, and nowhere else.
+    expect(JSON.parse(await page.evaluate(() => window.__factory4x!.raidBadges())) as number[]).toEqual([p0.target, p1.target].sort((a, b) => a - b));
+    await page.screenshot({ path: 'test-results/h9-two-prong-muster.png' });
+    // Each rock carries its own prong's plan, and the banner opens the first prong's rock.
+    for (const p of [p0, p1]) {
+      const st = await rock(page, p.target);
+      expect(st.raidMix).toEqual(p.planned);
+      expect(st.raidTarget).toBe(true);
+    }
+    await page.locator('#banner').click();
+    expect(await page.evaluate(() => window.__factory4x!.selected())).toBe(p0.target);
+    await expect(page.locator('#sheet .rock-note .raid')).toHaveText(/^Raid coming: /);
+    await page.locator('#sheet .close').click();
+    await settled(page);
+    const p = await page.evaluate((n) => window.__factory4x!.nodeScreenPos(n), p1.target);
+    await tapAt(page, p.x, p.y);
+    expect(await page.evaluate(() => window.__factory4x!.selected())).toBe(p1.target);
+    await expect(page.locator('#sheet .rock-note .raid')).toHaveText(/^Raid coming: /);
+  });
+
+  test('two legs fly out with their own markers; the rock sheet with two prongs out fits and the map keeps its room; the end report lists each prong', async ({ page }) => {
+    test.setTimeout(150_000);
+    await ready(page);
+    await pause(page);
+    await toTwoProngMuster(page, 30);
+    const map = async (): Promise<{ prongs: Array<{ target: number; marker: boolean; countdown: string; frac: number }> }> => JSON.parse(await page.evaluate(() => window.__factory4x!.mapField()));
+    await stepSimUntil(page, async () => (await raid2(page)).prongs.every((p) => p.phase === 'out'), 600, 'both prongs out', false);
+    await settled(page);
+    const r = await raid2(page);
+    const m = await map();
+    expect(m.prongs.map((p) => p.target).sort((a, b) => a - b), 'a leg per prong').toEqual(r.prongs.map((p) => p.target).sort((a, b) => a - b));
+    for (const leg of m.prongs) {
+      expect(leg.marker, `prong at ${leg.target} has a marker`).toBe(true);
+      expect(leg.countdown).toMatch(/^\d+s$/);
+    }
+    expect(await page.evaluate(() => window.__factory4x!.raidFlight())).toContain('"prongs":[');
+    // The rock sheet on the second prong's rock, raid out: it fits without scrolling, and the map keeps its room.
+    const target = r.prongs[1]!.target;
+    const p = await page.evaluate((n) => window.__factory4x!.nodeScreenPos(n), target);
+    await tapAt(page, p.x, p.y);
+    await expect(page.locator('#sheet .rock-note .raid')).toHaveText(/^Raid coming: /);
+    await settled(page);
+    const fit = await page.evaluate(() => {
+      const e = document.getElementById('sheet')!;
+      // A rock with ships parked at it adds the Recycle section (H8), which H8's 185 px figure did not include.
+      const rec = e.querySelector('.recycle-btn')?.closest('section');
+      const extra = rec !== null && rec !== undefined && !rec.hasAttribute('hidden') ? rec.getBoundingClientRect().height : 0;
+      return { scroll: e.scrollHeight, client: e.clientHeight, stage: document.getElementById('stage')!.clientHeight, extra };
+    });
+    console.log(`rock sheet open, two prongs out, wide font: map (stage) ${fit.stage} px, sheet ${fit.client} px, Recycle section ${Math.round(fit.extra)} px`);
+    await page.screenshot({ path: 'test-results/h9-two-prong-out.png' });
+    expect(fit.scroll).toBeLessThanOrEqual(fit.client + 1);
+    expect(fit.stage + fit.extra, 'the map keeps the room H8 left it with two prongs out, counting the Recycle section').toBeGreaterThanOrEqual(185);
+    await expectControlsFit(page, '#sheet', 'the rock sheet with two prongs out');
+    await page.locator('#sheet .close').click();
+    // To the end: a toast lists each prong, badges clear, the result line counts prongs.
+    // On the way, a prong that is done leaves nothing on its rock (no mix, no badge) while the other may still be out.
+    let sawDoneWhileOtherLive = false;
+    await stepSimUntil(
+      page,
+      async () => {
+        const now = await raid2(page);
+        const live = now.prongs.filter((q) => q.phase !== 'done').map((q) => q.target);
+        for (const q of now.prongs) {
+          if (q.phase !== 'done' || live.includes(q.target)) continue;
+          const st = await rock(page, q.target);
+          expect(st.raidMix, `the done prong's rock ${q.target} has no mix`).toBeNull();
+          expect(st.raidTarget, `the done prong's rock ${q.target} is no longer a target`).toBe(false);
+          if (live.length > 0) sawDoneWhileOtherLive = true;
+        }
+        return now.phase === 'none' && now.last !== null;
+      },
+      9000,
+      'the raid ending',
+      false,
+    );
+    console.log(`a done prong was seen while the other was still live: ${sawDoneWhileOtherLive}`);
+    await settled(page);
+    expect(await page.evaluate(() => window.__factory4x!.raidBadges())).toBe('[]');
+    const last = (await raid2(page)).last!;
+    expect(last.prongs).toHaveLength(2);
+    await expect(page.locator('#toast')).toContainText(/Raid: A\d (beaten|turned back|hit, [^·]+ lost) · A\d (beaten|turned back|hit, [^·]+ lost)/);
+    await page.evaluate(() => window.__factory4x!.debugShowResult());
+    await expect(page.locator('#result .stat-line', { hasText: 'Raid prongs' })).toContainText(/\d+: \d+ beaten · \d+ hit · \d+ turned back/);
+  });
+
+  test('before the raid, the rank line shows on both rocks a split would hit and on no other', async ({ page }) => {
+    test.setTimeout(150_000);
+    await ready(page);
+    await pause(page);
+    // Raids stay on (nextProngs is 0 with them off) but their threshold is out of reach, so none musters.
+    await tune(page, 'raid.firstAtEcon', 20);
+    await tune(page, 'raid.prongMinSize', 2);
+    const nodes = await page.evaluate((l) => l.map((i) => window.__factory4x!.nodeIndex(i)), IDS);
+    await stepSimUntil(page, async () => (await raid2(page)).nextProngs === 2, 30_000, 'a raid that would split', false);
+    const marked = (await Promise.all(nodes.map(async (n) => ({ n, r: await rock(page, n) })))).filter((x) => x.r.mine);
+    const next = marked.filter((x) => x.r.raidNext).map((x) => x.n);
+    expect(next, 'two rocks a raid would hit').toHaveLength(2);
+    for (const x of marked) {
+      const id = IDS[nodes.indexOf(x.n)]!;
+      await openRock(page, id);
+      await expect(page.locator('#sheet .rock-note .rank'), id).toHaveText(next.includes(x.n) ? /raids hit here first/i : '');
+      await page.locator('#sheet .close').click();
+    }
   });
 });
