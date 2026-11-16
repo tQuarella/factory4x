@@ -1,5 +1,5 @@
 {
-  "dataVersion": 14,
+  "dataVersion": 15,
   "tickRate": 30,
   "run": { "mode": "field" },
   "tunables": {
@@ -96,11 +96,14 @@
     "raid.shieldEcon": { "default": 1, "min": 0, "max": 1 },
     "raid.haulersHold": { "default": 1, "min": 0, "max": 1 },
     "move.splitPct": { "default": 50, "min": 25, "max": 75 },
+    "raid.prongsMax": { "default": 2, "min": 1, "max": 3 },
+    "raid.prongMinSize": { "default": 4, "min": 2, "max": 12 },
     "stats.throughputWindowSec": { "default": 60, "min": 60, "max": 60 },
     "client.autosaveSec": { "default": 5, "min": 2, "max": 60 },
     "client.longPressMs": { "default": 450, "min": 250, "max": 900 },
     "client.dragSlopPx": { "default": 12, "min": 6, "max": 24 },
-    "client.moveGesture": { "default": 1, "min": 0, "max": 1 }
+    "client.moveGesture": { "default": 1, "min": 0, "max": 1 },
+    "client.haulerStepper": { "default": 0, "min": 0, "max": 1 }
   },
   "map": {
     "nodes": [

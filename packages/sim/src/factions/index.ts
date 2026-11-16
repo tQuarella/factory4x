@@ -59,6 +59,16 @@ export interface Raid {
   killed: GuardCounts;
 }
 
+/** H9: one prong's part of a finished raid (`RaidResult.prongs`). */
+export interface ProngResult {
+  target: number;
+  /** The prong's own outcome (W6), or `withered` when the hive fell with it out (R9). */
+  outcome: RaidOutcome;
+  lostEcon: EconTypeCounts;
+  lostShips: ShipTypeCounts;
+  killed: GuardCounts;
+}
+
 /** What a finished raid did (`world.lastRaid`, `raidStatus().last`). */
 export interface RaidResult {
   id: number;
@@ -70,6 +80,11 @@ export interface RaidResult {
   lostEcon: EconTypeCounts;
   lostShips: ShipTypeCounts;
   killed: GuardCounts;
+  /**
+   * H9: each prong's result, in prong order. `outcome` above is W6's overall outcome and `target` is prong 0's.
+   * h9-sim stub: one prong mirroring the single raid (h9-raids fills it per prong).
+   */
+  prongs: ProngResult[];
 }
 
 /** The hive's guardian (the heart), or null in a world without one. */
@@ -194,6 +209,8 @@ function finish(world: World, outcome: RaidOutcome): void {
     lostEcon: { ...r.lostEcon },
     lostShips: { ...r.lostShips },
     killed: { ...r.killed },
+    // h9-sim stub: the single raid is prong 0.
+    prongs: [{ target: r.target, outcome, lostEcon: { ...r.lostEcon }, lostShips: { ...r.lostShips }, killed: { ...r.killed } }],
   };
   world.raid = null;
 }
@@ -430,6 +447,73 @@ function haulersHolding(world: Readonly<World>): number {
   return n;
 }
 
+/** H9: a prong's phase in `raidStatus.prongs` (`done`: beaten, or home and rejoined the guard list; W6). */
+export type ProngPhase = RaidPhase | 'done';
+
+/** H9 W6: a prong's own outcome, once decided. */
+export type ProngOutcome = 'beaten' | 'hit' | 'turnedBack';
+
+/** H9: one prong of the raid in progress (`raidStatus.prongs`, DESIGN.md H9 "Selectors"). */
+export interface ProngStatus {
+  target: number;
+  phase: ProngPhase;
+  /** W2's deal of the plan. */
+  planned: GuardCounts;
+  /** This prong's raiders away now (zeros while mustering). */
+  raiders: GuardCounts;
+  /** Ticks until arrival at the target, or at the hive when returning (else 0). */
+  ticksToArrival: number;
+  /** Null until decided (W6), then the prong's own outcome. */
+  outcome: ProngOutcome | null;
+  /** The haulers H10 holds for this prong. */
+  holding: number;
+}
+
+/**
+ * h9-sim stub for `raidStatus.prongs`: today's single raid as prong 0 (empty when there is no raid). Its outcome is
+ * decided when it leaves its target for home (W6): `hit` if it killed an economy ship, else `turnedBack`; a beaten raid
+ * ends at once, so it is never seen with `beaten` here. h9-raids replaces this with the real prongs.
+ */
+function prongsOf(world: Readonly<World>): ProngStatus[] {
+  const r = world.raid;
+  if (r === null) return [];
+  const outcome: ProngOutcome | null = r.phase === 'home' ? (r.lostEcon.extractor + r.lostEcon.hauler > 0 ? 'hit' : 'turnedBack') : null;
+  return [
+    {
+      target: r.target,
+      phase: r.phase,
+      planned: { ...r.planned },
+      raiders: raidersOut(world),
+      ticksToArrival: r.phase === 'out' || r.phase === 'home' ? r.ticksLeft : 0,
+      outcome,
+      holding: haulersHolding(world),
+    },
+  ];
+}
+
+/**
+ * h9-sim stub for `raidStatus.nextProngs`: 1 if a raid could muster now, else 0. "Could" is R3 without the gap, the
+ * economy threshold, the raid in progress and a battle at the hive: raids on, the hive alive, a raidable node, and
+ * R4's size from today's economy at least 1. h9-raids replaces it with W1's count.
+ */
+export function nextProngs(world: Readonly<World>): number {
+  const hive = hiveOf(world);
+  if (world.tun['raid.enabled'] !== 1 || hive === null || !hive.alive) return 0;
+  if (raidTarget(world) === null) return 0;
+  return raidSize(world, econAlive(world), hive) >= 1 ? 1 : 0;
+}
+
+/**
+ * H9 `rockStatus.raidMix`: the guard counts of the prong aimed at `node` (its plan while mustering, then its raiders
+ * away), or null when no prong is aimed there. h9-sim stub: the single raid, from muster until it ends (the same span as
+ * `raidTarget`). h9-raids replaces it per prong.
+ */
+export function raidMixAt(world: Readonly<World>, node: number): GuardCounts | null {
+  const r = world.raid;
+  if (r === null || r.target !== node) return null;
+  return r.phase === 'muster' ? { ...r.planned } : raidersOut(world);
+}
+
 /** `raidStatus` (DESIGN.md H7 "Selectors"). */
 export interface RaidStatus {
   /** `raid.enabled` is 1 (the client hides the chip when it isn't). */
@@ -456,6 +540,10 @@ export interface RaidStatus {
   last: RaidResult | null;
   /** H10: haulers held at the probe for this raid (0 when none, or `raid.haulersHold` is 0). */
   holding: number;
+  /** H9: one entry per prong, in prong order; empty when there is no raid. */
+  prongs: ProngStatus[];
+  /** H9: how many prongs a raid would have if it mustered now (W1); 0 when R3 would not muster for lack of size or target. */
+  nextProngs: number;
 }
 
 /** Field mode only (throws in a campaign world). */
@@ -475,5 +563,7 @@ export function raidStatus(world: Readonly<World>): RaidStatus {
     ticksToNextAllowed: Math.max(0, world.nextRaidTick - world.tick),
     last: world.lastRaid,
     holding: haulersHolding(world),
+    prongs: prongsOf(world),
+    nextProngs: nextProngs(world),
   };
 }

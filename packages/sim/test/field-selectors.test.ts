@@ -140,8 +140,14 @@ describe('rockStatus', () => {
       haulerTarget: 2,
       raidTarget: false,
       haulersHeld: false,
+      // h9-sim: no count set (All), so extCap is the slots; no raid is aimed here; a raid now (3 economy ships,
+      // size ceil(3 ÷ 3) = 1, so raidStatus.nextProngs 1) would hit a5, rank 1.
+      extractorSet: null,
+      extCap: 3,
+      raidMix: null,
+      raidNext: true,
     });
-    expect(rockStatus(w, F.a1)).toMatchObject({ mine: false, mineable: false, docked: 0, bound: 0, haulers: 0, raidRank: 0 });
+    expect(rockStatus(w, F.a1)).toMatchObject({ mine: false, mineable: false, docked: 0, bound: 0, haulers: 0, raidRank: 0, raidNext: false });
   });
 
   it('backedUp exactly when the buffer is at node.bufferCap', () => {
@@ -232,6 +238,7 @@ describe('fieldSummary', () => {
       lost: { extractor: 2, hauler: 1, drone: 1, lancer: 0, flak: 0 },
       recycled: { extractor: 0, hauler: 0, drone: 1, lancer: 0, flak: 0 },
       raids: { mustered: 0, beaten: 0, hit: 0, turnedBack: 0 },
+      raidProngs: { beaten: 0, hit: 0, turnedBack: 0 },
       econLostToRaids: 3,
       allocChanges: 1,
       peakEcon: 1,

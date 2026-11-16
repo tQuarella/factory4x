@@ -1,6 +1,6 @@
 import { buyResearch, canBuyResearch, isAreaOpen, isWon, leaveActive } from './campaign.ts';
 import { BUILD_TYPES, ECON_TYPES, SHIP_TYPES, isSimTunableKey, type BuildType, type ShipType, type SimData, type TunableKey } from './data.ts';
-import { applySetAlloc, applySetHaulers, applySetMine, clampEconCounts, isMarkable, recycleEcon, syncExtractors } from './field.ts';
+import { applySetAlloc, applySetExtractors, applySetHaulers, applySetMine, clampEconCounts, extractorMinCount, isMarkable, recycleEcon, syncExtractors } from './field.ts';
 import { fleetCap, recycleRefundEach } from './fleet.ts';
 import { applyRecycleFleet, clampFleetCounts, isMovePart, moveCounts, type MovePart } from './orders.ts';
 import { shipsAtByType, startTransit } from './ships.ts';
@@ -54,6 +54,13 @@ export type Input =
    * or 0..rock.haulerMax. Kept while the rock is unmarked.
    */
   | { type: 'setHaulers'; node: number; count: number | null }
+  /**
+   * H9 X1 (field mode only): an asteroid's, or a captured pocket's or hive's, extractor count: null (All: the slots)
+   * or an integer from extractorMinCount (1; for a captured pocket or the hive, max(1, its free extractors)) to the
+   * node's slots. 0 is not a count (Stop mining is). Kept while the rock is unmarked. Lowering unbinds the surplus
+   * this tick (X3).
+   */
+  | { type: 'setExtractors'; node: number; count: number | null }
   /**
    * H8 H8 (field mode only): recycle up to counts[type] ships of each of the five types, wherever they are
    * (recycleOrder: idle at the probe, then parked or docked by node index, then in transit; lowest id first). Ships
@@ -188,6 +195,11 @@ function validFieldInput(world: Readonly<World>, input: Input): boolean {
       const c: unknown = input.count;
       return c === null || (typeof c === 'number' && Number.isInteger(c) && c >= 0 && c <= world.tun['rock.haulerMax']);
     }
+    case 'setExtractors': {
+      if (!isIndex(world, input.node) || !isMarkable(world, input.node)) return false;
+      const c: unknown = input.count;
+      return c === null || (typeof c === 'number' && Number.isInteger(c) && c >= extractorMinCount(world, input.node) && c <= world.nodes[input.node]!.slots);
+    }
     case 'recycleFleet': {
       const c: unknown = input.counts;
       if (c === null || typeof c !== 'object') return false;
@@ -321,6 +333,9 @@ export function applyInput(world: World, data: SimData, input: Input): void {
       return;
     case 'setHaulers':
       applySetHaulers(world, input.node, input.count);
+      return;
+    case 'setExtractors':
+      applySetExtractors(world, input.node, input.count);
       return;
     case 'recycleFleet':
       applyRecycleFleet(world, input.counts, (t) => recycleRefundEach(world, t));

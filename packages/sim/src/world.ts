@@ -143,6 +143,13 @@ export interface RaidStats {
   turnedBack: number;
 }
 
+/** H9 W6: raid prongs by outcome (`stats.raidProngs`). Counted per prong by h9-raids; zeros until then. */
+export interface ProngStats {
+  beaten: number;
+  hit: number;
+  turnedBack: number;
+}
+
 /**
  * H7 field-mode state (DESIGN.md H7 F2–F6). Null in a campaign world. Per-type records use BUILD_TYPES keys
  * and per-node arrays are indexed by node index.
@@ -169,6 +176,11 @@ export interface FieldState {
    * rock is unmarked; read through `haulerSetOf`, which caps it at rock.haulerMax.
    */
   haulerSet: (number | null)[];
+  /**
+   * H9 X1 (`setExtractors`): per node, the extractor count the player set, or null for All (the slots). Kept while
+   * the rock is unmarked; read through `extCap` (field.ts), which is this or the node's slots.
+   */
+  extractorSet: (number | null)[];
 }
 
 export interface Guard {
@@ -311,6 +323,8 @@ export interface Stats {
   econRecycled: EconTypeCounts;
   /** H7 F14: raids by outcome (R8; h7-raids counts them). */
   raids: RaidStats;
+  /** H9 W6: raid prongs by their own outcome (`raids` keeps counting raids by the overall outcome). */
+  raidProngs: ProngStats;
   /** H7 F14: setAlloc inputs that changed a weight. */
   allocChanges: number;
   /** H7 F14: most economy ships alive at once. */
@@ -620,6 +634,7 @@ function freshStats(data: SimData): Stats {
     econLost: zeroEcon(),
     econRecycled: zeroEcon(),
     raids: { mustered: 0, beaten: 0, hit: 0, turnedBack: 0 },
+    raidProngs: { beaten: 0, hit: 0, turnedBack: 0 },
     allocChanges: 0,
     peakEcon: 0,
   };
@@ -796,6 +811,7 @@ function landField(world: World, data: SimData): void {
     free: world.nodes.map(() => 0),
     rockBuckets: world.nodes.map(() => new Array<number>(window).fill(0)),
     haulerSet: world.nodes.map(() => null),
+    extractorSet: world.nodes.map(() => null),
   };
   world.rally = PROBE;
 }

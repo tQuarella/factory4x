@@ -903,6 +903,9 @@ describe('raidStatus and rockStatus.raidRank at each phase', () => {
       ticksToNextAllowed: 0,
       last: null,
       holding: 0,
+      // h9-sim: no raid, so no prongs; a raid could muster now (a5 is raidable and R4's size is ceil(4 ÷ 3) = 2), so 1.
+      prongs: [],
+      nextProngs: 1,
     });
     w.tun['raid.enabled'] = 0;
     expect(raidStatus(w).enabled).toBe(false);

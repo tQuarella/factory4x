@@ -246,6 +246,23 @@
  *   rockStatus                      gains haulerNeed, haulerSet, haulerTarget, raidTarget and haulersHeld (h8-raids).
  *   fleetStatus.types               per BUILD_TYPES type {alive, idle, building (0/1), recyclable}.
  *
+ * H9 "A wider front" (h9-sim: the extractor dial and the prong selectors' final shape; data v15)
+ *   world.field.extractorSet        per node: the extractor count the player set (setExtractors), or null for All. Saved.
+ *   setExtractors{node, count}      X1: an asteroid, or a captured pocket or hive; count null (All) or
+ *                                   extractorMinCount(world, node) (1; max(1, free) for a pocket or the hive)..slots.
+ *                                   Kept while the rock is unmarked. X3: lowering unbinds the surplus on that tick
+ *                                   (in flight first, then docked, highest id first); F5 re-dispatches it.
+ *   extCap(world, node)             X2: extractorSet, else the slots. F5's dispatch, H4b's free slots
+ *                                   (extractorShortfall) and the committed extractors (staffCounts) read it.
+ *   stats.raidProngs                W6: prongs by outcome {beaten, hit, turnedBack}; fieldSummary.raidProngs.
+ *   raidStatus                      gains prongs (per prong: target, phase incl. 'done', planned, raiders,
+ *                                   ticksToArrival, outcome, holding) and nextProngs; last (RaidResult) gains prongs
+ *                                   (per prong: target, outcome, lostEcon, lostShips, killed). The legacy fields keep
+ *                                   their one-prong meaning. Until h9-raids: one prong mirroring world.raid.
+ *   rockStatus                      gains extractorSet, extCap, raidMix (the prong aimed here: plan, then raiders) and
+ *                                   raidNext (raidable with raidRank ≤ nextProngs).
+ *   raid.prongsMax / raid.prongMinSize / client.haulerStepper   the v15 keys (the client key never reaches the sim).
+ *
  * Reading `World` fields directly is fine (it is plain data); never mutate it outside `step`.
  * Time: `world.tickRate` ticks per game second (30). Ships in transit: interpolate from
  * `ship.transit.{from,to,ticksLeft,totalTicks}`; pods from `route.pods[].ticksLeft` and
@@ -289,11 +306,13 @@ export {
   worstHauls,
 } from './data.ts';
 export type { BuildType, EconType, FieldMap, RunMode } from './data.ts';
-export { haulersHeld, isRaidable, launchMix, raidKeep, raidMix, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
-export type { Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
+export { haulersHeld, isRaidable, launchMix, nextProngs, raidKeep, raidMix, raidMixAt, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
+export type { ProngOutcome, ProngPhase, ProngResult, ProngStatus, Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
 export {
   econAlive,
   econAtByType,
+  extCap,
+  extractorMinCount,
   extractorShortfall,
   haulerNeed,
   haulerShortfall,
@@ -317,7 +336,7 @@ export { allocStatus, fieldSummary, movePreview, rockStatus } from './selectors.
 export type { AllocRow, AllocState, AllocStatus, BuildTypeCounts, FieldSummary, RockStatus } from './selectors.ts';
 export type { RecycleCounts } from './inputs.ts';
 export { isField } from './world.ts';
-export type { EconShip, EconTypeCounts, FieldState, RaidStats } from './world.ts';
+export type { EconShip, EconTypeCounts, FieldState, ProngStats, RaidStats } from './world.ts';
 export type {
   AreaHeart,
   AreaSide,

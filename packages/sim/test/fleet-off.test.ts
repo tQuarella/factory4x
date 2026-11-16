@@ -34,7 +34,8 @@ function h4View(w: Readonly<World>): unknown {
   // campaign rule reads. Everything H4 had is still hashed.
   for (const k of H7_TUNABLES) delete v.tun[k];
   for (const k of ['field', 'raid', 'nextRaidTick', 'lastRaid']) delete v[k];
-  for (const k of ['econBuilt', 'econLost', 'econRecycled', 'raids', 'allocChanges', 'peakEcon']) delete v.stats[k];
+  // h9-sim: stats.raidProngs is field-mode state too (zero in a campaign world).
+  for (const k of ['econBuilt', 'econLost', 'econRecycled', 'raids', 'raidProngs', 'allocChanges', 'peakEcon']) delete v.stats[k];
   delete v.campaign.research.fleet;
   for (const a of v.campaign.areas) {
     delete a.shipsRecycled;

@@ -91,7 +91,9 @@ function fieldOk(f: unknown, nodes: number | null): boolean {
     perNode(f.rockBuckets) &&
     (f.rockBuckets as unknown[]).every((ring) => Array.isArray(ring) && ring.length > 0 && ring.every((v: unknown) => isInt(v) && v >= 0)) &&
     perNode(f.haulerSet) &&
-    (f.haulerSet as unknown[]).every((v) => v === null || (isInt(v) && v >= 0))
+    (f.haulerSet as unknown[]).every((v) => v === null || (isInt(v) && v >= 0)) &&
+    perNode(f.extractorSet) &&
+    (f.extractorSet as unknown[]).every((v) => v === null || (isInt(v) && v >= 1))
   );
 }
 
@@ -120,21 +122,22 @@ function econShipOk(s: unknown, nodes: number): boolean {
   );
 }
 
-/** H7 R1: `world.raid` null or an object with a phase, and `nextRaidTick` an integer. */
+/** H7 R1: `world.raid` null or an object with a phase, and `nextRaidTick` an integer. H9: `lastRaid.prongs` is an array. */
 function raidOk(raid: unknown, next: unknown, last: unknown): boolean {
   return (
     isInt(next) &&
     (raid === null || (isObj(raid) && typeof raid.phase === 'string' && Array.isArray(raid.guards))) &&
-    (last === null || (isObj(last) && typeof last.outcome === 'string'))
+    (last === null || (isObj(last) && typeof last.outcome === 'string' && Array.isArray(last.prongs)))
   );
 }
 
-/** H7 F14: the stats additions. */
+/** H7 F14: the stats additions (H9: `raidProngs`). */
 function h7StatsOk(stats: unknown): boolean {
   if (!isObj(stats)) return false;
   return (
     ['econBuilt', 'econLost', 'econRecycled'].every((k) => isIntRecord(stats[k], ECON_TYPES)) &&
     isIntRecord(stats.raids, ['mustered', 'beaten', 'hit', 'turnedBack']) &&
+    isIntRecord(stats.raidProngs, ['beaten', 'hit', 'turnedBack']) &&
     isInt(stats.allocChanges) &&
     isInt(stats.peakEcon)
   );

@@ -21,6 +21,7 @@ import { designResearched, extractPct, yardBuildTicks } from './campaign.ts';
 import {
   bayOf,
   boundCounts,
+  extCap,
   assignedHaulers,
   haulerNeed,
   haulerSetOf,
@@ -35,7 +36,7 @@ import {
   resourceCost,
   type ResourceCost,
 } from './field.ts';
-import { haulersHeld, isRaidTargetNode, raidRank } from './factions/index.ts';
+import { haulersHeld, isRaidTargetNode, nextProngs, raidMixAt, raidRank } from './factions/index.ts';
 import { isCountedType, isFleetFull } from './fleet.ts';
 import { shipsAtByType } from './inputs.ts';
 import { moveCounts, type MovePart } from './orders.ts';
@@ -938,6 +939,14 @@ export interface RockStatus {
   raidTarget: boolean;
   /** H8 H10: true while this rock's haulers hold for a raid (factions `haulersHeld`). */
   haulersHeld: boolean;
+  /** H9 X1: the extractor count the player set (`setExtractors`), or null for All. Kept while the rock is unmarked. */
+  extractorSet: number | null;
+  /** H9 X2: the most extractors this rock takes: `extractorSet`, else the slots. */
+  extCap: number;
+  /** H9: the guard counts of the prong aimed at this rock (its plan while mustering, then its raiders), or null. */
+  raidMix: GuardCounts | null;
+  /** H9: the rock is Mine-marked and raidable, with `raidRank` ≤ `raidStatus.nextProngs` (a raid now would hit it). */
+  raidNext: boolean;
 }
 
 /** H7: one rock's sheet. Field mode only (throws in a campaign world). */
@@ -949,6 +958,7 @@ export function rockStatus(world: Readonly<World>, node: number): RockStatus {
   for (const s of f.econ) if (isDocked(s) && s.at === node) docked++;
   const bound = boundCounts(world)[node]!;
   const cap = world.tun['node.bufferCap'];
+  const rank = raidRank(world, node);
   let delivered = 0;
   for (const v of f.rockBuckets[node]!) delivered += v;
   return {
@@ -968,12 +978,16 @@ export function rockStatus(world: Readonly<World>, node: number): RockStatus {
     bufferCap: cap,
     backedUp: n.buffer >= cap,
     deliveredPerMin: delivered,
-    raidRank: raidRank(world, node),
+    raidRank: rank,
     haulerNeed: haulerNeed(world, node),
     haulerSet: haulerSetOf(world, node),
     haulerTarget: haulerTarget(world, node),
     raidTarget: isRaidTargetNode(world, node),
     haulersHeld: haulersHeld(world, node),
+    extractorSet: f.extractorSet[node] ?? null,
+    extCap: extCap(world, node),
+    raidMix: raidMixAt(world, node),
+    raidNext: rank >= 1 && f.mine[node] === true && rank <= nextProngs(world),
   };
 }
 
@@ -1000,6 +1014,8 @@ export interface FieldSummary {
   recycled: BuildTypeCounts;
   /** Raids by outcome (R8). */
   raids: { mustered: number; beaten: number; hit: number; turnedBack: number };
+  /** H9 W6: raid prongs by their own outcome. */
+  raidProngs: { beaten: number; hit: number; turnedBack: number };
   /** Economy ships lost to raids (the only thing that kills them). */
   econLostToRaids: number;
   allocChanges: number;
@@ -1023,6 +1039,7 @@ export function fieldSummary(world: Readonly<World>): FieldSummary {
     lost: by(st.econLost, st.shipsLost),
     recycled: by(st.econRecycled, st.shipsRecycled),
     raids: { ...st.raids },
+    raidProngs: { ...st.raidProngs },
     econLostToRaids: st.econLost.extractor + st.econLost.hauler,
     allocChanges: st.allocChanges,
     peakEcon: st.peakEcon,

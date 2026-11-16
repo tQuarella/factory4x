@@ -184,6 +184,8 @@ describe('acceptance 10: the client keys are device settings', () => {
       ['client.longPressMs', 450, 250, 900, 'client'],
       ['client.dragSlopPx', 12, 6, 24, 'client'],
       ['client.moveGesture', 1, 0, 1, 'client'],
+      // h9-sim (data v15) adds the H9 client key; h9-client stores it in the settings.
+      ['client.haulerStepper', 0, 0, 1, 'client'],
     ]);
     expect(Object.keys(CLIENT_SETTING_KEYS)).toHaveLength(4);
   });
