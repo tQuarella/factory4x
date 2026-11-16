@@ -326,3 +326,15 @@ QUESTIONS.md Q22 asks the owner to pick. The H7 handoff's fun questions are mark
 - C, "Strike back": a beaten raid leaves the hive open for a while, so defending pays. It's small, and it can join A.
 
 QUESTIONS.md Q24 asks the owner to pick. DECISIONS.md logs the calls. No spec and no BACKLOG change until the pick.
+
+### 2026-11-16 · build build-20261116-1 (M2 H8) · owner, direction note (for a future iteration)
+
+> For a future iteration: fleet rebuild feels nearly instant on both sides.  There is no possibility for a war of attrition.  This leans into finding the right army comp that beats the hive in one go but it may feel more satisfying if you had to beat down the hive rather than just figure out the army composition that beats it in one go.  I think I'm going back on parts of the vision and we're now building an entirely different game (or sub-part of it) than I originally had in mind.  Originally, I was thinking more Factorio.  Now we're drifting more toward Starcraft.  Maybe there is a Factorio component that influences the Starcraft component?  e.g. combat is essentially distilled Starcraft and overworld logistics to unlock advantages in combat is distilled Factorio.
+
+**Interpretation (Director's first read):**
+- **Attrition:** the hive refills in about 16 s, and the probe rebuilds about as fast, so a fight is decided by composition in one push, not by wearing the hive down. VISION pillar 3 ("win a node by out-producing their replacement") wants attrition, so this is drift from the vision, not a new direction. Candidate C from the H9 triage (beaten raiders don't regrow for a window) is one small step toward it.
+- **Factorio vs Starcraft:** the owner proposes a layered shape. Combat is distilled Starcraft. Overworld logistics, which unlock advantages in combat, are distilled Factorio. Since H7, the game has been one field with the overworld parked, so the Factorio layer has shrunk to extractors and haulers.
+- This may change VISION.md wording (the fantasy, pillar 1). That needs the owner's approval in QUESTIONS.md.
+
+**Action:** not H9 (A, wider front, is in spec). After the H9 handoff, the Designer turns this into a direction question for the owner (H10 candidates, plus any VISION wording to approve), alongside Q18.
+
