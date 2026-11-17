@@ -424,24 +424,32 @@ describe('the report', () => {
     expect(slowerPct(rs, 'absent', 1)).toBeNull();
   });
 
-  it('the two H9 lines: splitting matters (concentrate loses 2 more, every seed) and ignoring raids costs (both 10% slower, undefended may not win)', () => {
+  it('the H9 lines: splitting matters (concentrate loses 2 more, or is 10% slower, every seed); 5a and 5b reported (10% slower, undefended may not win)', () => {
     const lost = (n: number) => ({ extractor: n, hauler: 0 });
     const base = [run({ econLost: lost(2) }), run({ seed: 2, econLost: lost(3) })];
     const conc = (a: number, b: number) => [run({ strategy: 'adaptive-concentrate', econLost: lost(a) }), run({ strategy: 'adaptive-concentrate', seed: 2, econLost: lost(b) })];
     expect(computeH9Lines([...base, ...conc(4, 5)])[0]!.pass).toBe(true);
     expect(computeH9Lines([...base, ...conc(4, 4)])[0]!.pass).toBe(false);
     expect(computeH9Lines(base)[0]!.detail).toBe('no runs');
+    // The time half: concentrate loses no more ships but is 10% slower on every seed (adaptive's hiveTick is 1000).
+    const slowConc = [run({ strategy: 'adaptive-concentrate', econLost: lost(2), hiveTick: 1100 }), run({ strategy: 'adaptive-concentrate', seed: 2, econLost: lost(3), hiveTick: 1100 })];
+    expect(computeH9Lines([...base, ...slowConc])[0]!.pass).toBe(true);
+    const fastConc = [run({ strategy: 'adaptive-concentrate', econLost: lost(2), hiveTick: 1090 }), run({ strategy: 'adaptive-concentrate', seed: 2, econLost: lost(3), hiveTick: 1100 })];
+    expect(computeH9Lines([...base, ...fastConc])[0]!.pass).toBe(false);
     const mk = (g: number, u: number | null) => [
       ...base,
       run({ strategy: 'greedy', hiveTick: g }),
       run({ strategy: 'greedy', seed: 2, hiveTick: g }),
       ...(u === null ? [run({ strategy: 'undefended', outcome: 'timeout', hiveTick: null }), run({ strategy: 'undefended', seed: 2, outcome: 'timeout', hiveTick: null })] : [run({ strategy: 'undefended', hiveTick: u }), run({ strategy: 'undefended', seed: 2, hiveTick: u })]),
     ];
-    const both = computeH9Lines(mk(1100, 1200))[1]!;
-    expect(both.pass).toBe(true);
-    const greedyMiss = computeH9Lines(mk(1050, null))[1]!;
-    expect(greedyMiss.pass).toBe(false);
-    expect(greedyMiss.detail).toContain('greedy half MISSED, undefended half met');
-    expect(computeH9Lines(mk(1100, 900))[1]!.detail).toContain('undefended half MISSED');
+    const both = computeH9Lines(mk(1100, 1200));
+    expect(both).toHaveLength(3);
+    expect([both[1]!.pass, both[2]!.pass]).toEqual([true, true]);
+    expect([both[0]!.reported, both[1]!.reported, both[2]!.reported]).toEqual([undefined, true, true]);
+    const greedyUnder = computeH9Lines(mk(1050, null));
+    expect([greedyUnder[1]!.pass, greedyUnder[2]!.pass]).toEqual([false, true]);
+    expect(greedyUnder[1]!.detail).toContain('greedy: seed 1 +5% (under 10% slower)');
+    expect(greedyUnder[2]!.detail).toContain('undefended: seed 1 timeout (at least 10% slower)');
+    expect(computeH9Lines(mk(1100, 900))[2]!.detail).toContain('undefended: seed 1 -10% (under 10% slower)');
   });
 });

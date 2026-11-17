@@ -45,12 +45,12 @@ const H9_SIM = ['raid.prongsMax', 'raid.prongMinSize'];
 const H9_CLIENT = ['client.haulerStepper'];
 
 describe('data/sim.json (shipped) at H9', () => {
-  it('is data version 15', () => {
-    expect(defaultData.dataVersion).toBe(15);
+  it('is data version 16', () => {
+    expect(defaultData.dataVersion).toBe(16);
   });
 
   it('matches the "Tunables (H9 …)" table: every key with its default and range', () => {
-    const rows = tableAfter('#### Tunables (H9, data v15, all integers)');
+    const rows = tableAfter('#### Tunables (H9, data v16, all integers)');
     const keys = rows.map((r) => strip(r[0]!) as TunableKey);
     expect(keys).toEqual([...H9_SIM, ...H9_CLIENT]);
     for (const [key = '', def = '', range = ''] of rows) {

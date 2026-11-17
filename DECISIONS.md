@@ -1749,3 +1749,65 @@ The H8 rule "the map keeps at least H8's height behind the rock sheet" was measu
 - **What the two-prong test found.** On a prong's rock with a ship parked there (a held hauler, say), the sheet also shows H8's Recycle section, 51 px tall. The map then measures 136 px.
 - **The call.** 136 + 51 = 187, so the extractor row, haulers line and raid lines cost the map nothing against H8. The smoke test asserts `stage + Recycle section height >= 185`, and the no-Recycle states still assert 185 (wide font) and 210 (normal font) directly. The Recycle section is H8's and is not changed here.
 - **Why not shrink it.** Hiding or folding Recycle away would change an H8 control the spec does not touch.
+## 2026-11-16 · Designer · h9-design-data: H9 stays on data v15; three findings for the Director
+
+**Decision:** no value in `data/sim.json` changes, and `dataVersion` stays 15. The probe, the sweep of 16 variants and the per-prong fights are in `reports/archive/h9-design-data-v15.md`.
+
+**Why:**
+- **Target 1** (adaptive meets ≥ 2 two-prong raids) is met only by `raid.prongMinSize` 3 or 2.
+  - Both move adaptive from 15:54 to 18:20 (+15%).
+  - Both put greedy level with or ahead of adaptive: 18:18 at 3; at 2, 18:26 (+1%), so greedy's +10% half fails there too.
+  - Under designer.md and PROCESS, a value that moves a winner by more than 10% or changes the strategy order goes to the Director and isn't committed.
+- **Target 4 is missed at every value tried.** Concentrating costs time, not ships: at min 3, concentrate is 27% slower but loses only 1 more ship. That is because a concentrated guard saves its own rock outright.
+- **Target 5b is a rule finding.** In every one of 16 variants, including every lever that makes raids hurt more, undefended was 23–65% faster than adaptive. In the bots, defending saves no economy ships (5 against 6), and raids open the hive. "No faster refill" was respected: no regrowth, repair, warship build time or warship cost was moved in any variant.
+- Targets 2, 3, 5a, 6, H8 staffing and flags 1–7 are met on v15. The per-prong fights give the same results in a second order.
+
+**Walk of the candidate `raid.prongMinSize` 3** (the four checks):
+- **Opening:** the first raid (3 raiders at 2:42) is `floor(3 ÷ 3)` = 1 prong, so the opening is unchanged (first raid 2:42 in every variant).
+- **Every raid phase:** splits start at a raid of 6, from 11 economy ships. The muster, flight, fight, hold and outcome rules are unchanged; only how often they run on two rocks changes.
+- **Limits:** at the fleet limit, no change. With one mined rock it is 1 prong. At `raid.prongsMax` 3 with min 3, adaptive is the same as at min 3 with max 2 (18:20), because a raid of 9 or more is rare at adaptive's peak economy of 16.
+- **Siblings:** min 2 gives adaptive the same 18:20; min 2 with max 3 gives 23:25 (+47%).
+
+**For the Director:** the three options are in DESIGN.md "Calibration result (h9-design-data, data v15)". The Director's rulings were applied:
+- windowHome and the no-piecemeal-wave rule are part of the bots measured here;
+- greedy's lost wave at 28412 is treated as greedy behaviour, not calibrated around;
+- staffing is judged against H8's target, and is met on v15 and on min 3.
+
+## 2026-11-16 · Director: h9-design-data rulings
+
+*(Recorded by the Designer, as the Director ruled.)*
+
+**Decisions:**
+1. **Ship `raid.prongMinSize` 3, as data v16.** H9's point is that the owner meets split raids, and on v15 adaptive never finished one, so the build wouldn't test the hypothesis. The Director accepts that:
+   - adaptive moves from 15:54 to 18:20 (+15%);
+   - greedy finishes level with it (18:18).
+
+   Target 5a (greedy at least 10% slower) becomes a reported finding, not a met target.
+2. **Target 4 is reworded** to "`adaptive-concentrate` loses at least 2 more economy ships than `adaptive`, **or** finishes at least 10% slower". It is met on v16 by time (23:13 against 18:20, +27%). DESIGN.md and BACKLOG.md carry the wording.
+3. **Target 5b (undefended) is report-only for this build.** It is a rule finding: in the bots, defending doesn't pay against split raids. It goes to the owner as a fun question in the handoff (DESIGN.md H9 fun question 4), next to their attrition note. The rule options are recorded as "H10 candidates" in DESIGN.md:
+   - a prong that has hit rolls on to the next mined rock;
+   - hits steal the rock's buffer or the probe's stock.
+
+   They are not built now.
+
+**Applied (Designer):**
+- `data/sim.json`: `raid.prongMinSize` 3 and `dataVersion` 16. The pin test (`data-h9.test.ts`) changes its version line, title and the H9 table heading it reads.
+- The full suite was re-run on v16: `reports/archive/h9-design-data-v16-bots.md`, with 3 seeds, all identical, and flags 1–7 MET.
+- The per-prong fights print the same on v16 as on v15.
+
+**Correction to the entry above:** "undefended was 23–65% faster in every one of 16 variants" should read **8–65%**. At `raid.gapTicks` 5400 with min 3 it was 8% faster. The archived report is corrected.
+
+## 2026-11-16 · Designer · h9-design-data: two edits outside the Designer's files, authorised by the Director
+
+**Authorisation:** the Director authorised both edits in the h9-design-data brief. designer.md routes a pinned value outside the Designer's files to the Director, so neither was made before that.
+
+1. **`packages/sim/test/reference-replay.test.ts`, "H9 (n)":**
+   - The `raid.prongMinSize` pin moves from 4 to 3, in the title, the pin and `2 * 3`.
+   - It stays a literal, so it still catches drift.
+   - A comment explains why raids 1 and 2 stay one prong: they have at most 3 raiders, under 2 × 3.
+   - What the test checks is unchanged.
+2. **The bots' H9 report lines (`packages/bots/src/field-flags.ts` `computeH9Lines`, `cli.ts`, and the test in `h9-bots.test.ts`):**
+   - Target 4 checks the reworded test: at least 2 more economy ships lost, **or** at least 10% slower.
+   - Targets 5a and 5b are separate lines marked `reported`, printed REPORTED, never MET or MISSED.
+   - Bot behaviour is unchanged. Only the report text and its check changed.
+   - `reports/archive/h9-design-data-v16-bots.md` is regenerated. It reads: target 4 MET (concentrate +27% on every seed), greedy +0% and undefended −28% REPORTED.
