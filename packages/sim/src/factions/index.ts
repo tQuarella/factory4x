@@ -700,7 +700,8 @@ export function hiveRebuildRetuned(world: World, before: number): void {
  * is missing; D2's guards take D3's type one at a time. A dead hive (or none) stays as it is. Bots size a wave's flight with it.
  */
 export function hiveAfter(world: Readonly<World>, ticks: number): GuardCounts {
-  const hive = hiveOf(world);
+  // (On the overworld there is no heart: heartIndex throws there, so look for one first.)
+  const hive = world.nodes.some((n) => n.kind === 'heart') ? hiveOf(world) : null;
   if (hive === null) return zeroGuards();
   const now = countGuards(hive);
   if (!hive.alive || world.field === null || ticks <= 0) return now;
