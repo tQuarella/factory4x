@@ -6,6 +6,12 @@ Player-facing changes per build. Three plain lines per build, written by the Dir
 
 Nothing yet.
 
+## build-20261117-1 (2026-11-16, commit 7055e2a) · Milestone 2, H9: A wider front
+
+- Raids split: once a raid is big enough, it splits and hits the two mined rocks nearest the hive at once. The banner names both targets, each target rock wears its own badge, and the raid chip shows "· 2". Guard both, stand on the one that matters, or let one go.
+- Dial extractors per rock: tap a mined rock and use − and + to set how many extractors work it, or All for as many as it takes. Haulers follow the dial on their own, and the rock sheet shows how many it gets.
+- When a raid ends, the notice and the result panel list each part of it and the rock it went for.
+
 ## build-20261116-1 (2026-11-15, commit c72eb04) · Milestone 2, H8: Hold the front
 
 - Move ships by hand: drag from one rock to another to send its warships there. Long-press, then drag, to send half. Your warships now shield the rock they sit on: a raid must beat them before it can touch your mining ships, and haulers wait out the fight instead of flying in.

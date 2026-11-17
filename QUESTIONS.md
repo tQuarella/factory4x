@@ -4,6 +4,41 @@ Any agent may add a question. The owner answers inline under **Answer:**. The Di
 
 To approve a change to a protected file, the owner adds a line `APPROVED-PROTECTED: <path>` under the question.
 
+## Build build-20261117-1 is ready (2026-11-16): H9, A wider front
+
+Play: https://factory4x.pages.dev (on your phone, portrait). Your old save is from data v14, so the game starts fresh.
+
+**Read this first: the bots say defending doesn't pay yet.** A bot that ignores raids completely takes the hive 28% faster than one that defends, and it did in every one of 16 tunings we tried. A greedy bot that defends late finishes level with the careful one. A guard that holds saves about as much ore as it loses in warships, so defending earns nothing back. Numbers alone can't fix that; it needs a rule (Q25). Please play the way you want to and tell us whether you feel it too.
+
+What changed:
+- Raids split: once a raid is big enough, it splits and hits the two mined rocks nearest the hive at once. The banner names both targets, each target rock wears its own badge, and the raid chip shows "· 2". Guard both, stand on the one that matters, or let one go.
+- Dial extractors per rock: tap a mined rock and use − and + to set how many extractors work it, or All for as many as it takes. Haulers follow the dial on their own, and the rock sheet shows how many it gets.
+- When a raid ends, the notice and the result panel list each part of it and the rock it went for.
+
+Try this: mine four or five rocks so your economy grows. The first split raid comes around minute 8: decide where your warships stand when the banner names two rocks. Later, dial a rock near the hive down to one extractor and watch its haulers follow.
+
+Fun questions (the H9 hypothesis):
+1. When a raid split across two rocks, how did you decide where your warships stood: both rocks, the richer one, or fewer rocks near the hive?
+2. Did a split raid ever make you stop or dial down a rock near the hive? Was that a good trade?
+3. Did the extractor dial do what you expected, with the haulers following on their own?
+4. Did defending a split raid feel worth it, or did ignoring raids and pushing the hive work better?
+
+Known from the team (not hidden from you):
+- The raid banner always takes two lines, so the map doesn't jump when a raid splits. On an older phone browser (Safari before 16.4) the map may still shift when the banner wraps; tell us if it does.
+- The old hauler −/+ is still in the tuning panel ("Hauler stepper" 1) if you miss it.
+
+Also open: Q25 (next direction, below). Q18 (pillar 1 wording, only if a fleet cap ships).
+Protected files changed this build: none.
+
+## Q25. Where should the game go next? (2026-11-16, Director)
+
+Your note after H8: rebuilds feel instant, so there's no war of attrition, and the game is drifting from Factorio toward Starcraft. You suggested logistics ("distilled Factorio") that unlock advantages in combat ("distilled Starcraft"). H9 adds a third thing: defending doesn't pay yet. These overlap, so pick a direction, and the Designer turns it into the next build:
+- **A: attrition first.** The hive can be worn down: beating its guards leaves it short for a while (H9's candidate C), and raids that hit take something that hurts, so holding the front pays. Smallest step; it answers both "attrition" and "defending doesn't pay".
+- **B: logistics feeds combat.** Rocks hold different resources, and the network you build decides which warship upgrades you can make. A bigger change, and it touches VISION.md; we'd draft the wording for you to approve.
+- **C: both, A first.** A is the next build, and B is the plan after it.
+
+Answer like "A", "B" or "C", plus anything you want to say about the vision. Default if unanswered: C.
+
 ## Build build-20261116-1 is ready (2026-11-15): H8, Hold the front
 
 Play: https://factory4x.pages.dev (on your phone, portrait). Your old save is from data v13, so the game starts fresh.

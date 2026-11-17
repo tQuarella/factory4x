@@ -317,19 +317,13 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-**Resumed by the owner (2026-11-16 19:56).** h9-bots fix round 1 resent to engineer af63892eea98f7a23 (resumed; launch count unchanged). Earlier pause: 08:23.
+**Awaiting owner feedback on build-20261117-1** (H9, A wider front), handed off 2026-11-16 21:50. Play: https://factory4x.pages.dev. Live version checked: 7055e2a.
 
-**20:20:** h9-bots APPROVED round 2 (be6ede0, pushed): adaptive 15:54, greedy 20:33, undefended 12:03. Director accepted windowHome and the no-piecemeal-wave additions; greedy's 28412 loss is accepted greedy behaviour. h9-design-data started (Designer a4f72a6ad9f89c048 resumed) on task/h9-bots be6ede0: targets 1, 4 and 5 (undefended half).
-
-**20:50:** h9-design-data APPROVED (a49e163, pushed). Data v16: raid.prongMinSize 3. Adaptive 18:20, greedy 18:18, concentrate 23:13, undefended 13:09. Targets 1, 4 and 6 met; 5a and 5b reported. Director rulings are in DECISIONS (confirmed). Handoff must lead with: the bots say defending doesn't pay (undefended is 28% faster) and greedy is level with adaptive, next to the owner's attrition note. h9-client final round sent (engineer a8c170b2da5b3533f resumed). Then: Critic final round, branch CI, merge-task h9-client.
-
-Where H9 stands:
-- Merged on main: cw-bots-gate-time (97b84f2).
-- Approved: h9-sim (12924fa), h9-raids (a34be08).
-- task/h9-bots: REJECT round 1 (review 72d23c9). The fix is not started (or partly started; check the worktree `.claude/worktrees/agent-af63892eea98f7a23` for uncommitted edits). Resend the fix brief: (1) an exact per-prong shield metric at 0 with a two-prong test; (2) the Director ruling that the bots' raid-window hive wave counts a prong as away only if the wave lands before that prong's earliest return, otherwise it holds; log the ruling and the trace; (3) the bot gate time measured alone, with a breakdown. The staffing bound under 0.25 is accepted.
-- task/h9-client: pre-design-data work done (ea946b5); waiting for h9-design-data.
-- Then h9-design-data (Designer resume): targets 1, 4 and 5 all miss on v15.
-- Then h9-client final round, CI, and `merge-task h9-client`.
+- H9 stack merged as 7055e2a (merge-task h9-client): h9-sim, h9-raids, h9-bots, h9-design-data (data v16), h9-client. Release gates passed: 302 smoke tests.
+- CI on 7055e2a: gates 9:36 of 20 min (48%), deploy 5:40 of 15 min (38%). Branch CI on 7c80ca1: gates 8:05, deploy 6:11.
+- Open for the owner: the H9 fun questions, Q25 (next direction: attrition / logistics feeds combat / both; default C), and Q18.
+- Bots finding up front in the handoff: undefended is 28% faster than adaptive, and greedy is level with it. The H10 rule candidates are in DESIGN.md.
+- Next: /retro (done right after the handoff). Then do Can wait work only, until the owner answers.
 
 ## Moving to another machine
 
