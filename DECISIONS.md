@@ -1731,3 +1731,27 @@ Raids stop when the hive falls (8010), so items (g)–(n) are placed before the 
 **What `adaptive` meets on v15 (for h9-design-data):** (traced on seeds 1 to 3, identical, since the field is the same)
 - Adaptive's raids: #1 at tick 4862 (econ 6, 3 raiders, 1 prong), #2 at 9573 (econ 6, 3), #3 at 14191 (econ 11, 6), #4 at 18745 (econ 12, 6), #5 at 23556 (econ 14, 7), #6 at 27871 (econ 17, 9: **2 prongs**, 2T3S + 1T3S). It wins before a seventh.
 - So the first 2-prong raid musters at econ 17 (a raid of 9; with `raid.econPerRaider` 2 a size of 8 comes from econ 15), at game minute 15.5, and there is exactly **one** on adaptive: calibration target 1 (at least 2 split raids in the run) is unmet on the shipped data. Greedy has two (#5 at 23401, econ 15, 2T2S + 1T3S; #6 at 27936, econ 16).
+
+## 2026-11-16 · Designer · h9-design-data: H9 stays on data v15; three findings for the Director
+
+**Decision:** no value in `data/sim.json` changes, and `dataVersion` stays 15. The probe, the sweep of 16 variants and the per-prong fights are in `reports/archive/h9-design-data-v15.md`.
+
+**Why:**
+- **Target 1** (adaptive meets ≥ 2 two-prong raids) is met only by `raid.prongMinSize` 3 or 2.
+  - Both move adaptive from 15:54 to 18:20 (+15%).
+  - Both put greedy level with or ahead of adaptive: 18:18 at 3; at 2, 18:26 (+1%), so greedy's +10% half fails there too.
+  - Under designer.md and PROCESS, a value that moves a winner by more than 10% or changes the strategy order goes to the Director and isn't committed.
+- **Target 4 is missed at every value tried.** Concentrating costs time, not ships: at min 3, concentrate is 27% slower but loses only 1 more ship. That is because a concentrated guard saves its own rock outright.
+- **Target 5b is a rule finding.** In every one of 16 variants, including every lever that makes raids hurt more, undefended was 23–65% faster than adaptive. In the bots, defending saves no economy ships (5 against 6), and raids open the hive. "No faster refill" was respected: no regrowth, repair, warship build time or warship cost was moved in any variant.
+- Targets 2, 3, 5a, 6, H8 staffing and flags 1–7 are met on v15. The per-prong fights give the same results in a second order.
+
+**Walk of the candidate `raid.prongMinSize` 3** (the four checks):
+- **Opening:** the first raid (3 raiders at 2:42) is `floor(3 ÷ 3)` = 1 prong, so the opening is unchanged (first raid 2:42 in every variant).
+- **Every raid phase:** splits start at a raid of 6, from 11 economy ships. The muster, flight, fight, hold and outcome rules are unchanged; only how often they run on two rocks changes.
+- **Limits:** at the fleet limit, no change. With one mined rock it is 1 prong. At `raid.prongsMax` 3 with min 3, adaptive is the same as at min 3 with max 2 (18:20), because a raid of 9 or more is rare at adaptive's peak economy of 16.
+- **Siblings:** min 2 gives adaptive the same 18:20; min 2 with max 3 gives 23:25 (+47%).
+
+**For the Director:** the three options are in DESIGN.md "Calibration result (h9-design-data, data v15)". The Director's rulings were applied:
+- windowHome and the no-piecemeal-wave rule are part of the bots measured here;
+- greedy's lost wave at 28412 is treated as greedy behaviour, not calibrated around;
+- staffing is judged against H8's target, and is met on v15 and on min 3.

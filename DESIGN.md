@@ -894,6 +894,45 @@ If a target can only be met that way, report it as a finding rather than tune it
 
 Flags 1–7 must stay met. The designer.md guard applies: a value that meets one target but changes which strategy finishes first, or moves a winner by more than 10%, goes to the Director with the reword option and isn't committed as shipped. Values only, in `data/sim.json`; `dataVersion` goes to 16 if any value changes.
 
+#### Calibration result (h9-design-data, data v15)
+
+**No value changed: H9 ships on data v15**, pending the Director's rulings below.
+- Report: `reports/archive/h9-design-data-v15.md`, with the verbatim sweep and per-prong fight output.
+- Scripts: `reports/archive/h9-design-data-v15-sweep.mts` and `-fights.mts`.
+- The full suite at `raid.prongMinSize` 3: `reports/archive/h9-design-data-min3-bots.md`.
+- Every seed gives the same run.
+
+| # | Target | v15 | Met |
+| --- | --- | --- | --- |
+| 1 | adaptive meets ≥ 2 two-prong raids | 0 finished; its one split raid launches as its winning wave leaves | **missed** |
+| 2 | each undefended prong kills ≥ 2 economy ships | a5 3, a6 2 | met |
+| 3 | a guard under half its prong loses, then the prong hits; matched wins losing ≤ 2 | 2 against 6: beaten, a5 hit for 3. 6: wins, loses 1. The same in a second order | met |
+| 4 | concentrate loses ≥ 2 more economy ships than adaptive | 7 against 6, same win time (15:54) | **missed** |
+| 5a | greedy ≥ 10% slower than adaptive | 20:33 against 15:54 (+29%) | met |
+| 5b | undefended ≥ 10% slower than adaptive | 12:03 (−24%) | **missed** |
+| 6 | pace; first raid at 2–6 min | adaptive 15:54, greedy 20:33; 2:42 | met |
+| H8 | staffing | adaptive: idle peak 1, 0 min over 1; nothing backed up with its target met | met |
+| flags 1–7 | | all MET | met |
+
+**The only candidate value: `raid.prongMinSize` 3.**
+- It meets target 1: adaptive meets 4 two-prong raids, the first at 7:53. Flags 1–7 and staffing still hold.
+- Target 4 as worded is still missed (6 against 5 ships lost). On time, concentrate is 27% slower.
+- It trips both guard triggers:
+  - adaptive goes from 15:54 to 18:20 (+15%);
+  - greedy (18:18) now finishes 2 s ahead of adaptive, so target 5a goes from met to missed.
+- So it is reported, not committed.
+
+**Target 5b is a rule finding.** No in-range value tried made ignoring raids slower. Undefended was 23–65% faster than adaptive in every variant. The report gives the reasons:
+- defending doesn't save economy ships in the bots (5 lost against 6);
+- a matched guard trades 1–2 warships for 2–3 extractors, about even in ore;
+- raids open the hive (flag 4);
+- a lean economy draws small raids.
+
+**For the Director** (the report has the detail):
+1. Ship `raid.prongMinSize` 3 (target 1 met; adaptive +15%; greedy ≈ adaptive), or keep 4 and reword target 1 to count greedy's run, which meets 2 split raids on v15.
+2. Reword target 4 to "≥ 2 more economy ships lost, **or** ≥ 10% slower".
+3. Target 5b needs a rule change (for example, a hit prong moves on to the next rock, or hits steal ore), or becomes report-only.
+
 #### Success criteria (H9; the owner, one 20–30 minute phone session; 4x is fine)
 
 1. They don't say there was only one place to defend, or nothing to decide. They name a moment of choosing between two raided rocks: hold both, hold one, or mine fewer exposed rocks.
