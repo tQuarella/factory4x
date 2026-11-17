@@ -263,6 +263,24 @@
  *                                   raidNext (raidable with raidRank ≤ nextProngs).
  *   raid.prongsMax / raid.prongMinSize / client.haulerStepper   the v15 keys (the client key never reaches the sim).
  *
+ * H10 "Wear the hive down" (h10-sim, data v17: hive.rebuildTicks 0, raid.rollMax 0, client.raidSlowdown 1; at 0 both rules
+ * are off and the game plays as v16)
+ *   hive.rebuildTicks               D1-D6: above 0 the field's hive replaces one missing guard (cap − (alive + out)) every
+ *                                   that many ticks, by one counter, world.field.hiveRebuildProgress (saved); D3 picks the
+ *                                   type at completion (rebuildPick(missing, caps): Thorn if missing.thorn × caps.spore ≥
+ *                                   missing.spore × caps.thorn and missing.thorn > 0, else Spore). 0 is R9 as built. Pockets
+ *                                   and the campaign are untouched. setTunable across 0 resets both counters (D6).
+ *   raid.rollMax                    L1-L5: a prong that hit its target and would go home rolls on to the first raidable rock
+ *                                   in hive order it hasn't hit and no live prong aims at, up to this many times. Prong
+ *                                   gains rolls and hitRocks (saved); stats.raidRolls counts rolls.
+ *   guardianStatus(world, hive)     gains rebuild {ticks, progress, nextType} | null (field hive, rebuildTicks > 0, alive);
+ *                                   the hive's GuardRow.regrowTicks is R9's period (× hive.regrowPct ÷ 100), or under D2
+ *                                   hive.rebuildTicks with regrowProgress 0.
+ *   hiveAfter(world, ticks)         the hive's guards at home after `ticks` more of D2 (or R9), no deaths, no raiders back.
+ *   raidStatus.prongs[i]            gains rolls and rolledFrom (the rock the last roll left, or null); raidStatus.last is a
+ *                                   RaidReport: each prong with hitRocks (stored) and hiveLost (its raiders killed; derived).
+ *   fieldSummary                    gains raidRolls and hive {alive, cap, lostToRaids, lostToPushes}.
+ *
  * Reading `World` fields directly is fine (it is plain data); never mutate it outside `step`.
  * Time: `world.tickRate` ticks per game second (30). Ships in transit: interpolate from
  * `ship.transit.{from,to,ticksLeft,totalTicks}`; pods from `route.pods[].ticksLeft` and
@@ -306,8 +324,8 @@ export {
   worstHauls,
 } from './data.ts';
 export type { BuildType, EconType, FieldMap, RunMode } from './data.ts';
-export { dealCounts, haulersHeld, isRaidable, launchMix, nextProngs, prongCount, prongOutcome, raidFightsAt, raidKeep, raidMix, raidMixAt, raidProngs, raidRank, raidSize, raidStatus, raidTarget } from './factions/index.ts';
-export type { Prong, ProngOutcome, ProngPhase, ProngResult, ProngStatus, Raid, RaidOutcome, RaidPhase, RaidResult, RaidStatus } from './factions/index.ts';
+export { dealCounts, haulersHeld, hiveAfter, isRaidable, launchMix, nextProngs, prongCount, prongOutcome, raidFightsAt, raidKeep, raidMix, raidMixAt, raidProngs, raidRank, raidReport, raidSize, raidStatus, raidTarget, rebuildPick } from './factions/index.ts';
+export type { HiveRebuild, Prong, ProngOutcome, ProngPhase, ProngReport, ProngResult, ProngStatus, Raid, RaidOutcome, RaidPhase, RaidReport, RaidResult, RaidStatus } from './factions/index.ts';
 export {
   econAlive,
   econAtByType,
@@ -333,7 +351,7 @@ export { isCountedType } from './fleet.ts';
 export { ECON_STRIKE_ORDER, guardPools, guardStrike } from './step.ts';
 export type { StrikeKills } from './step.ts';
 export { allocStatus, fieldSummary, movePreview, rockStatus } from './selectors.ts';
-export type { AllocRow, AllocState, AllocStatus, BuildTypeCounts, FieldSummary, RockStatus } from './selectors.ts';
+export type { AllocRow, AllocState, AllocStatus, BuildTypeCounts, FieldHive, FieldSummary, RockStatus } from './selectors.ts';
 export type { RecycleCounts } from './inputs.ts';
 export { isField } from './world.ts';
 export type { EconShip, EconTypeCounts, FieldState, ProngStats, RaidStats } from './world.ts';

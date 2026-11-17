@@ -65,7 +65,7 @@ function play(world: World, data: SimData, bot: FieldBot, ticks: number, extra: 
 
 /** Give a world a raid in a phase, with a planned size. */
 function setRaid(w: World, phase: 'muster' | 'out' | 'fight', target: number, planned: { thorn: number; spore: number }): void {
-  w.raid = { id: 1, phase, target, guards: [], ticksLeft: 300, planned, flightTicks: 144, from: 10, retargeted: false, lostEcon: { extractor: 0, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 } };
+  w.raid = { id: 1, phase, target, guards: [], ticksLeft: 300, planned, flightTicks: 144, from: 10, retargeted: false, rolls: 0, hitRocks: [], lostEcon: { extractor: 0, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 } };
 }
 
 describe('the field runner (acceptance 1)', () => {

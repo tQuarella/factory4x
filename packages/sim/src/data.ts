@@ -160,12 +160,15 @@ export const TUNABLE_KEYS = [
   'move.splitPct',
   'raid.prongsMax',
   'raid.prongMinSize',
+  'hive.rebuildTicks',
+  'raid.rollMax',
   'stats.throughputWindowSec',
   'client.autosaveSec',
   'client.longPressMs',
   'client.dragSlopPx',
   'client.moveGesture',
   'client.haulerStepper',
+  'client.raidSlowdown',
 ] as const;
 
 export type TunableKey = (typeof TUNABLE_KEYS)[number];

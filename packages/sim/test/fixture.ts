@@ -20,6 +20,7 @@ import rawV12 from './fixtures/sim-v12.json' with { type: 'json' };
 import rawV13 from './fixtures/sim-v13.json' with { type: 'json' };
 import rawV14 from './fixtures/sim-v14.json' with { type: 'json' };
 import rawV15 from './fixtures/sim-v15.json' with { type: 'json' };
+import rawV16 from './fixtures/sim-v16.json' with { type: 'json' };
 import { defaultData, parseSimData, withRunMode, type SimData } from '../src/index.ts';
 
 export const fixtureData: SimData = parseSimData(raw);
@@ -78,6 +79,15 @@ export const fixtureV14: SimData = parseSimData(rawV14);
  * prong is H8 exactly) and client.haulerStepper 1 (H8's hauler stepper shown), raid.prongMinSize at its default 4.
  */
 export const fixtureV15: SimData = parseSimData(rawV15);
+
+/**
+ * h10-sim: data/sim.json as it shipped at dataVersion 16 (h9-design-data's calibration, main bd702b9), frozen in
+ * fixtures/sim-v16.json and never retuned, with the three H10 keys at their v17 defaults (hive.rebuildTicks 0, raid.rollMax 0,
+ * client.raidSlowdown 1), so it plays exactly v16. Its `map.field` is the shipped one at v17. The H10 rule tests run on it with
+ * the rule keys set in the test, so h10-design-data's calibration (v18) changes none of them. h10-sim gave every older
+ * fixture the same three keys at those values: both rules off, as the fixtures were written for.
+ */
+export const fixtureV16: SimData = parseSimData(rawV16);
 
 /**
  * h7-sim: the shipped data with `run.mode` "campaign" (DESIGN.md H7 "What is parked, and how"). Tests that built

@@ -69,6 +69,10 @@ export interface Prong {
   killed: GuardCounts;
   /** Set when the prong is `done` (W6), never before: until then the outcome is derived (`prongOutcome`). */
   outcome?: ProngOutcome;
+  /** H10 L2: how many times this prong has rolled on to another rock (at most `raid.rollMax`). */
+  rolls: number;
+  /** H10 L3: the targets where this prong killed an economy ship, in the order of the first kill at each (no repeats). */
+  hitRocks: number[];
 }
 
 /**
@@ -94,6 +98,14 @@ export interface ProngResult {
   lostEcon: EconTypeCounts;
   lostShips: ShipTypeCounts;
   killed: GuardCounts;
+  /** H10 L3: the targets where the prong killed an economy ship, in order. */
+  hitRocks: number[];
+}
+
+/** H10: a prong's result as `raidStatus().last` reports it: the stored result plus `hiveLost` (derived, never stored). */
+export interface ProngReport extends ProngResult {
+  /** H10: the raiders of this prong killed (killed.thorn + killed.spore): what the prong cost the hive. */
+  hiveLost: number;
 }
 
 /** What a finished raid did (`world.lastRaid`, `raidStatus().last`). */
@@ -112,6 +124,29 @@ export interface RaidResult {
    * h9-sim stub: one prong mirroring the single raid (h9-raids fills it per prong).
    */
   prongs: ProngResult[];
+}
+
+/** H10: a finished raid as `raidStatus().last` reports it (each prong with `hiveLost`). */
+export interface RaidReport extends Omit<RaidResult, 'prongs'> {
+  prongs: ProngReport[];
+}
+
+/** H10: the report view of a stored raid result (adds each prong's `hiveLost`). */
+export function raidReport(r: Readonly<RaidResult>): RaidReport {
+  return {
+    ...r,
+    lostEcon: { ...r.lostEcon },
+    lostShips: { ...r.lostShips },
+    killed: { ...r.killed },
+    prongs: r.prongs.map((p) => ({
+      ...p,
+      lostEcon: { ...p.lostEcon },
+      lostShips: { ...p.lostShips },
+      killed: { ...p.killed },
+      hitRocks: [...p.hitRocks],
+      hiveLost: p.killed.thorn + p.killed.spore,
+    })),
+  };
 }
 
 /** The hive's guardian (the heart), or null in a world without one. */
@@ -317,6 +352,7 @@ function finish(world: World, outcome: RaidOutcome): void {
       lostEcon: { ...p.lostEcon },
       lostShips: { ...p.lostShips },
       killed: { ...p.killed },
+      hitRocks: [...p.hitRocks],
     })),
   };
   world.raid = null;
@@ -368,6 +404,8 @@ function tryMuster(world: World): void {
     lostEcon: zeroEcon(),
     lostShips: zeroShips(),
     killed: zeroGuards(),
+    rolls: 0,
+    hitRocks: [],
   }));
   prongs[0]!.ticksLeft = t['raid.musterTicks'];
   const [first, ...others] = prongs;
@@ -432,10 +470,39 @@ function muster(world: World, raid: Raid, hive: Guardian): void {
   else delete raid.others;
 }
 
-/** W5: where a prong retargets: the nearest raidable node in hive order that no other prong in `out` or `fight` aims at, or null. */
+/**
+ * W5: where a prong retargets: the nearest raidable node in hive order that no other prong in `out` or `fight` aims at, or
+ * null. H10 (h10-sim reading, DECISIONS.md): never a rock this prong has already hit, as L1's roll never picks one. Only a
+ * prong that rolled can have hit a rock before it retargets (a retarget is on arrival, before any fight at that node), so
+ * with `raid.rollMax` 0 this is W5 exactly.
+ */
 function retargetNode(world: Readonly<World>, raid: Readonly<Raid>, prong: Readonly<Prong>): number | null {
   const live = raidProngs(raid).filter((p) => p !== prong && (p.phase === 'out' || p.phase === 'fight'));
-  return raidables(world).find((n) => !live.some((p) => p.target === n)) ?? null;
+  return raidables(world).find((n) => !live.some((p) => p.target === n) && !prong.hitRocks.includes(n)) ?? null;
+}
+
+/**
+ * H10 L1: where a prong that hit its target rolls on to: the first raidable node in hive order that is not its target, not a
+ * rock it has already hit, and not the target of another prong in `out` or `fight`; or null (it goes home). Null always while
+ * `raid.rollMax` is 0, or once the prong has rolled that many times, or if it killed no economy ship at this target.
+ */
+export function rollNode(world: Readonly<World>, raid: Readonly<Raid>, prong: Readonly<Prong>): number | null {
+  if (prong.rolls >= world.tun['raid.rollMax'] || !prong.hitRocks.includes(prong.target)) return null;
+  const live = raidProngs(raid).filter((p) => p !== prong && (p.phase === 'out' || p.phase === 'fight'));
+  return raidables(world).find((n) => n !== prong.target && !prong.hitRocks.includes(n) && !live.some((p) => p.target === n)) ?? null;
+}
+
+/**
+ * H10 L2: the prong rolls from its target to `next`: phase `out` with `from` the old target, a new flight, `rolls` + 1 and
+ * `stats.raidRolls` + 1. The hold (H8 H10) follows `target`, so it moves on this tick. No raider is added.
+ */
+function roll(world: World, prong: Prong, next: number): void {
+  const from = prong.target;
+  prong.phase = 'out';
+  prong.target = next;
+  prong.rolls += 1;
+  world.stats.raidRolls += 1;
+  startFlight(world, prong, from, next);
 }
 
 /** R6 / W5: arrival at the target; if it is no longer raidable the prong retargets once, or flies home. */
@@ -457,14 +524,16 @@ function arrive(world: World, raid: Raid, prong: Prong): void {
   startFlight(world, prong, from, next);
 }
 
-/** R7 / W4: one round at the prong's own target. */
-function fight(world: World, prong: Prong): void {
+/** R7 / W4: one round at the prong's own target. H10 L1: where R7 would send it home, a prong that hit here may roll on. */
+function fight(world: World, raid: Raid, prong: Prong): void {
   if (world.tick % world.tun['combat.roundTicks'] !== 0) return;
   const f = fieldOf(world);
   const warships: Ship[] = world.ships.filter((s) => s.at === prong.target);
   const econ: EconShip[] = f.econ.filter((s) => s.at === prong.target);
   if (warships.length === 0 && econ.length === 0) {
-    goHome(world, prong);
+    const next = rollNode(world, raid, prong);
+    if (next === null) goHome(world, prong);
+    else roll(world, prong, next);
     return;
   }
   const byType = { drone: 0, lancer: 0, flak: 0 };
@@ -483,6 +552,7 @@ function fight(world: World, prong: Prong): void {
     prong.lostEcon[s.type] += 1;
     world.stats.econLost[s.type] += 1;
   }
+  if (kills.econ.length > 0 && !prong.hitRocks.includes(prong.target)) prong.hitRocks.push(prong.target);
   if (kills.ships.length > 0) world.ships = world.ships.filter((s) => s.hp > 0);
   if (kills.econ.length > 0) {
     f.econ = f.econ.filter((s) => s.hp > 0);
@@ -524,7 +594,7 @@ export function raidStep(world: World, data: SimData): void {
   for (const p of raidProngs(raid)) {
     if (world.raid !== raid) return;
     if (p.phase === 'fight') {
-      fight(world, p);
+      fight(world, raid, p);
       continue;
     }
     if (p.phase !== 'out' && p.phase !== 'home') continue;
@@ -536,32 +606,153 @@ export function raidStep(world: World, data: SimData): void {
   }
 }
 
+/** R9: the hive's regrow period of one type: guard.<type>.regrowTicks × hive.regrowPct ÷ 100, floored, at least 1 tick. */
+export function hiveRegrowPeriod(world: Readonly<World>, g: Readonly<Guardian>, type: GuardType): number {
+  return Math.max(1, Math.floor((guardRegrowTicks(world, g, type) * world.tun['hive.regrowPct']) / 100));
+}
+
+/** H10 D1: the hive rebuilds by D2's queue (`hive.rebuildTicks` > 0) rather than R9's per-type timers. */
+export function isHiveRebuild(world: Readonly<World>): boolean {
+  return world.tun['hive.rebuildTicks'] > 0;
+}
+
 /**
- * R9: rule 9 for the hive in field mode. The raiders away count against its caps, so only guards that died
- * regrow, and the period is guard.<type>.regrowTicks × hive.regrowPct ÷ 100 (floored, at least 1 tick).
+ * H10 D2: the hive's missing guards per type: max(0, cap − (alive + out)), where alive is its guard list (mustering raiders
+ * are in it, R1) and out is `raidersOut` over every prong (W7). `alive` may be given (hiveAfter counts forward from it).
+ */
+export function hiveMissing(world: Readonly<World>, g: Readonly<Guardian>, alive: Readonly<GuardCounts> = countGuards(g)): GuardCounts {
+  const caps = guardCaps(world, g);
+  const out = raidersOut(world);
+  return {
+    thorn: Math.max(0, caps.thorn - (alive.thorn + out.thorn)),
+    spore: Math.max(0, caps.spore - (alive.spore + out.spore)),
+  };
+}
+
+/**
+ * H10 D3: the type the queue adds: Thorn if missing.thorn × caps.spore ≥ missing.spore × caps.thorn and missing.thorn > 0,
+ * otherwise Spore; null when nothing is missing. So the type furthest below its cap in proportion, ties to Thorn; a type
+ * with nothing missing (a cap of 0 included) is never picked.
+ */
+export function rebuildPick(missing: Readonly<GuardCounts>, caps: Readonly<GuardCounts>): GuardType | null {
+  if (missing.thorn + missing.spore === 0) return null;
+  if (missing.thorn > 0 && missing.thorn * caps.spore >= missing.spore * caps.thorn) return 'thorn';
+  return 'spore';
+}
+
+/**
+ * Rule 9 for the hive in field mode (D1). With `hive.rebuildTicks` 0, R9 as built: the raiders away count against its caps,
+ * so only guards that died regrow, each type on its own timer at `hiveRegrowPeriod`. Above 0, D2's one queue: nothing
+ * missing resets `hiveRebuildProgress` to 0; otherwise it counts up and at `hive.rebuildTicks` adds one guard of D3's type
+ * (picked now, at completion) and starts again from 0. The hive's `regrowProgress` stays {0, 0} under D2 (D6 resets it when
+ * the queue starts).
  */
 export function hiveRegrow(world: World, g: Guardian, add: (type: GuardType) => void): void {
+  if (isHiveRebuild(world)) {
+    const f = fieldOf(world);
+    const type = rebuildPick(hiveMissing(world, g), guardCaps(world, g));
+    if (type === null) {
+      f.hiveRebuildProgress = 0;
+      return;
+    }
+    f.hiveRebuildProgress += 1;
+    if (f.hiveRebuildProgress >= world.tun['hive.rebuildTicks']) {
+      add(type);
+      f.hiveRebuildProgress = 0;
+    }
+    return;
+  }
   const caps = guardCaps(world, g);
   const count = countGuards(g);
   const out = raidersOut(world);
-  const pct = world.tun['hive.regrowPct'];
   for (const type of GUARD_TYPES) {
     if (count[type] + out[type] >= caps[type]) {
       g.regrowProgress[type] = 0;
       continue;
     }
     g.regrowProgress[type] += 1;
-    if (g.regrowProgress[type] >= Math.max(1, Math.floor((guardRegrowTicks(world, g, type) * pct) / 100))) {
+    if (g.regrowProgress[type] >= hiveRegrowPeriod(world, g, type)) {
       add(type);
       g.regrowProgress[type] = 0;
     }
   }
 }
 
+/**
+ * H10 D6, `setTunable hive.rebuildTicks` from `before` to the value now in `world.tun`. 0 → above 0: the queue starts from
+ * 0 and the hive's R9 timers reset to {0, 0}. Above 0 → 0: the queue's progress is dropped and R9's timers start from 0
+ * (they are {0, 0} under D2). Above 0 → another value above 0: the progress is kept (at or past the new value, the guard
+ * completes on the next tick's check, which is ≥). Field mode only; nothing in a campaign world.
+ */
+export function hiveRebuildRetuned(world: World, before: number): void {
+  const f = world.field;
+  if (f === null) return;
+  if ((before > 0) === isHiveRebuild(world)) return;
+  f.hiveRebuildProgress = 0;
+  const hive = hiveOf(world);
+  if (hive !== null) hive.regrowProgress = { thorn: 0, spore: 0 };
+}
+
+/**
+ * H10 `hiveAfter(world, ticks)`: the hive's guards at home after `ticks` more ticks of D2 (or R9 at `hive.rebuildTicks` 0),
+ * with no deaths and no raiders returning (the raiders out stay out and count against the caps). The closed form of the
+ * per-tick rule: from progress p and period P, a guard completes after max(1, P − p) ticks and then every P, until nothing
+ * is missing; D2's guards take D3's type one at a time. A dead hive (or none) stays as it is. Bots size a wave's flight with it.
+ */
+export function hiveAfter(world: Readonly<World>, ticks: number): GuardCounts {
+  // (On the overworld there is no heart: heartIndex throws there, so look for one first.)
+  const hive = world.nodes.some((n) => n.kind === 'heart') ? hiveOf(world) : null;
+  if (hive === null) return zeroGuards();
+  const now = countGuards(hive);
+  if (!hive.alive || world.field === null || ticks <= 0) return now;
+  const done = (progress: number, period: number): number => {
+    const first = Math.max(1, period - progress);
+    return ticks < first ? 0 : 1 + Math.floor((ticks - first) / period);
+  };
+  if (isHiveRebuild(world)) {
+    const caps = guardCaps(world, hive);
+    let n = done(world.field.hiveRebuildProgress, world.tun['hive.rebuildTicks']);
+    for (;;) {
+      const type = n > 0 ? rebuildPick(hiveMissing(world, hive, now), caps) : null;
+      if (type === null) return now;
+      now[type] += 1;
+      n -= 1;
+    }
+  }
+  const missing = hiveMissing(world, hive, now);
+  for (const type of GUARD_TYPES) {
+    if (missing[type] > 0) now[type] += Math.min(missing[type], done(hive.regrowProgress[type], hiveRegrowPeriod(world, hive, type)));
+  }
+  return now;
+}
+
+/** H10 `guardianStatus(hive).rebuild`: the queue's period, its progress, and D3's pick now (null when nothing is missing). */
+export interface HiveRebuild {
+  ticks: number;
+  progress: number;
+  nextType: GuardType | null;
+}
+
+/** H10: the hive's rebuild readout, or null unless `g` is the hive, in field mode, with `hive.rebuildTicks` > 0, and alive. */
+export function hiveRebuild(world: Readonly<World>, g: Readonly<Guardian>): HiveRebuild | null {
+  if (world.field === null || !isHiveRebuild(world) || !g.alive || world.nodes[g.node]!.kind !== 'heart') return null;
+  return {
+    ticks: world.tun['hive.rebuildTicks'],
+    progress: world.field.hiveRebuildProgress,
+    nextType: rebuildPick(hiveMissing(world, g), guardCaps(world, g)),
+  };
+}
+
 /** R9 / F11: the hive is captured: every raider is removed ("the raid withers") and raids end. */
 export function raidWither(world: World): void {
   if (world.raid === null) return;
   finish(world, 'withered');
+}
+
+/** H10 D5 (with R9 / F11): the hive is captured: the queue stops (`hiveRebuildProgress` 0) and the raid withers. */
+export function hiveCaptured(world: World): void {
+  if (world.field !== null) world.field.hiveRebuildProgress = 0;
+  raidWither(world);
 }
 
 /**
@@ -625,6 +816,19 @@ export interface ProngStatus {
   outcome: ProngOutcome | null;
   /** The haulers H10 holds for this prong. */
   holding: number;
+  /** H10 L2: how many times the prong has rolled on (0 while `raid.rollMax` is 0). */
+  rolls: number;
+  /** H10 L2: the rock its last roll left (the last target), or null if it has not rolled. */
+  rolledFrom: number | null;
+}
+
+/**
+ * H10 `raidStatus.prongs[i].rolledFrom`: the rock the prong's last roll left, or null. A roll leaves a rock the prong hit
+ * (L1), and neither a roll nor a retarget ever goes to a rock it has hit, so the rocks it rolled from are the first `rolls`
+ * entries of `hitRocks`, in order (any later entry is the rock it is at or left for home): the last roll left hitRocks[rolls − 1].
+ */
+function rolledFrom(p: Readonly<Prong>): number | null {
+  return p.rolls > 0 ? (p.hitRocks[p.rolls - 1] ?? null) : null;
 }
 
 /** `raidStatus.prongs`: one entry per prong in prong order (done ones stay until the raid ends), empty when there is no raid. */
@@ -640,6 +844,8 @@ function prongStatuses(world: Readonly<World>): ProngStatus[] {
     ticksToArrival: p.phase === 'out' || p.phase === 'home' ? p.ticksLeft : 0,
     outcome: prongOutcome(p),
     holding: hold && (p.phase === 'out' || p.phase === 'fight') ? haulersWaitingFor(world, p.target) : 0,
+    rolls: p.rolls,
+    rolledFrom: rolledFrom(p),
   }));
 }
 
@@ -692,8 +898,8 @@ export interface RaidStatus {
   nextRaidAtEcon: number;
   /** Ticks until a raid may muster again (the gap), 0 if allowed now. */
   ticksToNextAllowed: number;
-  /** The last finished raid, or null. */
-  last: RaidResult | null;
+  /** The last finished raid, or null. H10: each prong with `hiveLost` (`raidReport`). */
+  last: RaidReport | null;
   /** H10: haulers held at the probe for this raid, over every prong (0 when none, or `raid.haulersHold` is 0). */
   holding: number;
   /** H9: one entry per prong, in prong order; empty when there is no raid. */
@@ -733,7 +939,7 @@ export function raidStatus(world: Readonly<World>): RaidStatus {
     econ: econAlive(world),
     nextRaidAtEcon: world.tun['raid.firstAtEcon'],
     ticksToNextAllowed: Math.max(0, world.nextRaidTick - world.tick),
-    last: world.lastRaid,
+    last: world.lastRaid === null ? null : raidReport(world.lastRaid),
     holding: haulersHolding(world),
     prongs,
     nextProngs: nextProngs(world),

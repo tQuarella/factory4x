@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createWorld, hashState, parseSimData, step, type Input, type World } from '../src/index.ts';
 import raw13 from './fixtures/sim-v13.json' with { type: 'json' };
 import { F } from './field-helpers.ts';
+import { withoutH10 } from './h10-strip.ts';
 
 /**
  * h8-sim acceptance 3, last item: hauler.autoNeed 0 reproduces H7's F6 on the frozen v13 fixture (DESIGN.md H8 H5).
@@ -22,9 +23,9 @@ const H8_SIM_KEYS = ['hauler.autoNeed', 'hauler.needPct', 'rock.haulerMax', 'rai
 /** h9-sim: what H9 added: the two raid tunables, `field.extractorSet`, `stats.raidProngs` and `lastRaid.prongs`. */
 const H9_SIM_KEYS = ['raid.prongsMax', 'raid.prongMinSize'];
 
-/** The world without what H8 (and H9) added. */
+/** The world without what H8 (and H9, and h10-sim: `withoutH10`) added. */
 function h7Hash(w: World): string {
-  const c = JSON.parse(JSON.stringify(w)) as { field: Record<string, unknown>; tun: Record<string, unknown>; stats: Record<string, unknown>; lastRaid: Record<string, unknown> | null };
+  const c = withoutH10(w) as { field: Record<string, unknown>; tun: Record<string, unknown>; stats: Record<string, unknown>; lastRaid: Record<string, unknown> | null };
   delete c.field.haulerSet;
   for (const k of H8_SIM_KEYS) delete c.tun[k];
   delete c.field.extractorSet;

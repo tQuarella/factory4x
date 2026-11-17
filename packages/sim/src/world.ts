@@ -181,6 +181,11 @@ export interface FieldState {
    * the rock is unmarked; read through `extCap` (field.ts), which is this or the node's slots.
    */
   extractorSet: (number | null)[];
+  /**
+   * H10 D2: ticks toward the hive's next rebuilt guard while `hive.rebuildTicks` > 0 (one counter for both types; D3
+   * picks the type at completion). 0 while the hive is full, while `hive.rebuildTicks` is 0, and after the capture (D5).
+   */
+  hiveRebuildProgress: number;
 }
 
 export interface Guard {
@@ -325,6 +330,8 @@ export interface Stats {
   raids: RaidStats;
   /** H9 W6: raid prongs by their own outcome (`raids` keeps counting raids by the overall outcome). */
   raidProngs: ProngStats;
+  /** H10 L3: raid prongs that rolled on to another rock (`raid.rollMax`); 0 while it is 0. */
+  raidRolls: number;
   /** H7 F14: setAlloc inputs that changed a weight. */
   allocChanges: number;
   /** H7 F14: most economy ships alive at once. */
@@ -635,6 +642,7 @@ function freshStats(data: SimData): Stats {
     econRecycled: zeroEcon(),
     raids: { mustered: 0, beaten: 0, hit: 0, turnedBack: 0 },
     raidProngs: { beaten: 0, hit: 0, turnedBack: 0 },
+    raidRolls: 0,
     allocChanges: 0,
     peakEcon: 0,
   };
@@ -812,6 +820,7 @@ function landField(world: World, data: SimData): void {
     rockBuckets: world.nodes.map(() => new Array<number>(window).fill(0)),
     haulerSet: world.nodes.map(() => null),
     extractorSet: world.nodes.map(() => null),
+    hiveRebuildProgress: 0,
   };
   world.rally = PROBE;
 }

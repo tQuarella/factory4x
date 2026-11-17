@@ -90,12 +90,34 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - (j) Prong 0 strikes the 24 hp extractor at p1 (no warship there) every round from 5850, three damage a round, while prong 1,
  *     at p2, has warships at its target and so strikes warships only (the shield).
  *   - (i) Prong 1 is beaten at p2 in its first round (6060), where prong 0 kills the extractor: the raid is a hit (one prong
- *     beaten, one hit; raidProngs {beaten 2, hit 2} with raids 1 and 2), and the gap runs from the last prong, which lands at 6305.
+ *     beaten, one hit; raidProngs {beaten 2, hit 2} with raids 1 and 2), and the gap runs from the last prong, which lands at 6305
+ *     (6384 since h10-sim: prong 0 rolls on to a5 first, item (g) below).
  *   - (k) The hold at p2 ends at prong 1's outcome (6060) while prong 0 still fights at p1; p1's ends at its own (6090).
  *   - 6070: p2 is unmarked until 6600, so that hauler 41, which the a3 unmark sent to p2, goes back to a3 at its next delivery.
  *   - (m) Raid 4 musters at 7705 with 2 prongs (p1 and a3). At 7800 guard.capPct 85 and raid.hiveKeepPct 90 leave the hive 2 spare
  *     guards (both back to 50 at 7860), so at its launch (7854) it drops to one prong, at p1. It is out when the hive falls at 8010,
  *     and withers (raid 4, the old raid 3).
+ *
+ * h10-sim (DESIGN.md H10 "Save, data version and replay", items (a)-(h); reference-replay.test.ts checks each). hive.rebuildTicks is
+ * 300 from tick 0, so the hive rebuilds by D2's queue throughout; it starts above its caps (it is built at guard.capPct 100,
+ * which tick 0 halves), so nothing rebuilds until 650, when guard.capPct 88 makes its caps 10 Thorns and 15 Spores: the count
+ * the H9 items had left it at by raid 4 (10T 15S at 7705), so every raid and fight above keeps its sizes and timing. Below those
+ * caps the queue refills it, one guard per 300 ticks, never above them.
+ *   - (c) 1900-1995: with the fleet limit at 17 and the rally at the probe, 3 Drones and 2 Flak are built and sent to the hive.
+ *     They land at 2234 and lose (2250-2310): 5 Thorns and 5 Spores die, and the queue counts through the battle.
+ *   - (b) The queue's picks from 7T 11S: a Thorn (3T 4S missing), a Spore (2T 4S: Spores further below), a Thorn on the tie at
+ *     2T 3S (3359), a Spore (1T 3S), and so on until full at 4859.
+ *   - (f) 2700: hive.rebuildTicks 0 mid-rebuild (R9's timers run from 0), and back to 300 at 2760 (the queue starts from 0).
+ *   - (d) 3600: raid 2 musters mid-rebuild after the beaten raid 1. raid.econPerRaider 2 and raid.hiveKeepPct 72 for that tick
+ *     (3 and 50 again at 3601) make its want 5 and its size alive − keep = 21 − 18 = 3, the size it had.
+ *   - (e) Raid 2 lands at 4565 while the queue counts (its Thorn died at 4290): the rejoin leaves the progress as it was.
+ *   - (a) Raid 3's prong 1 is beaten at p2 at 6060 with the hive at its caps: the deficit's 300th tick (6359) adds a Thorn.
+ *   - (g) 5870: raid.rollMax 1 (0 again at 6250), with a5 marked and one sacrificial extractor built for it (the fleet limit at
+ *     14 for a tick, docked at 6033, after prong 1's retarget at 5859). At 6090 prong 0, which killed p1's extractor, rolls on
+ *     to a5 (the hold moves), kills the sacrificial extractor (6210) and goes home (6240), landing at 6384. raid.gapTicks is
+ *     1321 from 5000 (it was 1400), so raid 4 still musters at 7705.
+ *   - (h) 7990: guard.capPct 100 puts the hive below its caps while the push lands, so the queue is counting when it falls at
+ *     8010; the count drops to 0 and nothing rebuilds after.
  *
  * Node indices are the field's nodes in frame order: 0 probe, 1-7 a1-a7, 8 p1 (ice), 9 p2 (crystal), 10 heart.
  * It runs on the shipped data, so a calibration that changes the field's guards can break the script
@@ -138,6 +160,8 @@ export const referenceReplay: Replay = {
       tun('raid.maxSize', 10),
       tun('raid.gapTicks', 2700),
       tun('hive.regrowPct', 100),
+      // h10-sim: the rebuild queue, inert until 650 (see above).
+      tun('hive.rebuildTicks', 300),
       tun('hauler.autoNeed', 0),
       mine(3, false),
       mine(4, false),
@@ -151,9 +175,20 @@ export const referenceReplay: Replay = {
     ...at(400, mine(3, true)),
     ...at(450, alloc('drone', 3), alloc('flak', 2)),
     ...at(600, mine(1, false)),
+    // h10-sim: the hive's caps become 10T 15S (pockets: p1 is captured; p2's caps are 0T 1S at 50 and 88 alike).
+    ...at(650, tun('guard.capPct', 88)),
     ...at(850, alloc('drone', 0)),
     ...at(900, { type: 'recycleShips', node: 2, counts: { drone: 0, lancer: 0, flak: 0, extractor: 1 } }),
+    // h10-sim (c): a push at the hive that loses.
+    ...at(1900, tun('field.fleetCap', 17), { type: 'setRally', node: 0 }, alloc('drone', 2)),
+    ...at(1991, tun('field.fleetCap', 12), { type: 'setRally', node: 8 }, alloc('drone', 0)),
+    ...at(1995, { type: 'sendShips', from: 0, to: 10, counts: SEND_ALL }),
     ...at(2400, { type: 'sendShips', from: 8, to: 9, counts: SEND_ALL }),
+    // h10-sim (f) and (d).
+    ...at(2700, tun('hive.rebuildTicks', 0)),
+    ...at(2760, tun('hive.rebuildTicks', 300)),
+    ...at(3600, tun('raid.econPerRaider', 2), tun('raid.hiveKeepPct', 72)),
+    ...at(3601, tun('raid.econPerRaider', 3), tun('raid.hiveKeepPct', 50)),
     ...at(4100, { type: 'sendShips', from: 9, to: 8, counts: { drone: 1, lancer: 0, flak: 0 } }),
     ...at(4250, tun('guard.thorn.damage', 6), tun('guard.spore.damage', 6)),
     ...at(4330, tun('guard.thorn.damage', 1), tun('guard.spore.damage', 1)),
@@ -162,21 +197,27 @@ export const referenceReplay: Replay = {
     // A sacrificial extractor with 24 hp (a limit of 13 lets it be built; it docks at p1, the only rock with room).
     ...at(4410, tun('ship.extractor.hp', 24), tun('field.fleetCap', 13), alloc('flak', 0), alloc('extractor', 1)),
     ...at(4500, tun('ship.extractor.hp', 6), alloc('extractor', 0), tun('field.fleetCap', 12), alloc('flak', 2)),
-    // The gap after the next raid ends is 1400, so the last raid is out when the hive falls.
-    ...at(5000, tun('raid.gapTicks', 1400)),
+    // The gap after the next raid ends is 1321 (1400 before h10-sim's roll kept raid 3 out longer), so the last raid musters at
+    // 7705 and is out when the hive falls.
+    ...at(5000, tun('raid.gapTicks', 1321)),
     // Raid 3 (muster 5465, launch 5614, prongs at p1 and a3): p1 is left undefended, a3 is unmarked while the prongs fly.
     ...at(5550, { type: 'sendShips', from: 8, to: 2, counts: SEND_ALL }),
     ...at(5690, ext(9, 1)),
     ...at(5700, mine(3, false)),
-    ...at(5870, mine(3, true)),
+    // h10-sim (g): a5 marked, its sacrificial extractor, and the roll-on.
+    ...at(5870, mine(3, true), mine(5, true), tun('field.fleetCap', 14), alloc('extractor', 1), tun('raid.rollMax', 1)),
+    ...at(5871, tun('field.fleetCap', 12), alloc('extractor', 0)),
     ...at(6000, ext(9, null), { type: 'sendShips', from: 2, to: 8, counts: SEND_ALL }),
     ...at(6070, mine(9, false)),
+    ...at(6250, mine(5, false), tun('raid.rollMax', 0)),
     ...at(6600, mine(9, true)),
     // Raid 4 (muster 7705, launch 7854): the hive can spare only 2 when it launches, so it drops to one prong.
     ...at(7000, tun('field.fleetCap', 40), { type: 'setRally', node: 0 }, alloc('drone', 5)),
     ...at(7750, { type: 'sendShips', from: 0, to: 10, counts: SEND_ALL }),
     ...at(7800, tun('guard.capPct', 85), tun('raid.hiveKeepPct', 90)),
     ...at(7860, tun('guard.capPct', 50), tun('raid.hiveKeepPct', 50)),
+    // h10-sim (h).
+    ...at(7990, tun('guard.capPct', 100)),
     ...at(8100, tun('hauler.autoNeed', 1), alloc('hauler', 2), alloc('drone', 0), alloc('flak', 0)),
     ...at(8150, { type: 'recycleFleet', counts: { extractor: 0, hauler: 0, drone: 3, lancer: 0, flak: 0 } }),
     ...at(8400, { type: 'setHaulers', node: 2, count: 1 }),

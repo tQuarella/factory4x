@@ -219,6 +219,8 @@ describe('the field result panel text', () => {
     econLostToRaids: 1,
     allocChanges: 9,
     peakEcon: 14,
+    raidRolls: 0,
+    hive: { alive: 0, cap: 30, lostToRaids: 0, lostToPushes: 0 },
   };
   it('reads time, ships and raids from fieldSummary', () => {
     expect(hiveTimeText(s)).toBe('16:40');

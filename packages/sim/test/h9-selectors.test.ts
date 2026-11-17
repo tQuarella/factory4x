@@ -50,7 +50,7 @@ function expectMirror(w: World): ProngStatus | null {
     return null;
   }
   const outcome = r.phase === 'home' ? (r.lostEcon.extractor + r.lostEcon.hauler > 0 ? 'hit' : 'turnedBack') : null;
-  expect(s.prongs).toEqual([{ target: s.target, phase: s.phase, planned: s.planned, raiders: s.raiders, ticksToArrival: s.ticksToArrival, outcome, holding: s.holding }]);
+  expect(s.prongs).toEqual([{ target: s.target, phase: s.phase, planned: s.planned, raiders: s.raiders, ticksToArrival: s.ticksToArrival, outcome, holding: s.holding, rolls: 0, rolledFrom: null }]); // h10-sim: no roll at raid.rollMax 0
   for (const n of w.nodes) {
     const mix = rockStatus(w, n.index).raidMix;
     if (n.index !== r.target) expect(mix).toBeNull();
@@ -96,7 +96,9 @@ describe('raidStatus.prongs and last.prongs (one prong mirroring the raid)', () 
     expect(seen.holding).toBeGreaterThan(0);
     const last = raidStatus(w).last!;
     expect(last.outcome).toBe('hit');
-    expect(last.prongs).toEqual([{ target: last.target, outcome: last.outcome, lostEcon: last.lostEcon, lostShips: last.lostShips, killed: last.killed }]);
+    // h10-sim: each prong also reports the rocks it hit (L3) and the raiders it lost (hiveLost).
+    expect(last.prongs).toEqual([{ target: last.target, outcome: last.outcome, lostEcon: last.lostEcon, lostShips: last.lostShips, killed: last.killed, hitRocks: [F.a5], hiveLost: 0 }]);
+    expect(last.killed).toEqual({ thorn: 0, spore: 0 });
     expect(last.target).toBe(F.a5);
   });
 
@@ -105,7 +107,7 @@ describe('raidStatus.prongs and last.prongs (one prong mirroring the raid)', () 
     const seen = playRaid(w, (x) => (x.raid !== null && x.raid.phase === 'out' && x.field!.mine[F.a5] ? [{ type: 'setMine', node: F.a5, on: false }] : []));
     expect([...seen.phases]).toEqual(['muster', 'out', 'home']);
     expect([...seen.outcomes]).toEqual(['turnedBack']);
-    expect(raidStatus(w).last!.prongs).toEqual([{ target: F.a5, outcome: 'turnedBack', lostEcon: { extractor: 0, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 } }]);
+    expect(raidStatus(w).last!.prongs).toEqual([{ target: F.a5, outcome: 'turnedBack', lostEcon: { extractor: 0, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 }, hitRocks: [], hiveLost: 0 }]);
   });
 
   it('a raid beaten by defenders ends at once (no home phase): last.prongs has the beaten prong with its kills', () => {
@@ -116,8 +118,9 @@ describe('raidStatus.prongs and last.prongs (one prong mirroring the raid)', () 
     expect([...seen.outcomes]).toEqual([]);
     const last = raidStatus(w).last!;
     expect(last.outcome).toBe('beaten');
-    expect(last.prongs).toEqual([{ target: F.a5, outcome: 'beaten', lostEcon: last.lostEcon, lostShips: last.lostShips, killed: last.killed }]);
+    expect(last.prongs).toEqual([{ target: F.a5, outcome: 'beaten', lostEcon: last.lostEcon, lostShips: last.lostShips, killed: last.killed, hitRocks: [], hiveLost: last.killed.thorn + last.killed.spore }]);
     expect(last.killed.thorn + last.killed.spore).toBeGreaterThan(0);
+    expect(last.lostEcon).toEqual({ extractor: 0, hauler: 0 });
   });
 
   it('a raid out when the hive falls withers: last.prongs carries withered', () => {

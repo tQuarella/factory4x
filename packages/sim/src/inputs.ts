@@ -3,6 +3,7 @@ import { BUILD_TYPES, ECON_TYPES, SHIP_TYPES, isSimTunableKey, type BuildType, t
 import { applySetAlloc, applySetExtractors, applySetHaulers, applySetMine, clampEconCounts, extractorMinCount, isMarkable, recycleEcon, syncExtractors } from './field.ts';
 import { fleetCap, recycleRefundEach } from './fleet.ts';
 import { applyRecycleFleet, clampFleetCounts, isMovePart, moveCounts, type MovePart } from './orders.ts';
+import { hiveRebuildRetuned } from './factions/index.ts';
 import { shipsAtByType, startTransit } from './ships.ts';
 import { PROBE, guardianAt, isGuarded, landArea, nodeDistance, routeFrom, type EconTypeCounts, type ShipTypeCounts, type World } from './world.ts';
 
@@ -369,8 +370,13 @@ export function applyInput(world: World, data: SimData, input: Input): void {
     case 'setRally':
       world.rally = input.node;
       return;
-    case 'setTunable':
-      if (isSimTunableKey(input.key)) world.tun[input.key] = input.value;
+    case 'setTunable': {
+      if (!isSimTunableKey(input.key)) return;
+      const before = world.tun[input.key];
+      world.tun[input.key] = input.value;
+      // H10 D6: switching the hive between R9 and the rebuild queue resets both counters.
+      if (input.key === 'hive.rebuildTicks') hiveRebuildRetuned(world, before);
       return;
+    }
   }
 }
