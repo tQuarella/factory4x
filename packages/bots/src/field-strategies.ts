@@ -24,7 +24,7 @@ import {
   type SimData,
   type World,
 } from '@factory4x/sim';
-import { fieldMix, raidAwayAtEcon, guardFull, guardsAtHome } from './field-estimate.ts';
+import { fieldBattleTicks, fieldMix, raidAwayAtEcon, guardFull, guardsAtHome } from './field-estimate.ts';
 import type { FieldBot, FieldStrategy, Weights } from './field-runner.ts';
 import { raisedMix } from './strategies.ts';
 
@@ -326,6 +326,118 @@ function regroup(world: Readonly<World>, parked: Map<number, ShipTypeCounts>, st
   return out;
 }
 
+const ceilDiv = (a: number, b: number): number => Math.floor((a + b - 1) / b);
+
+/**
+ * The hive's guards the bots plan the raid window on: with the raid that `econ` would muster out (R4), except that when
+ * it would split (`prongs` 2 or more) one prong's share of the raiders is counted back home, because the prong that
+ * finds an empty rock turns straight back (`hiveAtLanding`). One prong is H8's plan.
+ */
+export function windowHome(world: Readonly<World>, prongs: number, heart: number, econ: number): { thorn: number; spore: number } {
+  const a = raidAwayAtEcon(world, heart, econ);
+  if (prongs < 2) return a.home;
+  return { thorn: a.home.thorn + ceilDiv(a.raid.thorn, prongs), spore: a.home.spore + ceilDiv(a.raid.spore, prongs) };
+}
+
+/**
+ * The hive as a wave sent now from `from` would find it, and the wave for it (Director ruling, DECISIONS.md "h9-bots
+ * round 1"). In a raid with more than one prong, a live prong counts as away only if the wave has taken the hive
+ * before that prong's earliest return: arrival time plus the time the wave needs to capture, against the prong's ticks
+ * to arrival plus the flight home (out), the flight home (fighting), or its ticks to arrival (homebound). A prong that
+ * could be back sooner is counted in the hive, so the wave is sized for its raiders (and a wave that doesn't fit is held).
+ * A prong aimed at an empty rock turns straight home, which is what this covers. The capture time is the estimate's own
+ * battle on the inert field, so each prong dropped from "away" makes the hive stronger and is re-checked (at most
+ * once per prong). One prong, or no raid, is H8's rule: raiders away stay away (`raid.prongsMax` 1 is H8 to the hash).
+ */
+export function hiveAtLanding(
+  world: Readonly<World>,
+  data: SimData,
+  raid: RaidStatus | null,
+  from: readonly number[],
+  heart: number,
+  types: readonly ShipType[],
+  limit: number,
+  parked: ReadonlyMap<number, ShipTypeCounts> = new Map(),
+): { counts: { thorn: number; spore: number }; mix: { total: number; fleet: ShipTypeCounts } | null } {
+  const base = guardsAtHome(world, heart);
+  if (raid === null || raid.prongs.length < 2) return { counts: base, mix: waveFor(world, data, heart, types, limit, base) };
+  const arrivals = from.map((n) => ceilDiv(nodeDistance(world, n, heart), world.tun['ship.speedSu']));
+  const arrive = Math.max(0, ...arrivals);
+  // The estimate fights one wave arriving together; ships from nearer rocks arrive earlier and fight alone, and a battle starts on a round tick.
+  const slack = arrive - Math.min(arrive, ...arrivals) + world.tun['combat.roundTicks'];
+  const back = raid.prongs.map((p) => {
+    if (p.phase === 'muster' || p.phase === 'done') return Infinity;
+    // Committed: a warship that is not part of the wave stands at its rock, so it fights there instead of turning home.
+    if ((p.phase === 'out' || p.phase === 'fight') && !from.includes(p.target) && total(parked.get(p.target) ?? EMPTY) > 0) return Infinity;
+    const flight = ceilDiv(nodeDistance(world, p.target, heart), world.tun['raid.speedSu']);
+    return p.phase === 'out' ? p.ticksToArrival + flight : p.phase === 'fight' ? flight : p.ticksToArrival;
+  });
+  const away = raid.prongs.map((p, i) => p.phase !== 'muster' && p.phase !== 'done' && arrive < back[i]!);
+  for (let guard = 0; guard <= raid.prongs.length; guard++) {
+    const counts = { thorn: base.thorn, spore: base.spore };
+    raid.prongs.forEach((p, i) => {
+      if (p.phase !== 'muster' && p.phase !== 'done' && !away[i]) {
+        counts.thorn += p.raiders.thorn;
+        counts.spore += p.raiders.spore;
+      }
+    });
+    const mix = waveFor(world, data, heart, types, limit, counts);
+    if (mix === null) return { counts, mix };
+    const ticks = fieldBattleTicks(world, data, heart, mix.fleet, counts);
+    let changed = false;
+    if (ticks !== null) {
+      raid.prongs.forEach((_, i) => {
+        if (away[i] && arrive + slack + ticks >= back[i]!) {
+          away[i] = false;
+          changed = true;
+        }
+      });
+    }
+    if (!changed) return { counts, mix };
+  }
+  const counts = { thorn: base.thorn, spore: base.spore };
+  return { counts, mix: waveFor(world, data, heart, types, limit, counts) };
+}
+
+/**
+ * The hive wave to send now, if any: from the rocks the warships stand at, nearest the hive first. In a raid with more
+ * than one prong it tries the nearest rock alone, then the two nearest, and so on, and takes the first set whose sound
+ * ships cover the wave that `hiveAtLanding` sizes for that arrival time, so a slow set that would meet a returning
+ * prong is left behind (held) while a faster one goes. `mix` is the wave to build toward (the smallest over the sets
+ * when none covers), `from` the rocks to send from, `ok` whether the wave can go now. Without a second prong it is H8's:
+ * every gathered ship, sized for the hive as it is.
+ */
+export function hiveWave(
+  world: Readonly<World>,
+  data: SimData,
+  raid: RaidStatus | null,
+  gather: readonly number[],
+  parked: ReadonlyMap<number, ShipTypeCounts>,
+  heart: number,
+  types: readonly ShipType[],
+  limit: number,
+): { mix: { total: number; fleet: ShipTypeCounts } | null; from: number[]; ok: boolean } {
+  const stood = gather.filter((n) => parked.has(n));
+  const all = stood.length > 0 ? stood : [...gather];
+  const one = (from: number[]): { mix: { total: number; fleet: ShipTypeCounts } | null; from: number[]; ok: boolean } => {
+    const mix = hiveAtLanding(world, data, raid, from, heart, types, limit, parked).mix;
+    return { mix, from, ok: mix !== null && covers(soundAt(world, from), mix.fleet) };
+  };
+  if (raid === null || raid.prongs.length < 2 || all.length < 2) return one(all);
+  const byDist = [...all].sort((a, b) => nodeDistance(world, a, heart) - nodeDistance(world, b, heart) || a - b);
+  let best: { mix: { total: number; fleet: ShipTypeCounts } | null; from: number[]; ok: boolean } | null = null;
+  for (let k = 1; k <= byDist.length; k++) {
+    const r = one(byDist.slice(0, k));
+    // Ships from rocks at different distances arrive one by one and fight piecemeal, which the estimate (one wave arriving together) does not see: a set may spread over one round at most.
+    const dists = r.from.map((n) => nodeDistance(world, n, heart));
+    const spread = Math.ceil((Math.max(...dists) - Math.min(...dists)) / world.tun['ship.speedSu']);
+    if (spread > world.tun['combat.roundTicks']) r.ok = false;
+    if (r.ok) return r;
+    if (r.mix !== null && (best === null || best.mix === null || r.mix.total < best.mix.total)) best = r;
+  }
+  return best ?? one(all);
+}
+
 /** A place warships are held: a rock, the size of the guard wanted there, and the mix of the raid prong it answers. */
 export interface Post {
   node: number;
@@ -468,8 +580,6 @@ export class AdaptiveBot implements FieldBot {
     const limit = searchMax(world, data);
     const w: Weights = { ...ZERO, ...economyWeights(world, data, this.offence) };
     const types = unlockedWarships(world, this.opts.dronesOnly);
-    const hiveNow = guardsAtHome(world, heart);
-    const hiveMix = this.offence ? waveFor(world, data, heart, types, limit, hiveNow) : null;
     const room = warshipRoom(world, data, limit);
 
     // Where the warships gather: the prongs' targets while answering a raid, the standing posts otherwise. New ships rally
@@ -486,6 +596,9 @@ export class AdaptiveBot implements FieldBot {
       this.rally = stage;
     }
     const fit = soundAt(world, gather);
+    // The hive as a wave sent now would find it (the Director's raid-window rule, below).
+    const hiveGo = this.offence ? hiveWave(world, data, raid, gather, parked, heart, types, limit) : null;
+    const hiveMix = hiveGo === null ? null : hiveGo.mix;
     const placeShips = (minHalf: boolean): Input[] => place(world, parked, posts, minHalf, this.opts.dronesOnly);
     /** Every branch ends here: the trade in slots in offence, then the weights. */
     const finish = (extra: Input[]): Input[] => {
@@ -500,9 +613,9 @@ export class AdaptiveBot implements FieldBot {
     };
 
     // 1. Offence first when the hive can be taken right now (the raid window included: raiders away shrink hiveNow).
-    if (this.offence && isGuarded(world, heart) && hiveMix !== null && covers(fit, hiveMix.fleet) && guardianAt(world, heart)!.battle === null && raid?.phase !== 'fight') {
+    if (this.offence && isGuarded(world, heart) && hiveMix !== null && hiveGo!.ok && guardianAt(world, heart)!.battle === null && raid?.phase !== 'fight') {
       Object.assign(w, deficitWeights(world, data, hiveMix.fleet));
-      return finish(gather.filter((n) => parked.has(n)).map((n) => sendInput(n, heart, parked.get(n)!)));
+      return finish(hiveGo!.from.filter((n) => parked.has(n)).map((n) => sendInput(n, heart, parked.get(n)!)));
     }
 
     if (raidActive) {
@@ -526,7 +639,7 @@ export class AdaptiveBot implements FieldBot {
       // hive with a full-size raid away), and wait there for a raid to go out.
       let plan = hiveMix !== null && hiveMix.total <= room ? hiveMix : null;
       if (plan === null) {
-        const away = raidAwayAtEcon(world, heart, econAliveNow(world, data)).home;
+        const away = windowHome(world, rs.nextProngs, heart, econAliveNow(world, data));
         const m = waveFor(world, data, heart, types, limit, away);
         if (m !== null && m.total <= room && rs.enabled) plan = m;
       }
@@ -634,7 +747,7 @@ export class AdaptiveBot implements FieldBot {
     const now = waveFor(world, data, heart, types, limit, guardsAtHome(world, heart));
     if (now !== null) totals.push(now.total);
     if (raidStatus(world).enabled) {
-      const away = waveFor(world, data, heart, types, limit, raidAwayAtEcon(world, heart, econAliveNow(world, data)).home);
+      const away = waveFor(world, data, heart, types, limit, windowHome(world, raidStatus(world).nextProngs, heart, econAliveNow(world, data)));
       if (away !== null) totals.push(away.total);
     }
     return totals.length === 0 ? null : Math.min(...totals);
