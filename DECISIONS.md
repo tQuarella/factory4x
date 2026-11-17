@@ -1817,3 +1817,35 @@ The H8 rule "the map keeps at least H8's height behind the rock sheet" was measu
 Merged the approved lower tasks (h9-sim 12924fa, h9-raids a34be08, h9-bots be6ede0, h9-design-data a49e163) and origin/main; no conflicts.
 - **One value moved in the client tests:** `raid.prongMinSize` default 4 to 3 (data v16). `packages/client/test/h9-client.test.ts` pinned the old default, so it now pins 3. Min 2 and max 12 are unchanged, and no assertion was loosened.
 - **Smoke tests are unaffected.** The two-prong tests set `raid.prongMinSize` 2 themselves, as the spec tests do.
+
+## 2026-11-17 · Retrospective · build-20261117-1 (M2 H9, A wider front)
+
+Scope: `git log build-20261116-1..build-20261117-1` (57 commits), `reviews/h9-*.md` and `reviews/cw-bots-gate-time.md`, the "Iteration 9 ledger" and "Next step" in `STATUS.md`, `BACKLOG.md` (iteration 9), `PROCESS.md`, `.claude/agents/*.md`, and the entries above since the last retro.
+
+**Went well**
+- **The pause and resume were clean.** The owner paused at 08:23 ("Pause this work"). The Director stopped the running fix at once and wrote a checkpoint in `STATUS.md` (b3f40f3): what was approved, the rejected task, and the fix brief to resend. The work resumed at 19:56 from that note (7c80470), and the agent was resumed, not relaunched.
+- **Last retro's calibration guard worked as written.** h9-design-data found that no value met target 1 without moving adaptive by more than 10% and putting greedy level with it. It shipped nothing on v15 (bbee93f) and sent three findings to the Director, including the rule finding that defending doesn't pay (undefended was 8–65% faster in all 16 variants). The Director ruled (v16, target 4 reworded, 5 report-only, H10 candidates), and the finding leads the handoff. In H8 the same situation cost a commit and a revert.
+- **The Critic caught two real problems in h9-bots round 1** (72d23c9): a shield metric that had gone blind, and a 15:53 → 20:46 slowdown that came from one raid-window hive wave lost to a prong turning home, not from the split. Without that trace, h9-design-data would have calibrated around that one event.
+- **Small and cheap.** 6 launches plus this retro (7 of 12). Every other run was a resume. The last retro's `cw-bots-gate-time` landed first (97 s → about 46 s, with identical results). Nothing was parked or escalated, and CI headroom held (gates 9:36 of 20, deploy 5:40 of 15 on 7055e2a).
+
+**Didn't go well**
+- **h9-bots round 1: a metric generalised by narrowing it.** Moving `econLostGuarded` to prongs, the engineer counted a loss only when *every* live prong was guarded. The h8 exact-0 assertion stayed green, but it no longer measured anything in split raids. engineer.md's "keep its strength" rule covers changed tests, not the metrics a test asserts on. The hive-wave half was a spec inheritance (the H7/H8 raid-window attack assumed raiders away stay away). designer.md's "check what the spec inherits" already covers that, so no new rule.
+- **A one-number pin needed a Director round trip.** The reference-replay "H9 (n)" pin of `raid.prongMinSize` lived outside the Designer's files, so v16 left the gates red until the Director authorised the edit (c6794bb). h9-client re-pinned the same default too (24cac28). PROCESS already pre-authorises the `dataVersion` pin, but not a pinned default.
+- **The ledger stopped at the pause.** After r12, the rest of H9's runs were logged as timestamped notes under "Next step" (and the handoff then replaced those). The header has said iteration 8, a private repo and build-20261114-1 since 8ef2666, through two handoffs.
+- **h9-client's final report left out acceptances 8 and 9** (the `--repeat-each 5` run and the CI job times). The Critic ran the repeat itself (140 passed). engineer.md Finish step 5 already asks for every criterion, so this was a miss against an existing rule, not a gap. No change.
+- **Rulings recorded by the Designer "as the Director ruled", for the second iteration running** (h8, h9). The Critic flagged it. The Director confirmed them in `STATUS.md` only, not in `DECISIONS.md`.
+
+**Changes made**
+1. **`PROCESS.md` "Conventions":** a data task may re-pin, in any test file, a literal that pins the shipped default of a value it changes. That covers only the number and the title or comment quoting it. The check is unchanged, the pin stays a literal, and each edit is listed in its `DECISIONS.md` entry for the Critic. A pin in a file a higher stack task is still building stays with that task. **`.claude/agents/designer.md`** ("Out-of-scope leftovers") points to it. Evidence: c6794bb, 24cac28. This doesn't loosen any test: the pins still catch drift, and the Critic still reviews the edit.
+2. **`PROCESS.md` "Usage budget":** the ledger is the record across a pause and resume, and timestamped notes don't replace it. Before the handoff, the Director checks that every run has a ledger line and that the header lines are current. Evidence: the iteration 9 ledger ends at r12, and the header has been stale since 8ef2666.
+3. **`.claude/agents/engineer.md`:** "keep its strength" now covers metrics that a test or gate asserts on. When one thing becomes several, the generalised metric still counts every case the old one did, with a test where a narrower condition would read 0. Evidence: h9-bots round 1 (72d23c9).
+
+**For the Director (not changed by me):**
+- Bring the Iteration 9 ledger up to date (the runs after r12, and this retro as launch 7) and fix the `STATUS.md` header.
+- Add a one-line `DECISIONS.md` entry confirming "Director: h9-design-data rulings". The file is append-only, so it can't be edited in place.
+
+**Not changed:** no gate, guardrail, threshold or protected file, and nothing in `critic.md`. The budget stays at 12 launches (7 used). No new Can wait item.
+
+## 2026-11-16 · Director · Confirming the h9-design-data entries written on my behalf
+
+The Designer wrote "Director: h9-design-data rulings" and the out-of-file authorisation on my behalf. Both match my rulings as sent (prongMinSize 3 and data v16; target 4 reworded; 5b report-only; re-pin and bots report wording authorised). Confirmed.

@@ -2,16 +2,16 @@
 
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
-**Milestone:** 2 — The asteroid field (iteration 8, hypothesis H8 B: Move ships by hand)
-**State:** Iteration 8 in flight. Owner played build-20261114-1 to a win (75b3021), triaged (d594224), and picked B in Q22 with a drag gesture (048156b). Owner then added A (756a237). Spec and split done (0d76117). cw-smoke-sim-time merged (66c9581). h8-sim approved (0b72251). Step: Build: h8-raids, h8-bots, h8-client in parallel; then h8-design-data on h8-bots; h8-client lands the stack.
+**Milestone:** 2 — The asteroid field (iteration 9, hypothesis H9 A: A wider front)
+**State:** Iteration 9 closed. build-20261117-1 handed off (42cfba5) and retro done. Awaiting owner feedback: H9 fun questions and Q25 (next direction).
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
-**Repo:** https://github.com/tQuarella/factory4x (private)
-**Last build:** build-20261114-1 (H7 One field, live enemy), commit f565c11, live (CI 43638281605 gates and deploy green; site shows f565c11 · data v13). Release gates passed locally (232/232 smoke).
-**Last updated:** 2026-11-14, iteration 8 start
+**Repo:** https://github.com/tQuarella/factory4x (public since 2026-11-15, Q23)
+**Last build:** build-20261117-1 (H9 A wider front), commit 7055e2a, live (CI 44003503570 gates and deploy green; site shows 7055e2a · data v16). Release gates passed locally (302/302 smoke).
+**Last updated:** 2026-11-16, iteration 9 close
 
 ## Iteration 9 ledger
 
-Launches: 6 / 12.
+Launches: 7 / 12. Resumes: 21. Iteration 9 closed: build-20261117-1 handed off, retro done.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -33,6 +33,15 @@ Launches: 6 / 12.
 | r10 | engineer | h9-client | resume | One-prong-done smoke test (ea946b5); map-height rule with Recycle logged; waiting for h9-design-data |
 | r11 | critic | h9-bots | resume | Review round 1: REJECT (72d23c9): shield metric blind in split raids; record why adaptive 15:53 → 20:46 (prong returns mid hive battle); gate time alone |
 | r12 | engineer | h9-bots | resume | Fix round 1 started, then stopped at once: owner said "Pause this work" (2026-11-16 08:23) |
+| r13 | engineer | h9-bots | resume | Owner resumed (19:56). Fix round 1 (6f1aa47): exact per-prong shield metric, raid-window rule, trace, gate alone 66 s |
+| r14 | critic | h9-bots | resume | Review round 2: APPROVE (be6ede0); adaptive 15:54, greedy 20:33 |
+| r15 | designer | h9-design-data | resume | Calibration probe on v15 (bbee93f): targets 1, 4, 5b miss in range; no value shipped; three findings to the Director |
+| r16 | designer | h9-design-data | resume | Director rulings: prongMinSize 3, data v16; target 4 reworded; 5b report-only, H10 candidates (0a2ec0b) |
+| r17 | designer | h9-design-data | resume | Authorised re-pins: replay pin to 3, bots report wording (c6794bb) |
+| r18 | critic | h9-design-data | resume | Review round 1: APPROVE (a49e163); determinism a8f4c2ff |
+| r19 | engineer | h9-client | resume | Final round (24cac28): merged the stack and main; gates green, smoke ×5 1510/1510 |
+| r20 | critic | h9-client | resume | Final round: APPROVE (7c80ca1); branch CI green; merged 7055e2a |
+| 7 | retrospective | after build-20261117-1 | launch | Retro: test re-pins of shipped defaults; ledger survives a pause; metrics keep their strength |
 
 ## Iteration 8 ledger
 
