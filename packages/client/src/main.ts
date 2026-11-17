@@ -576,6 +576,8 @@ function raidToast(w: World): void {
 /** H10 S1-S6: the auto-slowdown, stepped once per frame against the raid (see slowdown.ts). Speed is session state, never the sim's. */
 const slowdown = new Slowdown();
 const slowdownSeen: { world: unknown } = { world: null };
+/** The engage note while it may still be on screen (see the battle report below). */
+let engageNote: string | null = null;
 function applySlowdown(): void {
   const w = app.session.world;
   if (slowdownSeen.world !== w) {
@@ -590,6 +592,7 @@ function applySlowdown(): void {
     raidSlowdownSetting() === 1,
   );
   if (act.speed !== undefined) app.session.speed = act.speed;
+  if (act.toast !== undefined) engageNote = act.toast;
   if (act.toast !== undefined) toast.show(toastEl.hidden ? act.toast : `${toastEl.textContent}\n\n${act.toast}`);
 }
 
@@ -661,7 +664,9 @@ function refreshUi(): void {
     if (ended.length > 0) {
       ended.sort((a, b) => a.endTick - b.endTick || a.node - b.node);
       s.flags.seenBattleEnd = ended[ended.length - 1]!.endTick;
-      toast.show(ended.map((r) => battleReport(w, r, sd())).join('\n\n'));
+      // The slowdown's note explains the speed drop, so a report that lands with it shows both, the note first.
+      const note = !toastEl.hidden && engageNote !== null && (toastEl.textContent ?? '').startsWith(engageNote) ? `${engageNote}\n\n` : '';
+      toast.show(note + ended.map((r) => battleReport(w, r, sd())).join('\n\n'));
     }
     if (field) raidToast(w);
     // The first delivery that unlocks Lancers or Flak: say what their yard is doing; one tap opens the Probe.

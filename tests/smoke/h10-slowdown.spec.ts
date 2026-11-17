@@ -155,6 +155,34 @@ test.describe('375x667 portrait, the raid auto-slowdown', () => {
     // The battle ends; the raid musters again under a new id and engages again.
     await until(page, (r) => r.phase === 'muster', 'the muster again', 9000);
     expect(await speed(page), 'the next muster engaged again').toBe(1);
+    // The battle's report landed after the engage note and did not replace it: both show, the note first.
+    const both = await toastText(page);
+    expect(both.startsWith(TOAST_4X), 'the engage note is first').toBe(true);
+    expect(both, 'the battle report is there too').toMatch(/Hive/);
+  });
+
+  test('a raid that turns back (every rock unmarked before it arrives, so nothing is hit) restores 4x', async ({ page }) => {
+    test.setTimeout(120_000);
+    await setup(page, 600);
+    await until(page, (r) => r.phase === 'muster', 'the muster');
+    expect(await speed(page)).toBe(1);
+    // Unmark every marked rock with a real tap on its sheet's Mine button, so the raid finds nothing raidable.
+    for (const id of ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7']) {
+      const node = await page.evaluate((i) => window.__factory4x!.nodeIndex(i), id);
+      const marked = (JSON.parse(await page.evaluate((n) => window.__factory4x!.rockStatus(n), node)) as { mine: boolean }).mine;
+      if (!marked) continue;
+      await settled(page);
+      const p = await page.evaluate((i) => window.__factory4x!.nodeScreenPos(i), node);
+      if (test.info().project.name === 'phone') await page.touchscreen.tap(p.x, p.y);
+      else await page.mouse.click(p.x, p.y);
+      expect(await page.evaluate(() => window.__factory4x!.selected()), `the tap on ${id} opened its sheet`).toBe(node);
+      await page.locator('#sheet .mine-btn').click();
+      await page.locator('#sheet .close').click();
+    }
+    const done = await until(page, (r) => r.phase === 'none' && r.last !== null, 'the raid over');
+    expect(done.last).not.toBeNull();
+    expect((done.last as unknown as { outcome: string }).outcome, 'nothing was hit, so it turned back').toBe('turnedBack');
+    expect(await speed(page), 'a turned-back raid restores 4x').toBe(4);
   });
 
   test('a speed tap mid-raid wins: it stays, nothing is restored at the raid end, and the same raid never re-engages', async ({ page }) => {

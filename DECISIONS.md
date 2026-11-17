@@ -1897,3 +1897,7 @@ The owner picked C: attrition first, then logistics feeding combat. H10 will be 
    Turning it on still comes to the Director first, with the numbers.
 4. **H9 targets 1 and 4 become report lines.** A good defence keeping raids under the split size is intended.
 5. **The calibration guard is measured from the first v18 candidate.** The rule is meant to move adaptive, so measuring from v16 would trip the guard by design. The h10-design-data report still states the v16 → v18 move for each strategy, for the handoff.
+
+## 2026-11-17 · h10-client · The slowdown's note is never lost
+
+A battle report that lands in the same refresh as the slowdown's engage toast used to replace it, leaving a speed drop with no explanation. The owner missed raids at 4x, and that toast is what explains the drop, so the Director ruled it must never be lost. The battle-report toast now keeps the engage line when it is still on screen, and shows it first, as the other notices append. The cancelled-muster smoke test asserts both lines. A new smoke test forces a `turnedBack` outcome (every rock unmarked before the raid arrives) and checks the 4x restore.
