@@ -279,7 +279,7 @@ describe('raid.prongsMax 1: the bot decides as H8 did (v15, seed 1)', () => {
 
 describe('adaptive-concentrate and undefended: registered as report-only controls', () => {
   it('both are strategies of the field suite, neither is gated to win', () => {
-    expect(fieldStrategies.map((s) => s.name)).toEqual(['adaptive', 'greedy', 'idle', 'drones-only', 'adaptive-no-raids', 'adaptive-concentrate', 'undefended']);
+    expect(fieldStrategies.map((s) => s.name)).toEqual(['adaptive', 'greedy', 'idle', 'drones-only', 'adaptive-no-raids', 'adaptive-concentrate', 'undefended', 'one-push', 'two-push']);
     for (const s of [adaptiveConcentrate, undefended]) {
       expect(s.expectedWin).toBe(false);
       expect(FIELD_WINNERS).not.toContain(s.name);
