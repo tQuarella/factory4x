@@ -96,7 +96,6 @@ async function openNode(page: Page, node: number): Promise<void> {
 async function beatenRaid(page: Page): Promise<number> {
   await tune(page, 'raid.firstAtEcon', 2);
   await tune(page, 'raid.musterTicks', 60);
-  await tune(page, 'hive.rebuildTicks', 600);
   const m = await until(page, (r) => r.phase === 'muster', 'the muster');
   await page.evaluate((n) => window.__factory4x!.debugParkShips(n, { drone: 12, lancer: 4 }), m.target!);
   // Stop at the first look after the outcome, before the toast is dismissed.
@@ -164,8 +163,9 @@ test.describe('375x667 portrait, the hive readouts', () => {
     expect(await hudBoxes(page), 'a full hive shifts nothing either').toBe(hud0);
   });
 
-  test('with hive.rebuildTicks 0 the hive sheet has no guard line and keeps its regrow rows', async ({ page }) => {
+  test('with hive.rebuildTicks set to 0 the hive sheet has no guard line and keeps its regrow rows', async ({ page }) => {
     await ready(page);
+    await tune(page, 'hive.rebuildTicks', 0);
     const heart = await page.evaluate(() => window.__factory4x!.nodeIndex('heart'));
     await openNode(page, heart);
     await expect(page.locator('#sheet .hive-guards')).toBeHidden();
@@ -315,3 +315,55 @@ for (const [what, size] of [
     });
   });
 }
+
+test.describe('375x667 portrait, shipped data (v18), nothing set in the test', () => {
+  test.use({ viewport: PHONE });
+
+  test('a passive run at 4x reaches its first raid: the game drops to 1x with the toast; every prong is beaten; the hive readout, label and "Hive −N" show; 4x comes back', async ({ page }) => {
+    test.setTimeout(180_000);
+    await ready(page);
+    expect(await page.evaluate(() => JSON.parse(window.__factory4x!.hiveStatus()).rebuild !== null), 'the shipped hive rebuilds').toBe(true);
+    await page.evaluate(() => window.__factory4x!.setSpeed(4));
+    await stepSimUntil(page, async () => (await raid(page)).phase === 'muster', 60_000, 'the first raid', false);
+    await settled(page);
+    expect(await page.evaluate(() => Number(document.querySelector<HTMLElement>('.speed.on')?.dataset.speed)), 'the raid dropped the game to 1x').toBe(1);
+    expect(await toastText(page)).toContain('1x for the raid · back to 4x after');
+    const hud0 = await hudBoxes(page);
+    // Every prong's rock gets a guard that beats it, so the hive loses the raiders it sent.
+    const m = await raid(page);
+    for (const p of m.prongs) await page.evaluate((n) => window.__factory4x!.debugParkShips(n, { drone: 12, lancer: 4 }), p.target);
+    await until(page, (r) => r.phase === 'none' && r.last !== null, 'the raid over', 12_000);
+    await settled(page);
+    expect((await raid(page)).last!.outcome).toBe('beaten');
+    expect(await page.evaluate(() => Number(document.querySelector<HTMLElement>('.speed.on')?.dataset.speed)), 'the outcome gave 4x back').toBe(4);
+    expect(await toastText(page)).toMatch(/Hive\s−\d+/);
+    // The hive sheet: the line and the countdown.
+    const h0 = await hive(page);
+    expect(h0.total).toBeLessThan(h0.totalCap);
+    const heart = await page.evaluate(() => window.__factory4x!.nodeIndex('heart'));
+    await openNode(page, heart);
+    const line = page.locator('#sheet .hive-guards');
+    await expect(line).toHaveText(/^Guards \d+ \/ \d+ · \+1 (Thorn|Spore) in \d+ s$/);
+    await expect(line).toHaveText(`Guards ${h0.total} / ${h0.totalCap} · +1 ${h0.rebuild!.nextType === 'thorn' ? 'Thorn' : 'Spore'} in ${Math.ceil((h0.rebuild!.ticks - h0.rebuild!.progress) / 30)} s`);
+    await step(page, 60);
+    await settled(page);
+    const h1 = await hive(page);
+    await expect(line).toHaveText(h1.total >= h1.totalCap ? `Guards ${h1.total} / ${h1.totalCap}` : /^Guards \d+ \/ \d+ · \+1 (Thorn|Spore) in \d+ s$/);
+    await page.screenshot({ path: 'test-results/h10-shipped-hive.png' });
+    // The map label and its placement.
+    const labels = JSON.parse(await page.evaluate(() => window.__factory4x!.nodeLabels())) as Array<Box & { text: string }>;
+    const mine = labels.find((l) => /^HIVE \d+\/\d+$/.test(l.text));
+    expect(mine, 'the hive label carries its count').toBeDefined();
+    for (const o of labels) if (o !== mine) expect(apart(mine!, o), `the hive label is clear of ${o.text}`).toBe(true);
+    expect(await hudBoxes(page), 'nothing in the HUD moved').toBe(hud0);
+  });
+
+  test('the tuning panel describes hive.regrowPct, and hive.rebuildTicks shows its shipped 600', async ({ page }) => {
+    await ready(page);
+    await page.locator('#b-tune').click();
+    const row = (key: string) => page.locator('#tuning .t-row', { has: page.locator(`input[aria-label="${key}"]`) });
+    await expect(row('hive.regrowPct')).toContainText('only when Hive rebuild is 0');
+    await expect(page.locator('#tuning input[aria-label="hive.rebuildTicks"]')).toHaveValue('600');
+    await expect(row('client.raidSlowdown')).toContainText('this device');
+  });
+});

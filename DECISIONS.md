@@ -2000,3 +2000,10 @@ Accepted: `guardsOnArrival` returns `guardsAtHome` while `hive.rebuildTicks` is 
 1. **The H10 bot lines stay "REPORTED".** The spec made targets 1–6 report lines, and each line's ok/MISS already shows the result. No bots-source edit.
 2. **Accepted: the h9-bots "raid.prongsMax 1: decides as H8 did" tests pin `hive.rebuildTicks` 0 in their setup** instead of moving the tick literal. Those tests prove the bot decides as H8 did, under H8's hive rule. Fixing that rule keeps their pins meaningful; moving the literal to v18's 30541 would not.
 3. **Noted:** one-push's idle-hauler peak of 3 is acceptable. It's a report-only control, and staffing is judged on adaptive and greedy.
+
+## 2026-11-17 · h10-client · Final round on v18
+
+Merged `task/h10-design-data` (c192566: h10-sim 98fbf86, h10-bots 8118a5d, data v18, `hive.rebuildTicks` 600 shipped) and then origin/main; both merged with no conflicts. Values and assertions that moved:
+- `tests/smoke/h10-hive.spec.ts`: the "no guard line" test used the shipped 0 of v17, so it now sets `hive.rebuildTicks` 0 in the test (the same check, the value stated). The other hive tests no longer set `hive.rebuildTicks` 600, since it ships at 600; they run on the shipped value. No assertion was loosened.
+- New: a smoke test on shipped data with nothing set (a passive run at 4x to the first raid, every prong beaten, the slowdown, "Hive −N", the sheet line and countdown, the label) and a tuning-panel test of the shipped 600.
+- The hive label gained more places to try (beside the hive, level then nudged up or down). The shipped-data test, with the stacked toast shrinking the map, found a case where above, below, right and left all clashed with neighbour labels; the label overlapped A1. The smoke test checks it against every label.

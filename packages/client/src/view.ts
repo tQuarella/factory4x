@@ -516,7 +516,7 @@ export class MapView {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     // H10: the hive's label is the longest ("HIVE 18/30"), so it picks the first place that is inside the map and clear of every other
-    // label and of its own ring: above, below, then to the right, then to the left.
+    // label and of its own ring: above, below, then beside it (right before left, level first, then nudged up or down).
     const box = (l: { text: string; x: number; y: number }): { x: number; y: number; w: number; h: number } => {
       const wd = ctx.measureText(l.text).width + 6;
       return { x: l.x - wd / 2, y: l.y - 10, w: wd, h: 14 };
@@ -530,8 +530,11 @@ export class MapView {
       const spots = [
         { x: cx, y: l.hive.above },
         { x: cx, y: cy + r + 12 },
-        { x: cx + r + wd / 2 + 3, y: cy + 4 },
-        { x: cx - r - wd / 2 - 3, y: cy + 4 },
+        // Beside the ring, level with it first and then nudged up or down, for a map so short that a neighbour's label sits at the side.
+        ...[4, -4, -12, 12, -20, 20].flatMap((dy) => [
+          { x: cx + r + wd / 2 + 3, y: cy + dy },
+          { x: cx - r - wd / 2 - 3, y: cy + dy },
+        ]),
       ];
       const ok = (s: { x: number; y: number }): boolean => {
         const b = box({ text: l.text, ...s });
