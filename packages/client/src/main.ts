@@ -43,6 +43,7 @@ import {
 } from '@factory4x/sim';
 import { h, setHidden, setText, toggleClass } from './dom.ts';
 import { shortVersion } from './format.ts';
+import { Slowdown, raidSlowdownSetting } from './slowdown.ts';
 import { Hud, OverworldHud } from './hud.ts';
 import { FeedbackPanel, TuningPanel, confirmModal, showAreaResult, showFieldResult, showWin, type PanelHost } from './panels.ts';
 import { FIELD_HINT, MINE_MODE_TOAST, fieldFleetFullNotice, fieldUnlockNotice, moveBannerText, movedText, raidEndProngsText, raidEndText, raidFightLineProngs, raidMusterLineProngs } from './fieldreport.ts';
@@ -386,6 +387,7 @@ $('b-pause').addEventListener('click', () => {
 for (const b of document.querySelectorAll<HTMLElement>('.speed')) {
   b.addEventListener('click', () => {
     app.session.speed = Number(b.dataset.speed) as Speed;
+    slowdown.playerSpeed();
     refreshUi();
   });
 }
@@ -571,10 +573,31 @@ function raidToast(w: World): void {
   toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`, () => sheet.open(last.target));
 }
 
+/** H10 S1-S6: the auto-slowdown, stepped once per frame against the raid (see slowdown.ts). Speed is session state, never the sim's. */
+const slowdown = new Slowdown();
+const slowdownSeen: { world: unknown } = { world: null };
+function applySlowdown(): void {
+  const w = app.session.world;
+  if (slowdownSeen.world !== w) {
+    slowdownSeen.world = w;
+    slowdown.reset();
+  }
+  if (!isField(w)) return;
+  const r = raidStatus(w);
+  const act = slowdown.frame(
+    { id: w.raid === null ? null : w.raid.id, live: r.phase === 'muster' || r.phase === 'out' || r.phase === 'fight', decided: r.prongs.length > 0 && r.prongs.every((p) => p.outcome !== null) },
+    app.session.speed,
+    raidSlowdownSetting() === 1,
+  );
+  if (act.speed !== undefined) app.session.speed = act.speed;
+  if (act.toast !== undefined) toast.show(toastEl.hidden ? act.toast : `${toastEl.textContent}\n\n${act.toast}`);
+}
+
 /** Dev hook state: a copy of the world with chosen counts, shown by the in-area HUD instead of the live one (hud-stability.spec.ts). */
 let hudOverride: World | null = null;
 
 function refreshUi(): void {
+  applySlowdown();
   // The mode is set first, so a re-fit inside modeTransition measures the layout of the screen it is about to show.
   el.app.dataset.mode = app.session.onOverworld ? 'world' : 'area';
   el.app.dataset.run = isField(app.session.world) ? 'field' : 'campaign';
@@ -744,6 +767,7 @@ function frame(now: number): void {
   const dt = now - last;
   last = now;
   app.session.advance(dt);
+  applySlowdown();
   uiAcc += dt;
   // Inputs applied in advance() (a running withdraw, a heart falling) change the screen now, before this frame draws.
   if (uiAcc >= 100 || transitionPending()) {
@@ -887,12 +911,17 @@ window.__factory4x = {
   advanceTicks: (n) => {
     // Test hook: pauses, then steps exactly n ticks (so a raid's short phases can be looked at one by one).
     app.session.paused = true;
-    for (let i = 0; i < n; i++) app.session.stepOnce();
+    // The slowdown looks after every tick, as the frame loop does after each advance (a raid's short phases are never skipped).
+    for (let i = 0; i < n; i++) {
+      app.session.stepOnce();
+      applySlowdown();
+    }
     refreshUi();
   },
   log: () => JSON.stringify(app.session.log.map((l) => l.input)),
   setSpeed: (v) => {
     app.session.speed = v;
+    slowdown.playerSpeed();
     refreshUi();
   },
 };
