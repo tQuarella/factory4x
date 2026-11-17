@@ -19,6 +19,7 @@ import rawV10 from './fixtures/sim-v10.json' with { type: 'json' };
 import rawV12 from './fixtures/sim-v12.json' with { type: 'json' };
 import rawV13 from './fixtures/sim-v13.json' with { type: 'json' };
 import rawV14 from './fixtures/sim-v14.json' with { type: 'json' };
+import rawV15 from './fixtures/sim-v15.json' with { type: 'json' };
 import { defaultData, parseSimData, withRunMode, type SimData } from '../src/index.ts';
 
 export const fixtureData: SimData = parseSimData(raw);
@@ -69,6 +70,14 @@ export const fixtureV13: SimData = parseSimData(rawV13);
  * changes none of them.
  */
 export const fixtureV14: SimData = parseSimData(rawV14);
+
+/**
+ * h9-sim: data/sim.json as it shipped at dataVersion 15 (the v14 values plus every H9 key at its spec default),
+ * frozen in fixtures/sim-v15.json and never retuned. The H9 rule tests run on it, so h9-design-data's calibration
+ * changes none of them. h9-sim gave every older fixture the H9 keys at H8 behaviour: raid.prongsMax 1 (W8: one
+ * prong is H8 exactly) and client.haulerStepper 1 (H8's hauler stepper shown), raid.prongMinSize at its default 4.
+ */
+export const fixtureV15: SimData = parseSimData(rawV15);
 
 /**
  * h7-sim: the shipped data with `run.mode` "campaign" (DESIGN.md H7 "What is parked, and how"). Tests that built

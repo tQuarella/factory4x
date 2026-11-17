@@ -91,7 +91,9 @@ function fieldOk(f: unknown, nodes: number | null): boolean {
     perNode(f.rockBuckets) &&
     (f.rockBuckets as unknown[]).every((ring) => Array.isArray(ring) && ring.length > 0 && ring.every((v: unknown) => isInt(v) && v >= 0)) &&
     perNode(f.haulerSet) &&
-    (f.haulerSet as unknown[]).every((v) => v === null || (isInt(v) && v >= 0))
+    (f.haulerSet as unknown[]).every((v) => v === null || (isInt(v) && v >= 0)) &&
+    perNode(f.extractorSet) &&
+    (f.extractorSet as unknown[]).every((v) => v === null || (isInt(v) && v >= 1))
   );
 }
 
@@ -120,21 +122,65 @@ function econShipOk(s: unknown, nodes: number): boolean {
   );
 }
 
-/** H7 R1: `world.raid` null or an object with a phase, and `nextRaidTick` an integer. */
-function raidOk(raid: unknown, next: unknown, last: unknown): boolean {
+const PRONG_PHASES: readonly unknown[] = ['muster', 'out', 'fight', 'home', 'done'];
+const PRONG_OUTCOMES: readonly unknown[] = ['beaten', 'hit', 'turnedBack'];
+const RESULT_OUTCOMES: readonly unknown[] = ['beaten', 'hit', 'turnedBack', 'withered'];
+
+/** H9: a prong's counters (`lostEcon`, `lostShips`, `killed`) are integer records. */
+function prongCountersOk(p: Record<string, unknown>): boolean {
+  return isIntRecord(p.lostEcon, ECON_TYPES) && isIntRecord(p.lostShips, ['drone', 'lancer', 'flak']) && isIntRecord(p.killed, ['thorn', 'spore']);
+}
+
+/**
+ * H9 W1-W6: one prong (prong 0 is the raid object itself, prongs 1 and up are `raid.others`): a known phase, an integer
+ * target, the flight fields, a guard list and the counters, with an outcome only once it is done.
+ */
+function prongOk(p: unknown): boolean {
   return (
-    isInt(next) &&
-    (raid === null || (isObj(raid) && typeof raid.phase === 'string' && Array.isArray(raid.guards))) &&
-    (last === null || (isObj(last) && typeof last.outcome === 'string'))
+    isObj(p) &&
+    PRONG_PHASES.includes(p.phase) &&
+    isInt(p.target) &&
+    p.target >= 0 &&
+    Array.isArray(p.guards) &&
+    isInt(p.ticksLeft) &&
+    isInt(p.flightTicks) &&
+    isInt(p.from) &&
+    typeof p.retargeted === 'boolean' &&
+    isIntRecord(p.planned, ['thorn', 'spore']) &&
+    prongCountersOk(p) &&
+    (p.phase === 'done' ? PRONG_OUTCOMES.includes(p.outcome) : p.outcome === undefined)
   );
 }
 
-/** H7 F14: the stats additions. */
+/**
+ * H7 R1: `world.raid` null or a well-formed raid (an integer id, prong 0's fields, and `others` absent or a non-empty
+ * list of well-formed prongs), and `nextRaidTick` an integer. H9: each `lastRaid.prongs` entry has an integer target, a
+ * known outcome and the counters, and there is at least one.
+ */
+function raidOk(raid: unknown, next: unknown, last: unknown): boolean {
+  const live =
+    raid === null ||
+    (isObj(raid) &&
+      isInt(raid.id) &&
+      prongOk(raid) &&
+      (raid.others === undefined || (Array.isArray(raid.others) && raid.others.length > 0 && raid.others.every(prongOk))));
+  const result =
+    last === null ||
+    (isObj(last) &&
+      typeof last.outcome === 'string' &&
+      Array.isArray(last.prongs) &&
+      last.prongs.length > 0 &&
+      last.prongs.every((p: unknown) => isObj(p) && isInt(p.target) && RESULT_OUTCOMES.includes(p.outcome) && prongCountersOk(p)));
+  return isInt(next) && live && result;
+}
+
+/** H7 F14: the stats additions (H9: `raidProngs`). */
 function h7StatsOk(stats: unknown): boolean {
   if (!isObj(stats)) return false;
   return (
     ['econBuilt', 'econLost', 'econRecycled'].every((k) => isIntRecord(stats[k], ECON_TYPES)) &&
     isIntRecord(stats.raids, ['mustered', 'beaten', 'hit', 'turnedBack']) &&
+    isIntRecord(stats.raidProngs, ['beaten', 'hit', 'turnedBack']) &&
     isInt(stats.allocChanges) &&
     isInt(stats.peakEcon)
   );

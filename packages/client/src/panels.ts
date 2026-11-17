@@ -6,7 +6,7 @@ import { clampInt, mmss, shortVersion, stepFor, ticksText } from './format.ts';
 import { CLIENT_SETTING_KEYS, type ClientKey, type Settings } from './persist.ts';
 import { iconCanvas } from './icons.ts';
 import { drawProbeCore } from './placeholders.ts';
-import { hiveTimeText, raidsText, typesText } from './fieldreport.ts';
+import { hiveTimeText, raidProngsText, raidsText, typesText } from './fieldreport.ts';
 import { RES_NAME, SHIP_NAME, plusText, recycledText, tripleText } from './report.ts';
 import type { Session } from './session.ts';
 
@@ -71,10 +71,13 @@ export const TUNE_LABEL: Readonly<Record<string, string>> = {
   'rock.haulerMax': 'Most haulers per rock',
   'raid.shieldEcon': 'Warships shield the economy (0 = off)',
   'raid.haulersHold': 'Haulers wait out a raid (0 = off)',
+  'raid.prongsMax': 'Most raid prongs (1 = one target)',
+  'raid.prongMinSize': 'Fewest raiders per prong',
   'move.splitPct': 'Long-press split %',
   'client.longPressMs': 'Long-press time, ms',
   'client.dragSlopPx': 'Drag distance, px',
   'client.moveGesture': 'Move ships by (1 = drag, 0 = tap Move, tap)',
+  'client.haulerStepper': 'Hauler stepper on rock sheets (1 = on)',
   'alloc.maxWeight': 'Weight steps (radar scale)',
   'fleet.recycleRefundPct': 'Recycle refund %',
   'fleet.relayStep': 'Relay limit step',
@@ -445,6 +448,7 @@ export function showFieldResult(root: HTMLElement, session: Session, onNewRun: (
   h('span', 'lbl', 'Ships lost', lost);
   h('b', '', typesText(s.lost), lost);
   statLine(card, 'Raids', raidsText(s.raids));
+  statLine(card, 'Raid prongs', raidProngsText(s.raidProngs));
   statLine(card, 'Economy ships lost to raids', String(s.econLostToRaids));
   statLine(card, 'Weight changes', String(s.allocChanges));
   statLine(card, 'Most economy ships at once', String(s.peakEcon));

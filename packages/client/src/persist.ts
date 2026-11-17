@@ -160,6 +160,8 @@ export interface Settings {
   longPressMs: number;
   dragSlopPx: number;
   moveGesture: number;
+  /** H9 `client.haulerStepper` (1: H8's hauler stepper under the extractor row): this device only. */
+  haulerStepper: number;
 }
 
 /** The client-scope keys and the setting each one is stored in. */
@@ -168,6 +170,7 @@ export const CLIENT_SETTING_KEYS = {
   'client.longPressMs': 'longPressMs',
   'client.dragSlopPx': 'dragSlopPx',
   'client.moveGesture': 'moveGesture',
+  'client.haulerStepper': 'haulerStepper',
 } as const;
 export type ClientKey = keyof typeof CLIENT_SETTING_KEYS;
 
@@ -181,6 +184,7 @@ export function defaultSettings(data: SimData): Settings {
     longPressMs: d('client.longPressMs'),
     dragSlopPx: d('client.dragSlopPx'),
     moveGesture: d('client.moveGesture'),
+    haulerStepper: d('client.haulerStepper'),
   };
 }
 

@@ -28,7 +28,7 @@ import {
   fieldFleetFullNotice,
   fieldUnlockNotice,
   hiveTimeText,
-  pipText,
+  onTheWayText,
   radarLabel,
   raidChipText,
   raidEndText,
@@ -190,12 +190,11 @@ describe('acceptance 2: the probe sheet text, one line for each allocStatus stat
 
 describe('acceptance 3: the rock sheet text', () => {
   const rs = (over: Partial<RockStatus>): RockStatus => ({
-    node: 1, id: 'a1', kind: 'asteroid', prize: 'ore', mine: true, mineable: true, docked: 1, bound: 3, inFlight: 2, slots: 3, freeExtractors: 0, haulers: 2, buffer: 4, bufferCap: 40, backedUp: false, deliveredPerMin: 12, raidRank: 0, haulerNeed: 0, haulerSet: null, haulerTarget: 0, raidTarget: false, haulersHeld: false, ...over,
+    node: 1, id: 'a1', kind: 'asteroid', prize: 'ore', mine: true, mineable: true, docked: 1, bound: 3, inFlight: 2, slots: 3, freeExtractors: 0, haulers: 2, buffer: 4, bufferCap: 40, backedUp: false, deliveredPerMin: 12, raidRank: 0, haulerNeed: 0, haulerSet: null, haulerTarget: 0, raidTarget: false, haulersHeld: false, extractorSet: null, extCap: 3, raidMix: null, raidNext: false, ...over,
   });
   it('the pip line counts docked and free extractors and names the ones on the way', () => {
-    expect(pipText(rs({}))).toBe('1/3 (+2 on the way)');
-    expect(pipText(rs({ inFlight: 0, docked: 3 }))).toBe('3/3');
-    expect(pipText(rs({ kind: 'heart', slots: 4, docked: 1, freeExtractors: 1, inFlight: 0 }))).toBe('2/4');
+    expect(onTheWayText(rs({}))).toBe('+2 on the way');
+    expect(onTheWayText(rs({ inFlight: 0, docked: 3 }))).toBe('');
   });
   it('the live rock status of a landing: the near rocks are mined and have no ships yet', () => {
     const w = createWorld(1, data);
@@ -216,6 +215,7 @@ describe('the field result panel text', () => {
     lost: { extractor: 1, hauler: 0, drone: 3, lancer: 0, flak: 0 },
     recycled: { extractor: 0, hauler: 0, drone: 0, lancer: 0, flak: 0 },
     raids: { mustered: 4, beaten: 2, hit: 1, turnedBack: 1 },
+    raidProngs: { beaten: 0, hit: 0, turnedBack: 0 },
     econLostToRaids: 1,
     allocChanges: 9,
     peakEcon: 14,

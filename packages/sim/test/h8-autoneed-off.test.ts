@@ -19,11 +19,18 @@ const D13 = parseSimData(raw13);
 const T = 1800;
 const H8_SIM_KEYS = ['hauler.autoNeed', 'hauler.needPct', 'rock.haulerMax', 'raid.shieldEcon', 'raid.haulersHold', 'move.splitPct'];
 
-/** The world without what H8 added. */
+/** h9-sim: what H9 added: the two raid tunables, `field.extractorSet`, `stats.raidProngs` and `lastRaid.prongs`. */
+const H9_SIM_KEYS = ['raid.prongsMax', 'raid.prongMinSize'];
+
+/** The world without what H8 (and H9) added. */
 function h7Hash(w: World): string {
-  const c = JSON.parse(JSON.stringify(w)) as { field: Record<string, unknown>; tun: Record<string, unknown> };
+  const c = JSON.parse(JSON.stringify(w)) as { field: Record<string, unknown>; tun: Record<string, unknown>; stats: Record<string, unknown>; lastRaid: Record<string, unknown> | null };
   delete c.field.haulerSet;
   for (const k of H8_SIM_KEYS) delete c.tun[k];
+  delete c.field.extractorSet;
+  for (const k of H9_SIM_KEYS) delete c.tun[k];
+  delete c.stats.raidProngs;
+  if (c.lastRaid !== null) delete c.lastRaid.prongs;
   return hashState(c);
 }
 

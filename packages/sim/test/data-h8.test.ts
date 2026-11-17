@@ -20,7 +20,7 @@ import { F } from './field-helpers.ts';
 /**
  * h8-sim acceptance 2: data v14 (DESIGN.md H8 "Tunables (H8, data v14, all integers)" and "Save, data version and
  * replay"). The shipped data is checked against the spec's table, so a retune edits data and DESIGN.md together and
- * no test. The dataVersion pin lives here.
+ * no test. h9-sim moved the dataVersion pin to data-h9.test.ts.
  */
 const strip = (cell: string): string => cell.replace(/`/g, '');
 const h8At = design.indexOf('### H8 (Milestone 2, iteration 8');
@@ -42,10 +42,6 @@ const H8_SIM = ['hauler.autoNeed', 'hauler.needPct', 'rock.haulerMax', 'raid.shi
 const H8_CLIENT = ['client.longPressMs', 'client.dragSlopPx', 'client.moveGesture'];
 
 describe('data/sim.json (shipped) at H8', () => {
-  it('is data version 14', () => {
-    expect(defaultData.dataVersion).toBe(14);
-  });
-
   it('matches the "Tunables (H8 …)" table: every key with its default and range', () => {
     const rows = tableAfter('#### Tunables (H8, data v14, all integers)');
     const keys = rows.map((r) => strip(r[0]!) as TunableKey);
@@ -61,7 +57,7 @@ describe('data/sim.json (shipped) at H8', () => {
     const at = TUNABLE_KEYS.indexOf('hive.regrowPct');
     expect(TUNABLE_KEYS.slice(at + 1, at + 1 + H8_SIM.length)).toEqual(H8_SIM);
     const c = TUNABLE_KEYS.indexOf('client.autosaveSec');
-    expect(TUNABLE_KEYS.slice(c + 1)).toEqual(H8_CLIENT);
+    expect(TUNABLE_KEYS.slice(c + 1, c + 1 + H8_CLIENT.length)).toEqual(H8_CLIENT);
     const meta = tunableMeta(defaultData);
     const row = (k: string) => meta.find((m) => m.key === k)!;
     for (const k of H8_SIM) expect([k, row(k).scope, row(k).live, row(k).newRunOnly]).toEqual([k, 'sim', true, false]);

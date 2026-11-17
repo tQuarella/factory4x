@@ -4,7 +4,7 @@
  * placeholders.ts get pixel radii, so line widths and sprites stay crisp at any
  * map scale. Ships and pods interpolate between ticks using session.alpha.
  */
-import { SHIP_TYPES, activeBattles, guardianStatus, heartIndex, isCaptured, isField, isGuarded, isRootCut, lastBattle, movePreview, nodeStatus, raidStatus, rockStatus, rootIndex, shipCounts, type EconShip, type Node, type ShipType, type World } from '@factory4x/sim';
+import { SHIP_TYPES, activeBattles, guardianStatus, heartIndex, isCaptured, isField, isGuarded, isRootCut, lastBattle, movePreview, nodeStatus, raidStatus, rockStatus, rootIndex, shipCounts, type EconShip, type Node, type RockStatus, type ShipType, type World } from '@factory4x/sim';
 import { palette } from './palette.ts';
 import type { MoveGesture } from './gesture.ts';
 import {
@@ -41,6 +41,7 @@ import {
 } from './placeholders.ts';
 import { isBackedUp } from './report.ts';
 import { shortName } from './sheet.ts';
+import { raidLegs, type RaidLeg } from './raidlegs.ts';
 import { fitMap, type Fit } from './fit.ts';
 import { lerp, podTotalTicks, progressFrac } from './interp.ts';
 import type { Session } from './session.ts';
@@ -103,14 +104,22 @@ const TAG_WORD = { strong: 'Strong', even: 'Even', weak: 'Weak' } as const;
 const nodeName = shortName;
 
 /**
- * The raiders on the badge, or null when the rock is not a raid's target. `flag` is `rockStatus.raidTarget`: true from the muster to
- * the raid's end. The ring shows the planned mix while it musters, then who is out.
+ * The raiders on a rock's raid badge, or null when no prong is aimed there. H9: each prong's target wears its own badge with that
+ * prong's mix (`rockStatus.raidMix`: the plan while it musters, then the raiders away); `raidTarget` runs from the muster to that
+ * prong's end, so a prong that is done leaves nothing drawn.
  */
-export function raidBadgeMix(world: Readonly<World>, flag: boolean): { thorn: number; spore: number } | null {
-  if (!flag) return null;
-  const r = raidStatus(world);
-  const out = r.raiders.thorn + r.raiders.spore;
-  return out > 0 && r.phase !== 'muster' ? { ...r.raiders } : { ...r.planned };
+export function raidBadgeMix(rs: Readonly<Pick<RockStatus, 'raidTarget' | 'raidMix'>>): { thorn: number; spore: number } | null {
+  return rs.raidTarget && rs.raidMix !== null ? { thorn: rs.raidMix.thorn, spore: rs.raidMix.spore } : null;
+}
+
+/** H9 test record: one prong leg as drawn in the last frame. */
+export interface DrawnProng {
+  target: number;
+  from: number;
+  to: number;
+  marker: boolean;
+  frac: number;
+  countdown: string;
 }
 
 interface WiltAnim {
@@ -158,11 +167,13 @@ export class MapView {
     econ: { docked: 0, idle: 0, waiting: 0, moving: 0 },
     /** H7 raids: what the last frame drew (the muster pulse, the dashed line and marker, the rock under raid, the countdown text). */
     raid: { pulse: false, line: false, marker: false, raided: -1, countdown: '', from: -1, to: -1, frac: -1 },
+    /** H9: one entry per prong leg drawn (prong order): its target, the leg's ends, progress and countdown. */
+    prongs: [] as DrawnProng[],
   };
 
   /** H7 test hook: what the last frame drew for the economy (Mine badges, haul lines, hulls docked, idle at the probe, waiting, moving). */
-  drawnField(): { mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number }; raid: { pulse: boolean; line: boolean; marker: boolean; raided: number; countdown: string; from: number; to: number; frac: number } } {
-    return { mine: [...this.drawn.mine], haul: [...this.drawn.haul], econ: { ...this.drawn.econ }, raid: { ...this.drawn.raid } };
+  drawnField(): { mine: number[]; haul: Array<[number, number]>; econ: { docked: number; idle: number; waiting: number; moving: number }; raid: { pulse: boolean; line: boolean; marker: boolean; raided: number; countdown: string; from: number; to: number; frac: number }; prongs: DrawnProng[] } {
+    return { mine: [...this.drawn.mine], haul: [...this.drawn.haul], econ: { ...this.drawn.econ }, raid: { ...this.drawn.raid }, prongs: this.drawn.prongs.map((p) => ({ ...p })) };
   }
 
   /** The move gesture being shown (set by main.ts): drawn over everything while it is armed or dragging. */
@@ -170,10 +181,10 @@ export class MapView {
   /** H8: Mine badge pops: a rock just marked grows in, one just unmarked fades out (client only). */
   private readonly pops = new Map<number, { start: number; on: boolean }>();
   /** H8 test hook: what the last frame drew for the raid badge and the drag. */
-  private readonly drawnNew: { raidBadge: number; drag: DragDrawn | null } = { raidBadge: -1, drag: null };
+  private readonly drawnNew: { raidBadge: number; raidBadges: number[]; drag: DragDrawn | null } = { raidBadge: -1, raidBadges: [], drag: null };
 
-  drawnH8(): { raidBadge: number; drag: DragDrawn | null } {
-    return { raidBadge: this.drawnNew.raidBadge, drag: this.drawnNew.drag === null ? null : { ...this.drawnNew.drag } };
+  drawnH8(): { raidBadge: number; raidBadges: number[]; drag: DragDrawn | null } {
+    return { raidBadge: this.drawnNew.raidBadge, raidBadges: [...this.drawnNew.raidBadges], drag: this.drawnNew.drag === null ? null : { ...this.drawnNew.drag } };
   }
 
   /** Starts the badge pop of a rock whose Mine mark just changed. */
@@ -270,7 +281,9 @@ export class MapView {
     this.drawn.haul.clear();
     this.drawn.econ = { docked: 0, idle: 0, waiting: 0, moving: 0 };
     this.drawn.raid = { pulse: false, line: false, marker: false, raided: -1, countdown: '', from: -1, to: -1, frac: -1 };
+    this.drawn.prongs = [];
     this.drawnNew.raidBadge = -1;
+    this.drawnNew.raidBadges = [];
     this.drawnNew.drag = null;
     ctx.fillStyle = palette.space;
     ctx.fillRect(0, 0, w, h);
@@ -350,6 +363,7 @@ export class MapView {
 
     const counts = shipCounts(world);
     const labels: Array<{ text: string; x: number; y: number }> = [];
+    const legs = field ? raidLegs(world) : [];
     for (const n of world.nodes) {
       const { x, y } = this.nodePos(n.index);
       const rr = this.nodeR(n);
@@ -358,7 +372,7 @@ export class MapView {
       if (n.kind === 'probe') drawProbe(ctx, rr, t);
       else if (n.kind === 'pocket' && isGuarded(world, n.index)) drawPocket(ctx, rr, t, true, n.prize ?? 'ore');
       else if (n.kind === 'asteroid' || n.kind === 'pocket') {
-        const raided = world.raid !== null && world.raid.phase === 'fight' && world.raid.target === n.index;
+        const raided = legs.some((l) => l.phase === 'fight' && l.target === n.index);
         if (raided) this.drawn.raid.raided = n.index;
         drawAsteroid(ctx, rr, n.index * 7 + 3, n.extractors, n.slots, raided ? 'raided' : 'normal', t);
         // A captured pocket is a rock that shows its prize.
@@ -460,9 +474,10 @@ export class MapView {
           ctx.restore();
         }
         // H8: the raid-target badge, lower left (the Mine badge is lower right), from the muster to the raid's end.
-        const raidMix = rs === undefined ? null : raidBadgeMix(world, rs.raidTarget);
+        const raidMix = rs === undefined ? null : raidBadgeMix(rs);
         if (raidMix !== null) {
-          this.drawnNew.raidBadge = n.index;
+          if (this.drawnNew.raidBadge < 0) this.drawnNew.raidBadge = n.index;
+          this.drawnNew.raidBadges.push(n.index);
           ctx.save();
           ctx.translate(x - rr * 0.95, y + rr * 0.7);
           drawRaidBadge(ctx, Math.max(8, rr * 0.4), raidMix);
@@ -626,16 +641,16 @@ export class MapView {
     }
   }
 
-  /** H7 raid readability: the hive pulses while it musters; the marker rides a dashed line out to the target (and home), with its countdown. */
+  /**
+   * H7 raid readability, per prong (H9): the hive pulses while the raid musters; each prong's marker rides a dashed line out to its
+   * target (and home), with its own countdown.
+   */
   private drawRaid(world: Readonly<World>, t: number, alpha: number): void {
     const { ctx } = this;
-    const raid = world.raid;
-    if (raid === null) return;
     const hive = world.nodes.find((n) => n.kind === 'heart');
-    const target = world.nodes[raid.target];
-    if (hive === undefined || target === undefined) return;
+    if (hive === undefined) return;
     const hp = this.nodePos(hive.index);
-    if (raid.phase === 'muster') {
+    if (raidStatus(world).phase === 'muster') {
       this.drawn.raid.pulse = true;
       const rr = this.nodeR(hive);
       const pulse = 0.5 + 0.5 * Math.sin(t * 6);
@@ -649,9 +664,19 @@ export class MapView {
       ctx.restore();
       return;
     }
-    // Each leg runs from `raid.from` to its end (the target going out, the hive going home); progress is 1 - ticksLeft / flightTicks.
-    const origin = world.nodes[raid.from] ?? hive;
-    const [fromNode, toNode] = raid.phase === 'home' ? [origin, hive] : [origin, target];
+    for (const leg of raidLegs(world)) this.drawLeg(world, hive, leg, alpha);
+  }
+
+  /** One prong's leg: the dashed line, and (in flight) the marker and its countdown. The first leg also fills the H7 `raid` record. */
+  private drawLeg(world: Readonly<World>, hive: Node, leg: RaidLeg, alpha: number): void {
+    const { ctx } = this;
+    const target = world.nodes[leg.target];
+    if (target === undefined) return;
+    const first = this.drawn.prongs.length === 0;
+    const hp = this.nodePos(hive.index);
+    // Each leg runs from `leg.from` to its end (the target going out, the hive going home); progress is 1 - ticksLeft / flightTicks.
+    const origin = world.nodes[leg.from] ?? hive;
+    const [fromNode, toNode] = leg.phase === 'home' ? [origin, hive] : [origin, target];
     const a = this.nodePos(fromNode.index);
     const b = this.nodePos(toNode.index);
     const tp = this.nodePos(target.index);
@@ -662,29 +687,43 @@ export class MapView {
     ctx.setLineDash([7, 6]);
     ctx.beginPath();
     // The dashed line is the leg being flown; at the target it joins the hive to the rock.
-    const [l0, l1] = raid.phase === 'fight' ? [hp, tp] : [a, b];
+    const [l0, l1] = leg.phase === 'fight' ? [hp, tp] : [a, b];
     ctx.moveTo(l0.x, l0.y);
     ctx.lineTo(l1.x, l1.y);
     ctx.stroke();
     ctx.restore();
-    this.drawn.raid.line = true;
-    this.drawn.raid.from = l0 === hp ? hive.index : fromNode.index;
-    this.drawn.raid.to = raid.phase === 'fight' ? target.index : toNode.index;
-    if (raid.phase === 'fight') return;
-    const f = progressFrac(raid.ticksLeft, Math.max(1, raid.flightTicks), alpha);
-    this.drawn.raid.frac = Math.round(f * 1000) / 1000;
+    const drawn: DrawnProng = {
+      target: leg.target,
+      from: l0 === hp ? hive.index : fromNode.index,
+      to: leg.phase === 'fight' ? target.index : toNode.index,
+      marker: false,
+      frac: -1,
+      countdown: '',
+    };
+    if (first) {
+      this.drawn.raid.line = true;
+      this.drawn.raid.from = drawn.from;
+      this.drawn.raid.to = drawn.to;
+    }
+    this.drawn.prongs.push(drawn);
+    if (leg.phase === 'fight') return;
+    const f = progressFrac(leg.ticksLeft, Math.max(1, leg.flightTicks), alpha);
+    drawn.frac = Math.round(f * 1000) / 1000;
     const x = lerp(a.x, b.x, f);
     const y = lerp(a.y, b.y, f);
-    const mix = { thorn: 0, spore: 0 };
-    for (const g of raid.guards) mix[g.type]++;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(Math.atan2(b.y - a.y, b.x - a.x));
-    drawRaidMarker(ctx, 11, mix);
+    drawRaidMarker(ctx, 11, leg.mix);
     ctx.restore();
-    this.drawn.raid.marker = true;
-    const text = `${Math.ceil(raid.ticksLeft / world.tickRate)}s`;
-    this.drawn.raid.countdown = text;
+    drawn.marker = true;
+    const text = `${Math.ceil(leg.ticksLeft / world.tickRate)}s`;
+    drawn.countdown = text;
+    if (first) {
+      this.drawn.raid.frac = drawn.frac;
+      this.drawn.raid.marker = true;
+      this.drawn.raid.countdown = text;
+    }
     ctx.save();
     ctx.font = '700 11px ui-monospace, Menlo, Consolas, monospace';
     ctx.textAlign = 'center';

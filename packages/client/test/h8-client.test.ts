@@ -184,8 +184,10 @@ describe('acceptance 10: the client keys are device settings', () => {
       ['client.longPressMs', 450, 250, 900, 'client'],
       ['client.dragSlopPx', 12, 6, 24, 'client'],
       ['client.moveGesture', 1, 0, 1, 'client'],
+      // H9 (data v15): the hauler stepper key, stored in the settings like the others.
+      ['client.haulerStepper', 0, 0, 1, 'client'],
     ]);
-    expect(Object.keys(CLIENT_SETTING_KEYS)).toHaveLength(4);
+    expect(Object.keys(CLIENT_SETTING_KEYS)).toHaveLength(5);
   });
   it('settings default to the data, load valid stored values and drop out-of-range ones', () => {
     const d = defaultSettings(data);
@@ -208,7 +210,7 @@ describe('acceptance 6: the raid badge', () => {
     const r = raidStatus(s.world);
     expect(r.phase).not.toBe('none');
     const target = r.target!;
-    const mixes = s.world.nodes.map((n) => raidBadgeMix(s.world, n.kind === 'probe' ? false : rockStatus(s.world, n.index).raidTarget));
+    const mixes = s.world.nodes.map((n) => raidBadgeMix(n.kind === 'probe' ? { raidTarget: false, raidMix: null } : rockStatus(s.world, n.index)));
     s.world.nodes.forEach((n, i) => {
       if (n.index === target) expect(mixes[i]).not.toBeNull();
       else expect(mixes[i], `node ${n.id}`).toBeNull();
@@ -217,6 +219,6 @@ describe('acceptance 6: the raid badge', () => {
     expect(mix.thorn + mix.spore).toBeGreaterThan(0);
     // To the end: the badge goes when the raid has finished.
     for (let i = 0; i < 12000 && !(raidStatus(s.world).phase === 'none' && raidStatus(s.world).last !== null); i++) s.stepOnce();
-    expect(raidBadgeMix(s.world, rockStatus(s.world, target).raidTarget)).toBeNull();
+    expect(raidBadgeMix(rockStatus(s.world, target))).toBeNull();
   });
 });

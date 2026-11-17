@@ -1581,6 +1581,44 @@ Spec: DESIGN.md "H9 (Milestone 2, iteration 9, spec ready): A wider front". Spli
 3. **h9-raids changes the raid save shape without its own `dataVersion` bump:** confirmed. h9-sim bumps to v15 in the same stack, nothing ships between the two, and `merge-task h9-client` lands them together. A v14 save is discarded on load as usual, and save.ts validates the new shape.
 
 
+## 2026-11-16 · Core Engineer · h9-sim: the extractor dial, data v15 and the H9 selector stubs
+
+Spec: DESIGN.md "H9 (Milestone 2, iteration 9, spec ready): A wider front", X1–X4, data v15, "Selectors" and replay items (a)–(f). Task: BACKLOG.md "### h9-sim".
+
+**Architecture:**
+- **`extCap(world, node)`** (field.ts) is the one place the dial is read: `extractorSet[node]`, else the slots (a `min` with the slots keeps it in range for any state). F5's dispatch, H4b's free slots (`extractorShortfall`) and the committed extractors (`staffCounts`) read it where H7 and H8 read the slots. Nothing else changed in those rules.
+- **Lowering runs in the input (`applySetExtractors`, rule 1), not in F5.** So F2 and F3 on the same tick already see the surplus as unbound: H4b counts it as an unbound extractor and doesn't build for the slot it left. Rejected: an "over the cap" pass at the top of F5. F2 and F3 would see the old bound count for that tick, and it would repeat X3's order inside every F5 for a state that only an input can create (only `setExtractors` lowers `extCap`).
+- **The raid stubs live in `factions/index.ts`** (the two exceptions the task allows): `RaidStatus.prongs` and `nextProngs` (`prongsOf`, the exported `nextProngs`), `RaidResult.prongs` (written by `finish`, so it is in `world.lastRaid` and saved), and `raidMixAt`. `ProngStatus`, `ProngResult`, `ProngPhase` and `ProngOutcome` are the final types. `selectors.ts` reads `nextProngs` and `raidMixAt` for `rockStatus`.
+- **`RaidResult.prongs[].outcome` is typed `RaidOutcome`**, which includes `withered`. W6's limits say every prong withers when the hive falls, so the per-prong record needs it. `ProngStatus.outcome` (a live prong) is `beaten | hit | turnedBack | null`.
+
+**Readings of the spec:**
+- **An in-flight extractor unbound by X3 finishes its leg first.** X3 says each unbound extractor "re-dispatches by F5 from where it is", and F5 as built dispatches an unbound extractor in flight from where it lands. So it lands at the rock it was flying to, not docked, and leaves from there the next tick. Rejected: turning it around mid-flight. That is a new movement rule, and the spec names F5.
+- **`extractorMinCount` is `max(1, free)` for every kind.** An asteroid has no free extractors, so this is 1 there, as X1 says.
+- **`stats.raidProngs` stays at zero in h9-sim.** The BACKLOG table says "(zeros)", and counting per prong is W6 (h9-raids). `fieldSummary.raidProngs` reads it.
+- **The stub's prong outcome** is decided when the raid leaves its target for home: `hit` if it killed an economy ship, else `turnedBack`. A beaten raid ends at once (`world.raid` null), so the stub never shows a live `beaten` prong. `last.prongs` has it.
+- **`raidMix`** is non-null for the same span as `raidTarget` (muster until the raid ends, so through `home`). It shows the plan while mustering and the raiders away after that. The client decides what to show while a prong is home-bound.
+- **`nextProngs` (stub)** is 1 when R3 would muster now apart from the gap, the economy threshold, a raid in progress and a battle at the hive. So raids must be on, the hive alive, a raidable rock present, and R4's size from today's economy at least 1. Otherwise it is 0.
+- **`raidNext`** is `raidRank ≥ 1` (raidable, so Mine-marked), Mine-marked, and `raidRank ≤ nextProngs`. Without `≥ 1`, every non-raidable rock (rank 0) would read true.
+- **The save check:** `extractorSet` entries are null or an integer ≥ 1 (not checked against slots, like `haulerSet` against `rock.haulerMax`). `stats.raidProngs` has three integers. `lastRaid.prongs` is an array (h9-raids tightens its shape).
+- **Fixtures.** `fixtures/sim-v15.json` is the shipped v15, frozen. It is v14 plus the H9 keys, and data-h9.test.ts checks that. Every older fixture gets the H9 keys at H8 behaviour: `raid.prongsMax` 1 (W8), `raid.prongMinSize` 4 and `client.haulerStepper` 1. These follow the pattern h8-sim used for the H8 keys.
+
+**Acceptance 4 (the opening is H8's), how it was checked:** I exported main at 2ceada1 (`git archive 2ceada1 packages/sim data`) and ran the same loop there on its v14 data and here on v15 (fixture v15, equal to the shipped data). The loop runs 6 game minutes with no inputs:
+- every tick, it chains a hash over the tick, warships, economy ships, stock, delivered, both economy bays, the warship bays and the shares;
+- every 600 ticks, it hashes the whole world without dataVersion, `raid.prongsMax`, `raid.prongMinSize`, `field.extractorSet`, `stats.raidProngs` and `lastRaid.prongs`.
+
+Both runs gave the same values (chain a48e6bea). They are pinned in data-h9.test.ts, so the hashes differ only by the version and the new keys. The run includes two finished raids (both `hit`).
+
+**Tests outside the task's file list, or changed (strength kept):**
+- `packages/client/test/h7-client.test.ts`: the `RockStatus` and `FieldSummary` fakes gain the new required fields. This is compile-only. No `packages/client/src` or `packages/bots/src` edit was needed beyond `reference-replay.ts`.
+- `packages/client/test/h8-client.test.ts`: the client-key list gains `client.haulerStepper` with its default and range. The device-settings count stays 4 until h9-client stores the key.
+- `data-h8.test.ts`: the dataVersion pin moved to data-h9.test.ts (15). The client-key order check is bounded to the H8 keys.
+- `fleet-off.test.ts` and `h8-autoneed-off.test.ts`: their "without what later tasks added" projections also drop the H9 additions. The golden hashes are unchanged.
+- `field-selectors.test.ts` and `raids.test.ts`: the exact `toEqual`s gain the new fields with derived values.
+- `reference-replay.test.ts`: "a setMine off (a1, tick 600) unbinds every extractor" read a1's `rockStatus` at the end of the run. The H9 items mark a1 again at 8761, so it is now read on the tick of the unmark, which is the state the check is about. "No input ignored" became "only the four invalid setExtractors of item (f) are ignored", and they are listed exactly.
+
+**The replay.** Items (a)–(f) run from 8760 on a1 and a2, after the H8 a4 item's extractor has launched (8750). `ship.speedSu` 20 at 8760 makes the dial's extractor flights short; the in-flight a4 extractor keeps its transit. Item (f)'s guarded-pocket input is at tick 1, while p2 and the hive are guarded. reference-replay.test.ts checks each item. The determinism final goes from cdbdea56 (main, 2ceada1) to 2141b502.
+
+**For h9-raids (risk):** the replay now uses the window up to 8880, and raids end when the hive falls at 8010. So items (g)–(n) can't go at the tail. They need raids before 8010, which moves the H7/H8 raid timings the replay test pins, or a tail where the hive is not yet captured. This is a replay restructure, not something to tune.
 ## 2026-11-16 — cw-bots-gate-time: the bots gate from 96.7 s to about 46 s, no metric sampled
 
 Profile of one `npm run bots` run (`node --cpu-prof`, seeds 1): the metrics were a small share. The cost was the bots' own reads and the min-wave estimate. Findings, and what changed (all in `packages/bots/src`, results bit-identical on v14: every run's outcome, times, counters, trace, metrics and `finalHash` match the before-report; flags and failures equal):
@@ -1591,7 +1629,191 @@ Profile of one `npm run bots` run (`node --cpu-prof`, seeds 1): the metrics were
 - **Nothing is sampled.** Every metric the report shows (staffing, backed-up, economy lost under a guard, no-idle) is still read every tick and exact.
 - **Not done, left to the sim:** about 4 s per seed-1 run is `byProbeDistance` re-sorting every node each tick inside `runExtractors` (and `staffCounts`), including in the min-wave estimate's inert world where there are no extractors. A sim-side cache or early exit would cut it further; the sim is outside this task.
 
+## 2026-11-16 · Engineer · h9-bots: the split defence, the two controls and the prong report (pre-raids part)
+
+Spec: DESIGN.md "Bots (H9)". Task: BACKLOG.md "### h9-bots". Built on `task/h9-sim` (12924fa) with `cw-bots-gate-time` in it, against the h9-sim prong stubs.
+
+**Architecture:**
+- **One placement function, `place`, for every branch.** H8's `regroup` sent every parked warship to one stage. `place(posts)` generalises it: posts come largest first; each takes what its goal lacks (warships standing at it or flying to it count first); the pool left over goes to the first post. With one post it is `regroup`, so `raid.prongsMax` 1 is H8 (below). The raid response (`minHalf`: a post the pool can't bring to `ceil(goal / 2)` gets none), the standing guard, the pocket assault and the hive wave all use it, so the guards on two rocks don't get pulled to one stage by steps 3 and 4. The hive wave and the pocket assault take their ships from every post (`exactSendFrom`, one `sendShips` per rock), not only the stage.
+- **Goals.** A raid's goal per prong is its `planned` size, in the counter for that prong's majority. Production raises the counter of the post with the most unmet (goal less warships at or flying to it; ties to the largest prong, then prong 0) while the goals add up to more than the warships alive. New warships rally to that post. The standing guard is `ceil(size / 2)` of each prong of the last raid, at its target while it is mined; its production reads warships parked at the post, as H8 did.
+- **Live prongs.** A done prong is not answered. A homebound prong is answered only when no other prong is still going out or fighting (H8 stayed at the target through `home`, and so does a one-prong raid).
+- **`adaptive-concentrate` is H8's rule aimed at prong 0.** The goal is the whole planned size (that is what `raidStatus.planned` is), the post is `raidStatus.target` (prong 0's), and there is no half-size rule. It is one option (`concentrate`) of the adaptive bot, so it shares every other rule.
+- **`undefended` is `respond: false`.** The option already existed for greedy's first phase. Offence, pockets, economy and the backstops are unchanged.
+- **A test seam, `raidView`.** An `AdaptiveBot` option that replaces `raidStatus`, so a unit fixture can give it a two-prong raid before the sim builds one. Production strategies never set it. The prong tests will stay useful after h9-raids, because they fix the prongs exactly.
+
+**Report:** `FieldResult` gains `raidProngs` (`stats.raidProngs`) and each `RaidRecord` gains `prongs` (target rock id, outcome, economy ships lost, from `lastRaid.prongs`). "Economy ships lost per prong target" and "raids by prong count" come from those, so a prong count is the number of prongs in `lastRaid.prongs`. The win time against adaptive is `round((t - adaptive) * 100 / adaptive)` on the same seed. The two new lines are in `field-flags.ts` (`computeH9Lines`), not in `computeFieldFlags`, so flags 1–7 are unchanged; they are report lines until h9-design-data.
+
+**Checks on the stubs (v15, before h9-raids):**
+- `adaptive`, `greedy`, `idle`, `drones-only` and `adaptive-no-raids` have the same final hash on all three seeds as the build before this task (adaptive 4d001674 / 2e2d139c / 09f4b47b). `adaptive-concentrate` equals adaptive (one prong). With `raid.prongsMax` 1 set, the H8 bots (field-strategies.ts at 12924fa) and the new ones give the same hash over a 20 minute run for adaptive, greedy and drones-only (pinned in h9-bots.test.ts).
+- `undefended` wins at 12:03 against adaptive's 15:53 (−24%), losing 5 economy ships against 6. So on v15, ignoring raids does not cost the run yet. That is the target-5 gap h9-design-data must close, and it matches the Director's ruling: greedy (15:45, −1%) can't separate from adaptive by values.
+
+**After the h9-raids merge (real prongs, v15; report archived as `reports/archive/h9-bots-v15.md`):**
+- **The shield metric reads every prong.** `econLostGuarded` counts a loss only in a tick that began with a warship at the target of every prong still going (`raidProngs`, not `done`). Losses are not attributed per prong, so a prong with no warship at its rock while another is held is a legitimate loss. The raid record's `planned` is the sum over prongs (`world.raid.planned` is prong 0's now). No other bot or report read touches `world.raid` (the bot reads `raidStatus`, whose `phase`, `planned` and `target` are the summaries the spec defines). The H8 "shield holds" test is green and still exactly 0.
+- **H8 equivalence holds on the real-prong sim.** With `raid.prongsMax` 1 the H8 bots and the new ones give the same hash (adaptive ae732e36, greedy 964a3c11, drones-only 7baddb4a, 20 minute cap, seed 1); the pins in h9-bots.test.ts are re-taken on this sim (the hash moved with the new world shape, the ticks and raid counts did not).
+- **Target 1, as measured (not tuned):** adaptive meets one two-prong raid (6 single, 1 double; econ 17, minute 15.5), greedy meets two. Concentrate and undefended win before any raid is large enough to split (15:53 and 12:03), so they meet none.
+- **Targets 4 and 5, as measured:** adaptive now wins at 20:46 (was 15:53), losing 8 economy ships (7 are in the prong records: a1 2, a5 3, p1 2; the two-prong raid hit a5 and the pocket p1, one each); concentrate loses 7, so target 4 (2 more) is MISSED, because concentrate wins before the first split raid. `undefended` is 42% faster than adaptive, greedy +0%. Both target 5 halves MISSED. h9-design-data calibrates these.
+- **One H8 bound loosened, with a reason:** the "staffing holds" test allowed 0 game minutes of more than one idle hauler outside raids. Adaptive now has 0.07 min (about 4 s, once): a two-prong hit killed two extractors at once and their haulers idled at the probe until they rebalanced. The test now allows under 0.25 min. The Critic should rule whether that is right or the sim should rebalance faster.
+
+**h9-bots round 1 (Critic REJECT, 72d23c9; Director rulings).**
+- **Shield metric, exact per prong.** `ShieldMeter` (field-runner.ts) records, before each step, whether a warship stands at each prong's target and that prong's `lostEcon`; after the step it adds the increase for the prongs that were guarded. A prong that ends in the step is read from `world.lastRaid.prongs` at the same index. The whole-run assertion is exactly 0 again. The unit tests (h9-bots-window.test.ts) use a two-prong raid with a5 guarded and p1 not: a loss at the guarded prong counts (the "every prong guarded" metric read 0 there), a loss at the unguarded one does not.
+- **Director ruling: the raid-window hive wave.** Under H9 a prong that finds an empty rock turns home and can rejoin the hive mid-battle. The bot now counts a live prong of a raid with two or more prongs as away only if the wave has taken the hive before that prong's earliest return, and otherwise counts its raiders back in the hive (`hiveAtLanding`, `hiveWave`).
+  - Earliest return: `out` = ticks to arrival + flight home; `fight` = flight home; `home` = ticks to arrival. A prong whose rock holds a warship that is not part of the wave is committed (it fights there) and stays away.
+  - The wave's own time: arrival at the hive, plus the capture time from the estimate's inert-field battle (`fieldBattleTicks`), plus one round, plus the spread of arrivals when the ships stand at different distances. Each prong dropped from "away" makes the hive stronger, so the wave is resized and re-checked.
+  - **Wave set.** It sends from the nearest rock alone, then the two nearest, and so on, and takes the first set whose sound ships cover the wave sized for that arrival. A set whose arrival spread exceeds a round is never sent: the estimate fights one wave arriving together, and ships from two distances arrive one by one and are beaten piecemeal (that is what cost greedy its wave at 28170). Otherwise the wave is held and the bot builds toward the smallest sized wave.
+  - **The raid-window plan** (`windowHome`): when the raid that would muster splits (`nextProngs` 2 or more), the plan counts one prong's share of the raiders back at home, so the bot builds a wave sized for the real window.
+  - Applies to adaptive, greedy after its switch and adaptive-concentrate alike (one code path). One prong, or no raid, is H8's rule, so `raid.prongsMax` 1 stays hash-identical to H8 (pinned in h9-bots.test.ts, re-run green).
+- **The trace behind the ruling** (Critic's, confirmed): at tick 28320 raid 6 launches with prongs a5 and p1. Adaptive's 5L/8F wave stood at p1, its post from the previous raid, and reached the hive about 60 ticks after concentrate's. The a5 prong found no ship and turned home; its 5 raiders rejoined the hive mid-battle (hive guards 2 → 4 → 6 → 7) and adaptive lost 13 warships, rebuilt for about 9000 ticks and won at 37380 (20:46). Concentrate's 13 stood at a5 and took the hive at about 28590 (15:53).
+- **Results, before and after (v15, seeds 1-3 identical):** adaptive 20:46 → 15:54, greedy 20:41 → 20:33, concentrate 15:53 → 15:54, undefended 12:03 (unchanged: no split raid). Target 4 is 6 lost against 7 lost: adaptive and concentrate play the same game until a split raid is fought, so it shows no difference on v15. Target 5: greedy +29% (met), undefended −24% (missed). **Targets 4 and 5 on v15 hinged on that one event before the rule; do not calibrate around the old 20:46.**
+- **Raid targets moved:** with the rule adaptive's last raid aims at p1 and p2 (215 ticks out), not a5 and p1; this is the run's timing, not a rule. The archived report (`reports/archive/h9-bots-v15.md`) opens with this note.
+- **The replay.** This task adds no sim state and no input (the bots' changes are decisions only, and `reference-replay.ts` is untouched), so the replay enters the same states as at h9-raids; the determinism gate passed.
+- **Open for the Director:** greedy still loses one wave (28412, a full-strength attack after a raid) and so is 20:33; the rule does not cover a wave sent when no raid is out.
+
+**Bots gate time (solo, nothing else running, `npm run bots`, after round 1):** 66.5 s wall, 65.2 s of runs. Per strategy (3 seeds): adaptive 7.7 s, greedy 7.5 s, idle 1.4 s, drones-only 9.6 s, adaptive-no-raids 3.2 s, adaptive-concentrate 2.8 s, undefended 2.0 s, static sweep about 31 s. The two new strategies cost 4.8 s; against h9-raids' 55.0 s (Critic), the other +6 s is longer winner games (greedy 20:33, drones-only more raids) and the rule's battle estimates, not new strategies.
+
+**Bots gate time (before round 1):** before (main with cw-bots-gate-time, h9-sim code): 56.6 s of runs, 61 s wall in one `cli.ts` run. After: the two new strategies add about 5 s of runs (concentrate 3 × about 1 s, undefended 3 × about 0.5 s); the full gate (`npm run gates`) measured 64.3 s. The remainder of the difference is machine noise: the second run was about 17% slower on every unchanged strategy too (idle 12.5 s → 15.6 s).
+
 ## 2026-11-16 — Director: correction to the cw-bots-gate-time entry
 
 The entry above says the estimate key is computed "once per world and tick (tunables only change inside `step`)". That was round 1 and was rejected: tests and probe scripts change tunables in place. As merged (591ea28, approved 436d64e), the key is reused only while every tunable value still equals a snapshot taken with it, and the map hash is rebuilt with the key. A map edited in place within one tick is still missed until the next tick; no caller does that. The bots gate went from 97 s to about 56–64 s with identical results.
 
+
+## 2026-11-16 · Engineer · h9-client: two client calls the spec left open
+
+**The raid banner always has two lines of room.** DESIGN.md H9 allowed either one line at 375 px under the wide font, or a fixed two-line height whenever raids are on.
+- **Why not one line.** "Raid gathering in 15 s → A5 2T 4S · A6 1T 4S" is about 44 characters, so it cannot fit one line under the wide font. Even H7's one-prong text needs two lines there.
+- **What it does.** Every raid line (muster and fight, one prong or several) keeps `min-height: 2lh`, wraps and clamps at two lines. The map below never moves when a second prong appears or when the muster gives way to the fight.
+- **Cost.** A one-prong raid banner is now two lines tall in a normal font too, and about 15 px of map goes while it shows. It shows only while a raid musters or fights.
+- **Left behind.** With `raid.prongsMax` 3 under the wide font a long muster line is clamped (ellipsis). Normal fonts fit three prongs in two lines.
+
+**The rank line is hidden on a rock that shows its raid line.** The spec says the rank line shows when `raidNext` is true.
+- **Why hide it.** On a rock whose prong is already mustering or out, "raid coming: ..." says the same thing sooner, as in H8. Showing both would need a fourth reserved note line, and the rock sheet's map is at H8's height only by a few pixels (187 px wide-font, against 185).
+- **Result.** The rank line shows on every `raidNext` rock without a raid line, so before a raid it appears on both rocks a split would hit.
+
+
+## 2026-11-16 · Faction AI · h9-raids: prongs in `factions/`, the save shape and the replay restructure
+
+Spec: DESIGN.md "H9 (Milestone 2, iteration 9, spec ready): A wider front", W1–W8 and replay items (g)–(n). Task: BACKLOG.md "### h9-raids". Stacked on `task/h9-sim` (12924fa).
+
+**Architecture: the raid is its prong 0, plus `others`.**
+- `world.raid` is still one raid (one muster, one gap). The per-prong fields (`phase`, `target`, `guards`, `ticksLeft`, `planned`, `flightTicks`, `from`, `retargeted`, `lostEcon`, `lostShips`, `killed`, and `outcome` once done) are the new `Prong` type. `Raid extends Prong` with `id` and an optional `others: Prong[]` (prongs 1 and up). `raidProngs(raid)` lists them in prong order. Chosen over a `prongs: Prong[]` array for three reasons:
+  - W8 says every H8 raid test passes unchanged under `raid.prongsMax` 1. Those tests (raids.test.ts, raids-h8.test.ts, h8-haulers, h8-inputs) build a `Raid` by hand in the flat shape and mutate `raid.phase`. They still do, and they are untouched.
+  - h9-sim's selector tests read `w.raid.planned`, `.guards` and `.phase` directly.
+  - A one-prong raid has no `others` and no `outcome` while it lives, so its state, and the hashes over it, are H8's. The opening check in data-h9.test.ts (chain a48e6bea, every 600 ticks the whole world minus the new keys) still passes with no edit.
+- `raid.phase` on the object is prong 0's phase, and now includes `done` (`ProngPhase`). `raidStatus.phase` is the summary (muster, else fight > out > home).
+- `Prong.outcome` is set only when a prong is `done`. Before that it is derived (`prongOutcome`: `home` is hit or turned back by `lostEcon`), so a `home` prong needs no extra state.
+- `stats.raidProngs` is counted at the raid's end, with `stats.raids`, from each prong's `outcome`. A withered raid counts nothing in either. Rejected: counting a prong when it is done. A raid that withers with a prong already done would then count the prong but not the raid.
+- A prong the hive's fall catches (not `done`) is `withered` in `last.prongs`, even if its outcome was decided (home-bound). A prong done earlier keeps its outcome.
+
+**Readings of the spec:**
+- **W2 at launch** takes `launchMix` on the sum of the prongs' plans, takes the raiders in hive order, and deals them with the same pointer, Thorns first, each type in hive order (lowest id first). Each prong keeps its raiders in hive order, so a one-prong launch is H8's list exactly. `n = min(prongs, max(1, floor(launched ÷ raid.prongMinSize)))` keeps the nearest `n` targets, and `others` is deleted when `n` is 1.
+- **W5** excludes only prongs in `out` or `fight` (as written): a home-bound prong's rock can be taken. A prong with no alternative goes home with `retargeted` still false, as H8's raid did.
+- **W6 gap:** `nextRaidTick = tick + raid.gapTicks` at the tick the last prong is done, in `endRaid`. `prongDone` ends the raid the moment every prong is done, even mid-loop. The raid hook walks the prongs in prong order each tick, and stops if the raid ended.
+- **Holding** (`haulersHeld`) and `raidTarget` are per prong: held while a prong is `out` or `fight` at the node (so the retarget moves it, and a held rock resumes at its own prong's outcome); `raidTarget` and `raidMix` are true from muster until that prong is done. `ProngStatus.holding` counts the haulers waiting at the probe for that prong's target.
+- **`nextProngs`** is W1's formula on today's economy and today's raidable rocks (so it is now 2 or 3 where a split would happen). `rockStatus.raidNext` is unchanged (`raidRank ≥ 1`, marked, `≤ nextProngs`), so it covers every rock a split would hit.
+- **`recycleFleet`'s exclusion** (orders.ts) reads every prong: ships at a target whose prong is in `fight` are kept. Inline in `recycleRank`: orders.ts imports no rule module, by its own header.
+- **Save:** `raidOk` validates the raid (integer id, prong 0's fields) and `others` (absent, or a non-empty list of well-formed prongs; an outcome only on a `done` prong), and every `lastRaid.prongs` entry (at least one, integer target, a known outcome, the counters). It is stricter than h9-sim's "is an array", so data-h9.test.ts's one valid `lastRaid` fixture (`prongs: []`) got one real prong. That test's other cases (a missing `prongs` is corrupt) are unchanged.
+
+**The replay: restructured around the hive that falls at 8010.**
+Raids stop when the hive falls (8010), so items (g)–(n) are placed before the push, and the tail (8100 on) is kept. The three H7/H8 raids were small (2 to 3 raiders): no split was possible, and raid 2's timings are pinned by H8 items (4100 to 4565), so raids 1 and 2 are untouched. From 4400 the replay uses `setTunable` (recorded inputs) so later raids split. The full walk is in reference-replay.ts's header; in short:
+- 4400: `raid.prongMinSize` 2, `raid.econPerRaider` 2, `raid.musterTicks` 150, `raid.gapTicks` 900 (the minimum; 1400 from tick 5000 so the last raid is out at 8010).
+- 4410–4500: one sacrificial 24 hp extractor (`ship.extractor.hp` 24, the fleet limit 13, Flak weight 0 for the window). It docks at p1. A raid's hit has to kill an economy ship, and the economy in the replay is 8 ships that the tail needs, so this ship is the one that dies.
+- Raid 3 (muster 5465, launch 5614): prongs at p1 and a3. The two Flak at p1 go to a2 (5550), so p1 is undefended. a3 is unmarked (5700) with p2 capped (5690) so its extractor idles, then marked again (5870). Prong 1 arrives at a3 at 5859, finds it unraidable and retargets to p2, skipping p1 (prong 0's live target). Prong 0 kills the extractor at p1 (hit); prong 1 is beaten at p2 by the Drone and the Flak there (6060). Overall `hit`; the raid ends at 6305.
+- Raid 4 (muster 7705, launch 7854): 2 prongs at muster, then `guard.capPct` 85 and `raid.hiveKeepPct` 90 (7800 to 7860) leave the hive 2 spare guards, so it launches as one prong at p1. It is out when the hive falls and withers.
+
+**Every moved pinned value (reference-replay.test.ts, same state checked each time):**
+- Determinism final: 2141b502 (h9-sim) to **9a2e957c** (30 checkpoints over 9000 ticks). Main's was cdbdea56.
+- `stats.allocChanges`: 10 to 14 (four setAlloc inputs in the sacrificial window at 4410 and 4500).
+- The hive-falls test ("the third raid out at p1: it withers"): now the last raid, **raid 4** (launched 7854, one prong, out at 8010), `lastRaid.id` 3 to 4, `stats.raids` `{mustered 3, beaten 1, hit 1}` to `{mustered 4, beaten 1, hit 2}`. The assertion is the same: a raid is out when the hive falls (tick 8010), it withers, and it isn't counted. The old raid 3 muster at 7265 is gone: its gap now ends at 7705 (raid 4's muster).
+- H1 amendment (round 2), first hauler picked for a4: tick **8720 to 8750**. The a3 unmark of raid 3 shifted hauler 41's trips, so at 8720 no hauler is idle at the probe (the baseline had one), and the first free one is at 8750. Its states (staffed true, haulable false), its wait to the dock and the dock tick are as before. Its load check moved from "the first pick loads after the dock" to "every hauler picked for a4 before the dock that loads in the run loads after it, with 2": loads go in id order, and the first pick (94) now has a higher id than the second (89), so it loads at about 9050, past the 9000 ticks the replay runs. Loosened in one respect, which is flagged here: the load of the first pick itself is no longer in the run.
+- Instrumentation, not an assertion: the "a1 unmark unbinds 2" check now records only a1's unmark (the replay unmarks a3 and p2 too, from 4400), and ids after the sacrificial extractor (id 55) are one higher.
+- The tail (8100 on) is otherwise unchanged: the 8488 recycle order, the 8760 dial items and every tick in them pass as written. The economy and the warships are back where they were by 7700 (the same 8 economy ships on the same jobs, the same warships at the same nodes); only ids, one hauler's trip phase, ore, ice and crystal (12 crystal delivered from p2) and the p2 Drone and Flak hp (9 and 10, not 10 and 11) differ.
+
+**The replay enters each of (g)–(n)** (a test each, in reference-replay.test.ts): (g) the 5465 muster and its deal; (h) the 5614 launch and the arrivals at 5829 and 5859; (i) the hit with one prong beaten, `raidProngs` and the gap; (j) the shield at p2 while p1's economy is struck; (k) the holds ending at 6060 and 6090; (l) the 5859 retarget, with the raidable rocks in hive order at that moment; (m) raid 4's trim; (n) raids 1 and 2.
+
+**Outside my file list (flag for the Critic):**
+- `packages/sim/src/index.ts`: the re-exports `dealCounts`, `prongCount`, `prongOutcome`, `raidFightsAt`, `raidProngs` and the type `Prong`, and one comment line. The bots and the client need `raidProngs` from `@factory4x/sim`, and a test import from `factions/index.ts` would not give them that. Nothing else changed there.
+- `packages/sim/test/h9-selectors.test.ts` and `data-h9.test.ts`: h9-sim's stub tests. `fieldSummary.raidProngs` is no longer zero after a raid (it counts the one hit prong), a `lastRaid` fixture got a real prong, and the labels no longer say "stub". No assertion was weakened.
+- `npm ci` in the worktree: `node_modules` otherwise links `@factory4x/*` to the main checkout, and the bots and client typecheck against the wrong sim.
+
+**For h9-bots and h9-client (what breaks, by design):**
+- `npm run bots` is green (the bots gate passes at this commit), but one bots test is red: `h8-bots.test.ts` "the shield holds" (greedy, 1 ≠ 0). It reads `world.raid.target` (prong 0's) in `field-runner.ts` and counts an economy loss at the other prong's target as unshielded. A traced run (greedy, seed 1) shows 1 such loss and 0 real violations (an economy ship lost at a rock with a prong in `fight` and a warship there at the start of the tick). h9-bots should read each prong's target (`raidProngs`).
+- The client reads `world.raid.target`, `.phase`, `.guards` and `.from` in view.ts and main.ts (`raidFlight`): prong 0 only until h9-client draws `raidProngs(world.raid)`.
+
+**What `adaptive` meets on v15 (for h9-design-data):** (traced on seeds 1 to 3, identical, since the field is the same)
+- Adaptive's raids: #1 at tick 4862 (econ 6, 3 raiders, 1 prong), #2 at 9573 (econ 6, 3), #3 at 14191 (econ 11, 6), #4 at 18745 (econ 12, 6), #5 at 23556 (econ 14, 7), #6 at 27871 (econ 17, 9: **2 prongs**, 2T3S + 1T3S). It wins before a seventh.
+- So the first 2-prong raid musters at econ 17 (a raid of 9; with `raid.econPerRaider` 2 a size of 8 comes from econ 15), at game minute 15.5, and there is exactly **one** on adaptive: calibration target 1 (at least 2 split raids in the run) is unmet on the shipped data. Greedy has two (#5 at 23401, econ 15, 2T2S + 1T3S; #6 at 27936, econ 16).
+
+## 2026-11-16 · Engineer · h9-client: the map-height rule counts the Recycle section
+
+The H8 rule "the map keeps at least H8's height behind the rock sheet" was measured at 185 px (wide font) with no ships parked at the rock.
+- **What the two-prong test found.** On a prong's rock with a ship parked there (a held hauler, say), the sheet also shows H8's Recycle section, 51 px tall. The map then measures 136 px.
+- **The call.** 136 + 51 = 187, so the extractor row, haulers line and raid lines cost the map nothing against H8. The smoke test asserts `stage + Recycle section height >= 185`, and the no-Recycle states still assert 185 (wide font) and 210 (normal font) directly. The Recycle section is H8's and is not changed here.
+- **Why not shrink it.** Hiding or folding Recycle away would change an H8 control the spec does not touch.
+## 2026-11-16 · Designer · h9-design-data: H9 stays on data v15; three findings for the Director
+
+**Decision:** no value in `data/sim.json` changes, and `dataVersion` stays 15. The probe, the sweep of 16 variants and the per-prong fights are in `reports/archive/h9-design-data-v15.md`.
+
+**Why:**
+- **Target 1** (adaptive meets ≥ 2 two-prong raids) is met only by `raid.prongMinSize` 3 or 2.
+  - Both move adaptive from 15:54 to 18:20 (+15%).
+  - Both put greedy level with or ahead of adaptive: 18:18 at 3; at 2, 18:26 (+1%), so greedy's +10% half fails there too.
+  - Under designer.md and PROCESS, a value that moves a winner by more than 10% or changes the strategy order goes to the Director and isn't committed.
+- **Target 4 is missed at every value tried.** Concentrating costs time, not ships: at min 3, concentrate is 27% slower but loses only 1 more ship. That is because a concentrated guard saves its own rock outright.
+- **Target 5b is a rule finding.** In every one of 16 variants, including every lever that makes raids hurt more, undefended was 23–65% faster than adaptive. In the bots, defending saves no economy ships (5 against 6), and raids open the hive. "No faster refill" was respected: no regrowth, repair, warship build time or warship cost was moved in any variant.
+- Targets 2, 3, 5a, 6, H8 staffing and flags 1–7 are met on v15. The per-prong fights give the same results in a second order.
+
+**Walk of the candidate `raid.prongMinSize` 3** (the four checks):
+- **Opening:** the first raid (3 raiders at 2:42) is `floor(3 ÷ 3)` = 1 prong, so the opening is unchanged (first raid 2:42 in every variant).
+- **Every raid phase:** splits start at a raid of 6, from 11 economy ships. The muster, flight, fight, hold and outcome rules are unchanged; only how often they run on two rocks changes.
+- **Limits:** at the fleet limit, no change. With one mined rock it is 1 prong. At `raid.prongsMax` 3 with min 3, adaptive is the same as at min 3 with max 2 (18:20), because a raid of 9 or more is rare at adaptive's peak economy of 16.
+- **Siblings:** min 2 gives adaptive the same 18:20; min 2 with max 3 gives 23:25 (+47%).
+
+**For the Director:** the three options are in DESIGN.md "Calibration result (h9-design-data, data v15)". The Director's rulings were applied:
+- windowHome and the no-piecemeal-wave rule are part of the bots measured here;
+- greedy's lost wave at 28412 is treated as greedy behaviour, not calibrated around;
+- staffing is judged against H8's target, and is met on v15 and on min 3.
+
+## 2026-11-16 · Director: h9-design-data rulings
+
+*(Recorded by the Designer, as the Director ruled.)*
+
+**Decisions:**
+1. **Ship `raid.prongMinSize` 3, as data v16.** H9's point is that the owner meets split raids, and on v15 adaptive never finished one, so the build wouldn't test the hypothesis. The Director accepts that:
+   - adaptive moves from 15:54 to 18:20 (+15%);
+   - greedy finishes level with it (18:18).
+
+   Target 5a (greedy at least 10% slower) becomes a reported finding, not a met target.
+2. **Target 4 is reworded** to "`adaptive-concentrate` loses at least 2 more economy ships than `adaptive`, **or** finishes at least 10% slower". It is met on v16 by time (23:13 against 18:20, +27%). DESIGN.md and BACKLOG.md carry the wording.
+3. **Target 5b (undefended) is report-only for this build.** It is a rule finding: in the bots, defending doesn't pay against split raids. It goes to the owner as a fun question in the handoff (DESIGN.md H9 fun question 4), next to their attrition note. The rule options are recorded as "H10 candidates" in DESIGN.md:
+   - a prong that has hit rolls on to the next mined rock;
+   - hits steal the rock's buffer or the probe's stock.
+
+   They are not built now.
+
+**Applied (Designer):**
+- `data/sim.json`: `raid.prongMinSize` 3 and `dataVersion` 16. The pin test (`data-h9.test.ts`) changes its version line, title and the H9 table heading it reads.
+- The full suite was re-run on v16: `reports/archive/h9-design-data-v16-bots.md`, with 3 seeds, all identical, and flags 1–7 MET.
+- The per-prong fights print the same on v16 as on v15.
+
+**Correction to the entry above:** "undefended was 23–65% faster in every one of 16 variants" should read **8–65%**. At `raid.gapTicks` 5400 with min 3 it was 8% faster. The archived report is corrected.
+
+## 2026-11-16 · Designer · h9-design-data: two edits outside the Designer's files, authorised by the Director
+
+**Authorisation:** the Director authorised both edits in the h9-design-data brief. designer.md routes a pinned value outside the Designer's files to the Director, so neither was made before that.
+
+1. **`packages/sim/test/reference-replay.test.ts`, "H9 (n)":**
+   - The `raid.prongMinSize` pin moves from 4 to 3, in the title, the pin and `2 * 3`.
+   - It stays a literal, so it still catches drift.
+   - A comment explains why raids 1 and 2 stay one prong: they have at most 3 raiders, under 2 × 3.
+   - What the test checks is unchanged.
+2. **The bots' H9 report lines (`packages/bots/src/field-flags.ts` `computeH9Lines`, `cli.ts`, and the test in `h9-bots.test.ts`):**
+   - Target 4 checks the reworded test: at least 2 more economy ships lost, **or** at least 10% slower.
+   - Targets 5a and 5b are separate lines marked `reported`, printed REPORTED, never MET or MISSED.
+   - Bot behaviour is unchanged. Only the report text and its check changed.
+   - `reports/archive/h9-design-data-v16-bots.md` is regenerated. It reads: target 4 MET (concentrate +27% on every seed), greedy +0% and undefended −28% REPORTED.
+
+## 2026-11-16 · Engineer · h9-client: final round on data v16
+
+Merged the approved lower tasks (h9-sim 12924fa, h9-raids a34be08, h9-bots be6ede0, h9-design-data a49e163) and origin/main; no conflicts.
+- **One value moved in the client tests:** `raid.prongMinSize` default 4 to 3 (data v16). `packages/client/test/h9-client.test.ts` pinned the old default, so it now pins 3. Min 2 and max 12 are unchanged, and no assertion was loosened.
+- **Smoke tests are unaffected.** The two-prong tests set `raid.prongMinSize` 2 themselves, as the spec tests do.

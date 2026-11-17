@@ -225,8 +225,8 @@ export function syncExtractors(world: World): void {
  * F5, extractors. First, an extractor bound to a node that is no longer mineable (its mark was turned off) is
  * unbound. Then every unbound extractor that is parked (idle at the probe, at the node it was unbound from, or
  * just built), in id order, is dispatched to the mineable node nearest the probe whose bound plus free extractors
- * are below its slots (ties to the lower index), and binds to it at once. With no such node it flies home and parks
- * at the probe as idle. An unbound extractor in flight finishes its leg first and is dispatched from where it lands.
+ * are below its `extCap` (H9 X2: the dial's count, else the slots; ties to the lower index), and binds to it at
+ * once. With no such node it flies home and parks at the probe as idle. An unbound extractor in flight finishes its leg first and is dispatched from where it lands.
  */
 export function runExtractors(world: World): void {
   const f = fieldOf(world);
@@ -239,7 +239,7 @@ export function runExtractors(world: World): void {
   const order = byProbeDistance(world);
   for (const s of f.econ) {
     if (s.type !== 'extractor' || s.target !== null || s.at === null) continue;
-    const node = order.find((n) => isMineable(world, n) && bound[n]! + f.free[n]! < world.nodes[n]!.slots);
+    const node = order.find((n) => isMineable(world, n) && bound[n]! + f.free[n]! < extCap(world, n));
     if (node !== undefined) {
       s.target = node;
       bound[node] = bound[node]! + 1;
@@ -311,9 +311,9 @@ export function haulRoundTrip(world: Readonly<World>, node: number): number {
  * Per node, the extractors staffing counts (H1 amendment, with h8-sim's extension): the extractor ships bound there
  * (docked or on their way), plus the committed extractors, at the node F5 would send them to now. Committed means
  * the one in the probe's bay and a full extractor share (it starts in F3 as soon as the bay is free). They fill the
- * mineable nodes nearest the probe with a free slot, ties to the lower index, as F5 dispatches; with no free slot
- * they count nowhere. Without them, the landing's first 40 ore all go to extractor shares before any extractor
- * launches (tick 120), and the first hauler waits for probe mining (h8-sim, DECISIONS.md).
+ * mineable nodes nearest the probe with a free slot under `extCap` (H9 X2), ties to the lower index, as F5
+ * dispatches; with no free slot they count nowhere. Without them, the landing's first 40 ore all go to extractor
+ * shares before any extractor launches (tick 120), and the first hauler waits for probe mining (h8-sim, DECISIONS.md).
  */
 export function staffCounts(world: Readonly<World>): number[] {
   const f = fieldOf(world);
@@ -325,8 +325,8 @@ export function staffCounts(world: Readonly<World>): number[] {
   if (pending === 0) return out;
   for (const n of byProbeDistance(world)) {
     if (!isMineable(world, n)) continue;
-    const slots = world.nodes[n]!.slots;
-    while (pending > 0 && out[n]! + f.free[n]! < slots) {
+    const cap = extCap(world, n);
+    while (pending > 0 && out[n]! + f.free[n]! < cap) {
       out[n] = out[n]! + 1;
       pending -= 1;
     }
@@ -426,9 +426,9 @@ export function haulerShortfall(world: Readonly<World>): number {
 
 /**
  * No surplus extractors (Director, 2026-11-14, with hauler.autoNeed 1): the free extractor slots. Σ over mineable
- * (Mine-marked, unguarded) nodes of max(0, slots − free extractors − extractor ships bound there, docked or on their
- * way), minus the unbound extractor ships (idle at the probe or flying home: F5 puts them in the next slot that
- * opens), minus an extractor in the bay. A full share is not subtracted: it is what the bay would build.
+ * (Mine-marked, unguarded) nodes of max(0, extCap − free extractors − extractor ships bound there, docked or on
+ * their way; H9 X2: extCap is the dial's count, else the slots), minus the unbound extractor ships (idle at the
+ * probe or flying home: F5 puts them in the next slot that opens), minus an extractor in the bay. A full share is not subtracted: it is what the bay would build.
  */
 export function extractorShortfall(world: Readonly<World>): number {
   const f = fieldOf(world);
@@ -436,7 +436,7 @@ export function extractorShortfall(world: Readonly<World>): number {
   let open = 0;
   for (const n of world.nodes) {
     if (n.index === PROBE || !isMineable(world, n.index)) continue;
-    open += Math.max(0, n.slots - f.free[n.index]! - bound[n.index]!);
+    open += Math.max(0, extCap(world, n.index) - f.free[n.index]! - bound[n.index]!);
   }
   for (const s of f.econ) if (s.type === 'extractor' && s.target === null) open -= 1;
   if (f.bays.extractor.ticksLeft > 0) open -= 1;
@@ -601,6 +601,51 @@ export function applySetMine(world: World, node: number, on: boolean): void {
 /** H8 H7 `setHaulers`: the node's hauler count, or null for Auto. Kept while the rock is unmarked. */
 export function applySetHaulers(world: World, node: number, count: number | null): void {
   fieldOf(world).haulerSet[node] = count;
+}
+
+/**
+ * H9 X2: the most extractors `node` takes: the count the player set (`setExtractors`), or the node's slots for All
+ * (null). F5's dispatch, H4b's free slots and the committed extractors' pick read it where H7 and H8 read the slots.
+ * A set count is never above the slots (X1), and the min keeps it so for any state.
+ */
+export function extCap(world: Readonly<World>, node: number): number {
+  const n = world.nodes[node]!;
+  const set = world.field?.extractorSet[node] ?? null;
+  return set === null ? n.slots : Math.min(set, n.slots);
+}
+
+/**
+ * H9 X1: the lowest count `setExtractors` accepts at `node`: 1 for an asteroid; max(1, free extractors) for a
+ * captured pocket or the hive, because free extractors aren't ships and can't be sent away. (An asteroid has no
+ * free extractors, so the one formula covers both.)
+ */
+export function extractorMinCount(world: Readonly<World>, node: number): number {
+  return Math.max(1, fieldOf(world).free[node]!);
+}
+
+/**
+ * H9 X1 and X3, `setExtractors`: set the node's count (null is All). If the node now has more extractor ships bound
+ * than `extCap` allows (bound + free > extCap), the surplus is unbound this tick: those still on their way first,
+ * then docked ones, highest id first within each group. An unbound ship keeps its place: F5 re-dispatches it later
+ * this tick from where it is (a docked one to another rock with room, or home to park idle; one in flight finishes
+ * its leg first, as F5 does for any unbound extractor). A docked one takes nothing with it: the buffer stays.
+ * Raising the count, or All, needs nothing here: F5 and H4b read `extCap` on this tick's pass. X3 never reads raid state.
+ */
+export function applySetExtractors(world: World, node: number, count: number | null): void {
+  const f = fieldOf(world);
+  f.extractorSet[node] = count;
+  let surplus = boundCounts(world)[node]! + f.free[node]! - extCap(world, node);
+  if (surplus <= 0) return;
+  const bound = f.econ.filter((s) => s.type === 'extractor' && s.target === node);
+  const inFlight = bound.filter((s) => !isDocked(s)).sort((a, b) => b.id - a.id);
+  const dockedHere = bound.filter((s) => isDocked(s)).sort((a, b) => b.id - a.id);
+  for (const s of [...inFlight, ...dockedHere]) {
+    if (surplus <= 0) break;
+    s.target = null;
+    surplus -= 1;
+  }
+  // A docked extractor that left no longer works the node: its count drops now.
+  syncExtractors(world);
 }
 
 /** Economy ships of each type parked at `node` (not in transit). */

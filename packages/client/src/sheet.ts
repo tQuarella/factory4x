@@ -77,6 +77,8 @@ export interface SheetHost {
   startMove(from: number, part: 'all' | 'split'): void;
   /** `client.moveGesture`: 1 drag, 0 tap-Move-tap. */
   moveGesture(): number;
+  /** H9 `client.haulerStepper`: 1 brings H8's hauler stepper back under the extractor row. */
+  haulerStepper(): number;
   close(): void;
 }
 
@@ -155,6 +157,7 @@ export class Sheet {
       data: () => host.session.data,
       send: (i) => host.send(i),
       recycle: (node) => host.recycle(node),
+      haulerStepper: () => host.haulerStepper() === 1,
       close: () => host.close(),
     };
   }

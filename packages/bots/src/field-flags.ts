@@ -12,6 +12,8 @@ export interface FieldFlag {
   name: string;
   pass: boolean;
   detail: string;
+  /** A reported finding, not a target (H9 targets 5a and 5b, Director 2026-11-16): printed REPORTED, never MET or MISSED. */
+  reported?: boolean;
 }
 
 const ALL: readonly ShipType[] = ['drone', 'lancer', 'flak'];
@@ -125,4 +127,88 @@ export function computeFieldFlags(results: readonly FieldResult[], data: SimData
     });
   }
   return flags;
+}
+
+// ---- The two H9 report lines (DESIGN.md "Calibration targets (H9)" 4 and 5) -------------------------------------
+
+/** A run's raids by prong count (a raid that did not split is 1), and the economy ships lost per prong target (rock id), from its raid log. */
+export function prongSummary(r: FieldResult): { byCount: Record<number, number>; lostByTarget: Record<string, number> } {
+  const byCount: Record<number, number> = {};
+  const lostByTarget: Record<string, number> = {};
+  for (const raid of r.raidLog) {
+    const n = Math.max(1, raid.prongs.length);
+    byCount[n] = (byCount[n] ?? 0) + 1;
+    for (const p of raid.prongs) lostByTarget[p.target] = (lostByTarget[p.target] ?? 0) + p.econLost;
+  }
+  return { byCount, lostByTarget };
+}
+
+/** The hive time of a won run, in ticks, else null. */
+const winTick = (r: FieldResult | undefined): number | null => (r !== undefined && r.outcome === 'won' ? r.hiveTick : null);
+
+/**
+ * A strategy's win time against `adaptive` on the same seed, as a whole percent (+12 is 12% slower), or null when
+ * either did not win. Integer math, rounded to the nearest percent.
+ */
+export function slowerPct(results: readonly FieldResult[], name: string, seed: number): number | null {
+  const a = winTick(results.find((r) => r.strategy === 'adaptive' && r.seed === seed));
+  const t = winTick(results.find((r) => r.strategy === name && r.seed === seed));
+  if (a === null || t === null || a === 0) return null;
+  return Math.round(((t - a) * 100) / a);
+}
+
+/**
+ * The H9 report lines (DESIGN.md "Calibration targets (H9)", as the Director ruled on 2026-11-16):
+ *  - splitting matters (target 4, reworded): `adaptive-concentrate` loses at least 2 more economy ships to raids than
+ *    `adaptive`, or finishes at least 10% slower, on every seed;
+ *  - ignoring raids costs (targets 5a and 5b): `greedy` and `undefended` against `adaptive`. Report-only for H9, so both
+ *    are `reported`: the line shows each one's win time against adaptive and whether it reached +10%.
+ */
+export function computeH9Lines(results: readonly FieldResult[]): FieldFlag[] {
+  const ad = rowsOf(results, 'adaptive');
+  const out: FieldFlag[] = [];
+  {
+    const co = rowsOf(results, 'adaptive-concentrate');
+    const rows = ad.map((a) => ({ seed: a.seed, a: lostTotal(a), c: co.find((r) => r.seed === a.seed) }));
+    const pctOf = (x: { seed: number }): number | null => slowerPct(results, 'adaptive-concentrate', x.seed);
+    const ok = (x: { seed: number; a: number; c: FieldResult | undefined }): boolean => {
+      if (x.c === undefined) return false;
+      const pct = pctOf(x);
+      return lostTotal(x.c) >= x.a + 2 || (pct !== null && pct >= 10);
+    };
+    const pctText = (x: { seed: number }): string => {
+      const pct = pctOf(x);
+      return pct === null ? 'time n/a' : `${pct >= 0 ? '+' : ''}${pct}%`;
+    };
+    out.push({
+      name: 'Splitting matters: adaptive-concentrate loses at least 2 more economy ships to raids than adaptive, or finishes at least 10% slower, on every seed',
+      pass: ad.length > 0 && rows.every(ok),
+      detail: ad.length === 0 || co.length === 0 ? 'no runs' : rows.map((x) => `seed ${x.seed}: adaptive lost ${x.a}, concentrate lost ${x.c === undefined ? '-' : lostTotal(x.c)}, concentrate ${pctText(x)} ${ok(x) ? 'ok' : 'MISS'}`).join('; '),
+    });
+  }
+  {
+    const half = (name: string, mayNotWin: boolean): { pass: boolean; text: string } => {
+      const rs = ad.map((a) => ({ seed: a.seed, r: results.find((x) => x.strategy === name && x.seed === a.seed), pct: slowerPct(results, name, a.seed), adWon: a.outcome === 'won' }));
+      const ok = (x: { r: FieldResult | undefined; pct: number | null; adWon: boolean }): boolean => x.r !== undefined && (x.pct !== null ? x.pct >= 10 : mayNotWin && x.adWon && x.r.outcome !== 'won');
+      return {
+        pass: rs.length > 0 && rs.every(ok),
+        text: `${name}: ${rs.map((x) => `seed ${x.seed} ${x.r === undefined ? 'no run' : x.pct !== null ? `${x.pct >= 0 ? '+' : ''}${x.pct}%` : x.r.outcome === 'won' ? 'n/a' : x.r.outcome} ${ok(x) ? '(at least 10% slower)' : '(under 10% slower)'}`).join(', ')}`,
+      };
+    };
+    const g = half('greedy', false);
+    const u = half('undefended', true);
+    out.push({
+      name: 'Ignoring raids costs (5a, reported finding): greedy against adaptive',
+      pass: ad.length > 0 && g.pass,
+      detail: ad.length === 0 ? 'no runs' : g.text,
+      reported: true,
+    });
+    out.push({
+      name: 'Ignoring raids costs (5b, report-only rule finding): undefended against adaptive (undefended may fail to win)',
+      pass: ad.length > 0 && u.pass,
+      detail: ad.length === 0 ? 'no runs' : u.text,
+      reported: true,
+    });
+  }
+  return out;
 }

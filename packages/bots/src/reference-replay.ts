@@ -46,8 +46,8 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *
  * The raids (DESIGN.md H7 R1-R9) run on their own from tick 95, when the economy reaches 6 ships, and the script
  * leaves them alone: raid 1 musters at a1 and, a1 being stopped at 600, retargets to the captured p1, where the rally
- * defenders beat it (tick 900). Raid 2 (muster 3600) hits p1 after the ships went to p2. Raid 3 (muster 7265) is at p1
- * when the hive falls at 8010, and withers.
+ * defenders beat it (tick 900). Raid 2 (muster 3600) hits p1 after the ships went to p2. Under h7 and h8 raid 3 (muster 7265)
+ * was at p1 when the hive fell at 8010, and withered; under h9-raids that is raid 4 (see below), and raid 3 is a prong raid.
  *
  * h8-raids (DESIGN.md H8 H9 and H10; raid.shieldEcon and raid.haulersHold are 1 in the shipped data, so every raid above
  * runs under both):
@@ -59,6 +59,44 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
  *   - 8440: recycleShips of one Flak at p1. The Drone's fall at 4290 freed a place in the fleet limit that the Flak weight
  *     filled, so p1 held two Flak by 8450 and the 1-ship fallback below would not have been exercised.
  *
+ * h9-sim (DESIGN.md H9 "Save, data version and replay", the extractor dial, items (a)-(f)); reference-replay.test.ts
+ * checks each:
+ *   - 1 (f): setExtractors on the guarded pocket p2 and the guarded hive: invalid, ignored, nothing changes.
+ *   - 8760: ship.speedSu 20 (after a4's extractor launched at 8750, so the H8 a4 item keeps its timing; it makes the dial's
+ *     extractor flights short). (e) setExtractors a1 1 while a1 is unmarked: kept. (f) setExtractors a2 0 and a2 3 (above
+ *     its 2 slots): invalid, ignored, nothing changes.
+ *   - 8761: a1 marked again with setExtractors a2 1. (a) a2's highest-id docked extractor is unbound and re-dispatches
+ *     to a1, the marked rock with room; (e) a1 takes one (its kept count), not its two slots; (b) the Extractor stays
+ *     enough, its share held and its bay idle, with a1 and a2 each one under their slots. a2 keeps its hauler (set 1).
+ *   - 8800: (d) setExtractors a1 null (All): the bay starts that tick, and the extractor docks at a1 (need 3 haulers).
+ *   - 8880: (a) setExtractors a1 1: the new extractor finds no marked rock with room, flies home and parks idle;
+ *     (b) the Extractor is enough again; (c) a1's target drops from 3 to 2 and the first of its haulers home leaves it
+ *     at that delivery and parks idle.
+ *
+ * h9-raids (DESIGN.md H9 "Save, data version and replay", items (g)-(n); reference-replay.test.ts checks each). From tick 4400
+ * (raid 2 is over at 4565 and the items above it are untouched) raids may split from 4 raiders: raid.prongMinSize 2,
+ * raid.econPerRaider 2, a muster of 150 and a gap of 900 (1400 from tick 5000, so that the last raid is out when the hive falls).
+ * One sacrificial extractor is built to be hit: ship.extractor.hp 24 for its build (4410-4500), with the fleet limit 13 and the
+ * Flak weight 0 for that window, so the free place goes to the Extractor, which docks at p1 (the only rock with room).
+ *   - (n) Raids 1 and 2 (3 raiders or fewer, under the split size 2 x raid.prongMinSize 4 of the data) stay one prong, although
+ *     raid 2 has three raidable rocks.
+ *   - (g) Raid 3 musters at 5465 with 2 prongs, at p1 and a3 (hive order): its 2 Thorns and 3 Spores are dealt 1T 2S and 1T 1S (W2).
+ *   - 5550: the two Flak at p1 go to a2, so p1 is undefended. 5690: p2 is capped at one extractor (its free one fills it), so a3's
+ *     extractor, which the next input unbinds, has nowhere to go but the probe. 5700: a3 is unmarked.
+ *   - (h) Both prongs launch at 5614 and arrive on different ticks: p1 at 5829, a3 at 5859.
+ *   - (l) a3 is no longer raidable on arrival (5859): prong 1 retargets once, to p2, skipping p1, the nearest rock but prong 0's live
+ *     target (W5). p2 is raidable because the unmark sent hauler 41 there; the Drone and the Flak at p2 defend it.
+ *   - 5870: a3 is marked again and its extractor goes back to it. 6000: the p2 cap is lifted and the Flak return to p1.
+ *   - (j) Prong 0 strikes the 24 hp extractor at p1 (no warship there) every round from 5850, three damage a round, while prong 1,
+ *     at p2, has warships at its target and so strikes warships only (the shield).
+ *   - (i) Prong 1 is beaten at p2 in its first round (6060), where prong 0 kills the extractor: the raid is a hit (one prong
+ *     beaten, one hit; raidProngs {beaten 2, hit 2} with raids 1 and 2), and the gap runs from the last prong, which lands at 6305.
+ *   - (k) The hold at p2 ends at prong 1's outcome (6060) while prong 0 still fights at p1; p1's ends at its own (6090).
+ *   - 6070: p2 is unmarked until 6600, so that hauler 41, which the a3 unmark sent to p2, goes back to a3 at its next delivery.
+ *   - (m) Raid 4 musters at 7705 with 2 prongs (p1 and a3). At 7800 guard.capPct 85 and raid.hiveKeepPct 90 leave the hive 2 spare
+ *     guards (both back to 50 at 7860), so at its launch (7854) it drops to one prong, at p1. It is out when the hive falls at 8010,
+ *     and withers (raid 4, the old raid 3).
+ *
  * Node indices are the field's nodes in frame order: 0 probe, 1-7 a1-a7, 8 p1 (ice), 9 p2 (crystal), 10 heart.
  * It runs on the shipped data, so a calibration that changes the field's guards can break the script
  * (packages/sim/test/reference-replay.test.ts says so); the tunables it depends on are set at tick 0 to keep that
@@ -68,6 +106,7 @@ import { SEND_ALL, defaultData, type Input, type Replay } from '@factory4x/sim';
 const at = (tick: number, ...inputs: Input[]) => inputs.map((input) => ({ tick, input }));
 const tun = (key: Extract<Input, { type: 'setTunable' }>['key'], value: number): Input => ({ type: 'setTunable', key, value });
 const mine = (node: number, on: boolean): Input => ({ type: 'setMine', node, on });
+const ext = (node: number, count: number | null): Input => ({ type: 'setExtractors', node, count });
 const alloc = (shipType: Extract<Input, { type: 'setAlloc' }>['shipType'], weight: number): Input => ({ type: 'setAlloc', shipType, weight });
 
 export const referenceReplay: Replay = {
@@ -107,6 +146,7 @@ export const referenceReplay: Replay = {
       mine(7, false),
       { type: 'setRally', node: 8 },
     ),
+    ...at(1, ext(9, 1), ext(10, 1)), // h9-sim (f): guarded, so invalid
     ...at(280, alloc('extractor', 0), alloc('hauler', 0)),
     ...at(400, mine(3, true)),
     ...at(450, alloc('drone', 3), alloc('flak', 2)),
@@ -117,8 +157,26 @@ export const referenceReplay: Replay = {
     ...at(4100, { type: 'sendShips', from: 9, to: 8, counts: { drone: 1, lancer: 0, flak: 0 } }),
     ...at(4250, tun('guard.thorn.damage', 6), tun('guard.spore.damage', 6)),
     ...at(4330, tun('guard.thorn.damage', 1), tun('guard.spore.damage', 1)),
+    // h9-raids: the prong raids (see above). Raids may now split from 4 raiders, come every 900 ticks and muster in 150.
+    ...at(4400, tun('raid.prongMinSize', 2), tun('raid.econPerRaider', 2), tun('raid.musterTicks', 150), tun('raid.gapTicks', 900)),
+    // A sacrificial extractor with 24 hp (a limit of 13 lets it be built; it docks at p1, the only rock with room).
+    ...at(4410, tun('ship.extractor.hp', 24), tun('field.fleetCap', 13), alloc('flak', 0), alloc('extractor', 1)),
+    ...at(4500, tun('ship.extractor.hp', 6), alloc('extractor', 0), tun('field.fleetCap', 12), alloc('flak', 2)),
+    // The gap after the next raid ends is 1400, so the last raid is out when the hive falls.
+    ...at(5000, tun('raid.gapTicks', 1400)),
+    // Raid 3 (muster 5465, launch 5614, prongs at p1 and a3): p1 is left undefended, a3 is unmarked while the prongs fly.
+    ...at(5550, { type: 'sendShips', from: 8, to: 2, counts: SEND_ALL }),
+    ...at(5690, ext(9, 1)),
+    ...at(5700, mine(3, false)),
+    ...at(5870, mine(3, true)),
+    ...at(6000, ext(9, null), { type: 'sendShips', from: 2, to: 8, counts: SEND_ALL }),
+    ...at(6070, mine(9, false)),
+    ...at(6600, mine(9, true)),
+    // Raid 4 (muster 7705, launch 7854): the hive can spare only 2 when it launches, so it drops to one prong.
     ...at(7000, tun('field.fleetCap', 40), { type: 'setRally', node: 0 }, alloc('drone', 5)),
     ...at(7750, { type: 'sendShips', from: 0, to: 10, counts: SEND_ALL }),
+    ...at(7800, tun('guard.capPct', 85), tun('raid.hiveKeepPct', 90)),
+    ...at(7860, tun('guard.capPct', 50), tun('raid.hiveKeepPct', 50)),
     ...at(8100, tun('hauler.autoNeed', 1), alloc('hauler', 2), alloc('drone', 0), alloc('flak', 0)),
     ...at(8150, { type: 'recycleFleet', counts: { extractor: 0, hauler: 0, drone: 3, lancer: 0, flak: 0 } }),
     ...at(8400, { type: 'setHaulers', node: 2, count: 1 }),
@@ -129,5 +187,10 @@ export const referenceReplay: Replay = {
     ...at(8660, mine(9, false), mine(10, false), alloc('extractor', 3)),
     ...at(8670, mine(8, false)),
     ...at(8720, mine(4, true), tun('field.fleetCap', 45), tun('ship.hauler.cargo', 2)),
+    // h9-sim: the extractor dial (see above).
+    ...at(8760, tun('ship.speedSu', 20), ext(1, 1), ext(2, 0), ext(2, 3)),
+    ...at(8761, mine(1, true), ext(2, 1)),
+    ...at(8800, ext(1, null)),
+    ...at(8880, ext(1, 1)),
   ],
 };
