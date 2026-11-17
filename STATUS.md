@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 10, hypothesis H10: attrition, pending Q26)
-**State:** Iteration 10 Plan step. Owner played build-20261117-1 (6c86157), triaged (ca9a425). Waiting on Q26 (default A). Then spec (resume Designer a867adefdc2bc7b17), split, build.
+**State:** Iteration 10 Build step. Q26 answered A (18a2fc8); spec and split bd702b9. Building h10-sim and h10-client (phase 1, slowdown) in parallel. Next: Critic on each, h10-bots on approved h10-sim, h10-design-data, h10-client phase 2, and the stack lands via merge-task h10-client.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (public since 2026-11-15, Q23)
 **Last build:** build-20261117-1 (H9 A wider front), commit 7055e2a, live (CI 44003503570 gates and deploy green; site shows 7055e2a · data v16). Release gates passed locally (302/302 smoke).
@@ -11,11 +11,14 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 10 ledger
 
-Launches: 1 / 12.
+Launches: 3 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | triage build-20261117-1 owner playtest; H10 candidates | launch | Plan (ca9a425): H10 A recommended (hive rebuilds one guard per 20 s), auto-slowdown ride-along; Q26 to owner |
+| r1 | designer | H10 spec + task split | resume | Owner picked A (18a2fc8). Spec and split, Director rulings (bd702b9) |
+| 2 | core-engineer | h10-sim | launch | Build: rebuild queue D1–D6, roll-on L1–L5 off, data v17, save, selectors, replay (a)–(h) |
+| 3 | engineer | h10-client | launch | Phase 1: auto-slowdown S1–S6 in parallel from main; phase 2 after h10-sim approval |
 
 ## Iteration 9 ledger
 
