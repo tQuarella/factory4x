@@ -30,6 +30,23 @@ Known from the team (not hidden from you):
 Also open: Q25 (next direction, below). Q18 (pillar 1 wording, only if a fleet cap ships).
 Protected files changed this build: none.
 
+**Answered (owner, 2026-11-17, in chat):** 1, at 4x they missed where the second raid was going, and asked for an auto-slowdown to 1x while a raid is coming, then back. 2, yes, but to shift toward warships rather than economy. 3, the dial worked well. 4, ignoring raids felt fine with enough economy. Scored against the success criteria in PLAYTEST_LOG.md (build-20261117-1).
+
+## Q26. How should the next build (H10) make the hive wear down? (2026-11-17, Designer)
+
+You picked attrition first (Q25). Your H9 answers point the same way: ignoring raids felt fine, and you want the game to lean toward warships. The cause is one rule: the hive replaces every guard it loses in about 16 seconds, so no fight leaves a mark. **Whatever you pick, this comes with it:** when a raid starts gathering, the game drops to 1x and shows "1x for the raid · back to 4x after". When every part of the raid is decided, it goes back to your speed. If you change speed yourself during the raid, your choice sticks. Pause is never touched, and the tuning panel can turn it off.
+
+Pick one:
+- **A (recommended): wear the hive down.** The hive rebuilds its dead one at a time, about one every 20 seconds of game time. Beating a full raid leaves it 12 guards short for about 4 minutes, and its next raids are small. A push that loses still leaves it weaker for the next one. Its sheet shows "Guards 18 / 30".
+- **B: A, plus hits roll on.** A raid that wins at a rock moves on to the next mined rock instead of going home. About a third of a build more.
+- **C: strike back.** Only beaten raids leave the hive short, for 90 s with a countdown. A lost push still resets in seconds.
+
+Answer like "A", "A only", "B" or "C". "A" means that if the bots still show defending doesn't pay under A, we add B's roll-on in the same build rather than stop to ask you; "A only" rules that out. Default if unanswered: A.
+
+Optional, VISION.md pillar 4: A fits the current wording, but "waiting never makes things worse" could be read as "damage you dealt never heals". Proposed: "4. **Pressure, not a clock.** Raids grow with what you build, never with time, so waiting never makes the enemy stronger than it started. Damage you deal heals slowly, so pressing an advantage pays. The challenge is balancing an efficient economy against the force that protects it." Add "and pillar 4" to approve it; the Director applies it with a permission prompt. Default: no edit.
+
+Details: DESIGN.md → "H10 candidates (iteration 10)".
+
 ## Q25. Where should the game go next? (2026-11-16, Director)
 
 Your note after H8: rebuilds feel instant, so there's no war of attrition, and the game is drifting from Factorio toward Starcraft. You suggested logistics ("distilled Factorio") that unlock advantages in combat ("distilled Starcraft"). H9 adds a third thing: defending doesn't pay yet. These overlap, so pick a direction, and the Designer turns it into the next build:

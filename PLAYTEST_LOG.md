@@ -350,4 +350,58 @@ Answers to the H9 fun questions (QUESTIONS.md handoff block), in chat:
 
 Also (Q25, 2026-11-17): "C": attrition first, then logistics feeds combat.
 
-**Interpretation:** pending Designer triage.
+**Interpretation (Designer, 2026-11-17, iteration 10 triage; all quotes are the owner's):** **H9 is not supported as a decision, but the dial is.** The split raid reached the owner, but it didn't produce the choice the claim was about, for two separate reasons:
+- **They couldn't read it at 4x:** "I ran at 4x and missed where the second raid was going several times." A choice you can't see in time isn't a choice.
+- **When they could, getting it wrong cost nothing:** "ignoring raids felt fine with enough econ." That is the bots' rule finding (undefended takes the hive 28% faster than adaptive on v16, DESIGN.md "Calibration result (h9-design-data, data v16)"), now confirmed in play.
+
+H2 taught the same lesson: a trade-off the player doesn't feel won't register. H9 made more places to defend, but no reason to defend them. The extractor dial works ("Yes, that worked well"), and the owner used it to shift toward warships rather than to dodge raids (fun question 2).
+
+*Success criteria (DESIGN.md H9):*
+
+| # | Criterion | Score | Evidence |
+| --- | --- | --- | --- |
+| 1 | Names a moment of choosing between two raided rocks | **Not met** | "missed where the second raid was going several times". No moment of choice is named, and ignoring raids "felt fine". |
+| 2 | Splits warships across two rocks at least once | **Not answered** | Not mentioned. Missing the second target suggests they mostly didn't. |
+| 3 | A two-prong raid ends with one rock held, and they can say what happened at the other | **Not met (readability)** | They couldn't follow the second prong at 4x. |
+| 4 | Uses the extractor dial; no complaint about haulers or rebuilds | **Met** | "Yes, that worked well." They used it (fun question 2: "Yeah"). |
+| 5 | Split raids not called a chore, a timer or a punishment | **Met** | No such language. "Felt fine" is the opposite problem: raids are ignorable, not oppressive. |
+| 6 | Phone checks: the sheet and the two-prong banner fit, and nothing shifts | **Not answered** | No layout complaint. The two-line banner wasn't mentioned. |
+
+*Fun questions (H9):*
+1. **How did you decide where your warships stood?** **Answered: they often couldn't decide, because they didn't see it.** "I ran at 4x and missed where the second raid was going several times." Their fix: "Auto-slowdown to 1x when the raid is impending. Auto-back to the previous speed when raid is over." This is a readability request, not a rules request. The banner names both targets for the muster's 15 s of game time, which is under 4 s of real time at 4x.
+2. **Did a split raid make you stop or dial down a rock? A good trade?** **Answered: yes, but the reason was the army.** "Yeah, but more to balance back toward military rather than economy." There are two readings:
+   - *(a) their motive:* they dialled rocks down to move fleet slots and income into warships, not to hide rocks from raids. This matches H8 ("at the end, I wanted to reduce extractor count") and H7 ("pull economy way back").
+   - *(b) a direction:* the game should weigh military more than economy.
+
+   I read it as (a) with (b) behind it: the dial became the pivot lever, and the owner wants the warship half of the game to carry the decisions. Both readings point the same way for H10, so I don't ask which.
+3. **Did the extractor dial do what you expected?** **Answered: yes.** "Yes, that worked well." No hauler or rebuild complaint. The H9 secondary claim is supported. Keep the dial and the haulers readout as built.
+4. **Did defending feel worth it, or did ignoring raids work better?** **Answered: ignoring worked.** "ignoring raids felt fine with enough econ." This matches the bots (undefended −28%). The finding is now the owner's as well as the team's, so H10 must make defending pay.
+
+*The direction (Q25 "C", and the 2026-11-16 note), joined to this playtest:*
+- **Attrition.** The hive rebuilds a killed Spore every 40 ticks and a Thorn every 120 (R9 at `hive.regrowPct` 200, one timer per type), so a beaten full raid is back in about 16 s of game time, and a failed push's damage is gone just as fast. Every fight resets, so the only question is which army wins in one go ("finding the right army comp").
+- **Defending doesn't pay.** It is the same cause seen from the raid side. Killing raiders kills hive guards, but they're back in 16 s, so a defence earns nothing that lasts. The only thing it saves is 2–3 extractors, about the ore of the warships it loses.
+- **Balance toward military.** The same fix covers it. If fights leave lasting damage, warships decide the run and the economy is the means.
+
+*A quick probe (Designer, scratch, 1 seed, data v16, values only):* slower hive regrowth alone flips the finding, but unreliably.
+- At `hive.regrowPct` 1000, undefended finishes 30% *slower* than adaptive (20:52 against 16:04).
+- At 750 it is 29% faster, and at 900 7% faster.
+- Adaptive moves between 16:04 and 23:10 across 500–1000 with no trend.
+
+So slow rebuild is the right lever, but on its own the result is a knife edge in the bots. The bots never push into a weakened hive on purpose. H10 needs the rule and a bot that uses it, not only a value.
+
+*Likes (keep):* the extractor dial with the haulers following it; split raids as a threat (not called a chore); repelling a raid (liked in H7 and H8, not contradicted).
+
+*Rule gaps:*
+1. **No lasting damage (attrition).** Hive losses refill in seconds (R9).
+2. **Ignoring raids costs nothing** (above).
+3. **Raids can't be read at 4x** (fun question 1). The warning is about 20 s of game time.
+
+*Feature requests:* auto-slowdown to 1x while a raid is impending, and back to the previous speed when it is over.
+
+**Action:** DESIGN.md H9 marked tested. DESIGN.md "H10 candidates (iteration 10)":
+- the auto-slowdown as a ride-along for any option;
+- A, "Wear the hive down" (recommended): the hive replaces its dead one guard at a time, slowly, so beaten raids and failed pushes both leave it weaker;
+- B, A plus "a prong that hits rolls on" to the next mined rock;
+- C, "Strike back", H9's timed window after a beaten raid.
+
+QUESTIONS.md Q26 asks the owner to pick. DECISIONS.md logs the calls. No spec and no BACKLOG change until the pick.

@@ -438,18 +438,250 @@ H7 (build-20261114-1, spec below) made the run one field. Data `run.mode` `"fiel
 - hive raids paced by your economy ships and aimed at the mined rock nearest the hive;
 - a shared fleet limit of 30 that counts economy ships.
 
-H8 (build-20261116-1, spec below) is the current build, on data v14:
+H8 (build-20261116-1, spec below), on data v14:
 - haulers staffed by need, rebalancing at home, and no surplus haulers or extractors;
 - a per-rock hauler count (Auto by default);
 - drag (or long-press, then drag, for half) to move warships between nodes;
 - warships shield the economy ships at a raided rock, and haulers wait out the fight;
 - a raid-target badge, a fleet panel with Recycle, Mine mode, and income shares on the weights.
 
+H9 (build-20261117-1, spec below) is the current build, on data v16:
+- a raid of at least 2 × `raid.prongMinSize` splits into up to `raid.prongsMax` prongs, aimed at the mined rocks nearest the hive, each its own fight, with a badge per target and a two-line banner;
+- the extractor dial (`setExtractors`, −, + and All on the rock sheet), with haulers as a readout that follows it.
+
 ## Hypotheses
+
+### H10 candidates (iteration 10)
+
+*Iteration 10, 2026-11-17. The triage is in PLAYTEST_LOG.md (build-20261117-1, 2026-11-17). **H9 is not supported as a decision; the extractor dial is supported.** At 4x the owner "missed where the second raid was going several times". "Ignoring raids felt fine with enough econ" confirms the bots' finding in play (undefended −28%). The owner answered Q25 "C": attrition first (this build), then logistics feeding combat (later, with VISION.md wording for the owner to approve). QUESTIONS.md Q26 asks for the pick. No spec until then.*
+
+**What any H10 has to answer** (the Director's brief, from the owner's words):
+1. **Attrition.** "Fleet rebuild feels nearly instant on both sides… it may feel more satisfying if you had to beat down the hive rather than just figure out the army composition that beats it in one go."
+2. **Defending doesn't pay.** "ignoring raids felt fine with enough econ."
+3. **Balance toward military.** "more to balance back toward military rather than economy."
+
+**One cause behind all three.** R9 refills the hive in seconds. Each guard type has its own timer at `guard.<type>.regrowTicks × hive.regrowPct ÷ 100`:
+- a Spore every 40 ticks and a Thorn every 120, in parallel;
+- a beaten full raid (4 Thorns, 8 Spores) is back in 480 ticks, 16 s of game time or 4 s at 4x;
+- a push that kills 10 guards and loses is undone just as fast.
+
+So no fight leaves a mark:
+- A push either wins outright or is wasted, which is why the game is "find the composition".
+- Killing raiders is the only thing a defence does to the hive, and it is undone before the next push. A defence then earns only the 2–3 extractors it saves, about the ore of the 1–2 warships it loses.
+- The economy never resets, so it carries the run, and fights are one-off checks.
+
+**What a scratch probe says** (Designer, 1 seed, data v16, values only; the numbers are in the triage). Slow rebuild is the right lever, but a value alone is a knife edge:
+- at `hive.regrowPct` 1000, undefended finishes 30% *slower* than adaptive;
+- at 750 and 900 it finishes 29% and 7% faster;
+- adaptive moves between 16:04 and 23:10 with no trend.
+
+Two things make it fragile. The bots don't push into a weakened hive on purpose, and per-type timers make the refill depend on which mix was killed. So every candidate below is a rule, plus a bot that uses it.
+
+#### Ride-along (ships with A, B or C): auto-slowdown for raids
+
+The owner: "I ran at 4x and missed where the second raid was going several times. Auto-slowdown to 1x when the raid is impending. Auto-back to the previous speed when raid is over." Speed is client state (`session`), not sim state. So this is client-only, and it never touches the sim, the replay or determinism.
+
+The client checks these rules once per frame, against `raidStatus`.
+1. **Trigger.** A raid **engages** the slowdown the first frame the client sees it with any prong in `muster`, `out` or `fight`, if `client.raidSlowdown` is 1. The client tracks raids by `world.raid` id, so each raid engages once.
+   - Normally that is the muster's first tick, when the banner names the targets.
+   - Tracking by id rather than by a phase change also covers a game loaded mid-raid.
+2. **On engage:**
+   - if the speed is above 1x, remember it as `restoreSpeed` and set 1x;
+   - if the speed is already 1x, remember nothing;
+   - pause is never touched. If the game is paused, the speed underneath still drops to 1x, so un-pausing runs at 1x.
+3. **The note.** On engage with a remembered speed, a toast shows "1x for the raid · back to 4x after". It uses the existing toast slot, so nothing in the HUD moves. The speed control shows 1x pressed, as for any speed change.
+4. **Restore.** The raid is **over** when every prong has an outcome (beaten, hit or turned back). It is also over when the raid ends another way:
+   - a battle at the hive cancels the muster (R6);
+   - the raid withers (R9);
+   - `world.raid` is null.
+
+   On that frame, if `restoreSpeed` is set, the speed goes back to it and `restoreSpeed` clears. The raiders' flight home doesn't hold 1x, because nothing is left to react to. Under B, a prong that rolls on has no outcome yet (B2), so the raid isn't over until the roll ends.
+5. **The player changes speed during the raid.** Tapping 1x, 2x or 4x while engaged is the player's choice, and it wins:
+   - `restoreSpeed` clears, so the raid's end restores nothing;
+   - the same raid never re-engages, because its id is already seen;
+   - the next raid engages as normal, from whatever speed is set then.
+
+   Pause and un-pause are not speed changes, and neither is opening a panel that pauses the game (the tuning panel).
+6. **Edge cases:**
+   - **Raids back to back.** The gap (R8) runs from the end of a raid, so two raids never overlap. If a cancelled muster musters again after the battle at the hive, it has a new id, so it engages again.
+   - **A reload.** `restoreSpeed` is session state and isn't saved. A game reloaded mid-raid engages from the speed it loads at, which is 1x today, so nothing is remembered.
+   - **The setting off** (`client.raidSlowdown` 0). Nothing engages, as in H9.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `client.raidSlowdown` | 1 | 0–1 | client, this device. 0: speed is only ever the player's (H9) / 1: every raid plays at 1x from muster to outcome, then the speed comes back |
+
+The key follows `client.autosaveSec`:
+- it is in data, and it shows in the tuning panel tagged "this device";
+- it is stored in settings;
+- it never reaches the sim.
+
+**Cost:** about a tenth of an iteration. That covers a small client state machine, a toast and a unit test of rules 1–5. It also needs one smoke step: at 4x, a raid mustering drops the speed to 1x, and its outcome restores 4x.
+
+**Disproved if** the owner still misses a prong's target, or calls the slowdown intrusive. A follow-up would be a slow-to-2x setting, not removing it.
+
+#### A. Wear the hive down (recommended)
+
+- **Claim:** when the guards you kill stay dead for minutes, the hive is beaten down over several fights rather than cracked by one composition. Every beaten raid and every lost push leaves it weaker, so defending pays and the warships carry the run.
+- **The smallest mechanics:**
+  1. **One rebuild queue (replaces R9's per-type timers, for the hive only).** The hive replaces one dead guard at a time, one every `hive.rebuildTicks`. It rebuilds the type furthest below its cap in proportion, and ties go to Thorn. The rest of R9 holds:
+     - raiders away count against the caps, so only the dead are rebuilt;
+     - a wither still removes every raider.
+
+     Pockets keep their own regrowth. At the default of 600 ticks (20 s of game time, 5 s at 4x):
+     - a beaten full raid of 12 takes 4 game minutes to replace;
+     - a push that kills 10 takes 3:20.
+
+     `hive.rebuildTicks` 0 means R9 as built, which is the in-build A/B.
+  2. **Raids follow the hive (no new rule; R4 as built).**
+     - R4's keep line is 15 of 30 guards (`raid.hiveKeepPct` 50). So a weakened hive sends small raids, or none.
+     - After a beaten full raid, the hive is at 18, so the next raid is at most 3 raiders.
+     - It is back to raids of 12 only once 9 guards are rebuilt, 3 game minutes later.
+
+     So defending well also quiets the raids. That is a second payoff, and it comes from a rule that already exists.
+  3. **Readout.**
+     - The hive sheet gets a line: "Guards 18 / 30 · +1 in 14 s".
+     - While the hive is below its caps, its map label shows "18/30".
+     - Its Strong/Even/Weak tags and the drag's drop-target tag read the live guards, as now.
+     - The raid report adds "Hive −12", so each beaten raid visibly costs the hive.
+- **What the owner would do differently:**
+  - defend, because a beaten raid weakens the hive for minutes;
+  - push when the hive is low, even with an army that couldn't beat a full hive;
+  - accept a lost push that thinned the hive, and follow it with a second.
+
+  The run becomes a series of fights whose results add up, not one composition test at the end.
+- **Edge walk:**
+  - *Opening:* if the first raid (3 raiders at 2:42) is beaten, the hive is down 3 guards for 1 game minute. That's too early for a push to use, so the opening is H9's apart from the readout.
+  - *Phases:*
+    - **muster:** the raiders still defend the hive (R1), unchanged.
+    - **out:** the window works as built.
+    - **fight:** each raider killed is a hive guard lost.
+    - **home:** survivors rejoin with their hp (R8).
+
+    A push at the hive kills guards that stay dead. Thorn repair (H3) still heals wounded survivors, so only kills count.
+  - *Limits:*
+    - **At zero guards:** a hive that isn't captured yet rebuilds one at a time. Capture is H3's rule as built.
+    - **At the keep line:** no raid musters until the hive rebuilds to 16 (below that R4's size is 0, so R3 doesn't muster). The hive pauses its raids; this isn't a timer.
+    - **At full:** no rebuild.
+    - **At the fleet limit:** nothing new. The player's side is unchanged.
+  - *Siblings:* only the hive changes.
+    - Pockets stay one-shot nodes, so taking a pocket is still a composition check, and the hive is the war.
+    - `hive.regrowPct` stays in data, and is read only when `hive.rebuildTicks` is 0.
+- **Pillar 4 check:** the rebuild never takes the hive above its caps, so waiting never leaves it stronger than it started. Raids still grow only with the economy. What waiting does do is heal damage you dealt. That is attrition as the owner asked for it, not a clock on the run. I read it as within pillar 4's wording, and offer an optional clarifying line under "VISION impact".
+- **Cost:** about half an iteration:
+  - one rule in the hive's regrowth: a single queue in place of two per-type timers when `hive.rebuildTicks` > 0;
+  - the hive line, label and report line;
+  - three bot changes (below);
+  - a recalibration with a robustness check;
+  - a data version bump, because the hive's `regrowProgress` changes shape.
+- **Bot changes:**
+  1. `adaptive` pushes when its warships beat the hive's live guards plus the guards the hive rebuilds during the flight (`flightTicks ÷ hive.rebuildTicks`). The bots' estimate already reads the hive "as it is now", so this is mostly the flight allowance.
+  2. New control `one-push` (report only): adaptive, but it launches the hive wave only when the wave beats the hive at full caps. It measures what attrition is worth.
+  3. New control `two-push` (report only): adaptive, but its first hive push launches at about two-thirds of the full-caps wave, and then it pushes again with what it has. It measures whether a lost push is wasted.
+- **Bot targets (h10-design-data, every seed):**
+  1. **Defending pays.** `undefended` finishes at least 10% slower than `adaptive`, or doesn't win. This was report-only in H9; here it is the main target.
+  2. **Attrition shows.** In adaptive's run:
+     - the hive is at most 75% of its caps when the winning wave lands;
+     - at least two hive-damaging events come before the win, where an event is a beaten raid or a push that kills at least 5 guards.
+  3. **One push is slower.** `one-push` finishes at least 10% slower than adaptive.
+  4. **A lost push isn't wasted.** `two-push` finishes no more than 10% behind `one-push`.
+  5. **Robust, not a knife edge.** Targets 1 and 3 still hold at `hive.rebuildTicks` 450 and 750 (±25%). The probe above shows why this matters.
+  6. **Pace.** Adaptive takes 15–30 game minutes and greedy at most 40. The first raid comes at 2–6 minutes.
+
+  "No faster refill" (H9) still holds: no warship gets cheaper or quicker, and nothing on the hive refills faster.
+- **How it would be disproved:**
+  - the owner still wins in one push with "the right comp", or says the hive "never seemed to go down";
+  - attrition reads as a slog ("I had to chip at it forever");
+  - ignoring raids still feels fine;
+  - in the bots, target 1 or 5 fails.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `hive.rebuildTicks` | 600 (20 s) | 0–3600 | 0: R9 as built; the hive refills in about 16 s and every fight resets (the comparison) / 3600: two game minutes per guard; every kill is close to permanent, and the hive is a siege |
+
+#### B. Wear it down, and hits roll on
+
+- **Claim:** A, and also: when a prong that has hit rolls on to the next mined rock instead of going home, an undefended front is stripped rock by rock. Ignoring raids costs something, on top of defending paying.
+- **The smallest mechanics:** A, plus:
+  - **B1. The roll.** A prong that has hit and has no player ship left at its target doesn't fly home. It flies to the next raidable node in hive order that no live prong holds. There it fights under R7, the shield and the hold, as on arrival. It goes home when any of these happens:
+    - it is beaten;
+    - it finds no such rock;
+    - it has hit `raid.rollMax` rocks after its first.
+
+    A warship at the next rock stops the roll by fighting it.
+  - **B2. Outcome.** A rolling prong's outcome stays open until it goes home or is beaten. It is **hit** if it killed at least one economy ship at any rock.
+  - **B3. Readout.** The roll target gets the prong's badge the tick the prong leaves, and the banner names it ("A5 hit → A6 next").
+- **What the owner would do differently:** keep at least a token guard on the second rock in line, because one guard there stops a roll. "Let one go" becomes "let one go, and maybe the one behind it".
+- **Edge walk, beyond A:**
+  - *Opening:* the first raid can roll from a5 to the next mined rock. It is 3 raiders against unguarded extractors, so up to 2–3 more extractors can be lost early. This is the riskiest part of B, and calibration must check the first raid's damage.
+  - *Phases:* while a prong rolls, the raid isn't over, so the slowdown holds 1x and the hold (H8's H10) moves with the prong.
+  - *Limits:* with one mined rock there is no roll. `raid.rollMax` 0 is exactly A.
+  - *Sibling:* a rolling prong is away longer, so the hive is open longer (flag 4). That favours a player who ignores raids and pushes while they're out. A's slow rebuild matters more here than the roll does, so B needs A.
+- **Cost:** A, plus about a third of an iteration: a prong phase, the outcome rule, the badge and banner, and a calibration of the first raid.
+- **Extra bot target:** `undefended` loses at least 50% more economy ships to raids than `adaptive`.
+- **How it would be disproved:** as for A, and also if the roll reads as a punishment ("one raid wiped my whole wing") or the opening becomes a scramble.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `raid.rollMax` | 1 | 0–3 | 0: a prong goes home after one rock, as in A (the comparison) / 3: one unguarded prong can strip the whole front wing |
+
+#### C. Strike back (H9's candidate C, as specced)
+
+- **Claim:** when beating a raid leaves the hive open for a while, defending pays: repel, then strike.
+- **The smallest mechanics:**
+  - raiders that die don't regrow for `hive.reopenTicks` (default 2700, 90 s) after the raid's outcome;
+  - the hive carries an "Open" badge with a countdown;
+  - everything else stays R9.
+- **Why it isn't recommended:**
+  - It answers "defending doesn't pay", but only half of attrition. Guards killed by a lost push still come back in seconds, so a push is still all or nothing, and "find the composition" stays the game.
+  - The countdown is a timer ("I had to rush"), which goes against the spirit of pillar 4.
+  - It costs about the same as A, so A is the better buy.
+- **Cost:** about half an iteration.
+- **Bot targets:** A's targets 1 and 6.
+
+| Key | Default | Range | Feels like (low / high) |
+| --- | --- | --- | --- |
+| `hive.reopenTicks` | 2700 (90 s) | 0–9000 | 0: R9 as built / 9000: a beaten raid leaves the hive short for 5 minutes |
+
+#### Considered, not proposed
+
+- **Hits steal ore** (option 2 of 2026-11-16). A prong that hits takes the rock's buffer or the probe's stock, and the hive's next raid grows by one raider per `raid.stealPerRaider` ore stolen.
+  - Taking ore is abstract on a phone. Nothing visible flies away, so the player feels it only as a smaller number.
+  - "Raids grow with what you build" would become "and with what you failed to defend". That needs pillar 4's wording changed (draft under "VISION impact"), for a rule that adds punishment rather than a reason to fight.
+  - The roll (B) does the same work visibly.
+- **Slower player rebuilds** (raising `ship.<type>.buildTicks`). The owner's note says rebuild is instant "on both sides". But the player's rebuild is limited by ore and fleet slots, not by build time (a Drone is 18 ore and 90 ticks), so slowing it only makes the run longer. If A ships and the owner still calls the player's side instant, that is a separate question.
+- **A hive too big to take in one push at the fleet limit.** It would force attrition rather than reward it. If A's target 2 fails because adaptive still wins in one push, calibration may raise the hive's guard counts. That is a value change within A.
+
+#### Recommendation
+
+**A, "Wear the hive down", with the auto-slowdown.**
+- It is the smallest rule that answers all three asks, because they share one cause:
+  - **attrition:** kills stay dead, so pushes add up;
+  - **defending pays:** a beaten raid is 12 hive guards gone for minutes, with quieter raids after it;
+  - **military lean:** fights decide the run, and the economy feeds them.
+- It gives pillar 3's "Win a node by out-producing their replacement" real meaning. Today replacement is too fast to out-produce.
+- The probe says the lever is right but a value alone is a knife edge. A's bot rules and the robustness target are there for that.
+
+**B is the fallback in the same build.** If h10-design-data can't make `undefended` 10% slower with A's rule and values, the roll-on is the next lever. Q26's default asks the owner to approve that in advance, so the build doesn't stop for a second question.
+
+C is the cheaper-looking version of A, but it leaves the "one composition" problem in place.
+
+#### VISION impact (VISION.md is protected; flagged, not edited)
+
+| Option | Impact |
+| --- | --- |
+| A | None needed. Pillar 3 ("their factories repair and replace up to a cap. Win a node by out-producing their replacement") is served better than today. Under pillar 4, the hive never rebuilds above its caps, and raids still grow only with what you build. **Optional clarifying edit to pillar 4,** because "waiting never makes things worse" could be read as "damage you dealt never heals": "4. **Pressure, not a clock.** Raids grow with what you build, never with time, so waiting never makes the enemy stronger than it started. Damage you deal heals slowly, so pressing an advantage pays. The challenge is balancing an efficient economy against the force that protects it." |
+| B | None. The roll is a raid doing more with what it has, not growing. |
+| C | None, as for H9's C. |
+| Ride-along | None. Pause and 1x/2x/4x stay as fixed. |
+| Not proposed: steal | Would need pillar 4's first sentence to read "Raids grow with what you build and with what you fail to defend, never with time". |
+| Later (Q25's B) | Logistics feeding combat touches the fantasy and pillar 1. The wording is drafted for the owner when that iteration is planned, not here. Q18 (pillar 1 wording) stays open until then. |
 
 ### H10 candidates (recorded 2026-11-16 from h9-design-data; not proposed yet)
 
 *Recorded on the Director's ruling (DECISIONS.md, "Director: h9-design-data rulings"). Not built in H9. They wait for the owner's H9 session and the direction question on attrition and the logistics layer (PLAYTEST_LOG.md, 2026-11-16).*
+
+*Folded into "H10 candidates (iteration 10)" above (2026-11-17): rule option 1 is candidate B's roll-on, and rule option 2 is under "Considered, not proposed".*
 
 **The finding.** In the bots, defending doesn't pay against split raids. `undefended` takes the hive at 13:09 on v16 against adaptive's 18:20, and it was faster in all 16 variants tried (`reports/archive/h9-design-data-v15.md`). The reasons:
 - a prong kills at most the extractors docked at its rock (2–3, about 40–60 ore), then leaves;
@@ -579,7 +811,7 @@ C answers the watch items rather than the owner's complaint. It's the right add,
 | Dial | None. It serves pillar 1 directly: the player sets extraction, and logistics follow. |
 | All | **Q18 (pillar 1 wording) is still open.** The fleet limit has shipped since H7, and Q18's text still mentions research, which field mode doesn't have. As with Q22, I leave it out of Q24 so Q24 stays one reply. |
 
-### H9 (Milestone 2, iteration 9, spec ready): A wider front
+### H9 (Milestone 2, iteration 9, tested on build-20261117-1): A wider front
 
 The owner picked A without C (QUESTIONS.md Q24: "A, wider front", d3ff938). So H9 is **A, "A wider front", with the extractor dial**. The background is "H9 candidates" above. Where they differ, this spec wins, and where this spec and BACKLOG.md differ, the spec wins.
 

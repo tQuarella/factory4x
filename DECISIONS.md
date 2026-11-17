@@ -1853,3 +1853,15 @@ The Designer wrote "Director: h9-design-data rulings" and the out-of-file author
 ## 2026-11-17 · Owner · Q25: next direction is C
 
 The owner picked C: attrition first, then logistics feeding combat. H10 will be the attrition step (the hive can be worn down, and defending pays), drawn from DESIGN.md "H10 candidates" and H9 candidate C. B follows, with VISION.md wording drafted for the owner to approve. H10 does not start until the H9 playtest feedback arrives (PROCESS: no new hypothesis while a build awaits feedback), because that playtest is the evidence for what attrition must fix.
+
+## 2026-11-17 · Designer · Iteration 10 plan: H9 triage and H10 candidates
+
+- **H9 scored as not supported as a decision, the dial supported** (PLAYTEST_LOG.md, build-20261117-1). The owner missed the second prong at 4x, and "ignoring raids felt fine". The second confirms the bots' rule finding, so H10 makes defending pay rather than adding more places to defend.
+- **"More to balance back toward military" read as motive first, direction second.** The owner dialled rocks down to move slots and income into warships, as in H7 and H8. Either reading points H10 the same way (fights should carry the run), so no clarifying question.
+- **One cause behind attrition, "defending doesn't pay" and the military lean:** R9 refills the hive in about 16 s, so no fight leaves a mark. H10 therefore changes the hive's replacement rather than raid damage.
+- **Scratch probe (1 seed, v16, values only; not committed):** `hive.regrowPct` 1000 made undefended +30% against adaptive, but 750 and 900 gave −29% and −7%, and adaptive moved 16:04–23:10 with no trend. So slow rebuild is the right lever, but a value alone is a knife edge. Candidate A is a rule (one rebuild queue) plus bot rules, with a ±25% robustness target.
+- **Recommended A ("Wear the hive down", `hive.rebuildTicks` 600) over H9's C (`hive.reopenTicks`).** C only covers raid kills and adds a countdown, so a lost push still resets and "find the composition" survives. A covers every kill and has no timer, at about the same cost.
+- **B (roll-on) offered as a pre-approved fallback in Q26's default**, so calibration can reach for it without a second owner round trip if A alone can't make `undefended` 10% slower. "A only" rules it out.
+- **"Hits steal ore" not proposed.** It is abstract on a phone, reads as punishment, and making raids grow with stolen ore would need pillar 4 reworded. The roll does the same job visibly.
+- **Auto-slowdown restore rules.** The slowdown engages once per raid id, which also covers a load mid-raid. It restores when every prong has an outcome, not on the flight home. A speed tap by the player cancels the restore for that raid. Pause is never touched. It is client-only (`client.raidSlowdown`), so the sim, the replay and determinism are untouched.
+- **Pillar 4: no edit needed for A.** An optional clarifying sentence ("waiting never makes the enemy stronger than it started; damage you deal heals slowly") is offered in Q26, with no edit as the default.
