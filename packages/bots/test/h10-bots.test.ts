@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PROBE, createWorld, defaultData, fieldSummary, guardianAt, heartIndex, hiveAfter, raidStatus, type Input, type RaidStatus, type ShipType, type ShipTypeCounts, type World } from '@factory4x/sim';
 import { fieldMix, flightTicks, guardFull, guardsAtHome, guardsOnArrival } from '../src/field-estimate.ts';
 import { runField, type FieldResult } from '../src/field-runner.ts';
-import { AdaptiveBot, adaptive, hiveAtLanding, hiveWave, onePush, parkedWarships, twoPush, twoThirds, weightsFor, fieldStrategies } from '../src/field-strategies.ts';
+import { AdaptiveBot, adaptive, hiveAtLanding, onePush, twoPush, twoThirds, weightsFor, fieldStrategies } from '../src/field-strategies.ts';
 import { atLeastSlower, computeH10Lines, eventsBeforeWin, landingPct, pctText, target1, target3, target4, winLanding } from '../src/h10-lines.ts';
 
 /**
@@ -73,8 +73,6 @@ describe('change 1: hive waves are sized at hiveAfter(world, arrive)', () => {
   it('at hive.rebuildTicks 0 the hive is sized as it is now, as in H9 (R9 is not read)', () => {
     const { w, heart } = setup(0, 60, 14);
     w.field!.hiveRebuildProgress = 0;
-    const g = guardianAt(w, heart)!;
-    g.regrowProgress = { thorn: g.regrowProgress.thorn, spore: g.regrowProgress.spore };
     expect(hiveAfter(w, 4000)).not.toEqual(guardsAtHome(w, heart)); // R9 would have regrown some
     expect(guardsOnArrival(w, heart, [PROBE])).toEqual(guardsAtHome(w, heart));
     expect(hiveAtLanding(w, data, null, [PROBE], heart, ALL, 60).counts).toEqual(guardsAtHome(w, heart));
@@ -257,15 +255,22 @@ describe('two-push: its first hive push is ceil(2W / 3) ships of W\'s mix, then 
 });
 
 describe('adaptive, with a weakened hive and no raid, sizes the next wave for the weaker hive (a push that lost)', () => {
-  it('it sends the smaller wave, builds toward the live wave, and uses the hive-at-keep-line plan with no posts', () => {
+  it('with the ships for the live wave at home it sends that wave, smaller than the full-caps wave', () => {
+    const { w, heart } = setup(600, 60, 15);
+    const live = fieldMix(w, data, heart, ALL, 60, hiveAfter(w, flightTicks(w, [PROBE], heart)))!;
+    const full = fieldMix(w, data, heart, ALL, 60, guardFull(w, heart))!;
+    expect(live.total).toBeLessThan(full.total);
+    shipsOf(w, live.fleet, PROBE);
+    expect(sent(bot('live').decide(w, data), heart)).toEqual(live.fleet);
+  });
+
+  it('with no ships it builds toward the live wave (no posts, no raid)', () => {
     const { w, heart } = setup(600, 60, 15);
     const live = fieldMix(w, data, heart, ALL, 60, hiveAfter(w, flightTicks(w, [PROBE], heart)))!;
     const inputs = bot('live').decide(w, data);
     expect(heartSends(inputs, heart)).toEqual([]);
     const weights = weightsFor(w, live.fleet);
     for (const t of ALL) if (weights[t] > 0) expect(inputs.find((i) => i.type === 'setAlloc' && i.shipType === t)).toMatchObject({ weight: weights[t] });
-    void parkedWarships;
-    void hiveWave;
   });
 });
 
