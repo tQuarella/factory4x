@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 10, hypothesis H10: attrition, pending Q26)
-**State:** Iteration 10 Build step. Q26 answered A (18a2fc8); spec and split bd702b9. Building h10-sim and h10-client (phase 1, slowdown) in parallel. Next: Critic on each, h10-bots on approved h10-sim, h10-design-data, h10-client phase 2, and the stack lands via merge-task h10-client.
+**State:** Iteration 10 Build step. h10-sim approved (98fbf86). h10-bots building on it; h10-client phase 2 (readouts) building. Next: Critic h10-bots, then h10-design-data (resume Designer a867adefdc2bc7b17), then h10-client final round and merge-task h10-client.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (public since 2026-11-15, Q23)
 **Last build:** build-20261117-1 (H9 A wider front), commit 7055e2a, live (CI 44003503570 gates and deploy green; site shows 7055e2a · data v16). Release gates passed locally (302/302 smoke).
@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 10 ledger
 
-Launches: 3 / 12.
+Launches: 5 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -19,6 +19,10 @@ Launches: 3 / 12.
 | r1 | designer | H10 spec + task split | resume | Owner picked A (18a2fc8). Spec and split, Director rulings (bd702b9) |
 | 2 | core-engineer | h10-sim | launch | Build: rebuild queue D1–D6, roll-on L1–L5 off, data v17, save, selectors, replay (a)–(h) |
 | 3 | engineer | h10-client | launch | Phase 1: auto-slowdown S1–S6 in parallel from main; phase 2 after h10-sim approval |
+| r2 | engineer | h10-client | resume | Director ruling: engage toast never lost (both lines), turnedBack browser test (86f20c9) |
+| 4 | critic | h10-sim | launch | Review round 1: APPROVE (98fbf86); determinism 3b20982a; identical at 0 checked both ways |
+| 5 | engineer | h10-bots | launch | Build on task/h10-sim 98fbf86: flight allowance, one-push/two-push, hive columns, targets 1–6 lines, sweep 450/600/750 |
+| r3 | engineer | h10-client | resume | Phase 2: merge h10-sim; readouts, roll banner, tuning keys, regrowPct description |
 
 ## Iteration 9 ledger
 
