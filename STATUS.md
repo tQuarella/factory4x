@@ -317,7 +317,7 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-**Paused by the owner (2026-11-16 08:23, "Pause this work").** Nothing is running. Resume only when the owner says so.
+**Resumed by the owner (2026-11-16 19:56).** h9-bots fix round 1 resent to engineer af63892eea98f7a23 (resumed; launch count unchanged). Earlier pause: 08:23.
 
 Where H9 stands:
 - Merged on main: cw-bots-gate-time (97b84f2).
