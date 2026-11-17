@@ -319,6 +319,8 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 **Resumed by the owner (2026-11-16 19:56).** h9-bots fix round 1 resent to engineer af63892eea98f7a23 (resumed; launch count unchanged). Earlier pause: 08:23.
 
+**20:20:** h9-bots APPROVED round 2 (be6ede0, pushed): adaptive 15:54, greedy 20:33, undefended 12:03. Director accepted windowHome and the no-piecemeal-wave additions; greedy's 28412 loss is accepted greedy behaviour. h9-design-data started (Designer a4f72a6ad9f89c048 resumed) on task/h9-bots be6ede0: targets 1, 4 and 5 (undefended half).
+
 Where H9 stands:
 - Merged on main: cw-bots-gate-time (97b84f2).
 - Approved: h9-sim (12924fa), h9-raids (a34be08).
