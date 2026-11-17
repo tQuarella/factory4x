@@ -1865,3 +1865,35 @@ The owner picked C: attrition first, then logistics feeding combat. H10 will be 
 - **"Hits steal ore" not proposed.** It is abstract on a phone, reads as punishment, and making raids grow with stolen ore would need pillar 4 reworded. The roll does the same job visibly.
 - **Auto-slowdown restore rules.** The slowdown engages once per raid id, which also covers a load mid-raid. It restores when every prong has an outcome, not on the flight home. A speed tap by the player cancels the restore for that raid. Pause is never touched. It is client-only (`client.raidSlowdown`), so the sim, the replay and determinism are untouched.
 - **Pillar 4: no edit needed for A.** An optional clarifying sentence ("waiting never makes the enemy stronger than it started; damage you deal heals slowly") is offered in Q26, with no edit as the default.
+
+## 2026-11-17 · Designer · H10 spec and split (Q26: A)
+
+- **The new rule keys ship at 0 in h10-sim (v17), and h10-design-data sets `hive.rebuildTicks` (v18).** This is H9's pattern. Every gate stays green below calibration, and "hash-identical at 0" becomes a check the shipped game itself passes. Raw hashes can't be equal, because new tunable keys and state fields are hashed. The check is therefore (i) the bots suite equal to main's v16 output and (ii) the determinism checkpoints equal with the new keys and fields stripped.
+- **D3 picks the type at completion, not at start.** Only one counter is stored, and the pick is the type furthest below its cap in proportion, ties to Thorn. A death mid-count can change the next type, and the sheet shows the current pick.
+- **The queue keeps running during a battle at the hive (D4),** as R9 did, so pillar 3's "out-produce their replacement" stays literal. At 600 ticks it adds one guard per 20 rounds, which is small enough that damage lasts.
+- **Thorn repair is unchanged.** Kills count and chip damage doesn't. A rule for "wounds stay" would be a second attrition lever, and H10 tests one.
+- **The roll-on is built inert in h10-sim (`raid.rollMax` 0), not held back as a conditional task.** A conditional task would be a fifth task that re-stacks h10-bots and h10-design-data late. Inert, it costs h10-sim about a third more work and no extra launch, and turning it on is a value the Director rules on. Q26's "A" pre-approved it.
+- **Fallback conditions.** These are mine, for the Director to confirm: no allowed value meets targets 1 and 5, with `hive.rebuildTicks` 300–1200 and hive guards up to +50%; then targets L (first raid ≤ 3 economy ships lost) and L2 (undefended loses ≥ 50% more) must hold at `raid.rollMax` 1.
+- **H9 target 1 (splits in play) and target 4 (concentrate) become report lines.** Under D2 a good defence keeps the hive near the keep line, so raids rarely reach the split size. That is the intended effect, not a regression.
+- **The guard is measured against the first v18 candidate, not v16.** The rule is meant to move adaptive, so measuring against v16 would trip the guard on purpose.
+- **An existing readout bug, fixed in h10-sim's selector.** The hive's `GuardRow.regrowTicks` omits `hive.regrowPct`, so the sheet shows the hive regrowing twice as fast as it does. The fix changes no state.
+- **h10-client starts from `main` in parallel with h10-sim.** The slowdown needs only `client.raidSlowdown`, which h10-sim adds because `packages/sim/src/data.ts` lists client keys. Until the merge, the client reads the setting through one function that returns 1.
+- **Nothing below the top merges alone.** A data version on `main` deploys and discards the owner's save mid-iteration.
+
+## 2026-11-17 · Director · H10 spec rulings
+
+1. **"Unchanged at 0" is checked two ways, not by a literal hash match.** The new keys and state fields are part of the hashed state, so a literal match is impossible. Accepted:
+   - the bots suite on h10-sim at `hive.rebuildTicks` 0 and `raid.rollMax` 0 matches main's v16 output exactly;
+   - the determinism checkpoints match main's once the new keys and fields are stripped from the hash.
+
+   Tightened: the h10-sim report lists the stripped fields by name, and the Critic checks that the list holds nothing else.
+2. **The roll-on is built into h10-sim, switched off.** This avoids a fifth task re-stacking late in the iteration.
+3. **The Designer's conditions for turning the roll-on on are accepted.** All must hold:
+   - no allowed value meets targets 1 and 5;
+   - at `raid.rollMax` 1, targets 1–6 hold;
+   - L: the first raid costs at most 3 economy ships;
+   - L2: undefended loses at least 50% more economy ships than adaptive.
+
+   Turning it on still comes to the Director first, with the numbers.
+4. **H9 targets 1 and 4 become report lines.** A good defence keeping raids under the split size is intended.
+5. **The calibration guard is measured from the first v18 candidate.** The rule is meant to move adaptive, so measuring from v16 would trip the guard by design. The h10-design-data report still states the v16 → v18 move for each strategy, for the handoff.

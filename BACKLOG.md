@@ -1252,6 +1252,180 @@ No data value changes. If one is needed, report it rather than making it.
 8. **Smoke time:** new smoke tests step the sim and never wait in real time. Report the CI job times. Past 80% of a limit, say so before the final round.
 9. **The stack:** merge `task/h9-raids` once it is approved, then `task/h9-design-data`. Before the final Critic round, merge every lower task's approving review commit. Run the gates and the full smoke on the final data at desktop and phone sizes with `--repeat-each 5`. Branch CI must be green on the exact commit merged.
 
+## Milestone 2, iteration 10: H10 Wear the hive down (spec in `DESIGN.md` → "H10 (Milestone 2, iteration 10, spec ready): Wear the hive down")
+
+The owner picked A (Q26, 18a2fc8). B's roll-on is pre-approved as a calibration fallback, and there is no pillar 4 edit. Where this backlog and the spec differ, the spec wins.
+
+**Three build tasks, plus a Designer calibration resume.** There is no art task: the hive label and the toast reuse existing art, folded into h10-client.
+
+**The roll-on is built inert in h10-sim, not held back as a conditional task.**
+- `raid.rollMax` ships at 0, so L1–L5 change nothing until calibration asks for them.
+- If calibration needs the roll-on, turning it on is then a value (`raid.rollMax` 1), ruled on by the Director.
+- That avoids a fifth task and a re-stack under h10-bots and h10-design-data late in the iteration (DECISIONS.md).
+
+**One stack, topped by `h10-client`.**
+- h10-sim ships the new rule keys at 0 (data v17), so the game plays as v16 does and every gate stays green on it, the bots gate included.
+- h10-design-data sets the shipped `hive.rebuildTicks` (data v18). From there, client tests and the smoke may go red until h10-client merges it.
+- Nothing below the top merges alone. Each data version bump on `main` would deploy and discard the owner's save mid-iteration.
+- **`merge-task h10-client` lands the whole stack** once every task in it is approved.
+  - Before h10-client's final Critic round, merge the approving review commits of h10-sim, h10-bots and h10-design-data into `task/h10-client` (PROCESS "Gates that wait on calibration").
+  - Hold the top task's final round until every lower task is approved.
+
+**Order (at most three builders at once, with no file overlap):**
+1. **Now, in parallel:**
+   - `h10-sim` (core-engineer), from `main`.
+   - `h10-client` (engineer), from `main`. The slowdown (S1–S6) is client-only and needs nothing from h10-sim except its data key. So h10-client builds S1–S6 first, reading the setting through one function that returns 1 until `client.raidSlowdown` exists. It merges `task/h10-sim` once that is approved, for the key, the selectors and the readouts.
+2. **After h10-sim has Critic approval:** `h10-bots` (engineer), stacked on `task/h10-sim`.
+3. **After h10-bots has Critic approval:** `h10-design-data` (Designer resume), stacked on `task/h10-bots`.
+4. **Last:** h10-client merges `task/h10-design-data`, re-runs the gates and the full smoke on the final data, gets its final Critic approval and lands the stack.
+
+`reference-replay.ts` is touched only by h10-sim. `data/sim.json` is touched by h10-sim (keys), then by h10-design-data (values), in sequence.
+
+**Browser-facing:** h10-client only. It needs green branch CI on the exact commit merged, with the Critic's verdict committed before that CI run (PROCESS "Before merging"). h10-sim may make compile-only client edits, listed in DECISIONS.md.
+
+**Gate expectations below the top:**
+- **h10-sim:** every gate is green, the bots gate included, because shipped behaviour is v16's.
+- **h10-bots:** every gate is green. The new strategies are report-only, and the shipped rule keys are still 0.
+- **h10-design-data:** the bots gate must be green. Client tests and smoke may be red until h10-client.
+
+**Planned launches (12; 1 used for the triage):**
+- Designer: triage, 1 (done). The spec, this split and h10-design-data are resumes.
+- Builders: 3 (core-engineer h10-sim, engineer h10-client, engineer h10-bots).
+- Critics: 2 launches, each resumed across the tasks it reviews.
+- Retrospective: 1.
+
+That's 7 of 12, with 5 spare for rework, a Director-ruled roll-on rework, or a broken `main`.
+
+| Id | Task | Owner | Depends on | Browser-facing | Status |
+| --- | --- | --- | --- | --- | --- |
+| h10-sim | Rebuild queue D1–D6; roll-on L1–L5 inert; data v17 (`hive.rebuildTicks` 0, `raid.rollMax` 0, `client.raidSlowdown` 1); `hiveRebuildProgress`, prong `rolls`/`hitRocks`, `stats.raidRolls`; save check; selectors (`rebuild`, `hiveAfter`, the hive `GuardRow` fix, prong fields, `fieldSummary.hive`/`raidRolls`); replay (a)–(h); identical-at-0 checks | core-engineer | none | no | Ready |
+| h10-client | Slowdown S1–S6 and its toast (first, from main); then the hive sheet line, map label, "Hive −N" and "Hive 20 / 30" in reports, the roll banner segment, tuning entries, phone checks, smoke tests. **Top of the stack** | engineer | none to start; merges h10-sim when approved, then h10-design-data | **yes** | Ready |
+| h10-bots | adaptive's flight allowance via `hiveAfter` everywhere it sizes the hive; `one-push` and `two-push` (report only); the no-plan-fits table; hive report columns; a sweep at `hive.rebuildTicks` 600 in the report | engineer | h10-sim Critic-approved (stacked) | no | Blocked |
+| h10-design-data | Probe at 450/600/750 and up; calibrate to "Calibration targets (H10)"; v18; the roll-on fallback only through the Director | designer (resume) | h10-bots Critic-approved (stacked) | no | Blocked |
+
+### h10-sim (core-engineer; from `main`)
+
+**Files:**
+- `packages/sim/**`, tests included, and `packages/sim/src/factions/**` too (D2 replaces `hiveRegrow`'s body when `hive.rebuildTicks` > 0, and L1–L5 are prong rules);
+- `data/sim.json` (the three keys and `dataVersion` only);
+- `packages/bots/src/reference-replay.ts`;
+- **compile-only** edits in `packages/client/src` and `packages/bots/src` if a widened type breaks the build, with no change in behaviour (list them in DECISIONS.md);
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Data v17:**
+   - `hive.rebuildTicks` (0, 0–3600), `raid.rollMax` (0, 0–3) and `client.raidSlowdown` (1, 0–1, client-scoped like `client.autosaveSec`);
+   - `hive.regrowPct`'s description becomes "used only when Hive rebuild is 0";
+   - the `dataVersion` pin is 17.
+2. **D1–D6,** each with unit tests on shipped `map.field` with `hive.rebuildTicks` set to 600 in the test:
+   - exactly one guard added `hive.rebuildTicks` ticks after the first death;
+   - the D3 pick, including the tie to Thorn, a type at cap never picked, and a cap of 0;
+   - raiders away are never rebuilt, in single and split raids;
+   - a rejoin leaves `hiveRebuildProgress` unchanged;
+   - the queue runs during a battle at the hive;
+   - progress resets when the hive is full and at capture;
+   - all three D6 cases;
+   - pockets on rule 9, unchanged;
+   - campaign mode untouched.
+3. **L1–L5 with `raid.rollMax` 1 in the test:**
+   - a prong that hit rolls to the first eligible node and skips rocks it has hit and other live targets;
+   - the hold moves on the roll tick;
+   - the outcome stays open through a roll;
+   - `hitRocks` and `stats.raidRolls`;
+   - the shield, `recycleFleet`'s exclusion, `raidTarget` and `raidMix` read the current target;
+   - with `raid.rollMax` 0, every H9 raid test passes unchanged.
+4. **Identical at 0 (spec, "Save, data version and replay"):**
+   - (i) `npm run bots` on h10-sim matches `main`'s suite output (`reports/archive/h9-design-data-v16-bots.json`) exactly for every strategy and seed;
+   - (ii) the determinism checkpoints match `main`'s with the new keys and fields stripped from the hash. Report the method and both hash lists.
+5. **Save:**
+   - `hiveRebuildProgress` and the prong fields are saved and validated, and a malformed save is rejected;
+   - a save at `hiveRebuildProgress` > 0, loaded and stepped 2000 ticks, matches the uninterrupted run.
+6. **Selectors, in the spec's shape:**
+   - `guardianStatus(hive).rebuild` (with `nextType`);
+   - the hive `GuardRow.regrowTicks` fix under R9 (×`hive.regrowPct`), and the D2 values;
+   - `hiveAfter(world, ticks)`, tested against stepping the sim;
+   - `raidStatus.prongs[i].rolls` and `rolledFrom`;
+   - `RaidResult.prongs[i].hitRocks` and `hiveLost`;
+   - `fieldSummary.raidRolls` and `fieldSummary.hive`.
+7. **The reference replay** adds items (a)–(h), with a test that the replay enters each state. The determinism final changes.
+8. **Gates:** all green, the bots gate included. Name any red test outside your files. Report the bots gate time.
+
+### h10-client (engineer; from `main`; merges `task/h10-sim` when approved, then `task/h10-design-data`; top of the stack)
+
+**Files:**
+- `packages/client/**` (tests included; `placeholders.ts`, `icons.ts`, `gallery.ts` and `palette.ts` only if art changes);
+- `tests/smoke/**`;
+- `ART_STYLE.md`;
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **S1–S6, built first from `main`:**
+   - a unit test of the state machine covers each rule:
+     - engage above 1x, and at 1x with nothing remembered;
+     - engage while paused, without un-pausing;
+     - one engage per raid id, and an engage on load mid-raid;
+     - restore when every outcome is decided, on a cancelled muster, on a wither, and on a changed id;
+     - a player speed tap cancels the restore and stops re-engaging;
+     - pause and the tuning panel are not speed changes;
+     - off at 0;
+   - the toast text carries the real speed.
+   - **A smoke test:** at 4x, a raid mustering drops to 1x, and its outcome restores 4x. Use `raid.firstAtEcon` 2 and `raid.musterTicks` 0 as in H7–H9, and step with `advanceTicks`.
+   - Until `task/h10-sim` is merged, the setting is read through one function that returns 1. After the merge it reads `client.raidSlowdown`.
+2. **The hive sheet:** "Guards 18 / 30 · +1 Thorn in 14 s" from `rebuild`, "Guards 30 / 30" when full, and the per-type regrow bars hidden under D2. Tested with `hive.rebuildTicks` 600 set through the tuning hook.
+3. **The hive's map label:** "18/30" while it is below caps, inside the map.
+4. **Reports:** "Hive −N" in the raid report and result panel; "Hive 20 / 30" in the battle report of a push at the hive, win or lose; the two loss totals in the result panel.
+5. **The roll banner segment** ("A5 hit → A6") and the badge moving on the roll tick, tested with `raid.rollMax` 1. With 0, H9's banner tests pass unchanged.
+6. **Tuning:** `client.raidSlowdown` tagged "this device"; `hive.rebuildTicks` and `raid.rollMax` listed; `hive.regrowPct`'s new description.
+7. **Fit and stability:**
+   - the hive sheet with the rebuild line fits 375x667 without scrolling under the wide-font stress;
+   - the label, the toast and the roll segment shift nothing in the HUD (measured).
+8. **Smoke time:** new smoke tests step the sim and never wait in real time. Report the CI job times. Past 80% of a limit, say so before the final round.
+9. **The stack:** merge `task/h10-sim` once it is approved, then `task/h10-design-data`. Before the final Critic round, merge every lower task's approving review commit. Run the gates and the full smoke on the final data at desktop and phone sizes with `--repeat-each 5`. Branch CI must be green on the exact commit merged.
+
+### h10-bots (engineer; stacked on `task/h10-sim` after its Critic approval)
+
+**Files:**
+- `packages/bots/src/**` except `reference-replay.ts`;
+- `packages/bots/test/**`;
+- `reports/`;
+- `DECISIONS.md`.
+
+**Acceptance:**
+1. **Change 1:** every place that sizes the hive (`hiveAtLanding`, `smallestHiveWave`, `limitEconomy`'s reserve) starts from `hiveAfter(world, arrive)`, not `guardsAtHome`. A unit test on a world with a deficit and `hive.rebuildTicks` 600 shows the wave sized for the guards at landing.
+   - At `hive.rebuildTicks` 0 the bot's decisions match H9's. That's shown by the shipped suite being unchanged against the v16 archive.
+2. **`one-push` and `two-push`:**
+   - registered as report-only strategies, with the spec's descriptions;
+   - a unit test each for what they do differently: one-push never launches below the full-caps wave; two-push's first push is `ceil(2W ÷ 3)` in W's scaled mix, and it plays adaptive after.
+3. **The no-plan-fits table:** each cell has a test, or is shown in a traced run in the report.
+4. **The report** adds, per strategy:
+   - hive guards lost to raids and to pushes;
+   - the hive's guards at home when the winning wave lands, as a percentage of caps;
+   - hive-damaging events before the win (spec, target 2);
+   - `raidRolls`;
+   - the win time against adaptive (%).
+
+   It also adds a **sweep section**: the suite's gated strategies plus `undefended`, `one-push` and `two-push` at `hive.rebuildTicks` 450, 600 and 750, on one seed (every seed is the same run). This is report-only on h10-bots, and it is h10-design-data's starting point.
+5. **Report lines for H10 targets 1–5** read REPORTED until h10-design-data says they hold. They are not gate flags here.
+6. **Gates:** green. Report the bots gate time before and after, and keep the growth to what the two new strategies' runs cost.
+
+### h10-design-data (designer, resume; stacked on `task/h10-bots` after its Critic approval)
+
+**Files:**
+- `data/sim.json` (values only);
+- `DESIGN.md`, `DECISIONS.md`;
+- the `dataVersion` pin test and any test literal pinning a shipped default this task changes (PROCESS "Conventions");
+- `reports/archive/h10-*`.
+
+**Acceptance:**
+1. **First,** commit the probe report from h10-bots' sweep and any wider sweep. Every scratch run is bounded and prints progress.
+2. **Calibrate to "Calibration targets (H10)",** values only:
+   - under the designer.md guard, measured against the first v18 candidate;
+   - "No faster refill" holds, with `hive.rebuildTicks` ≥ 300.
+3. **The roll-on, only through the Director,** and only under "The roll-on fallback": findings first, then the Director's ruling. Then targets L and L2 are checked.
+4. **Bump `dataVersion` to 18.** Update the pin and every H10 table, and recompute every derived claim: the rebuild times, the keep-line sizes, and flag 6's sums.
+5. **Re-run the suite and the gates;** the bots gate must be green here. Say which targets and flags hold, and what no bot exercises.
+6. **Before the Critic round,** merge h10-bots' approving review commit into this branch.
+
 ## Can wait (allowed while waiting on the owner)
 
 - **cw-smoke-sim-time** (engineer; added by the Retrospective after build-20261114-1; do this first): both CI jobs that run the smoke suite are past 80% of their limits (gates job 15.5–17.5 of 20 minutes, deploy job with the live smoke 13–14 of 15; runs 43630983499, 43635034312, 43638281605), so the next browser-facing task that adds smoke tests can cancel CI or the production deploy. Replace real-time waits with sim stepping (`advanceTicks` to a predicate with a tick cap, as `stepUntil` in `tests/smoke/h7-economy.spec.ts`): `boot.spec.ts` (`waitForTimeout` and 30 s polls on game state), `overworld.spec.ts` (lines ~398–407), `buffer-warning.spec.ts` (polls of up to 120 s), the remaining `setSpeed(4)` loop in `h7-economy.spec.ts`, and the gallery wait in `h7-art.spec.ts` (up to 100 s per project). Waits for motion to settle (`helpers.ts`) stay as they are. Acceptance: no assertion loosened and no test dropped; full smoke `--repeat-each 5` green; the CI gates job under 14 minutes and the deploy job under 11, with the run ids in the report.
