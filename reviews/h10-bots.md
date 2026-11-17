@@ -67,3 +67,36 @@ Required changes:
 3. Remove the no-op `g.regrowProgress = …` line in the "at hive.rebuildTicks 0" test.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-17
+
+Reviewed `task/h10-bots` at 1917dd1 (the round 1 fixes on top of 5f56994). The fixes touch only DECISIONS.md and `packages/bots/test/h10-bots.test.ts`. No source or report changed, so round 1's checks of the source and the identical-at-0 comparison still hold.
+
+**Gates (my own run, `npm run gates -- --base main` at 1917dd1): all PASS.**
+
+| Gate | Time |
+| --- | --- |
+| typecheck | 6.6 s |
+| lint | 3.8 s |
+| test | 52.5 s |
+| determinism | 0.7 s |
+| bots | 81.2 s |
+| protected-files (55 files changed, none protected) | 0.5 s |
+
+**Round 1's required changes:**
+1. **Bots gate time: done.**
+   - DECISIONS.md now gives the time before and after: 76.5 s (the builder's run on `task/h10-sim`) and 74.5 s (mine), against 81.3 s on this branch.
+   - It gives each new strategy's share: one-push 3.6 s and two-push 7.6 s over 3 seeds.
+   - The growth is about 5–7 s, within those two strategies' runs. My 81.2 s this round agrees.
+2. **The misnamed test: done.** It is now two tests that each check what their titles say:
+   - with the live wave's ships at home, adaptive sends exactly that wave, and the test asserts it is smaller than the full-caps wave;
+   - with no ships, the weights follow the live wave.
+
+   The `void parkedWarships; void hiveWave;` lines and the two imports are gone.
+3. **The no-op line: done.** The `g.regrowProgress = …` line is removed.
+
+**Still standing from round 1, for the Director:** at `hive.rebuildTicks` 0 the bot sizes the hive as it is now, without R9's in-flight regrowth, so that its decisions at 0 match H9 exactly. h10-design-data's comparison report should say so if it compares a v18 value against 0. The non-blocking note on a battle at the hive that starts and captures in a single tick also stands.
+
+Required changes: none.
+
+VERDICT: APPROVE
