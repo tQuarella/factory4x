@@ -24,7 +24,7 @@ import {
   type SimData,
   type World,
 } from '@factory4x/sim';
-import { fieldBattleTicks, fieldMix, raidAwayAtEcon, guardFull, guardsAtHome } from './field-estimate.ts';
+import { fieldBattleTicks, fieldMix, raidAwayAtEcon, guardFull, guardsAtHome, guardsOnArrival } from './field-estimate.ts';
 import type { FieldBot, FieldStrategy, Weights } from './field-runner.ts';
 import { raisedMix } from './strategies.ts';
 
@@ -234,6 +234,8 @@ export interface AdaptiveOptions {
   offenceGate: (world: Readonly<World>, data: SimData) => boolean;
   /** H9 `adaptive-concentrate`: answer only prong 0, with every warship, and post the standing guard only there (H8's rule aimed at prong 0). */
   concentrate?: boolean;
+  /** How hive waves are sized (default `live`); `full` is `one-push`, `two-push` is the control of that name until its first push ends. */
+  hive?: HiveSizing;
   /** Test seam: where the bot reads the raid from (default `raidStatus`), so a unit test can hand it a two-prong raid before the sim builds one. */
   raidView?: (world: Readonly<World>) => RaidStatus;
 }
@@ -340,6 +342,37 @@ export function windowHome(world: Readonly<World>, prongs: number, heart: number
 }
 
 /**
+ * How a bot sizes its hive waves (DESIGN.md "Bots (H10)"):
+ *  - `live`: for the hive as the wave will find it (adaptive and its variants);
+ *  - `full`: for the hive at full caps, whatever its state (`one-push`);
+ *  - `two-push`: for `ceil(2W / 3)` ships of the full-caps wave W's mix (the first push of `two-push`).
+ */
+export type HiveSizing = 'live' | 'full' | 'two-push';
+
+/** A wave of `ceil(2 x W / 3)` ships in W's mix, scaled down per type with floors; the remainder goes to `counter` (the hive's counter type, or a Drone while it is locked). */
+export function twoThirds(w: Readonly<{ total: number; fleet: ShipTypeCounts }>, counter: ShipType): { total: number; fleet: ShipTypeCounts } {
+  const n = ceilDiv(2 * w.total, 3);
+  const fleet: ShipTypeCounts = { drone: 0, lancer: 0, flak: 0 };
+  let used = 0;
+  for (const t of WARSHIPS) {
+    fleet[t] = Math.floor((w.fleet[t] * n) / w.total);
+    used += fleet[t];
+  }
+  fleet[counter] += n - used;
+  return { total: n, fleet };
+}
+
+/** The hive wave a non-`live` sizing asks for, from the hive's caps (see `HiveSizing`); null when no mix within the search wins. */
+function cappedHiveWave(world: Readonly<World>, data: SimData, heart: number, types: readonly ShipType[], limit: number, sizing: 'full' | 'two-push'): { counts: { thorn: number; spore: number }; mix: { total: number; fleet: ShipTypeCounts } | null } {
+  const counts = guardFull(world, heart);
+  if (sizing === 'full') return { counts, mix: waveFor(world, data, heart, types, limit, counts) };
+  // The full-caps wave may be past the fleet limit: its two thirds can still fit, so W is searched past the limit.
+  const w = waveFor(world, data, heart, types, Math.max(limit, NO_LIMIT_SEARCH), counts);
+  const counter = hiveCounter(world).type;
+  return { counts, mix: w === null ? null : twoThirds(w, types.includes(counter) ? counter : 'drone') };
+}
+
+/**
  * The hive as a wave sent now from `from` would find it, and the wave for it (Director ruling, DECISIONS.md "h9-bots
  * round 1"). In a raid with more than one prong, a live prong counts as away only if the wave has taken the hive
  * before that prong's earliest return: arrival time plus the time the wave needs to capture, against the prong's ticks
@@ -358,8 +391,11 @@ export function hiveAtLanding(
   types: readonly ShipType[],
   limit: number,
   parked: ReadonlyMap<number, ShipTypeCounts> = new Map(),
+  sizing: HiveSizing = 'live',
 ): { counts: { thorn: number; spore: number }; mix: { total: number; fleet: ShipTypeCounts } | null } {
-  const base = guardsAtHome(world, heart);
+  if (sizing !== 'live') return cappedHiveWave(world, data, heart, types, limit, sizing);
+  // H10 change 1: the hive the wave finds after its flight (the queue rebuilds while it flies), not the hive now.
+  const base = guardsOnArrival(world, heart, from);
   if (raid === null || raid.prongs.length < 2) return { counts: base, mix: waveFor(world, data, heart, types, limit, base) };
   const arrivals = from.map((n) => ceilDiv(nodeDistance(world, n, heart), world.tun['ship.speedSu']));
   const arrive = Math.max(0, ...arrivals);
@@ -416,11 +452,12 @@ export function hiveWave(
   heart: number,
   types: readonly ShipType[],
   limit: number,
+  sizing: HiveSizing = 'live',
 ): { mix: { total: number; fleet: ShipTypeCounts } | null; from: number[]; ok: boolean } {
   const stood = gather.filter((n) => parked.has(n));
   const all = stood.length > 0 ? stood : [...gather];
   const one = (from: number[]): { mix: { total: number; fleet: ShipTypeCounts } | null; from: number[]; ok: boolean } => {
-    const mix = hiveAtLanding(world, data, raid, from, heart, types, limit, parked).mix;
+    const mix = hiveAtLanding(world, data, raid, from, heart, types, limit, parked, sizing).mix;
     return { mix, from, ok: mix !== null && covers(soundAt(world, from), mix.fleet) };
   };
   if (raid === null || raid.prongs.length < 2 || all.length < 2) return one(all);
@@ -552,14 +589,30 @@ export class AdaptiveBot implements FieldBot {
   /** The economy ships plus the reserve while haulerBlock is 'limit' (for tests: (a) says it is at least the fleet limit). */
   blockLoad = 0;
   private readonly backstops: Backstops;
+  /** `two-push`: 'first' until its first hive push is sent, 'flying' while ships are at or heading for the hive, then 'done' (adaptive from there). */
+  private push: 'first' | 'flying' | 'done' = 'first';
   respond: boolean;
   constructor(private readonly opts: AdaptiveOptions, backstops?: Backstops) {
     this.backstops = backstops ?? new Backstops(opts.dronesOnly);
     this.respond = opts.respond;
   }
 
+  /** How this tick's hive waves are sized (`two-push` is `live` once its first push has ended). */
+  get sizing(): HiveSizing {
+    const h = this.opts.hive ?? 'live';
+    return h === 'two-push' && this.push === 'done' ? 'live' : h;
+  }
+
+  /** `two-push`: tracks its first push (it ends when no player ship is left at or heading for the hive; a capture ends the run). */
+  private trackPush(world: Readonly<World>, heart: number): void {
+    if (this.opts.hive !== 'two-push' || this.push !== 'flying') return;
+    const engaged = world.ships.some((s) => s.at === heart || (s.transit !== null && s.transit.to === heart));
+    if (!engaged) this.push = 'done';
+  }
+
   decide(world: Readonly<World>, data: SimData): Input[] {
     const heart = heartIndex(world);
+    this.trackPush(world, heart);
     this.shrinking = false;
     this.waveTotal = 0;
     this.reserve = 0;
@@ -597,7 +650,8 @@ export class AdaptiveBot implements FieldBot {
     }
     const fit = soundAt(world, gather);
     // The hive as a wave sent now would find it (the Director's raid-window rule, below).
-    const hiveGo = this.offence ? hiveWave(world, data, raid, gather, parked, heart, types, limit) : null;
+    const sizing = this.sizing;
+    const hiveGo = this.offence ? hiveWave(world, data, raid, gather, parked, heart, types, limit, sizing) : null;
     const hiveMix = hiveGo === null ? null : hiveGo.mix;
     const placeShips = (minHalf: boolean): Input[] => place(world, parked, posts, minHalf, this.opts.dronesOnly);
     /** Every branch ends here: the trade in slots in offence, then the weights. */
@@ -615,6 +669,7 @@ export class AdaptiveBot implements FieldBot {
     // 1. Offence first when the hive can be taken right now (the raid window included: raiders away shrink hiveNow).
     if (this.offence && isGuarded(world, heart) && hiveMix !== null && hiveGo!.ok && guardianAt(world, heart)!.battle === null && raid?.phase !== 'fight') {
       Object.assign(w, deficitWeights(world, data, hiveMix.fleet));
+      if (this.opts.hive === 'two-push' && this.push === 'first') this.push = 'flying';
       return finish(hiveGo!.from.filter((n) => parked.has(n)).map((n) => sendInput(n, heart, parked.get(n)!)));
     }
 
@@ -638,7 +693,7 @@ export class AdaptiveBot implements FieldBot {
       // 4. Build for the hive: the wave for its strength now when it fits the room; else for the raid window (the
       // hive with a full-size raid away), and wait there for a raid to go out.
       let plan = hiveMix !== null && hiveMix.total <= room ? hiveMix : null;
-      if (plan === null) {
+      if (plan === null && sizing === 'live') {
         const away = windowHome(world, rs.nextProngs, heart, econAliveNow(world, data));
         const m = waveFor(world, data, heart, types, limit, away);
         if (m !== null && m.total <= room && rs.enabled) plan = m;
@@ -743,8 +798,12 @@ export class AdaptiveBot implements FieldBot {
   /** The smallest hive wave over the hive as it is and, when raids are on, with a full-size raid away. */
   private smallestHiveWave(world: Readonly<World>, data: SimData, types: readonly ShipType[], limit: number): number | null {
     const heart = heartIndex(world);
+    const sizing = this.sizing;
+    // `one-push` and the first push of `two-push` plan for the full-caps hive and no raid window.
+    if (sizing !== 'live') return cappedHiveWave(world, data, heart, types, limit, sizing).mix?.total ?? null;
     const totals: number[] = [];
-    const now = waveFor(world, data, heart, types, limit, guardsAtHome(world, heart));
+    // The wave builds at the probe and flies from there: the hive it finds is the hive after that flight (H10 change 1).
+    const now = waveFor(world, data, heart, types, limit, guardsOnArrival(world, heart, [PROBE]));
     if (now !== null) totals.push(now.total);
     if (raidStatus(world).enabled) {
       const away = waveFor(world, data, heart, types, limit, windowHome(world, raidStatus(world).nextProngs, heart, econAliveNow(world, data)));
@@ -930,7 +989,7 @@ class StaticBot implements FieldBot {
     const rows: { node: number; mix: { total: number; fleet: ShipTypeCounts } }[] = [];
     for (const n of world.nodes) {
       if (!isGuarded(world, n.index) || guardianAt(world, n.index)!.battle !== null) continue;
-      const m = waveFor(world, data, n.index, types, limit, guardsAtHome(world, n.index));
+      const m = waveFor(world, data, n.index, types, limit, guardsOnArrival(world, n.index, [PROBE]));
       if (m !== null) rows.push({ node: n.index, mix: m });
     }
     rows.sort((a, b) => a.mix.total - b.mix.total || a.node - b.node);
@@ -1009,7 +1068,29 @@ export const undefended: FieldStrategy = {
   make: () => new AdaptiveBot(adaptiveOpts({ respond: false })),
 };
 
+/**
+ * `one-push` (H10, report only): adaptive, except every hive wave is sized for the hive at full caps (`waveFor` on the caps) and
+ * launches only when its sound ships cover that. It measures what attrition is worth.
+ */
+export const onePush: FieldStrategy = {
+  name: 'one-push',
+  description: 'adaptive, but every hive wave is sized for the hive at full caps and launches only when its sound ships cover that (the control for attrition, report only)',
+  expectedWin: false,
+  make: () => new AdaptiveBot(adaptiveOpts({ hive: 'full' })),
+};
+/**
+ * `two-push` (H10, report only): adaptive, except its first hive push is ceil(2W / 3) ships of the full-caps wave W's mix (scaled
+ * down per type with floors, the remainder to the hive's counter type), launched when that many sound ships are at its rocks.
+ * After that push ends it plays adaptive. It measures whether a lost push is wasted.
+ */
+export const twoPush: FieldStrategy = {
+  name: 'two-push',
+  description: 'adaptive, but its first hive push is two thirds of the full-caps wave, in its mix; after that push ends it plays adaptive (the control for a lost push, report only)',
+  expectedWin: false,
+  make: () => new AdaptiveBot(adaptiveOpts({ hive: 'two-push' })),
+};
+
 /** The strategies the gate expects to win. */
 export const FIELD_WINNERS: readonly string[] = ['adaptive', 'greedy'];
 /** Every non-static strategy, in report order. */
-export const fieldStrategies: readonly FieldStrategy[] = [adaptive, greedy, idle, dronesOnly, adaptiveNoRaids, adaptiveConcentrate, undefended];
+export const fieldStrategies: readonly FieldStrategy[] = [adaptive, greedy, idle, dronesOnly, adaptiveNoRaids, adaptiveConcentrate, undefended, onePush, twoPush];
