@@ -338,3 +338,16 @@ QUESTIONS.md Q24 asks the owner to pick. DECISIONS.md logs the calls. No spec an
 
 **Action:** not H9 (A, wider front, is in spec). After the H9 handoff, the Designer turns this into a direction question for the owner (H10 candidates, plus any VISION wording to approve), alongside Q18.
 
+
+### 2026-11-17 · build build-20261117-1 (M2 H9, A wider front) · owner
+
+Answers to the H9 fun questions (QUESTIONS.md handoff block), in chat:
+
+> 1 I ran at 4x and missed where the second raid was going several times.  Auto-slowdown to 1x when the raid is impending.  Auto-back to the previous speed when raid is over.
+> 2 Yeah, but more to balance back toward military rather than economy.
+> 3 Yes, that worked well
+> 4 ignoring raids felt fine with enough econ
+
+Also (Q25, 2026-11-17): "C": attrition first, then logistics feeds combat.
+
+**Interpretation:** pending Designer triage.
