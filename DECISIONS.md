@@ -1901,3 +1901,9 @@ The owner picked C: attrition first, then logistics feeding combat. H10 will be 
 ## 2026-11-17 · Director · h10-bots: flight allowance off at hive.rebuildTicks 0
 
 Accepted: `guardsOnArrival` returns `guardsAtHome` while `hive.rebuildTicks` is 0, instead of reading `hiveAfter` (which covers R9 regrowth) there. My ruling that the bots play exactly as on main at 0 outranks the spec's "hiveAfter covers R9" for the bots. At 0 the rule is today's game, and the H9 bots never allowed for regrowth in flight. The spec's selector is unchanged; only the bots' use of it is gated.
+
+## 2026-11-17 · Director · h10-design-data rulings
+
+1. **The H10 bot lines stay "REPORTED".** The spec made targets 1–6 report lines, and each line's ok/MISS already shows the result. No bots-source edit.
+2. **Accepted: the h9-bots "raid.prongsMax 1: decides as H8 did" tests pin `hive.rebuildTicks` 0 in their setup** instead of moving the tick literal. Those tests prove the bot decides as H8 did, under H8's hive rule. Fixing that rule keeps their pins meaningful; moving the literal to v18's 30541 would not.
+3. **Noted:** one-push's idle-hauler peak of 3 is acceptable. It's a report-only control, and staffing is judged on adaptive and greedy.
