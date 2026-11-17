@@ -321,6 +321,8 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 **20:20:** h9-bots APPROVED round 2 (be6ede0, pushed): adaptive 15:54, greedy 20:33, undefended 12:03. Director accepted windowHome and the no-piecemeal-wave additions; greedy's 28412 loss is accepted greedy behaviour. h9-design-data started (Designer a4f72a6ad9f89c048 resumed) on task/h9-bots be6ede0: targets 1, 4 and 5 (undefended half).
 
+**20:50:** h9-design-data APPROVED (a49e163, pushed). Data v16: raid.prongMinSize 3. Adaptive 18:20, greedy 18:18, concentrate 23:13, undefended 13:09. Targets 1, 4 and 6 met; 5a and 5b reported. Director rulings are in DECISIONS (confirmed). Handoff must lead with: the bots say defending doesn't pay (undefended is 28% faster) and greedy is level with adaptive, next to the owner's attrition note. h9-client final round sent (engineer a8c170b2da5b3533f resumed). Then: Critic final round, branch CI, merge-task h9-client.
+
 Where H9 stands:
 - Merged on main: cw-bots-gate-time (97b84f2).
 - Approved: h9-sim (12924fa), h9-raids (a34be08).
