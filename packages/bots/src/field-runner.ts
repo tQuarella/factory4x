@@ -11,6 +11,7 @@ import {
   isWon,
   oreCost,
   SHIP_TYPES,
+  raidProngs,
   rockStatus,
   step,
   worldHash,
@@ -62,6 +63,8 @@ export interface RaidRecord {
   econLost: number;
   /** The planned size by type. */
   planned: { thorn: number; spore: number };
+  /** H9: each prong's result (`lastRaid.prongs`): the rock id it went to, its outcome, and the economy ships it killed. One entry for a raid that did not split. */
+  prongs: { target: string; outcome: string; econLost: number }[];
 }
 
 /** One trace point: economy alive, warships alive, ore in stock, the weights, and the bays running. */
@@ -86,6 +89,8 @@ export interface FieldResult {
   /** Tick the hive fell, or null. */
   hiveTick: number | null;
   raids: { mustered: number; beaten: number; hit: number; turnedBack: number };
+  /** H9 W6: prongs by outcome (`stats.raidProngs`). */
+  raidProngs: { beaten: number; hit: number; turnedBack: number };
   raidLog: RaidRecord[];
   /** Economy ships built and lost, by type. */
   econBuilt: { extractor: number; hauler: number };
@@ -138,6 +143,37 @@ const bayTicks = (w: Readonly<World>): number[] => BUILD_TYPES.map((t): number =
 const deliveredTotal = (w: Readonly<World>): number => w.stats.delivered.ore + w.stats.delivered.ice + w.stats.delivered.crystal;
 const econLostTotal = (w: Readonly<World>): number => w.stats.econLost.extractor + w.stats.econLost.hauler;
 
+/**
+ * The shield metric, exact per prong (H9 W4): `begin` before a step records, for each prong, whether a warship stands at
+ * its target and how many economy ships it has killed; `end` after the step returns the economy ships the prongs that
+ * were guarded killed during it. A prong's own `lostEcon` is read from `world.raid`, or, when the raid ended in the step,
+ * from `world.lastRaid.prongs` at the same index (prong order). A loss at an unguarded prong never counts.
+ */
+export class ShieldMeter {
+  private pre: { guarded: boolean; lost: number }[] = [];
+  private raidId = -1;
+
+  begin(world: Readonly<World>): void {
+    this.pre = [];
+    this.raidId = world.raid === null ? -1 : world.raid.id;
+    if (world.raid === null) return;
+    for (const p of raidProngs(world.raid)) this.pre.push({ guarded: p.phase !== 'done' && world.ships.some((s) => s.at === p.target), lost: p.lostEcon.extractor + p.lostEcon.hauler });
+  }
+
+  end(world: Readonly<World>): number {
+    if (this.pre.length === 0) return 0;
+    let now: number[];
+    if (world.raid !== null && world.raid.id === this.raidId) now = raidProngs(world.raid).map((p) => p.lostEcon.extractor + p.lostEcon.hauler);
+    else if (world.lastRaid !== null && world.lastRaid.id === this.raidId) now = world.lastRaid.prongs.map((p) => p.lostEcon.extractor + p.lostEcon.hauler);
+    else return 0;
+    let n = 0;
+    this.pre.forEach((p, i) => {
+      if (p.guarded && i < now.length) n += Math.max(0, now[i]! - p.lost);
+    });
+    return n;
+  }
+}
+
 /** Play one strategy on one seed. `variant` labels a `static` sweep shape. */
 export function runField(strategy: FieldStrategy, seed: number, data: SimData, opts: FieldRunOptions = defaultFieldOptions(data), variant: string | null = null): FieldResult {
   const world = createWorld(seed, data);
@@ -151,6 +187,7 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
   const backedUp: Record<string, { seconds: number; longest: number }> = {};
   const runs = new Map<string, number>();
   let econLostGuarded = 0;
+  const shield = new ShieldMeter();
   let idleOreRun = 0;
   let idleOreLongest = 0;
   const trace: TraceRow[] = [];
@@ -176,14 +213,12 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
       if (first.length > 0) {
         inputs = [...first.splice(0), ...inputs];
       }
-      // A warship standing at the raid's target as the tick begins (the shield's premise).
-      const raidNode = world.raid === null ? null : world.raid.target;
-      const guardedNow = raidNode !== null && world.ships.some((s) => s.at === raidNode);
-      const lostBefore = econLostTotal(world);
+      // The shield's premise, per prong: a warship standing at the prong's target as the tick begins.
+      shield.begin(world);
       const t0 = performance.now();
       step(world, data, inputs);
       times.push(performance.now() - t0);
-      if (guardedNow) econLostGuarded += econLostTotal(world) - lostBefore;
+      econLostGuarded += shield.end(world);
       // No-idle: ore for the dearest unlocked warship in stock while no bay runs (the cheap checks first).
       const bayNow = bayTicks(world);
       let noBay = true;
@@ -233,11 +268,12 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
       // Raids: a muster opens a record, the stats counter that moves closes it with its outcome. A muster
       // cancelled by a battle at the hive (R6) ends with no counter and leaves no record.
       const r = world.stats.raids;
-      if (open === null && world.raid !== null) open = { startTick: world.tick, lostAtStart: econLostTotal(world), planned: { ...world.raid.planned } };
+      if (open === null && world.raid !== null) open = { startTick: world.tick, lostAtStart: econLostTotal(world), planned: raidProngs(world.raid).reduce((a, p) => ({ thorn: a.thorn + p.planned.thorn, spore: a.spore + p.planned.spore }), { thorn: 0, spore: 0 }) };
       if (open !== null) {
         const outcomeNow = r.hit > prevRaids.hit ? 'hit' : r.beaten > prevRaids.beaten ? 'beaten' : r.turnedBack > prevRaids.turnedBack ? 'turnedBack' : null;
         if (outcomeNow !== null) {
-          raidLog.push({ startTick: open.startTick, endTick: world.tick, outcome: outcomeNow, econLost: econLostTotal(world) - open.lostAtStart, planned: open.planned });
+          const prongs = (world.lastRaid?.prongs ?? []).map((p) => ({ target: world.nodes[p.target]!.id, outcome: p.outcome, econLost: p.lostEcon.extractor + p.lostEcon.hauler }));
+          raidLog.push({ startTick: open.startTick, endTick: world.tick, outcome: outcomeNow, econLost: econLostTotal(world) - open.lostAtStart, planned: open.planned, prongs });
           open = null;
         } else if (world.raid === null) open = null;
       }
@@ -262,6 +298,7 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
     ticks: world.tick,
     hiveTick: world.capturedTick,
     raids: { ...s.raids },
+    raidProngs: { ...s.raidProngs },
     raidLog,
     econBuilt: { ...st.econBuilt },
     econLost: { ...st.econLost },

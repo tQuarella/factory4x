@@ -133,7 +133,7 @@ describe('the field runner (acceptance 1)', () => {
 
 describe('the six strategies (acceptance 2)', () => {
   it('exports the six: adaptive, greedy, static (a sweep of at most 6), idle, drones-only, adaptive-no-raids; the gate expects adaptive and greedy to win', () => {
-    expect([...fieldStrategies.map((s) => s.name), 'static'].sort()).toEqual(['adaptive', 'adaptive-no-raids', 'drones-only', 'greedy', 'idle', 'static']);
+    expect([...fieldStrategies.map((s) => s.name), 'static'].sort()).toEqual(['adaptive', 'adaptive-concentrate', 'adaptive-no-raids', 'drones-only', 'greedy', 'idle', 'static', 'undefended']);
     expect(STATIC_SHAPES.length).toBeGreaterThan(0);
     expect(STATIC_SHAPES.length).toBeLessThanOrEqual(6);
     expect(new Set(STATIC_SHAPES.map((s) => s.name)).size).toBe(STATIC_SHAPES.length);
@@ -430,7 +430,7 @@ describe('the seven capability flags (acceptance 4)', () => {
   });
 
   it("flag 2, greed is answered: greedy's first hitting raid kills at least 2 economy ships and greedy wins", () => {
-    const log = (n: number) => [{ startTick: 0, endTick: 1, outcome: 'hit' as const, econLost: n, planned: { thorn: 1, spore: 1 } }];
+    const log = (n: number) => [{ startTick: 0, endTick: 1, outcome: 'hit' as const, econLost: n, planned: { thorn: 1, spore: 1 }, prongs: [] }];
     expect(computeFieldFlags([run({ strategy: 'greedy', raidLog: log(2) })], fixtureV12)[1]!.pass).toBe(true);
     expect(computeFieldFlags([run({ strategy: 'greedy', raidLog: log(1) })], fixtureV12)[1]!.pass).toBe(false);
     expect(computeFieldFlags([run({ strategy: 'greedy', raidLog: log(3), outcome: 'timeout' })], fixtureV12)[1]!.pass).toBe(false);

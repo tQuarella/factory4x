@@ -65,6 +65,19 @@ export function waveWins(base: Readonly<World>, node: number, fleet: Readonly<Sh
   throw new Error('battle did not end');
 }
 
+/** Ticks from the wave's arrival until `node` is captured, or null when the wave loses (H9: how long a hive wave is exposed to a prong coming home). */
+export function waveTicks(base: Readonly<World>, node: number, fleet: Readonly<ShipTypeCounts>, data: SimData): number | null {
+  const w = JSON.parse(JSON.stringify(base)) as World;
+  placeShips(w, node, fleet);
+  const g = guardianAt(w, node)!;
+  for (let i = 1; i <= 100_000; i++) {
+    step(w, data, []);
+    if (!g.alive) return i;
+    if (!w.ships.some((s) => s.at === node)) return null;
+  }
+  throw new Error('battle did not end');
+}
+
 /** A battle test: `waveWins`, or a memo of it (the field estimate shares results across searches on one base). */
 export type WinsFn = (base: Readonly<World>, node: number, fleet: Readonly<ShipTypeCounts>, data: SimData) => boolean;
 

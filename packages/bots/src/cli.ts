@@ -12,7 +12,7 @@ import { dirname } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { BUILD_TYPES, defaultData } from '@factory4x/sim';
 import budgets from '../../../scripts/gates/budgets.json' with { type: 'json' };
-import { computeFieldFlags } from './field-flags.ts';
+import { computeFieldFlags, computeH9Lines, prongSummary, slowerPct } from './field-flags.ts';
 import { FIELD_CAP_MIN, SOFTLOCK_MIN, fieldGateFailures, gateRuns, runField, tickMmss, type FieldResult } from './field-runner.ts';
 import { FIELD_WINNERS, STATIC_SHAPES, fieldStrategies, staticStrategy } from './field-strategies.ts';
 
@@ -60,13 +60,14 @@ for (let seed = 1; seed <= seeds; seed++) {
 }
 const runSec = (performance.now() - started) / 1000;
 const flags = computeFieldFlags(results, data);
-const names = ['adaptive', 'greedy', 'static', 'idle', 'drones-only', 'adaptive-no-raids'];
+const h9Lines = computeH9Lines(results);
+const names = ['adaptive', 'greedy', 'static', 'idle', 'drones-only', 'adaptive-no-raids', 'adaptive-concentrate', 'undefended'];
 const failures = fieldGateFailures(gateRuns(results, sweep), FIELD_WINNERS, names, budgets.tickBudgetMsP95, tr);
 
 mkdirSync(dirname(outBase), { recursive: true });
 writeFileSync(
   `${outBase}.json`,
-  JSON.stringify({ generatedAt: new Date().toISOString(), dataVersion: data.dataVersion, seeds, capMinutes: FIELD_CAP_MIN, softlockMinutes: SOFTLOCK_MIN, tickBudgetMsP95: budgets.tickBudgetMsP95, runSeconds: Number(runSec.toFixed(2)), failures, flags, staticSweep: STATIC_SHAPES, results, sweep }, null, 2),
+  JSON.stringify({ generatedAt: new Date().toISOString(), dataVersion: data.dataVersion, seeds, capMinutes: FIELD_CAP_MIN, softlockMinutes: SOFTLOCK_MIN, tickBudgetMsP95: budgets.tickBudgetMsP95, runSeconds: Number(runSec.toFixed(2)), failures, flags, h9Lines, staticSweep: STATIC_SHAPES, results, sweep }, null, 2),
 );
 
 const t = (r: FieldResult): string => (r.outcome === 'won' ? tickMmss(r.hiveTick, tr) : `${r.outcome} ${tickMmss(r.ticks, tr)}`);
@@ -118,13 +119,33 @@ const md = [
     .filter((r) => r.seed === 1)
     .flatMap((r) => r.trace.map((x) => `| ${r.strategy}${r.variant === null ? '' : ` (${r.variant})`} | ${x.minute} | ${x.extractors} / ${x.haulers} | ${x.warships.drone}/${x.warships.lancer}/${x.warships.flak} | ${x.stockOre} | ${BUILD_TYPES.map((t) => x.weights[t]).join('/')} | ${x.bayRunning.join(', ') || 'none'} |`)),
   '',
+  '## Prongs (H9)',
+  '',
+  'Per run: raids by prong count (a raid that did not split is 1 prong), prongs by outcome (`stats.raidProngs`: beaten / hit / turned back), economy ships lost per prong target (the rock the prong went to, from `lastRaid.prongs`), and the win time against `adaptive` on the same seed (+12% is 12% slower; "-" when either did not win).',
+  '',
+  '| Strategy | Seed | Raids by prong count | Prongs beaten / hit / turned back | Economy ships lost per prong target | Win time against adaptive |',
+  '| --- | --- | --- | --- | --- | --- |',
+  ...results.map((r) => {
+    const ps = prongSummary(r);
+    const counts = Object.keys(ps.byCount).map(Number).sort((a, b) => a - b).map((k) => `${k}: ${ps.byCount[k]}`).join(', ');
+    const lost = Object.keys(ps.lostByTarget).sort().map((k) => `${k} ${ps.lostByTarget[k]}`).join(', ');
+    const pct = r.strategy === 'adaptive' ? 'base' : slowerPct(results, r.strategy, r.seed);
+    return `| ${r.strategy}${r.variant === null ? '' : ` (${r.variant})`} | ${r.seed} | ${counts || 'none'} | ${r.raidProngs.beaten} / ${r.raidProngs.hit} / ${r.raidProngs.turnedBack} | ${lost || 'none'} | ${pct === null ? '-' : typeof pct === 'string' ? pct : `${pct >= 0 ? '+' : ''}${pct}%`} |`;
+  }),
+  '',
   '## What no bot exercises',
   '',
-  'Bots stay on Auto haulers and use only `sendShips` and `recycleShips`. No bot uses: the drag gesture (a client gesture), `setHaulers`, `moveShips`, `recycleFleet`, or Mine mode (a client mode; the bots never send `setMine` and play with the marks the map starts with). Sim tests and the reference replay cover `setHaulers`, `moveShips` and `recycleFleet`; h8-client smoke tests cover the drag and Mine mode.',
+  'Bots stay on Auto haulers and use only `sendShips` and `recycleShips` (and the weights and the rally). No bot uses: `setExtractors` (they stay on All), the drag gesture (a client gesture), `setHaulers`, `moveShips`, `recycleFleet`, or Mine mode (a client mode; the bots never send `setMine` and play with the marks the map starts with). Sim tests and the reference replay cover `setExtractors`, `setHaulers`, `moveShips` and `recycleFleet`; h8-client smoke tests cover the drag and Mine mode.',
   '',
   '## H7 capability flags (report lines, not gates)',
   '',
   ...flags.map((f, i) => `${i + 1}. ${f.pass ? 'MET' : 'MISSED'}: ${f.name}\n   - ${f.detail}`),
+  '',
+  '## H9 report lines (not gate flags until h9-design-data says they hold)',
+  '',
+  'Calibration targets 4 and 5. Greedy plays adaptive after its first hit, so its half of target 5 may move to `undefended` (Director ruling, DECISIONS.md).',
+  '',
+  ...h9Lines.map((f, i) => `${i + 1}. ${f.pass ? 'MET' : 'MISSED'}: ${f.name}\n   - ${f.detail}`),
   '',
 ].join('\n');
 writeFileSync(`${outBase}.md`, md);

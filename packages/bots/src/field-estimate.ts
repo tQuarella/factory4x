@@ -14,7 +14,7 @@ import {
   type SimData,
   type World,
 } from '@factory4x/sim';
-import { minMix, minSingle, waveWins, type WinsFn } from './waves.ts';
+import { minMix, minSingle, waveTicks, waveWins, type WinsFn } from './waves.ts';
 
 /**
  * The field's min-wave estimate (DESIGN.md H7 "Bots (H7): strategies": "no pre-send battle simulation beyond the
@@ -162,6 +162,23 @@ export function fieldSingle(world: Readonly<World>, data: SimData, node: number,
 export function fieldWins(world: Readonly<World>, data: SimData, node: number, fleet: Readonly<ShipTypeCounts>, counts: Readonly<GuardCounts> | null = null): boolean {
   const b = baseFor(world, data, node, counts);
   return waveWins(b.world, node, fleet, b.data);
+}
+
+const ticksCache = new Map<string, number | null>();
+
+/**
+ * How many ticks `fleet` arriving together needs to take `node` with `counts` guards at home (null: it loses), on the
+ * inert field. A wave is exposed to a prong coming home for this long (H9).
+ */
+export function fieldBattleTicks(world: Readonly<World>, data: SimData, node: number, fleet: Readonly<ShipTypeCounts>, counts: Readonly<GuardCounts> | null = null): number | null {
+  const key = `${tunKey(world, data)}|${node}|${guardKey(counts)}|${fleet.drone},${fleet.lancer},${fleet.flak}`;
+  const hit = ticksCache.get(key);
+  if (hit !== undefined) return hit;
+  const b = baseFor(world, data, node, counts);
+  const t = waveTicks(b.world, node, fleet, b.data);
+  if (ticksCache.size > 4000) ticksCache.clear();
+  ticksCache.set(key, t);
+  return t;
 }
 
 /**
