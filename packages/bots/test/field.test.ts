@@ -133,7 +133,7 @@ describe('the field runner (acceptance 1)', () => {
 
 describe('the six strategies (acceptance 2)', () => {
   it('exports the six: adaptive, greedy, static (a sweep of at most 6), idle, drones-only, adaptive-no-raids; the gate expects adaptive and greedy to win', () => {
-    expect([...fieldStrategies.map((s) => s.name), 'static'].sort()).toEqual(['adaptive', 'adaptive-concentrate', 'adaptive-no-raids', 'drones-only', 'greedy', 'idle', 'static', 'undefended']);
+    expect([...fieldStrategies.map((s) => s.name), 'static'].sort()).toEqual(['adaptive', 'adaptive-concentrate', 'adaptive-no-raids', 'drones-only', 'greedy', 'idle', 'one-push', 'static', 'two-push', 'undefended']);
     expect(STATIC_SHAPES.length).toBeGreaterThan(0);
     expect(STATIC_SHAPES.length).toBeLessThanOrEqual(6);
     expect(new Set(STATIC_SHAPES.map((s) => s.name)).size).toBe(STATIC_SHAPES.length);

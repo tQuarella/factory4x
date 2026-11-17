@@ -8,6 +8,8 @@ import {
   raidSize,
   guardianAt,
   heartIndex,
+  hiveAfter,
+  nodeDistance,
   type GuardCounts,
   type ShipType,
   type ShipTypeCounts,
@@ -125,6 +127,24 @@ function winsFor(world: Readonly<World>, data: SimData, node: number, counts: Re
 /** A node's guards at home right now, by type (what a wave sent now would fight). */
 export function guardsAtHome(world: Readonly<World>, node: number): GuardCounts {
   return countGuards(guardianAt(world, node)!);
+}
+
+/**
+ * The guards a wave that flies from `from` to `node` finds there (H10 "Bots (H10)" change 1): at the hive, the hive's guards at home
+ * after the flight (`hiveAfter`: the queue rebuilds one per `hive.rebuildTicks`), so a wave isn't short by the
+ * guards rebuilt while it flies; anywhere else, the guards now (a pocket's rule 9 is unchanged by H10).
+ */
+export function guardsOnArrival(world: Readonly<World>, node: number, from: readonly number[]): GuardCounts {
+  // At `hive.rebuildTicks` 0 the bots play H9: the hive is sized as it is (R9's timers are not read, so the decisions are the v16 ones).
+  if (node !== heartIndex(world) || world.tun['hive.rebuildTicks'] === 0) return guardsAtHome(world, node);
+  return hiveAfter(world, flightTicks(world, from, node));
+}
+
+/** The ticks a ship from the slowest of `from` needs to reach `node` (the latest arrival), the integer ceiling as the sim counts a flight. */
+export function flightTicks(world: Readonly<World>, from: readonly number[], node: number): number {
+  let t = 0;
+  for (const n of from) t = Math.max(t, Math.floor((nodeDistance(world, n, node) + world.tun['ship.speedSu'] - 1) / world.tun['ship.speedSu']));
+  return t;
 }
 
 /** A node's guard caps by type under this world's tunables (the full-strength guard counts). */

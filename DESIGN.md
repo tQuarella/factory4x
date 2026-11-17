@@ -999,6 +999,67 @@ Values only, in `data/sim.json`; `dataVersion` goes to 18.
 
 **The designer.md guard applies.** A value that meets a target but flips which strategy finishes first, or moves a winner by more than 10% against the v17 run at the same rule keys, goes to the Director with the reword option. Here the rule itself is meant to move adaptive, so the guard is measured against the first v18 candidate, not v16.
 
+#### Calibration result (h10-design-data, data v18)
+
+**One value changed: `hive.rebuildTicks` 0 → 600, so `dataVersion` is 18.** It is the first v18 candidate and the value shipped, so no later value is measured against it under the guard (Director ruling 5). `raid.rollMax` stays 0.
+- **Final suite:** `reports/archive/h10-design-data-v18-bots.md` (3 seeds, all identical, with the sweep at 450/600/750).
+- **The probe across 300–1200:** `reports/archive/h10-design-data-v18.md`, with its script `h10-design-data-v18-sweep.mts`. h10-bots' sweep on v17 is `reports/archive/h10-bots-v17-sweep.md`.
+
+| # | Target | v18 (every seed) | Met |
+| --- | --- | --- | --- |
+| 1 | `undefended` ≥ 10% slower than adaptive | 19:19 against 16:04 (+20%) | **met** |
+| 2 | the hive ≤ 75% of caps when the winning wave lands, after ≥ 2 events | 21/30 (70%), 7 events | **met** |
+| 3 | `one-push` ≥ 10% slower than adaptive | 22:30 (+40%) | **met** |
+| 4 | `two-push` no more than 10% behind `one-push` | 17:58 (20% ahead) | **met** |
+| 5 | targets 1 and 3 hold at 450 and 750 | 450: +31% / +39%; 750: +19% / +39% | **met** (the band where both hold is 300–825) |
+| 6 | pace: adaptive 15–30, greedy ≤ 40; first raid 2–6 min | 16:04, 16:00; 2:42 | **met** |
+| H8 | staffing: adaptive and greedy ≤ 1 idle hauler outside raids; nothing backed up with its target met | peak 1 and 0, 0 min over 1; none | **met** |
+| H9 2, 3 | per-prong fights at rocks | unchanged rule (D2 doesn't touch rock fights) | met |
+| flags 1–7 | | all MET (flag 4: best mix 15 at full strength, 9 with a full raid out; flag 6: 15 + 22 = 37 > 30, 15 + 10 = 25 fits) | met |
+| 5a (reported) | greedy against adaptive | 16:00 against 16:04 (level) | reported |
+| H9 1 (report line) | adaptive meets ≥ 2 two-prong raids | 4 (first at 7:53) | reported (still true) |
+| H9 4 (report line) | concentrate loses ≥ 2 more economy ships, or is ≥ 10% slower | 7 against 3 lost; −1% | reported (met on ships) |
+
+**v16 → v18, per strategy (for the handoff).** The v16 numbers are main's suite, `reports/archive/h9-design-data-v16-bots.md`. At `hive.rebuildTicks` 0, h10-bots ignores R9's regrowth during a wave's flight (so that the bots play exactly as on main). The v16 and v17 rows therefore compare bots that sized the hive as it stood, against v18 bots that size it at landing.
+
+| Strategy | v16 | v18 | Move |
+| --- | --- | --- | --- |
+| adaptive | 18:20 | 16:04 | −12% |
+| greedy | 18:18 | 16:00 | −13% |
+| undefended | 13:09 | 19:19 | **+47%** (was 28% faster than adaptive; now 20% slower) |
+| adaptive-concentrate | 23:13 | 15:55 | −31% |
+| adaptive-no-raids | 9:46 | 9:42 | −1% |
+| one-push (new; v17 at 0) | 24:52 | 22:30 | −10% |
+| two-push (new; v17 at 0) | 23:06 | 17:58 | −22% |
+| idle, drones-only, static | timeout | timeout | – |
+
+Economy ships lost to raids: adaptive 5 → 3, undefended 5 → 7.
+
+**Why adaptive got faster.** Adaptive and greedy beat about 3 raids each, which costs the hive 28 guards over the run, rebuilt one per 20 s. Its hive-guard track for adaptive's run (seed 1, per game minute) is 30 30 27 30 30 27 30 30 29 30 23 27 30 24 27 21. The winning wave lands at 21/30 instead of a full hive.
+
+**Walk of `hive.rebuildTicks` 600:**
+- **The opening.** The first raid still musters at 2:42 with 3 raiders. It is beaten (the track's 27 at minute 3) and rebuilt within a minute, before R8's gap allows the next muster. The opening is H9's apart from the readout.
+- **Every raid phase:**
+  - **Muster and out:** unchanged. Raiders away are never rebuilt (W7).
+  - **Fight:** each kill is a lasting deficit. Adaptive's prongs: 7 beaten, 2 hit, 1 turned back.
+  - **Split raids:** adaptive still meets 4 two-prong raids, the first at 7:53. Their deficits share one queue.
+  - **Home:** a prong rejoining doesn't move the queue (the replay's item (e)).
+  - **The next muster:** raids are smaller after a beaten raid (the keep line). Adaptive met 6 raids against 7 on v16.
+- **The limits:**
+  - **The hive:** a beaten full raid of 12 takes 7200 ticks (4 game minutes, 1 real minute at 4x). An empty hive takes 18,000 ticks (10 game minutes).
+  - **"No faster refill":** holds. 600 is above the 300 floor, and no warship, repair or pocket value moved.
+  - **The fleet limit:** flag 6 holds.
+  - **Edge of the band:** targets hold from 300 to 825 and break by 900 (target 3: one-push wins first), so 600 has room on both sides.
+- **Siblings:**
+  - **Pockets:** rule 9, unchanged; flag 7 holds.
+  - **adaptive-no-raids** (9:46 → 9:42) barely moves. With no raids there are no kills to bank before its one push, so attrition only helps a player who fights the raids.
+  - **The opening stock** is unchanged.
+  - **The reference replay** sets `hive.rebuildTicks` itself from tick 0, so only its `dataVersion` changes. The determinism final is 3b20982a → ea89d755.
+
+**Greedy (5a).** No in-range value makes greedy at least 10% slower than adaptive without breaking a target. The only one is 900 (+13%), where target 3 fails. So it stays a reported finding, unforced. In the bots, greedy switches to adaptive's defence after its first hit, which comes at the first raid. That makes it a late defender, not an ignorer. `undefended` is the ignorer, and it now pays 20%.
+
+**The roll-on stays off.** The first agreed condition fails, because allowed values do meet targets 1 and 5. No numbers go to the Director for it.
+
 #### The roll-on fallback: when calibration may turn it on
 
 The owner pre-approved it (Q26, "A"). h10-design-data may propose `raid.rollMax` 1 to the Director, and only when all of these are true:

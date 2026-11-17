@@ -13,9 +13,11 @@ import { fixtureV16 } from '../../sim/test/fixture.ts';
  * (tickMsP50, tickMsP95) and `finalHash` (a world hash, which covers the new state by construction). The whole suite on the
  * shipped v17 data was compared once, the same way, for the h10-sim report (DECISIONS.md, h10-sim).
  */
-type Comparable = Omit<FieldResult, 'tickMsP50' | 'tickMsP95' | 'finalHash'>;
+type Comparable = Omit<FieldResult, 'tickMsP50' | 'tickMsP95' | 'finalHash' | 'hive' | 'raidRolls'>;
 const comparable = (r: FieldResult): Comparable => {
-  const { tickMsP50: _p50, tickMsP95: _p95, finalHash: _hash, ...rest } = r;
+  const { tickMsP50: _p50, tickMsP95: _p95, finalHash: _hash, hive: _hive, raidRolls: _rolls, ...rest } = r;
+  void _hive;
+  void _rolls;
   void _p50;
   void _p95;
   void _hash;

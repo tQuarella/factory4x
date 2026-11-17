@@ -41,9 +41,9 @@ const H10_SIM = ['hive.rebuildTicks', 'raid.rollMax'];
 const H10_CLIENT = ['client.raidSlowdown'];
 
 describe('data/sim.json (shipped) at H10', () => {
-  it('is data version 17, with the H10 keys at their v17 defaults (both rule keys 0: the game plays as v16)', () => {
-    expect(defaultData.dataVersion).toBe(17);
-    expect([...H10_SIM, ...H10_CLIENT].map((k) => defaultData.tunables[k as TunableKey].default)).toEqual([0, 0, 1]);
+  it('is data version 18, with the H10 keys at their v18 defaults (hive.rebuildTicks 600 from h10-design-data; raid.rollMax 0)', () => {
+    expect(defaultData.dataVersion).toBe(18);
+    expect([...H10_SIM, ...H10_CLIENT].map((k) => defaultData.tunables[k as TunableKey].default)).toEqual([600, 0, 1]);
   });
 
   it('matches the "Tunables (H10 …)" table: every key with its range, and the v17 default (the left of "v17 → v18")', () => {

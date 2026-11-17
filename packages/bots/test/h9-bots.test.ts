@@ -254,7 +254,8 @@ describe('change 1: the defence splits across prongs (a two-prong world: a5 THOR
 });
 
 describe('raid.prongsMax 1: the bot decides as H8 did (v15, seed 1)', () => {
-  const opts = { capTicks: 20 * MIN, softlockTicks: 5 * MIN, tunables: { 'raid.prongsMax': 1 } as const };
+  // hive.rebuildTicks 0 pins H9's hive (R9), the shipped default until v18 (h10-design-data), so these stay H8's runs.
+  const opts = { capTicks: 20 * MIN, softlockTicks: 5 * MIN, tunables: { 'raid.prongsMax': 1, 'hive.rebuildTicks': 0 } as const };
   // Hashes of the H8 bots (field-strategies.ts at 12924fa, before this task) on the h9-raids sim, over a 20 minute cap on v15, seed 1, with raid.prongsMax 1 set (the tunable is in the hash).
   // They hold while the data is v15; the equality with `adaptive-concentrate` below is data-independent.
   const pins: [FieldStrategy, string, number][] = [
@@ -279,7 +280,7 @@ describe('raid.prongsMax 1: the bot decides as H8 did (v15, seed 1)', () => {
 
 describe('adaptive-concentrate and undefended: registered as report-only controls', () => {
   it('both are strategies of the field suite, neither is gated to win', () => {
-    expect(fieldStrategies.map((s) => s.name)).toEqual(['adaptive', 'greedy', 'idle', 'drones-only', 'adaptive-no-raids', 'adaptive-concentrate', 'undefended']);
+    expect(fieldStrategies.map((s) => s.name)).toEqual(['adaptive', 'greedy', 'idle', 'drones-only', 'adaptive-no-raids', 'adaptive-concentrate', 'undefended', 'one-push', 'two-push']);
     for (const s of [adaptiveConcentrate, undefended]) {
       expect(s.expectedWin).toBe(false);
       expect(FIELD_WINNERS).not.toContain(s.name);

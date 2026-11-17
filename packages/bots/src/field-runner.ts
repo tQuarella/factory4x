@@ -5,6 +5,9 @@ import {
   allocStatus,
   createWorld,
   fieldSummary,
+  guardCaps,
+  guardianAt,
+  heartIndex,
   fleetStatus,
   isFleetFull,
   isTypeUnlocked,
@@ -67,6 +70,45 @@ export interface RaidRecord {
   prongs: { target: string; outcome: string; econLost: number }[];
 }
 
+/** One battle at the hive: when it started, the hive's guards at home then (and its caps), the guards it killed, and whether it took the hive. */
+export interface HivePush {
+  tick: number;
+  home: number;
+  cap: number;
+  killed: number;
+  won: boolean;
+}
+
+/**
+ * A hive-damaging event before the win (DESIGN.md H10 calibration target 2): a prong beaten with at least HIVE_EVENT_PRONG
+ * raiders killed (`prong`, at the raid's end), or a push that killed at least HIVE_EVENT_PUSH guards without taking the hive (`push`).
+ */
+export interface HiveEvent {
+  tick: number;
+  kind: 'prong' | 'push';
+  killed: number;
+}
+
+/** A beaten prong that cost the hive this many raiders is a hive-damaging event. */
+export const HIVE_EVENT_PRONG = 3;
+/** A lost push that killed this many guards is a hive-damaging event. */
+export const HIVE_EVENT_PUSH = 5;
+
+/** H10 hive columns of a run: what raids and pushes took from the hive, and its guards over time. */
+export interface HiveStats {
+  /** The hive's caps (guard.capPct applied) at the end of the run. */
+  cap: number;
+  /** Raiders killed at rocks, and guards killed in battles at the hive (fieldSummary.hive). */
+  lostToRaids: number;
+  lostToPushes: number;
+  /** Every battle at the hive, in order; the last is the winning push when the run was won. */
+  pushes: HivePush[];
+  /** The hive-damaging events, in order (the winning push is not one). */
+  events: HiveEvent[];
+  /** The hive's guards at home at each game minute (index 0 is minute 1). */
+  perMinute: number[];
+}
+
 /** One trace point: economy alive, warships alive, ore in stock, the weights, and the bays running. */
 export interface TraceRow {
   minute: number;
@@ -91,6 +133,10 @@ export interface FieldResult {
   raids: { mustered: number; beaten: number; hit: number; turnedBack: number };
   /** H9 W6: prongs by outcome (`stats.raidProngs`). */
   raidProngs: { beaten: number; hit: number; turnedBack: number };
+  /** H10 L3: prongs that rolled on to another rock (`stats.raidRolls`); 0 while `raid.rollMax` is 0. */
+  raidRolls: number;
+  /** H10: the hive columns. */
+  hive: HiveStats;
   raidLog: RaidRecord[];
   /** Economy ships built and lost, by type. */
   econBuilt: { extractor: number; hauler: number };
@@ -196,6 +242,12 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
   let prevDelivered = deliveredTotal(world);
   let open: { startTick: number; lostAtStart: number; planned: { thorn: number; spore: number } } | null = null;
   let prevRaids = { beaten: 0, hit: 0, turnedBack: 0 };
+  const heart = heartIndex(world);
+  const pushes: HivePush[] = [];
+  const events: HiveEvent[] = [];
+  const perMinute: number[] = [];
+  let curPush: { id: number; tick: number; home: number; cap: number; startKilled: number } | null = null;
+  let lastRaidId = -1;
   const first: Input[] = [];
   for (const src of [strategy.tunables, opts.tunables]) {
     if (src === undefined) continue;
@@ -258,6 +310,28 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
         } else runs.set(key, 0);
       }
       opts.onTick?.(world);
+      // The hive columns: a battle at the hive is a push (it ends when the battle does), a beaten prong that cost it enough raiders is an event.
+      {
+        const hg = guardianAt(world, heart)!;
+        const b = hg.battle;
+        if (curPush !== null && (b === null || b.id !== curPush.id)) {
+          const killed = hg.guardsKilled - curPush.startKilled;
+          const won = !hg.alive;
+          pushes.push({ tick: curPush.tick, home: curPush.home, cap: curPush.cap, killed, won });
+          if (!won && killed >= HIVE_EVENT_PUSH) events.push({ tick: world.tick, kind: 'push', killed });
+          curPush = null;
+        }
+        if (b !== null && curPush === null) {
+          const caps = guardCaps(world, hg);
+          curPush = { id: b.id, tick: world.tick, home: b.guardsAtStart.thorn + b.guardsAtStart.spore, cap: caps.thorn + caps.spore, startKilled: hg.guardsKilled - b.guardsKilled };
+        }
+        const lr = world.lastRaid;
+        if (lr !== null && lr.id !== lastRaidId) {
+          lastRaidId = lr.id;
+          for (const p of lr.prongs) if (p.outcome === 'beaten' && p.killed.thorn + p.killed.spore >= HIVE_EVENT_PRONG) events.push({ tick: lr.endTick, kind: 'prong', killed: p.killed.thorn + p.killed.spore });
+        }
+        if (world.tick % (60 * data.tickRate) === 0) perMinute.push(hg.guards.length);
+      }
       // Progress: a bay started a ship, or a hauler delivered.
       const bay = bayTicks(world);
       for (let i = 0; i < bay.length; i++) if (prevBay[i] === 0 && bay[i]! > 0) lastProgress = world.tick;
@@ -299,6 +373,8 @@ export function runField(strategy: FieldStrategy, seed: number, data: SimData, o
     hiveTick: world.capturedTick,
     raids: { ...s.raids },
     raidProngs: { ...s.raidProngs },
+    raidRolls: s.raidRolls,
+    hive: { cap: s.hive.cap, lostToRaids: s.hive.lostToRaids, lostToPushes: s.hive.lostToPushes, pushes, events, perMinute },
     raidLog,
     econBuilt: { ...st.econBuilt },
     econLost: { ...st.econLost },
