@@ -662,15 +662,16 @@ describe('reference replay (field mode)', () => {
   const sumPlanned = (c: [number, number]) => c[0] + c[1];
   const result = (id: number) => endsOf.find((e) => e.last.id === id)!;
 
-  it('H9 (n): raids 1 and 2 are below the split size (2 x raid.prongMinSize 4), so each stays one prong, though raid 2 has three raidable rocks', () => {
+  it('H9 (n): raids 1 and 2 are below the split size (2 x raid.prongMinSize 3), so each stays one prong, though raid 2 has three raidable rocks', () => {
     const [r1, r2] = [muster.find((m) => m.id === 1)!, muster.find((m) => m.id === 2)!];
-    expect(data.tunables['raid.prongMinSize'].default).toBe(4);
+    // Raids 1 and 2 have at most 3 raiders, under 2 x 3, so they stay one prong (data v16, raid.prongMinSize 3).
+    expect(data.tunables['raid.prongMinSize'].default).toBe(3);
     expect(r1.tick).toBe(95);
     expect(r1.raidable.length).toBeGreaterThanOrEqual(1); // one target: only a1 has a docked extractor by then
     expect(r2.raidable.map(nodeId)).toEqual(['a2', 'a3', 'p1']);
     for (const m of [r1, r2]) {
       expect(m.prongs).toHaveLength(1);
-      expect(sumPlanned(m.prongs[0]!.planned)).toBeLessThan(2 * 4);
+      expect(sumPlanned(m.prongs[0]!.planned)).toBeLessThan(2 * 3);
       expect(m.nextProngs).toBe(1);
     }
     expect(sumPlanned(r2.prongs[0]!.planned)).toBe(3);

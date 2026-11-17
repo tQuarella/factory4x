@@ -1,6 +1,6 @@
 # Bot suite: PASS
 
-Data version 16, 3 seeds, field mode, 8 strategies (adaptive, greedy, static, idle, drones-only, adaptive-no-raids, adaptive-concentrate, undefended). Cap 45 game minutes, softlock after 5 minutes with no ship start and no delivery, tick budget p95 ≤ 2 ms. Runs 65.7 s. Times are game minutes (m:ss). Gated for softlock and timeout: adaptive, greedy; the others are controls and are reported only.
+Data version 16, 3 seeds, field mode, 8 strategies (adaptive, greedy, static, idle, drones-only, adaptive-no-raids, adaptive-concentrate, undefended). Cap 45 game minutes, softlock after 5 minutes with no ship start and no delivery, tick budget p95 ≤ 2 ms. Runs 65.3 s. Times are game minutes (m:ss). Gated for softlock and timeout: adaptive, greedy; the others are controls and are reported only.
 
 ## Failures
 
@@ -10,30 +10,30 @@ None.
 
 | Strategy | Seed | Time to the hive | Raids by outcome | Economy ships lost | Peak economy | Allocation changes | Ships built (e/h/d/l/f) | Tick p50 / p95 (ms) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| adaptive | 1 | 18:20 | 7 mustered: 3 beaten / 2 hit / 1 turned back | 5 (5e 0h) | 16 | 73 | 12e 8h 24d 9l 14f | 0.0067 / 0.0120 |
+| adaptive | 1 | 18:20 | 7 mustered: 3 beaten / 2 hit / 1 turned back | 5 (5e 0h) | 16 | 73 | 12e 8h 24d 9l 14f | 0.0066 / 0.0119 |
 | adaptive | 2 | 18:20 | 7 mustered: 3 beaten / 2 hit / 1 turned back | 5 (5e 0h) | 16 | 73 | 12e 8h 24d 9l 14f | 0.0057 / 0.0088 |
-| adaptive | 3 | 18:20 | 7 mustered: 3 beaten / 2 hit / 1 turned back | 5 (5e 0h) | 16 | 73 | 12e 8h 24d 9l 14f | 0.0058 / 0.0089 |
-| greedy | 1 | 18:18 | 7 mustered: 3 beaten / 3 hit / 0 turned back | 5 (5e 0h) | 17 | 74 | 14e 8h 24d 6l 12f | 0.0057 / 0.0090 |
-| greedy | 2 | 18:18 | 7 mustered: 3 beaten / 3 hit / 0 turned back | 5 (5e 0h) | 17 | 74 | 14e 8h 24d 6l 12f | 0.0057 / 0.0087 |
-| greedy | 3 | 18:18 | 7 mustered: 3 beaten / 3 hit / 0 turned back | 5 (5e 0h) | 17 | 74 | 14e 8h 24d 6l 12f | 0.0057 / 0.0090 |
-| idle | 1 | timeout 45:00 | 1 mustered: 0 beaten / 1 hit / 0 turned back | 2 (2e 0h) | 6 | 9 | 5e 2h 25d 0l 0f | 0.0045 / 0.0069 |
-| idle | 2 | timeout 45:00 | 1 mustered: 0 beaten / 1 hit / 0 turned back | 2 (2e 0h) | 6 | 9 | 5e 2h 25d 0l 0f | 0.0045 / 0.0070 |
-| idle | 3 | timeout 45:00 | 1 mustered: 0 beaten / 1 hit / 0 turned back | 2 (2e 0h) | 6 | 9 | 5e 2h 25d 0l 0f | 0.0045 / 0.0070 |
-| drones-only | 1 | timeout 45:00 | 17 mustered: 12 beaten / 5 hit / 0 turned back | 7 (7e 0h) | 14 | 48 | 11e 6h 50d 0l 0f | 0.0068 / 0.0094 |
-| drones-only | 2 | timeout 45:00 | 17 mustered: 12 beaten / 5 hit / 0 turned back | 7 (7e 0h) | 14 | 48 | 11e 6h 50d 0l 0f | 0.0068 / 0.0095 |
-| drones-only | 3 | timeout 45:00 | 17 mustered: 12 beaten / 5 hit / 0 turned back | 7 (7e 0h) | 14 | 48 | 11e 6h 50d 0l 0f | 0.0068 / 0.0096 |
-| adaptive-no-raids | 1 | 9:46 | 0 mustered: 0 beaten / 0 hit / 0 turned back | 0 (0e 0h) | 16 | 42 | 8e 9h 7d 8l 10f | 0.0055 / 0.0079 |
-| adaptive-no-raids | 2 | 9:46 | 0 mustered: 0 beaten / 0 hit / 0 turned back | 0 (0e 0h) | 16 | 42 | 8e 9h 7d 8l 10f | 0.0055 / 0.0079 |
-| adaptive-no-raids | 3 | 9:46 | 0 mustered: 0 beaten / 0 hit / 0 turned back | 0 (0e 0h) | 16 | 42 | 8e 9h 7d 8l 10f | 0.0055 / 0.0078 |
-| adaptive-concentrate | 1 | 23:13 | 9 mustered: 3 beaten / 4 hit / 1 turned back | 6 (6e 0h) | 14 | 124 | 15e 10h 19d 16l 21f | 0.0054 / 0.0080 |
-| adaptive-concentrate | 2 | 23:13 | 9 mustered: 3 beaten / 4 hit / 1 turned back | 6 (6e 0h) | 14 | 124 | 15e 10h 19d 16l 21f | 0.0055 / 0.0082 |
-| adaptive-concentrate | 3 | 23:13 | 9 mustered: 3 beaten / 4 hit / 1 turned back | 6 (6e 0h) | 14 | 124 | 15e 10h 19d 16l 21f | 0.0054 / 0.0081 |
-| undefended | 1 | 13:09 | 5 mustered: 0 beaten / 2 hit / 2 turned back | 5 (5e 0h) | 13 | 58 | 12e 8h 9d 8l 10f | 0.0054 / 0.0078 |
-| undefended | 2 | 13:09 | 5 mustered: 0 beaten / 2 hit / 2 turned back | 5 (5e 0h) | 13 | 58 | 12e 8h 9d 8l 10f | 0.0054 / 0.0078 |
-| undefended | 3 | 13:09 | 5 mustered: 0 beaten / 2 hit / 2 turned back | 5 (5e 0h) | 13 | 58 | 12e 8h 9d 8l 10f | 0.0054 / 0.0077 |
-| static (war-lean 2/1/3/2/3) | 1 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0105 / 0.0112 |
-| static (war-lean 2/1/3/2/3) | 2 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0110 |
-| static (war-lean 2/1/3/2/3) | 3 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0109 |
+| adaptive | 3 | 18:20 | 7 mustered: 3 beaten / 2 hit / 1 turned back | 5 (5e 0h) | 16 | 73 | 12e 8h 24d 9l 14f | 0.0056 / 0.0088 |
+| greedy | 1 | 18:18 | 7 mustered: 3 beaten / 3 hit / 0 turned back | 5 (5e 0h) | 17 | 74 | 14e 8h 24d 6l 12f | 0.0057 / 0.0091 |
+| greedy | 2 | 18:18 | 7 mustered: 3 beaten / 3 hit / 0 turned back | 5 (5e 0h) | 17 | 74 | 14e 8h 24d 6l 12f | 0.0057 / 0.0089 |
+| greedy | 3 | 18:18 | 7 mustered: 3 beaten / 3 hit / 0 turned back | 5 (5e 0h) | 17 | 74 | 14e 8h 24d 6l 12f | 0.0057 / 0.0089 |
+| idle | 1 | timeout 45:00 | 1 mustered: 0 beaten / 1 hit / 0 turned back | 2 (2e 0h) | 6 | 9 | 5e 2h 25d 0l 0f | 0.0046 / 0.0067 |
+| idle | 2 | timeout 45:00 | 1 mustered: 0 beaten / 1 hit / 0 turned back | 2 (2e 0h) | 6 | 9 | 5e 2h 25d 0l 0f | 0.0045 / 0.0068 |
+| idle | 3 | timeout 45:00 | 1 mustered: 0 beaten / 1 hit / 0 turned back | 2 (2e 0h) | 6 | 9 | 5e 2h 25d 0l 0f | 0.0045 / 0.0069 |
+| drones-only | 1 | timeout 45:00 | 17 mustered: 12 beaten / 5 hit / 0 turned back | 7 (7e 0h) | 14 | 48 | 11e 6h 50d 0l 0f | 0.0068 / 0.0095 |
+| drones-only | 2 | timeout 45:00 | 17 mustered: 12 beaten / 5 hit / 0 turned back | 7 (7e 0h) | 14 | 48 | 11e 6h 50d 0l 0f | 0.0068 / 0.0094 |
+| drones-only | 3 | timeout 45:00 | 17 mustered: 12 beaten / 5 hit / 0 turned back | 7 (7e 0h) | 14 | 48 | 11e 6h 50d 0l 0f | 0.0067 / 0.0093 |
+| adaptive-no-raids | 1 | 9:46 | 0 mustered: 0 beaten / 0 hit / 0 turned back | 0 (0e 0h) | 16 | 42 | 8e 9h 7d 8l 10f | 0.0054 / 0.0081 |
+| adaptive-no-raids | 2 | 9:46 | 0 mustered: 0 beaten / 0 hit / 0 turned back | 0 (0e 0h) | 16 | 42 | 8e 9h 7d 8l 10f | 0.0054 / 0.0078 |
+| adaptive-no-raids | 3 | 9:46 | 0 mustered: 0 beaten / 0 hit / 0 turned back | 0 (0e 0h) | 16 | 42 | 8e 9h 7d 8l 10f | 0.0054 / 0.0077 |
+| adaptive-concentrate | 1 | 23:13 | 9 mustered: 3 beaten / 4 hit / 1 turned back | 6 (6e 0h) | 14 | 124 | 15e 10h 19d 16l 21f | 0.0054 / 0.0082 |
+| adaptive-concentrate | 2 | 23:13 | 9 mustered: 3 beaten / 4 hit / 1 turned back | 6 (6e 0h) | 14 | 124 | 15e 10h 19d 16l 21f | 0.0053 / 0.0080 |
+| adaptive-concentrate | 3 | 23:13 | 9 mustered: 3 beaten / 4 hit / 1 turned back | 6 (6e 0h) | 14 | 124 | 15e 10h 19d 16l 21f | 0.0053 / 0.0085 |
+| undefended | 1 | 13:09 | 5 mustered: 0 beaten / 2 hit / 2 turned back | 5 (5e 0h) | 13 | 58 | 12e 8h 9d 8l 10f | 0.0053 / 0.0077 |
+| undefended | 2 | 13:09 | 5 mustered: 0 beaten / 2 hit / 2 turned back | 5 (5e 0h) | 13 | 58 | 12e 8h 9d 8l 10f | 0.0053 / 0.0077 |
+| undefended | 3 | 13:09 | 5 mustered: 0 beaten / 2 hit / 2 turned back | 5 (5e 0h) | 13 | 58 | 12e 8h 9d 8l 10f | 0.0053 / 0.0077 |
+| static (war-lean 2/1/3/2/3) | 1 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0112 |
+| static (war-lean 2/1/3/2/3) | 2 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0112 |
+| static (war-lean 2/1/3/2/3) | 3 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0112 |
 
 ## The static sweep (the best shape per seed is the `static` row above: a win, then the earlier hive, then the fewer economy ships lost)
 
@@ -41,24 +41,24 @@ Shapes (extractor / hauler / drone / lancer / flak weights): econ-lean 4/3/1/1/1
 
 | Strategy | Seed | Time to the hive | Raids by outcome | Economy ships lost | Peak economy | Allocation changes | Ships built (e/h/d/l/f) | Tick p50 / p95 (ms) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| static (econ-lean 4/3/1/1/1) | 1 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 32 (30e 2h) | 24 | 5 | 38e 13h 9d 4l 1f | 0.0133 / 0.0143 |
-| static (even 3/2/2/2/2) | 1 | timeout 45:00 | 16 mustered: 0 beaten / 16 hit / 0 turned back | 19 (19e 0h) | 15 | 3 | 26e 7h 11d 5l 3f | 0.0109 / 0.0117 |
-| static (drone-heavy 3/2/4/1/1) | 1 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 1 turned back | 17 (17e 0h) | 13 | 3 | 23e 7h 17d 2l 1f | 0.0083 / 0.0096 |
-| static (flak-heavy 3/2/1/1/4) | 1 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 26 (26e 0h) | 23 | 3 | 34e 11h 9d 3l 2f | 0.0108 / 0.0117 |
-| static (lancer-heavy 3/2/1/4/1) | 1 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 24 (24e 0h) | 20 | 3 | 32e 10h 7d 8l 0f | 0.0099 / 0.0109 |
-| static (war-lean 2/1/3/2/3) | 1 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0105 / 0.0112 |
-| static (econ-lean 4/3/1/1/1) | 2 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 32 (30e 2h) | 24 | 5 | 38e 13h 9d 4l 1f | 0.0134 / 0.0144 |
-| static (even 3/2/2/2/2) | 2 | timeout 45:00 | 16 mustered: 0 beaten / 16 hit / 0 turned back | 19 (19e 0h) | 15 | 3 | 26e 7h 11d 5l 3f | 0.0110 / 0.0117 |
-| static (drone-heavy 3/2/4/1/1) | 2 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 1 turned back | 17 (17e 0h) | 13 | 3 | 23e 7h 17d 2l 1f | 0.0083 / 0.0098 |
-| static (flak-heavy 3/2/1/1/4) | 2 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 26 (26e 0h) | 23 | 3 | 34e 11h 9d 3l 2f | 0.0108 / 0.0117 |
-| static (lancer-heavy 3/2/1/4/1) | 2 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 24 (24e 0h) | 20 | 3 | 32e 10h 7d 8l 0f | 0.0099 / 0.0109 |
-| static (war-lean 2/1/3/2/3) | 2 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0110 |
-| static (econ-lean 4/3/1/1/1) | 3 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 32 (30e 2h) | 24 | 5 | 38e 13h 9d 4l 1f | 0.0134 / 0.0147 |
-| static (even 3/2/2/2/2) | 3 | timeout 45:00 | 16 mustered: 0 beaten / 16 hit / 0 turned back | 19 (19e 0h) | 15 | 3 | 26e 7h 11d 5l 3f | 0.0109 / 0.0118 |
-| static (drone-heavy 3/2/4/1/1) | 3 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 1 turned back | 17 (17e 0h) | 13 | 3 | 23e 7h 17d 2l 1f | 0.0083 / 0.0098 |
-| static (flak-heavy 3/2/1/1/4) | 3 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 26 (26e 0h) | 23 | 3 | 34e 11h 9d 3l 2f | 0.0108 / 0.0117 |
-| static (lancer-heavy 3/2/1/4/1) | 3 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 24 (24e 0h) | 20 | 3 | 32e 10h 7d 8l 0f | 0.0099 / 0.0108 |
-| static (war-lean 2/1/3/2/3) | 3 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0109 |
+| static (econ-lean 4/3/1/1/1) | 1 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 32 (30e 2h) | 24 | 5 | 38e 13h 9d 4l 1f | 0.0132 / 0.0148 |
+| static (even 3/2/2/2/2) | 1 | timeout 45:00 | 16 mustered: 0 beaten / 16 hit / 0 turned back | 19 (19e 0h) | 15 | 3 | 26e 7h 11d 5l 3f | 0.0109 / 0.0121 |
+| static (drone-heavy 3/2/4/1/1) | 1 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 1 turned back | 17 (17e 0h) | 13 | 3 | 23e 7h 17d 2l 1f | 0.0082 / 0.0101 |
+| static (flak-heavy 3/2/1/1/4) | 1 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 26 (26e 0h) | 23 | 3 | 34e 11h 9d 3l 2f | 0.0108 / 0.0118 |
+| static (lancer-heavy 3/2/1/4/1) | 1 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 24 (24e 0h) | 20 | 3 | 32e 10h 7d 8l 0f | 0.0098 / 0.0109 |
+| static (war-lean 2/1/3/2/3) | 1 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0112 |
+| static (econ-lean 4/3/1/1/1) | 2 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 32 (30e 2h) | 24 | 5 | 38e 13h 9d 4l 1f | 0.0133 / 0.0151 |
+| static (even 3/2/2/2/2) | 2 | timeout 45:00 | 16 mustered: 0 beaten / 16 hit / 0 turned back | 19 (19e 0h) | 15 | 3 | 26e 7h 11d 5l 3f | 0.0109 / 0.0125 |
+| static (drone-heavy 3/2/4/1/1) | 2 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 1 turned back | 17 (17e 0h) | 13 | 3 | 23e 7h 17d 2l 1f | 0.0083 / 0.0102 |
+| static (flak-heavy 3/2/1/1/4) | 2 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 26 (26e 0h) | 23 | 3 | 34e 11h 9d 3l 2f | 0.0108 / 0.0122 |
+| static (lancer-heavy 3/2/1/4/1) | 2 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 24 (24e 0h) | 20 | 3 | 32e 10h 7d 8l 0f | 0.0099 / 0.0110 |
+| static (war-lean 2/1/3/2/3) | 2 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0112 |
+| static (econ-lean 4/3/1/1/1) | 3 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 32 (30e 2h) | 24 | 5 | 38e 13h 9d 4l 1f | 0.0133 / 0.0152 |
+| static (even 3/2/2/2/2) | 3 | timeout 45:00 | 16 mustered: 0 beaten / 16 hit / 0 turned back | 19 (19e 0h) | 15 | 3 | 26e 7h 11d 5l 3f | 0.0110 / 0.0121 |
+| static (drone-heavy 3/2/4/1/1) | 3 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 1 turned back | 17 (17e 0h) | 13 | 3 | 23e 7h 17d 2l 1f | 0.0082 / 0.0102 |
+| static (flak-heavy 3/2/1/1/4) | 3 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 26 (26e 0h) | 23 | 3 | 34e 11h 9d 3l 2f | 0.0108 / 0.0122 |
+| static (lancer-heavy 3/2/1/4/1) | 3 | timeout 45:00 | 17 mustered: 0 beaten / 17 hit / 0 turned back | 24 (24e 0h) | 20 | 3 | 32e 10h 7d 8l 0f | 0.0098 / 0.0116 |
+| static (war-lean 2/1/3/2/3) | 3 | timeout 45:00 | 15 mustered: 0 beaten / 14 hit / 0 turned back | 15 (15e 0h) | 10 | 5 | 20e 5h 15d 2l 6f | 0.0102 / 0.0112 |
 
 ## Staffing and the shield (H8)
 
@@ -162,11 +162,13 @@ Bots stay on Auto haulers and use only `sendShips` and `recycleShips` (and the w
 7. MET: No free first win: every guarded node needs more drones than the opening stock buys
    - p1 needs more than 3 drones (2 buyable from the opening stock) ok; p2 needs more than 3 drones (2 buyable from the opening stock) ok; heart needs more than 3 drones (2 buyable from the opening stock) ok
 
-## H9 report lines (not gate flags until h9-design-data says they hold)
+## H9 report lines (report lines, not gates)
 
-Calibration targets 4 and 5. Greedy plays adaptive after its first hit, so its half of target 5 may move to `undefended` (Director ruling, DECISIONS.md).
+Calibration target 4 (reworded) and targets 5a and 5b, which are reported findings for H9, not targets (Director, 2026-11-16; DECISIONS.md).
 
-1. MISSED: Splitting matters: adaptive-concentrate loses at least 2 more economy ships to raids than adaptive, on every seed
-   - seed 1: adaptive lost 5, concentrate lost 6 MISS; seed 2: adaptive lost 5, concentrate lost 6 MISS; seed 3: adaptive lost 5, concentrate lost 6 MISS
-2. MISSED: Ignoring raids costs: greedy and undefended each finish at least 10% slower than adaptive (undefended may fail to win)
-   - greedy half MISSED, undefended half MISSED. greedy: seed 1 +0% MISS, seed 2 +0% MISS, seed 3 +0% MISS; undefended: seed 1 -28% MISS, seed 2 -28% MISS, seed 3 -28% MISS
+1. MET: Splitting matters: adaptive-concentrate loses at least 2 more economy ships to raids than adaptive, or finishes at least 10% slower, on every seed
+   - seed 1: adaptive lost 5, concentrate lost 6, concentrate +27% ok; seed 2: adaptive lost 5, concentrate lost 6, concentrate +27% ok; seed 3: adaptive lost 5, concentrate lost 6, concentrate +27% ok
+2. REPORTED: Ignoring raids costs (5a, reported finding): greedy against adaptive
+   - greedy: seed 1 +0% (under 10% slower), seed 2 +0% (under 10% slower), seed 3 +0% (under 10% slower)
+3. REPORTED: Ignoring raids costs (5b, report-only rule finding): undefended against adaptive (undefended may fail to win)
+   - undefended: seed 1 -28% (under 10% slower), seed 2 -28% (under 10% slower), seed 3 -28% (under 10% slower)

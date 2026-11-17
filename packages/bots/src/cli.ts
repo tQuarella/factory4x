@@ -141,11 +141,11 @@ const md = [
   '',
   ...flags.map((f, i) => `${i + 1}. ${f.pass ? 'MET' : 'MISSED'}: ${f.name}\n   - ${f.detail}`),
   '',
-  '## H9 report lines (not gate flags until h9-design-data says they hold)',
+  '## H9 report lines (report lines, not gates)',
   '',
-  'Calibration targets 4 and 5. Greedy plays adaptive after its first hit, so its half of target 5 may move to `undefended` (Director ruling, DECISIONS.md).',
+  'Calibration target 4 (reworded) and targets 5a and 5b, which are reported findings for H9, not targets (Director, 2026-11-16; DECISIONS.md).',
   '',
-  ...h9Lines.map((f, i) => `${i + 1}. ${f.pass ? 'MET' : 'MISSED'}: ${f.name}\n   - ${f.detail}`),
+  ...h9Lines.map((f, i) => `${i + 1}. ${f.reported === true ? 'REPORTED' : f.pass ? 'MET' : 'MISSED'}: ${f.name}\n   - ${f.detail}`),
   '',
 ].join('\n');
 writeFileSync(`${outBase}.md`, md);

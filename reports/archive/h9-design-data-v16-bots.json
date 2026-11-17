@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-11-17T01:36:56.863Z",
+  "generatedAt": "2026-11-17T01:43:31.001Z",
   "dataVersion": 16,
   "seeds": 3,
   "capMinutes": 45,
   "softlockMinutes": 5,
   "tickBudgetMsP95": 2,
-  "runSeconds": 65.71,
+  "runSeconds": 65.33,
   "failures": [],
   "flags": [
     {
@@ -46,14 +46,21 @@
   ],
   "h9Lines": [
     {
-      "name": "Splitting matters: adaptive-concentrate loses at least 2 more economy ships to raids than adaptive, on every seed",
-      "pass": false,
-      "detail": "seed 1: adaptive lost 5, concentrate lost 6 MISS; seed 2: adaptive lost 5, concentrate lost 6 MISS; seed 3: adaptive lost 5, concentrate lost 6 MISS"
+      "name": "Splitting matters: adaptive-concentrate loses at least 2 more economy ships to raids than adaptive, or finishes at least 10% slower, on every seed",
+      "pass": true,
+      "detail": "seed 1: adaptive lost 5, concentrate lost 6, concentrate +27% ok; seed 2: adaptive lost 5, concentrate lost 6, concentrate +27% ok; seed 3: adaptive lost 5, concentrate lost 6, concentrate +27% ok"
     },
     {
-      "name": "Ignoring raids costs: greedy and undefended each finish at least 10% slower than adaptive (undefended may fail to win)",
+      "name": "Ignoring raids costs (5a, reported finding): greedy against adaptive",
       "pass": false,
-      "detail": "greedy half MISSED, undefended half MISSED. greedy: seed 1 +0% MISS, seed 2 +0% MISS, seed 3 +0% MISS; undefended: seed 1 -28% MISS, seed 2 -28% MISS, seed 3 -28% MISS"
+      "detail": "greedy: seed 1 +0% (under 10% slower), seed 2 +0% (under 10% slower), seed 3 +0% (under 10% slower)",
+      "reported": true
+    },
+    {
+      "name": "Ignoring raids costs (5b, report-only rule finding): undefended against adaptive (undefended may fail to win)",
+      "pass": false,
+      "detail": "undefended: seed 1 -28% (under 10% slower), seed 2 -28% (under 10% slower), seed 3 -28% (under 10% slower)",
+      "reported": true
     }
   ],
   "staticSweep": [
@@ -315,8 +322,8 @@
         "flak": 8
       },
       "peakPerMin": 84,
-      "tickMsP50": 0.006699999999909778,
-      "tickMsP95": 0.012000000000000455,
+      "tickMsP50": 0.006600000000617001,
+      "tickMsP95": 0.01190000000042346,
       "finalHash": "481c64ce"
     },
     {
@@ -516,7 +523,7 @@
       },
       "peakPerMin": 84,
       "tickMsP50": 0.005699999999706051,
-      "tickMsP95": 0.008799999999610009,
+      "tickMsP95": 0.008800000000519503,
       "finalHash": "0cd8affa"
     },
     {
@@ -715,8 +722,8 @@
         "flak": 8
       },
       "peakPerMin": 84,
-      "tickMsP50": 0.005799999998998828,
-      "tickMsP95": 0.008899999998902786,
+      "tickMsP50": 0.005600000000413274,
+      "tickMsP95": 0.008799999999610009,
       "finalHash": "2a40fe25"
     },
     {
@@ -915,8 +922,8 @@
         "flak": 8
       },
       "peakPerMin": 80,
-      "tickMsP50": 0.005699999999706051,
-      "tickMsP95": 0.009000000000014552,
+      "tickMsP50": 0.005700000001525041,
+      "tickMsP95": 0.009100000001126318,
       "finalHash": "17fc9e71"
     },
     {
@@ -1116,7 +1123,7 @@
       },
       "peakPerMin": 80,
       "tickMsP50": 0.005699999999706051,
-      "tickMsP95": 0.008700000000317232,
+      "tickMsP95": 0.008900000000721775,
       "finalHash": "b8f8a313"
     },
     {
@@ -1316,7 +1323,7 @@
       },
       "peakPerMin": 80,
       "tickMsP50": 0.005699999999706051,
-      "tickMsP95": 0.009000000000014552,
+      "tickMsP95": 0.008899999998902786,
       "finalHash": "efb018b4"
     },
     {
@@ -1448,8 +1455,8 @@
         "flak": 0
       },
       "peakPerMin": 39,
-      "tickMsP50": 0.004499999999097781,
-      "tickMsP95": 0.006900000000314321,
+      "tickMsP50": 0.004599999998390558,
+      "tickMsP95": 0.006699999999909778,
       "finalHash": "10ee484b"
     },
     {
@@ -1581,8 +1588,8 @@
         "flak": 0
       },
       "peakPerMin": 39,
-      "tickMsP50": 0.004500000000916771,
-      "tickMsP95": 0.006999999999607098,
+      "tickMsP50": 0.004499999999097781,
+      "tickMsP95": 0.0068000000010215444,
       "finalHash": "60f841af"
     },
     {
@@ -1715,7 +1722,7 @@
       },
       "peakPerMin": 39,
       "tickMsP50": 0.004500000000916771,
-      "tickMsP95": 0.006999999999607098,
+      "tickMsP95": 0.006899999998495332,
       "finalHash": "31e262b2"
     },
     {
@@ -2154,8 +2161,8 @@
         "flak": 0
       },
       "peakPerMin": 76,
-      "tickMsP50": 0.006800000002840534,
-      "tickMsP95": 0.009399999999004649,
+      "tickMsP50": 0.0068000000010215444,
+      "tickMsP95": 0.009500000000116415,
       "finalHash": "e0d6a683"
     },
     {
@@ -2595,7 +2602,7 @@
       },
       "peakPerMin": 76,
       "tickMsP50": 0.006799999999202555,
-      "tickMsP95": 0.009500000000116415,
+      "tickMsP95": 0.009399999999004649,
       "finalHash": "4488bee1"
     },
     {
@@ -3034,8 +3041,8 @@
         "flak": 0
       },
       "peakPerMin": 76,
-      "tickMsP50": 0.006799999999202555,
-      "tickMsP95": 0.009599999997590203,
+      "tickMsP50": 0.0067000000017287675,
+      "tickMsP95": 0.009299999997892883,
       "finalHash": "dc4ce214"
     },
     {
@@ -3091,8 +3098,8 @@
         "flak": 9
       },
       "peakPerMin": 84,
-      "tickMsP50": 0.005499999999301508,
-      "tickMsP95": 0.007900000000518048,
+      "tickMsP50": 0.0054000000018277206,
+      "tickMsP95": 0.008099999999103602,
       "finalHash": "4f84ae31"
     },
     {
@@ -3148,8 +3155,8 @@
         "flak": 9
       },
       "peakPerMin": 84,
-      "tickMsP50": 0.005500000002939487,
-      "tickMsP95": 0.00789999999688007,
+      "tickMsP50": 0.005399999998189742,
+      "tickMsP95": 0.007799999999406282,
       "finalHash": "ae057425"
     },
     {
@@ -3205,8 +3212,8 @@
         "flak": 9
       },
       "peakPerMin": 84,
-      "tickMsP50": 0.005499999999301508,
-      "tickMsP95": 0.007799999999406282,
+      "tickMsP50": 0.0054000000018277206,
+      "tickMsP95": 0.007700000001932494,
       "finalHash": "55cafe42"
     },
     {
@@ -3440,7 +3447,7 @@
       },
       "peakPerMin": 82,
       "tickMsP50": 0.005399999998189742,
-      "tickMsP95": 0.008000000001629815,
+      "tickMsP95": 0.008200000000215368,
       "finalHash": "653e9c26"
     },
     {
@@ -3673,8 +3680,8 @@
         "flak": 15
       },
       "peakPerMin": 82,
-      "tickMsP50": 0.005499999999301508,
-      "tickMsP95": 0.008200000000215368,
+      "tickMsP50": 0.005300000000715954,
+      "tickMsP95": 0.008000000001629815,
       "finalHash": "856ffa8c"
     },
     {
@@ -3907,8 +3914,8 @@
         "flak": 15
       },
       "peakPerMin": 82,
-      "tickMsP50": 0.0054000000018277206,
-      "tickMsP95": 0.008099999999103602,
+      "tickMsP50": 0.005300000000715954,
+      "tickMsP95": 0.008499999999912689,
       "finalHash": "249c5ce5"
     },
     {
@@ -4038,8 +4045,8 @@
         "flak": 9
       },
       "peakPerMin": 61,
-      "tickMsP50": 0.0054000000018277206,
-      "tickMsP95": 0.007799999999406282,
+      "tickMsP50": 0.005299999997077975,
+      "tickMsP95": 0.007699999994656537,
       "finalHash": "a8b7d00e"
     },
     {
@@ -4169,8 +4176,8 @@
         "flak": 9
       },
       "peakPerMin": 61,
-      "tickMsP50": 0.0054000000018277206,
-      "tickMsP95": 0.007799999999406282,
+      "tickMsP50": 0.005299999997077975,
+      "tickMsP95": 0.007699999994656537,
       "finalHash": "4ebaec56"
     },
     {
@@ -4300,7 +4307,7 @@
         "flak": 9
       },
       "peakPerMin": 61,
-      "tickMsP50": 0.0054000000018277206,
+      "tickMsP50": 0.005300000004353933,
       "tickMsP95": 0.007700000001932494,
       "finalHash": "d5283763"
     },
@@ -4663,7 +4670,7 @@
         "flak": 0
       },
       "peakPerMin": 56,
-      "tickMsP50": 0.010499999996682163,
+      "tickMsP50": 0.010199999996984843,
       "tickMsP95": 0.011200000000826549,
       "finalHash": "9ab6cc27"
     },
@@ -5026,8 +5033,8 @@
         "flak": 0
       },
       "peakPerMin": 56,
-      "tickMsP50": 0.010199999996984843,
-      "tickMsP95": 0.010999999998603016,
+      "tickMsP50": 0.0102000000042608,
+      "tickMsP95": 0.011200000000826549,
       "finalHash": "e1f71adb"
     },
     {
@@ -5389,8 +5396,8 @@
         "flak": 0
       },
       "peakPerMin": 56,
-      "tickMsP50": 0.010199999996984843,
-      "tickMsP95": 0.010900000001129229,
+      "tickMsP50": 0.0102000000042608,
+      "tickMsP95": 0.011199999993550591,
       "finalHash": "09671dae"
     }
   ],
@@ -5871,8 +5878,8 @@
         "flak": 0
       },
       "peakPerMin": 108,
-      "tickMsP50": 0.01329999999870779,
-      "tickMsP95": 0.014299999995273538,
+      "tickMsP50": 0.013200000001234002,
+      "tickMsP95": 0.014800000004470348,
       "finalHash": "7f6cea7b"
     },
     {
@@ -6329,8 +6336,8 @@
         "flak": 0
       },
       "peakPerMin": 64,
-      "tickMsP50": 0.010900000001129229,
-      "tickMsP95": 0.011700000002747402,
+      "tickMsP50": 0.010899999993853271,
+      "tickMsP95": 0.01209999999991851,
       "finalHash": "5c3087ed"
     },
     {
@@ -6765,8 +6772,8 @@
         "flak": 0
       },
       "peakPerMin": 56,
-      "tickMsP50": 0.008299999994051177,
-      "tickMsP95": 0.00960000000486616,
+      "tickMsP50": 0.008200000003853347,
+      "tickMsP95": 0.010099999999511056,
       "finalHash": "794753c7"
     },
     {
@@ -7246,7 +7253,7 @@
       },
       "peakPerMin": 100,
       "tickMsP50": 0.010800000003655441,
-      "tickMsP95": 0.011700000002747402,
+      "tickMsP95": 0.011800000000221189,
       "finalHash": "f5b6a3c7"
     },
     {
@@ -7725,7 +7732,7 @@
         "flak": 0
       },
       "peakPerMin": 92,
-      "tickMsP50": 0.009899999997287523,
+      "tickMsP50": 0.009799999999813735,
       "tickMsP95": 0.010900000001129229,
       "finalHash": "31fc79db"
     },
@@ -8088,7 +8095,7 @@
         "flak": 0
       },
       "peakPerMin": 56,
-      "tickMsP50": 0.010499999996682163,
+      "tickMsP50": 0.010199999996984843,
       "tickMsP95": 0.011200000000826549,
       "finalHash": "9ab6cc27"
     },
@@ -8568,8 +8575,8 @@
         "flak": 0
       },
       "peakPerMin": 108,
-      "tickMsP50": 0.013400000003457535,
-      "tickMsP95": 0.014400000000023283,
+      "tickMsP50": 0.01329999999870779,
+      "tickMsP95": 0.015099999996891711,
       "finalHash": "f9cd9177"
     },
     {
@@ -9026,8 +9033,8 @@
         "flak": 0
       },
       "peakPerMin": 64,
-      "tickMsP50": 0.010999999998603016,
-      "tickMsP95": 0.011700000002747402,
+      "tickMsP50": 0.010900000001129229,
+      "tickMsP95": 0.012499999997089617,
       "finalHash": "d7fc5dcf"
     },
     {
@@ -9463,7 +9470,7 @@
       },
       "peakPerMin": 56,
       "tickMsP50": 0.008300000001327135,
-      "tickMsP95": 0.009800000007089693,
+      "tickMsP95": 0.0102000000042608,
       "finalHash": "4156ee17"
     },
     {
@@ -9943,7 +9950,7 @@
       },
       "peakPerMin": 100,
       "tickMsP50": 0.010800000003655441,
-      "tickMsP95": 0.011700000002747402,
+      "tickMsP95": 0.012199999997392297,
       "finalHash": "8920b9f9"
     },
     {
@@ -10423,7 +10430,7 @@
       },
       "peakPerMin": 92,
       "tickMsP50": 0.009899999997287523,
-      "tickMsP95": 0.010900000001129229,
+      "tickMsP95": 0.011000000005878974,
       "finalHash": "f84954d1"
     },
     {
@@ -10785,8 +10792,8 @@
         "flak": 0
       },
       "peakPerMin": 56,
-      "tickMsP50": 0.010199999996984843,
-      "tickMsP95": 0.010999999998603016,
+      "tickMsP50": 0.0102000000042608,
+      "tickMsP95": 0.011200000000826549,
       "finalHash": "e1f71adb"
     },
     {
@@ -11265,8 +11272,8 @@
         "flak": 0
       },
       "peakPerMin": 108,
-      "tickMsP50": 0.013399999996181577,
-      "tickMsP95": 0.014699999999720603,
+      "tickMsP50": 0.01329999999870779,
+      "tickMsP95": 0.015200000001641456,
       "finalHash": "3f43debe"
     },
     {
@@ -11723,8 +11730,8 @@
         "flak": 0
       },
       "peakPerMin": 64,
-      "tickMsP50": 0.010900000001129229,
-      "tickMsP95": 0.011800000000221189,
+      "tickMsP50": 0.010999999998603016,
+      "tickMsP95": 0.01209999999991851,
       "finalHash": "f78e0d9a"
     },
     {
@@ -12159,8 +12166,8 @@
         "flak": 0
       },
       "peakPerMin": 56,
-      "tickMsP50": 0.008300000001327135,
-      "tickMsP95": 0.009799999999813735,
+      "tickMsP50": 0.008200000003853347,
+      "tickMsP95": 0.0102000000042608,
       "finalHash": "00e9f1be"
     },
     {
@@ -12639,8 +12646,8 @@
         "flak": 0
       },
       "peakPerMin": 100,
-      "tickMsP50": 0.010799999996379483,
-      "tickMsP95": 0.011700000002747402,
+      "tickMsP50": 0.010800000003655441,
+      "tickMsP95": 0.012200000004668254,
       "finalHash": "4078d100"
     },
     {
@@ -13119,8 +13126,8 @@
         "flak": 0
       },
       "peakPerMin": 92,
-      "tickMsP50": 0.009899999997287523,
-      "tickMsP95": 0.010800000003655441,
+      "tickMsP50": 0.009799999999813735,
+      "tickMsP95": 0.011599999997997656,
       "finalHash": "da445824"
     },
     {
@@ -13482,8 +13489,8 @@
         "flak": 0
       },
       "peakPerMin": 56,
-      "tickMsP50": 0.010199999996984843,
-      "tickMsP95": 0.010900000001129229,
+      "tickMsP50": 0.0102000000042608,
+      "tickMsP95": 0.011199999993550591,
       "finalHash": "09671dae"
     }
   ]

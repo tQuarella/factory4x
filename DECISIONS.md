@@ -1779,3 +1779,18 @@ Raids stop when the hive falls (8010), so items (g)–(n) are placed before the 
 - The per-prong fights print the same on v16 as on v15.
 
 **Correction to the entry above:** "undefended was 23–65% faster in every one of 16 variants" should read **8–65%**. At `raid.gapTicks` 5400 with min 3 it was 8% faster. The archived report is corrected.
+
+## 2026-11-16 · Designer · h9-design-data: two edits outside the Designer's files, authorised by the Director
+
+**Authorisation:** the Director authorised both edits in the h9-design-data brief. designer.md routes a pinned value outside the Designer's files to the Director, so neither was made before that.
+
+1. **`packages/sim/test/reference-replay.test.ts`, "H9 (n)":**
+   - The `raid.prongMinSize` pin moves from 4 to 3, in the title, the pin and `2 * 3`.
+   - It stays a literal, so it still catches drift.
+   - A comment explains why raids 1 and 2 stay one prong: they have at most 3 raiders, under 2 × 3.
+   - What the test checks is unchanged.
+2. **The bots' H9 report lines (`packages/bots/src/field-flags.ts` `computeH9Lines`, `cli.ts`, and the test in `h9-bots.test.ts`):**
+   - Target 4 checks the reworded test: at least 2 more economy ships lost, **or** at least 10% slower.
+   - Targets 5a and 5b are separate lines marked `reported`, printed REPORTED, never MET or MISSED.
+   - Bot behaviour is unchanged. Only the report text and its check changed.
+   - `reports/archive/h9-design-data-v16-bots.md` is regenerated. It reads: target 4 MET (concentrate +27% on every seed), greedy +0% and undefended −28% REPORTED.

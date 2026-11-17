@@ -927,7 +927,7 @@ Flags 1–7 must stay met. The designer.md guard applies: a value that meets one
 | H8 | staffing: ≤ 1 idle hauler outside raids; nothing backed up with its target met | peak 1, 0 min over 1; none | peak 1, 0 min over 1; none | met |
 | flags 1–7 | | all MET | all MET | met |
 
-**Accepted by the Director:** adaptive moves 15:54 → 18:20 (+15%), and greedy finishes level with it (18:18). The bots report's own H9 lines still print target 4's old wording ("loses at least 2 more economy ships") as MISSED; this table judges the reworded target.
+**Accepted by the Director:** adaptive moves 15:54 → 18:20 (+15%), and greedy finishes level with it (18:18). The bots report's H9 lines match this table: target 4 is judged on the reworded test (MET), and 5a and 5b print REPORTED.
 
 **Walk of `raid.prongMinSize` 3:**
 - **The opening:** the first raid (3 raiders at 2:42) is `floor(3 ÷ 3)` = 1 prong, so the first raid musters at 2:42 on v15 and v16 alike.
