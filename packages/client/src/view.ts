@@ -182,7 +182,12 @@ export class MapView {
   /** H8: Mine badge pops: a rock just marked grows in, one just unmarked fades out (client only). */
   private readonly pops = new Map<number, { start: number; on: boolean }>();
   /** H8 test hook: what the last frame drew for the raid badge and the drag. */
-  private readonly drawnNew: { raidBadge: number; raidBadges: number[]; drag: DragDrawn | null; hiveLabel: { text: string; x: number; y: number; w: number; h: number } | null } = { raidBadge: -1, raidBadges: [], drag: null, hiveLabel: null };
+  private readonly drawnNew: { raidBadge: number; raidBadges: number[]; drag: DragDrawn | null; hiveLabel: { text: string; x: number; y: number; w: number; h: number } | null; labels: Array<{ text: string; x: number; y: number; w: number; h: number }> } = { raidBadge: -1, raidBadges: [], drag: null, hiveLabel: null, labels: [] };
+
+  /** H10 test hook: every node label as the last frame drew it (canvas px). */
+  drawnLabels(): Array<{ text: string; x: number; y: number; w: number; h: number }> {
+    return this.drawnNew.labels.map((l) => ({ ...l }));
+  }
 
   /** H10 test hook: the hive's label as the last frame drew it (canvas px), or null. */
   drawnHiveLabel(): { text: string; x: number; y: number; w: number; h: number } | null {
@@ -369,7 +374,7 @@ export class MapView {
     }
 
     const counts = shipCounts(world);
-    const labels: Array<{ text: string; x: number; y: number; hive?: boolean }> = [];
+    const labels: Array<{ text: string; x: number; y: number; hive?: { cx: number; cy: number; r: number; above: number } }> = [];
     const legs = field ? raidLegs(world) : [];
     for (const n of world.nodes) {
       const { x, y } = this.nodePos(n.index);
@@ -440,7 +445,7 @@ export class MapView {
       // A label that would clip at the top edge goes below the node instead.
       // H10: the hive's label carries its guard count while it is below its caps ("HIVE 18/30").
       const count = field && n.kind === 'heart' && guard !== null && guard.alive ? hiveLabelCount(guard.total, guard.totalCap) : null;
-      labels.push({ text: count === null ? nodeLabel(n, field) : `${nodeLabel(n, field)} ${count}`, x, y: labelTop < LABEL_TOP_PAD ? y + selR + 12 : labelTop, hive: n.kind === 'heart' });
+      labels.push({ text: count === null ? nodeLabel(n, field) : `${nodeLabel(n, field)} ${count}`, x, y: labelTop < LABEL_TOP_PAD ? y + selR + 12 : labelTop, ...(field && n.kind === 'heart' ? { hive: { cx: x, cy: y, r: selR, above: labelTop } } : {}) });
 
       if (selected === n.index) {
         ctx.save();
@@ -510,15 +515,49 @@ export class MapView {
     ctx.font = '600 11px ui-monospace, Menlo, Consolas, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    for (const l of labels) {
+    // H10: the hive's label is the longest ("HIVE 18/30"), so it picks the first place that is inside the map and clear of every other
+    // label and of its own ring: above, below, then to the right, then to the left.
+    const box = (l: { text: string; x: number; y: number }): { x: number; y: number; w: number; h: number } => {
       const wd = ctx.measureText(l.text).width + 6;
+      return { x: l.x - wd / 2, y: l.y - 10, w: wd, h: 14 };
+    };
+    const hit = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): boolean =>
+      a.x < b.x + b.w + 2 && b.x < a.x + a.w + 2 && a.y < b.y + b.h + 2 && b.y < a.y + a.h + 2;
+    for (const l of labels) {
+      if (!l.hive) continue;
+      const { cx, cy, r } = l.hive;
+      const wd = box(l).w;
+      const spots = [
+        { x: cx, y: l.hive.above },
+        { x: cx, y: cy + r + 12 },
+        { x: cx + r + wd / 2 + 3, y: cy + 4 },
+        { x: cx - r - wd / 2 - 3, y: cy + 4 },
+      ];
+      const ok = (s: { x: number; y: number }): boolean => {
+        const b = box({ text: l.text, ...s });
+        if (b.x < 0 || b.y < 0 || b.x + b.w > w || b.y + b.h > h) return false;
+        if (labels.some((o) => o !== l && hit(b, box(o)))) return false;
+        const nx = Math.min(Math.max(cx, b.x), b.x + b.w);
+        const ny = Math.min(Math.max(cy, b.y), b.y + b.h);
+        return (nx - cx) ** 2 + (ny - cy) ** 2 >= r * r;
+      };
+      const pick = spots.find(ok);
+      if (pick !== undefined) {
+        l.x = pick.x;
+        l.y = pick.y;
+      }
+    }
+    this.drawnNew.labels = [];
+    for (const l of labels) {
+      const b = box(l);
       ctx.fillStyle = 'rgba(5, 7, 13, 0.78)';
       ctx.beginPath();
-      ctx.roundRect(l.x - wd / 2, l.y - 10, wd, 14, 4);
+      ctx.roundRect(b.x, b.y, b.w, b.h, 4);
       ctx.fill();
       ctx.fillStyle = '#9fb4d6';
       ctx.fillText(l.text, l.x, l.y);
-      if (l.hive) this.drawnNew.hiveLabel = { text: l.text, x: l.x - wd / 2, y: l.y - 10, w: wd, h: 14 };
+      this.drawnNew.labels.push({ text: l.text, ...b });
+      if (l.hive) this.drawnNew.hiveLabel = { text: l.text, ...b };
     }
     ctx.restore();
 

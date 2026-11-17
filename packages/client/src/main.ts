@@ -907,6 +907,7 @@ window.__factory4x = {
   raidBadge: () => view.drawnH8().raidBadge,
   raidBadges: () => JSON.stringify(view.drawnH8().raidBadges),
   hiveLabel: () => JSON.stringify(view.drawnHiveLabel()),
+  nodeLabels: () => JSON.stringify(view.drawnLabels()),
   hiveStatus: () => {
     const g = guardianStatus(app.session.world, heartIndex(app.session.world));
     return JSON.stringify({ total: g.total, totalCap: g.totalCap, rebuild: g.rebuild });

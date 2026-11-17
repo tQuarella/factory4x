@@ -33,8 +33,8 @@ interface Hive {
   rebuild: null | { ticks: number; progress: number; nextType: 'thorn' | 'spore' | null };
 }
 
-async function ready(page: Page): Promise<void> {
-  await page.setViewportSize(PHONE);
+async function ready(page: Page, size: { width: number; height: number } = PHONE): Promise<void> {
+  await page.setViewportSize(size);
   await page.goto('/');
   await expect.poll(() => page.evaluate(() => Boolean(window.__factory4x))).toBe(true);
   await page.addStyleTag({ content: WIDE_FONT });
@@ -269,3 +269,49 @@ test.describe('375x667 portrait, the roll banner', () => {
     expect(await hudBoxes(page)).toBe(hud0);
   });
 });
+
+type Box = { x: number; y: number; w: number; h: number };
+const apart = (a: Box, b: Box): boolean => a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+
+for (const [what, size] of [
+  ['375x667 with the wide font', PHONE],
+  ['desktop 1280x800', { width: 1280, height: 800 }],
+] as const) {
+  test.describe(`the hive label is clear, ${what}`, () => {
+    test.use({ viewport: size });
+
+    test('below its caps, with the sheet open or closed, the hive label overlaps no other label and not the hive itself, and stays inside the map', async ({ page }) => {
+      test.setTimeout(120_000);
+      await ready(page, size);
+      await beatenRaid(page);
+      const heart = await page.evaluate(() => window.__factory4x!.nodeIndex('heart'));
+      const h0 = await hive(page);
+      expect(h0.total).toBeLessThan(h0.totalCap);
+      const check = async (state: string): Promise<void> => {
+        await settled(page);
+        const labels = JSON.parse(await page.evaluate(() => window.__factory4x!.nodeLabels())) as Array<Box & { text: string }>;
+        const mine = labels.find((l) => /^HIVE \d+\/\d+$/.test(l.text));
+        expect(mine, `${state}: the hive label carries its count`).toBeDefined();
+        expect(labels.some((l) => l.text === 'P1'), 'the P1 label was drawn').toBe(true);
+        expect(labels.some((l) => l.text === 'P2'), 'the P2 label was drawn').toBe(true);
+        for (const o of labels) if (o !== mine) expect(apart(mine!, o), `${state}: the hive label is clear of ${o.text}`).toBe(true);
+        // The hive itself: its centre is well outside the label box (the node is more than 20 px across).
+        const c = await page.evaluate((n) => window.__factory4x!.nodeScreenPos(n), heart);
+        const cv = (await page.locator('#view').boundingBox())!;
+        const cx = c.x - cv.x;
+        const cy = c.y - cv.y;
+        const nx = Math.min(Math.max(cx, mine!.x), mine!.x + mine!.w);
+        const ny = Math.min(Math.max(cy, mine!.y), mine!.y + mine!.h);
+        expect(Math.hypot(nx - cx, ny - cy), `${state}: the label is clear of the hive marker`).toBeGreaterThan(20);
+        expect(mine!.x).toBeGreaterThanOrEqual(0);
+        expect(mine!.y).toBeGreaterThanOrEqual(0);
+        expect(mine!.x + mine!.w).toBeLessThanOrEqual(cv.width + 0.5);
+        expect(mine!.y + mine!.h).toBeLessThanOrEqual(cv.height + 0.5);
+      };
+      await check('sheet closed');
+      await openNode(page, heart);
+      await check('hive sheet open');
+      await page.screenshot({ path: `test-results/h10-hive-label-${size.width}.png` });
+    });
+  });
+}
