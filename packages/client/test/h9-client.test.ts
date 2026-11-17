@@ -164,6 +164,6 @@ describe('acceptance 7: tuning', () => {
     }
     const m = tunableMeta(data);
     expect(m.find((x) => x.key === 'raid.prongsMax')).toMatchObject({ default: 2, min: 1, max: 3, scope: 'sim' });
-    expect(m.find((x) => x.key === 'raid.prongMinSize')).toMatchObject({ default: 4, min: 2, max: 12, scope: 'sim' });
+    expect(m.find((x) => x.key === 'raid.prongMinSize')).toMatchObject({ default: 3, min: 2, max: 12, scope: 'sim' });
   });
 });

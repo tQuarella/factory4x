@@ -613,6 +613,27 @@ test.describe('375x667 portrait, two prongs', () => {
     }
   });
 
+  test('on the shipped data (no tunables touched) a passive run reaches a raid with two live prongs, and the raid UI shows both', async ({ page }) => {
+    test.setTimeout(150_000);
+    await ready(page);
+    await pause(page);
+    const hud0 = await hudBoxes(page);
+    // The default muster is long enough for 30-tick steps to land inside it.
+    await stepSimUntil(page, async () => (await raid2(page)).phase === 'muster' && (await raid2(page)).prongs.length === 2, 60_000, 'a raid that splits in two', false);
+    const r = await raid2(page);
+    await settled(page);
+    expect(await page.evaluate(() => window.__factory4x!.raidBadges()), 'a badge on each prong target').toBe(JSON.stringify(r.prongs.map((p) => p.target).sort((a, b) => a - b)));
+    await expect(page.locator('#banner .bline.raid')).toHaveText(/^Raid gathering in \d+ s → A\d [0-9TS ]+ · A\d [0-9TS ]+$/);
+    await expect(page.locator('#chip-raid')).toContainText('· 2');
+    expect(await hudBoxes(page), 'the HUD did not move').toBe(hud0);
+    await page.screenshot({ path: 'test-results/h9-two-prong-default-data.png' });
+    await stepSimUntil(page, async () => (await raid2(page)).prongs.every((p) => p.phase !== 'muster'), 3000, 'the launch', false);
+    await settled(page);
+    const m = JSON.parse(await page.evaluate(() => window.__factory4x!.mapField())) as { prongs: unknown[] };
+    expect(m.prongs.length, 'a leg per live prong').toBe(2);
+    expect(await hudBoxes(page), 'the HUD did not move in flight').toBe(hud0);
+  });
+
   test('before the raid, the rank line shows on both rocks a split would hit and on no other', async ({ page }) => {
     test.setTimeout(150_000);
     await ready(page);

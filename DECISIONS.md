@@ -1811,3 +1811,9 @@ The H8 rule "the map keeps at least H8's height behind the rock sheet" was measu
    - Targets 5a and 5b are separate lines marked `reported`, printed REPORTED, never MET or MISSED.
    - Bot behaviour is unchanged. Only the report text and its check changed.
    - `reports/archive/h9-design-data-v16-bots.md` is regenerated. It reads: target 4 MET (concentrate +27% on every seed), greedy +0% and undefended −28% REPORTED.
+
+## 2026-11-16 · Engineer · h9-client: final round on data v16
+
+Merged the approved lower tasks (h9-sim 12924fa, h9-raids a34be08, h9-bots be6ede0, h9-design-data a49e163) and origin/main; no conflicts.
+- **One value moved in the client tests:** `raid.prongMinSize` default 4 to 3 (data v16). `packages/client/test/h9-client.test.ts` pinned the old default, so it now pins 3. Min 2 and max 12 are unchanged, and no assertion was loosened.
+- **Smoke tests are unaffected.** The two-prong tests set `raid.prongMinSize` 2 themselves, as the spec tests do.
