@@ -2,12 +2,20 @@
 
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
-**Milestone:** 2 — The asteroid field (iteration 9, hypothesis H9 A: A wider front)
-**State:** Iteration 9 closed. build-20261117-1 handed off (42cfba5) and retro done. Awaiting owner feedback: H9 fun questions. Q25 answered "C" (2026-11-17): H10 is attrition (A), then logistics feeds combat (B). H10 starts once the H9 playtest is in.
+**Milestone:** 2 — The asteroid field (iteration 10, hypothesis H10: attrition, pending Q26)
+**State:** Iteration 10 Plan step. Owner played build-20261117-1 (6c86157), triaged (ca9a425). Waiting on Q26 (default A). Then spec (resume Designer a867adefdc2bc7b17), split, build.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (public since 2026-11-15, Q23)
 **Last build:** build-20261117-1 (H9 A wider front), commit 7055e2a, live (CI 44003503570 gates and deploy green; site shows 7055e2a · data v16). Release gates passed locally (302/302 smoke).
 **Last updated:** 2026-11-16, iteration 9 close
+
+## Iteration 10 ledger
+
+Launches: 1 / 12.
+
+| # | Agent | Task | Launch / resume | Why |
+| --- | --- | --- | --- | --- |
+| 1 | designer | triage build-20261117-1 owner playtest; H10 candidates | launch | Plan (ca9a425): H10 A recommended (hive rebuilds one guard per 20 s), auto-slowdown ride-along; Q26 to owner |
 
 ## Iteration 9 ledger
 
