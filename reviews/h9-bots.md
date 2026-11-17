@@ -65,3 +65,46 @@ The bot's raid-window attack (H7/H8 step 1) assumes raiders away stay away. Unde
 3. **Re-run the bots** and report the gate time measured on its own, with the breakdown: new strategies, versus longer winner games.
 
 VERDICT: REJECT
+
+## Round 2 · 2026-11-16
+
+I reviewed 6f1aa47 against round 1, with the Director's ruling on the raid-window hive wave (STATUS.md, resend brief), which DECISIONS.md now records with the trace.
+
+**Gates (run by me on 6f1aa47, `npm run gates -- --base main`, nothing else running): all PASS.**
+- typecheck, lint and protected-files (46 files, none protected).
+- test: 57 files, 1204 tests.
+- determinism: final 9a2e957c. Unchanged, which is right: the bots add no sim state or inputs.
+- bots: 66.1 s of runs, with adaptive at 15:54 and greedy at 20:33. Flags 1–7 MET.
+
+The two H9 report lines are still MISSED: target 4, and target 5's `undefended` half. They are report lines, so that is allowed here.
+
+**Required change 1 (the exact shield metric): met.**
+- `ShieldMeter` records, before each step, whether each live prong's rock has a warship and the prong's own `lostEcon`.
+- After the step, it adds the increase only for the prongs that were guarded. If the raid ended during the step, it reads the prong from `lastRaid.prongs` at the same index, checking the raid id.
+- The unit tests cover four cases: a loss at the guarded prong counts (the round-1 metric read 0 there), a loss at the unguarded prong doesn't, a mixed tick counts only the guarded part, and a raid that ends in the step.
+- Whole-run assertions at exactly 0 hold for adaptive and greedy (h8-bots), and for adaptive again in the new file.
+
+**Required change 2 (the cause, and the ruling): met.** DECISIONS.md records my trace as confirmed and the Director's rule: in a raid with two or more prongs, a live prong counts as away only if the wave takes the hive before that prong's earliest return. The implementation (`hiveAtLanding`, `hiveWave`, `windowHome`):
+- sizes the wave against the prongs that could come back;
+- treats a prong pinned by a warship outside the wave as committed;
+- holds a wave whose arrivals would spread over more than a round, instead of sending it piecemeal;
+- with one prong or no raid, is H8's rule. The `raid.prongsMax` 1 hash pins in h9-bots.test.ts were re-run and are green.
+
+The bot-level test shows a two-rock wave leaving only from the rock that arrives in time.
+
+The results now make sense: adaptive 15:54 (was 20:46), concentrate 15:54, greedy 20:33 (+29%, target 5's greedy half met), undefended 12:03 (−24%, missed). DECISIONS.md and the archived report say plainly not to calibrate around the old 20:46.
+
+**Required change 3 (gate time): met.** The engineer measured 66.5 s alone and I measured 66.1 s of runs. The breakdown is honest: the two new strategies cost about 4.8 s, and the rest of the growth over h9-raids' 55.0 s is longer winner games plus the rule's battle estimates.
+
+**Notes, not required:**
+- In "a wave built from two rocks … is held", the second assertion, `expect(near.from).toEqual(near.ok ? [a5] : near.from)`, repeats the same call as `both`, and it is tautological when `ok` is false. The bot-level test that follows proves the behaviour, so tighten or drop this assertion when convenient.
+- `field-strategies.ts` defines its own `ceilDiv`. It is fine on integers and consistent with the sim's.
+
+**For the Director and h9-design-data:**
+- **Target 4 can't show a difference on v15 as things stand.** Adaptive and concentrate play the same game until a split raid is actually fought, and adaptive meets its only split raid at minute 15.5, just before it wins. Its losses are 6 against concentrate's 7. Calibration has to make splits come earlier (target 1), or the target needs the Director's reword option.
+- **The greedy wave loss is still open.** Greedy loses one full-strength wave at tick 28412, sent with no raid out, and the new rule doesn't cover that case.
+- **The staffing bound** (accepted in round 1) remains for h9-design-data to judge against H8's staffing target.
+
+Required changes: none.
+
+VERDICT: APPROVE
