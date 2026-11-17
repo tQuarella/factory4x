@@ -1849,3 +1849,7 @@ Scope: `git log build-20261116-1..build-20261117-1` (57 commits), `reviews/h9-*.
 ## 2026-11-16 · Director · Confirming the h9-design-data entries written on my behalf
 
 The Designer wrote "Director: h9-design-data rulings" and the out-of-file authorisation on my behalf. Both match my rulings as sent (prongMinSize 3 and data v16; target 4 reworded; 5b report-only; re-pin and bots report wording authorised). Confirmed.
+
+## 2026-11-17 · Owner · Q25: next direction is C
+
+The owner picked C: attrition first, then logistics feeding combat. H10 will be the attrition step (the hive can be worn down, and defending pays), drawn from DESIGN.md "H10 candidates" and H9 candidate C. B follows, with VISION.md wording drafted for the owner to approve. H10 does not start until the H9 playtest feedback arrives (PROCESS: no new hypothesis while a build awaits feedback), because that playtest is the evidence for what attrition must fix.

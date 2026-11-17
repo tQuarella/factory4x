@@ -39,6 +39,8 @@ Your note after H8: rebuilds feel instant, so there's no war of attrition, and t
 
 Answer like "A", "B" or "C", plus anything you want to say about the vision. Default if unanswered: C.
 
+**Answer (owner, 2026-11-17, in chat):** "C". Attrition first (next build), then logistics feeds combat, with VISION.md wording for the owner to approve.
+
 ## Build build-20261116-1 is ready (2026-11-15): H8, Hold the front
 
 Play: https://factory4x.pages.dev (on your phone, portrait). Your old save is from data v13, so the game starts fresh.
