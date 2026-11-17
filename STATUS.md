@@ -11,7 +11,7 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 9 ledger
 
-Launches: 3 / 12.
+Launches: 6 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
@@ -22,6 +22,17 @@ Launches: 3 / 12.
 | r2 | critic | cw-bots-gate-time | resume | Review round 1: REJECT (1716871): cached tunables key goes stale on in-place tuning |
 | r3 | engineer | cw-bots-gate-time | resume | Fix round 1 (591ea28): snapshot-checked key, new test |
 | r4 | critic | cw-bots-gate-time | resume | Review round 2: APPROVE (436d64e); merged 97b84f2, bots gate 97 s → about 60 s |
+| r5 | critic | h9-sim | resume | Review round 1: APPROVE (12924fa); determinism 2141b502; opening identical to H8 |
+| 4 | faction-ai | h9-raids | launch | Build prongs W1–W8 from task/h9-sim; may restructure the replay tail (Director ruling in brief: no assertion loosened, moved values logged) |
+| 5 | engineer | h9-bots | launch | Build from task/h9-sim; merges h9-raids when approved |
+| 6 | engineer | h9-client | launch | Build from task/h9-sim (top of stack); merges h9-raids, then h9-design-data |
+| r6 | engineer | h9-client | resume | Pre-raids rulings (6982899): exact lowering test, stepper-variant map ≥ 140 px, DECISIONS entry |
+| r7 | critic | h9-raids | resume | Review round 1: APPROVE (a34be08); determinism 9a2e957c; replay restructured, one a4 check narrowed (accepted) |
+| r8 | engineer | h9-bots | resume | Merge h9-raids; per-prong shield metric; whole-run checks on real prongs |
+| r9 | engineer | h9-client | resume | Merge h9-raids; draw every prong; two-prong smoke |
+| r10 | engineer | h9-client | resume | One-prong-done smoke test (ea946b5); map-height rule with Recycle logged; waiting for h9-design-data |
+| r11 | critic | h9-bots | resume | Review round 1: REJECT (72d23c9): shield metric blind in split raids; record why adaptive 15:53 → 20:46 (prong returns mid hive battle); gate time alone |
+| r12 | engineer | h9-bots | resume | Fix round 1 started, then stopped at once: owner said "Pause this work" (2026-11-16 08:23) |
 
 ## Iteration 8 ledger
 
@@ -306,7 +317,17 @@ Launches: 12 / 12. Resumes: 10. Iteration 3 closed. h3-art merged 4929fe6 after 
 
 ## Next step
 
-Iteration 9 (H9, A wider front) is building: h9-sim (core-engineer) and cw-bots-gate-time (engineer) in parallel. Then a Critic for each (resume an existing Critic per PROCESS). After h9-sim is approved: h9-raids, h9-bots and h9-client in parallel; then h9-design-data; `merge-task h9-client` lands the stack.
+**Resumed by the owner (2026-11-16 19:56).** h9-bots fix round 1 resent to engineer af63892eea98f7a23 (resumed; launch count unchanged). Earlier pause: 08:23.
+
+**20:20:** h9-bots APPROVED round 2 (be6ede0, pushed): adaptive 15:54, greedy 20:33, undefended 12:03. Director accepted windowHome and the no-piecemeal-wave additions; greedy's 28412 loss is accepted greedy behaviour. h9-design-data started (Designer a4f72a6ad9f89c048 resumed) on task/h9-bots be6ede0: targets 1, 4 and 5 (undefended half).
+
+Where H9 stands:
+- Merged on main: cw-bots-gate-time (97b84f2).
+- Approved: h9-sim (12924fa), h9-raids (a34be08).
+- task/h9-bots: REJECT round 1 (review 72d23c9). The fix is not started (or partly started; check the worktree `.claude/worktrees/agent-af63892eea98f7a23` for uncommitted edits). Resend the fix brief: (1) an exact per-prong shield metric at 0 with a two-prong test; (2) the Director ruling that the bots' raid-window hive wave counts a prong as away only if the wave lands before that prong's earliest return, otherwise it holds; log the ruling and the trace; (3) the bot gate time measured alone, with a breakdown. The staffing bound under 0.25 is accepted.
+- task/h9-client: pre-design-data work done (ea946b5); waiting for h9-design-data.
+- Then h9-design-data (Designer resume): targets 1, 4 and 5 all miss on v15.
+- Then h9-client final round, CI, and `merge-task h9-client`.
 
 ## Moving to another machine
 
