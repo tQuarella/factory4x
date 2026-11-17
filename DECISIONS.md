@@ -1897,3 +1897,7 @@ The owner picked C: attrition first, then logistics feeding combat. H10 will be 
    Turning it on still comes to the Director first, with the numbers.
 4. **H9 targets 1 and 4 become report lines.** A good defence keeping raids under the split size is intended.
 5. **The calibration guard is measured from the first v18 candidate.** The rule is meant to move adaptive, so measuring from v16 would trip the guard by design. The h10-design-data report still states the v16 → v18 move for each strategy, for the handoff.
+
+## 2026-11-17 · Director · h10-bots: flight allowance off at hive.rebuildTicks 0
+
+Accepted: `guardsOnArrival` returns `guardsAtHome` while `hive.rebuildTicks` is 0, instead of reading `hiveAfter` (which covers R9 regrowth) there. My ruling that the bots play exactly as on main at 0 outranks the spec's "hiveAfter covers R9" for the bots. At 0 the rule is today's game, and the H9 bots never allowed for regrowth in flight. The spec's selector is unchanged; only the bots' use of it is gated.
