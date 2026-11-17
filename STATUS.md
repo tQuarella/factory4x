@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 10, hypothesis H10: attrition, pending Q26)
-**State:** Iteration 10. h10-sim (98fbf86) and h10-bots (8118a5d) approved. h10-client phases 1–2 done (a68e82c). h10-design-data calibrating. Next: Critic h10-design-data, h10-client final round, branch CI, merge-task h10-client.
+**State:** Iteration 10. h10-sim, h10-bots, h10-design-data approved (v18, hive.rebuildTicks 600). h10-client final round building. Next: Critic final round, branch CI, merge-task h10-client, release, handoff. Handoff notes: concentrate now fastest (15:55) and greedy level with adaptive.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (public since 2026-11-15, Q23)
 **Last build:** build-20261117-1 (H9 A wider front), commit 7055e2a, live (CI 44003503570 gates and deploy green; site shows 7055e2a · data v16). Release gates passed locally (302/302 smoke).
@@ -28,6 +28,8 @@ Launches: 5 / 12.
 | r6 | engineer | h10-bots | resume | Fix round 1 (1917dd1) |
 | r7 | critic | h10-bots | resume | Review round 2: APPROVE (8118a5d) |
 | r8 | designer | h10-design-data | resume | Calibrate on task/h10-bots 8118a5d: pick hive.rebuildTicks, data v18 |
+| r9 | critic | h10-design-data | resume | Review round 1: APPROVE (c192566); v18 rebuildTicks 600; determinism ea89d755 |
+| r10 | engineer | h10-client | resume | Final round: merge h10-design-data c192566 + main; re-check on v18; smoke x5 |
 
 ## Iteration 9 ledger
 
