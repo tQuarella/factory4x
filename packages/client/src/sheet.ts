@@ -40,6 +40,7 @@ import {
 import { palette } from './palette.ts';
 import { bar, btn, h, setHidden, setText, toggleClass, type Btn } from './dom.ts';
 import { fmt10 } from './format.ts';
+import { hiveGuardsLine } from './hivereport.ts';
 import { guardIcon, recycleIcon, resourceIcon, shipIcon } from './icons.ts';
 import {
   COMPONENT_SOURCE,
@@ -515,6 +516,8 @@ export class Sheet {
     const sec = h('section', '', '', this.root);
     const prize = h('div', 'prize-line', '', sec);
     const supply = h('div', 'note supply', '', sec);
+    // H10: the hive's guard count and next rebuild (hive.rebuildTicks above 0 only).
+    const hiveGuards = isHeart ? h('div', 'note hive-guards', '', sec) : null;
     const feeds = isRoot ? this.feedsBox(sec) : null;
 
     // One row per guard type: icon, count/cap, regrow, hp and damage, a thin regrow bar.
@@ -578,11 +581,19 @@ export class Sheet {
       const supplyText = isHeart ? supplyLine(w) : '';
       setText(supply, supplyText);
       setHidden(supply, supplyText === '');
+      if (hiveGuards) {
+        const line = hiveGuardsLine(g.total, g.totalCap, g.rebuild, w.tickRate);
+        setText(hiveGuards, line ?? '');
+        setHidden(hiveGuards, line === null);
+      }
       if (feeds) setText(feeds, feedsBloomText(w, isCaptured(w)));
       for (const r of guardRows) {
         const row = g.guards[r.type];
         setHidden(r.wrap, row.count === 0 && row.cap === 0);
         setText(r.label, `${GUARD_NAME[r.type]} ${row.count}/${row.cap}`);
+        // Under the rebuild queue (H10 D2) the per-type timers are not what runs, so their regrow text and bar are hidden.
+        setHidden(r.regrow, g.rebuild !== null);
+        setHidden(r.progress.el, g.rebuild !== null);
         setText(r.regrow, `regrows ${regrowText(row.regrowTicks, w.tickRate)}`);
         setText(r.stats, `${row.hp} hp · hits ${row.damage}/round · heals ${row.repairPerRound}/round`);
         r.progress.set(row.count >= row.cap ? 0 : row.regrowProgress / Math.max(1, row.regrowTicks));

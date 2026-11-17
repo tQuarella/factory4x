@@ -102,6 +102,10 @@ interface Window {
     raidBadge(): number;
     /** H9: every node that wore a raid badge in the last frame (one per prong target), as JSON text, in node order. */
     raidBadges(): string;
+    /** H10: the hive's label as the last frame drew it ({text, x, y, w, h} in canvas px) as JSON text, or "null". */
+    hiveLabel(): string;
+    /** H10: the hive's guards at home, its caps and its rebuild readout as JSON text. */
+    hiveStatus(): string;
     /** H8: the gesture's phase and how many moves, cancels and split arms it has seen, as JSON text. */
     gestureState(): string;
     /** H8: fleetStatus(...).types (alive, idle, building, recyclable per build type) as JSON text. */

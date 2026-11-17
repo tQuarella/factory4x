@@ -11,6 +11,8 @@ import {
   campaignStatus,
   fieldSummary,
   fleetStatus,
+  guardianStatus,
+  heartIndex,
   defaultData,
   isCaptured,
   isField,
@@ -46,7 +48,8 @@ import { shortVersion } from './format.ts';
 import { Slowdown, raidSlowdownSetting } from './slowdown.ts';
 import { Hud, OverworldHud } from './hud.ts';
 import { FeedbackPanel, TuningPanel, confirmModal, showAreaResult, showFieldResult, showWin, type PanelHost } from './panels.ts';
-import { FIELD_HINT, MINE_MODE_TOAST, fieldFleetFullNotice, fieldUnlockNotice, moveBannerText, movedText, raidEndProngsText, raidEndText, raidFightLineProngs, raidMusterLineProngs } from './fieldreport.ts';
+import { FIELD_HINT, MINE_MODE_TOAST, fieldFleetFullNotice, fieldUnlockNotice, moveBannerText, movedText, raidEndProngsText, raidEndText, raidMusterLineProngs } from './fieldreport.ts';
+import { hiveLostText, raidLiveLine } from './hivereport.ts';
 import { FleetPanel } from './fleetpanel.ts';
 import { MoveGestureControl } from './gesturectl.ts';
 import { mineBadgeIcon } from './icons.ts';
@@ -549,9 +552,10 @@ function raidLines(w: World): string[] {
   if (r.target === null || r.prongs.length === 0) return [];
   const name = (n: number): string => shortName(w.nodes[n]!, true);
   if (r.phase === 'muster') return [raidMusterLineProngs(r.prongs.map((p) => ({ target: name(p.target), planned: p.planned })), r.ticksToLaunch, w.tickRate)];
-  if (r.phase === 'fight') {
-    const fighting = r.prongs.filter((p) => p.phase === 'fight');
-    return [raidFightLineProngs(fighting.map((p) => ({ target: name(p.target), left: p.raiders.thorn + p.raiders.spore })))];
+  // The fight, and (H10, only with raid.rollMax above 0) a prong that rolled and is flying on: "A5 hit → A6".
+  const rolling = r.prongs.some((p) => p.phase === 'out' && p.rolledFrom !== null);
+  if (r.phase === 'fight' || rolling) {
+    return [raidLiveLine(r.prongs.map((p) => ({ target: name(p.target), phase: p.phase, left: p.raiders.thorn + p.raiders.spore, rolledFrom: p.rolledFrom === null ? null : name(p.rolledFrom) })))];
   }
   return [];
 }
@@ -566,10 +570,11 @@ function raidToast(w: World): void {
   }
   if (last === null || last.id === raidSeen.id) return;
   raidSeen.id = last.id;
+  const hiveLost = last.prongs.reduce((n, p) => n + p.hiveLost, 0);
   const text =
-    last.prongs.length > 1 && last.outcome !== 'withered'
+    (last.prongs.length > 1 && last.outcome !== 'withered'
       ? raidEndProngsText(last.prongs.map((p) => ({ ...p, target: shortName(w.nodes[p.target]!, true) })))
-      : raidEndText(last, shortName(w.nodes[last.target]!, true));
+      : raidEndText(last, shortName(w.nodes[last.target]!, true))) + hiveLostText(hiveLost);
   toast.show(toastEl.hidden ? text : `${toastEl.textContent}\n\n${text}`, () => sheet.open(last.target));
 }
 
@@ -589,7 +594,7 @@ function applySlowdown(): void {
   const act = slowdown.frame(
     { id: w.raid === null ? null : w.raid.id, live: r.phase === 'muster' || r.phase === 'out' || r.phase === 'fight', decided: r.prongs.length > 0 && r.prongs.every((p) => p.outcome !== null) },
     app.session.speed,
-    raidSlowdownSetting() === 1,
+    raidSlowdownSetting(settings) === 1,
   );
   if (act.speed !== undefined) app.session.speed = act.speed;
   if (act.toast !== undefined) engageNote = act.toast;
@@ -901,6 +906,11 @@ window.__factory4x = {
   mapDrag: () => JSON.stringify(view.drawnH8().drag),
   raidBadge: () => view.drawnH8().raidBadge,
   raidBadges: () => JSON.stringify(view.drawnH8().raidBadges),
+  hiveLabel: () => JSON.stringify(view.drawnHiveLabel()),
+  hiveStatus: () => {
+    const g = guardianStatus(app.session.world, heartIndex(app.session.world));
+    return JSON.stringify({ total: g.total, totalCap: g.totalCap, rebuild: g.rebuild });
+  },
   gestureState: () => JSON.stringify({ phase: gestureCtl.gesture.phase, ...gestureCtl.counts }),
   fleetTypes: () => JSON.stringify(fleetStatus(app.session.world, sd()).types),
   mineMode: () => mineMode,

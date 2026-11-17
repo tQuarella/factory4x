@@ -69,7 +69,8 @@ describe('S1-S3: engage', () => {
     const r = rig(4);
     r.step(live(1));
     expect(r.speed()).toBe(1);
-    expect(raidSlowdownSetting()).toBe(1);
+    expect(raidSlowdownSetting({ raidSlowdown: 1 })).toBe(1);
+    expect(raidSlowdownSetting({ raidSlowdown: 0 })).toBe(0);
   });
 });
 

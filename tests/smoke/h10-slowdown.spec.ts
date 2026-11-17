@@ -130,6 +130,18 @@ test.describe('375x667 portrait, the raid auto-slowdown', () => {
     expect(await toastText(page)).not.toContain('for the raid');
   });
 
+  test('with client.raidSlowdown 0 (the tuning panel, this device) nothing engages: still 4x through the raid, no toast', async ({ page }) => {
+    test.setTimeout(120_000);
+    await setup(page, 0, 1);
+    await tune(page, 'client.raidSlowdown', 0);
+    await page.evaluate(() => window.__factory4x!.setSpeed(4));
+    await until(page, mustered, 'a raid');
+    expect(await speed(page)).toBe(4);
+    expect(await toastText(page)).not.toContain('for the raid');
+    await until(page, (r) => r.phase === 'none' && r.last !== null, 'the raid over');
+    expect(await speed(page)).toBe(4);
+  });
+
   test('a prong beaten by parked ships restores 4x', async ({ page }) => {
     test.setTimeout(120_000);
     await setup(page, 60);

@@ -189,7 +189,7 @@ describe('acceptance 10: the client keys are device settings', () => {
       // H10 (data v17, h10-sim): the raid slowdown key; h10-client stores it in the settings.
       ['client.raidSlowdown', 1, 0, 1, 'client'],
     ]);
-    expect(Object.keys(CLIENT_SETTING_KEYS)).toHaveLength(5);
+    expect(Object.keys(CLIENT_SETTING_KEYS)).toHaveLength(6);
   });
   it('settings default to the data, load valid stored values and drop out-of-range ones', () => {
     const d = defaultSettings(data);

@@ -162,6 +162,8 @@ export interface Settings {
   moveGesture: number;
   /** H9 `client.haulerStepper` (1: H8's hauler stepper under the extractor row): this device only. */
   haulerStepper: number;
+  /** H10 `client.raidSlowdown` (1: a raid drops the game to 1x and gives the speed back after): this device only. */
+  raidSlowdown: number;
 }
 
 /** The client-scope keys and the setting each one is stored in. */
@@ -171,6 +173,7 @@ export const CLIENT_SETTING_KEYS = {
   'client.dragSlopPx': 'dragSlopPx',
   'client.moveGesture': 'moveGesture',
   'client.haulerStepper': 'haulerStepper',
+  'client.raidSlowdown': 'raidSlowdown',
 } as const;
 export type ClientKey = keyof typeof CLIENT_SETTING_KEYS;
 
@@ -185,6 +188,7 @@ export function defaultSettings(data: SimData): Settings {
     dragSlopPx: d('client.dragSlopPx'),
     moveGesture: d('client.moveGesture'),
     haulerStepper: d('client.haulerStepper'),
+    raidSlowdown: d('client.raidSlowdown'),
   };
 }
 

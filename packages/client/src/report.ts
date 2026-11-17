@@ -169,13 +169,20 @@ export function battleReport(world: Readonly<World>, r: BattleResult, data?: Sim
   }
   const rates = combatRates(world, r.node, r.engagedByType);
   const rate = `${sent} ships strip ${fmt10(rates.killPerSecX10)} guards/s; ${name} regrows ${fmt10(rates.regrowPerSecX10)}/s.`;
-  if (r.outcome === 'withdrew') return `Wave withdrew: ${counts}, ${r.guardsKilled} guards stripped\n${rate}`;
+  // H10: a push at the field's hive ends with what is left of it, "Hive 20 / 30".
+  const hive = world.field !== null && kind === 'heart' ? `\n${hiveCountText(guardianStatus(world, r.node).total, guardianStatus(world, r.node).totalCap)}` : '';
+  if (r.outcome === 'withdrew') return `Wave withdrew: ${counts}, ${r.guardsKilled} guards stripped\n${rate}${hive}`;
   const first = `${name} held: ${counts}. ${repelHint(world, r)}${fullFleetHint(world, r, data)}`;
   const why =
     rates.killPerSecX10 <= rates.regrowPerSecX10
       ? 'Regrowth outpaced the wave.'
       : `Too few ships to strip all ${guardianStatus(world, r.node).totalCap} guards before the wave was lost. Send more at once.`;
-  return `${first}\n${why} ${rate}`;
+  return `${first}\n${why} ${rate}${hive}`;
+}
+
+/** "Hive 20 / 30": the hive's guards at home against its caps, in the battle report of a push at the hive. */
+export function hiveCountText(total: number, cap: number): string {
+  return `Hive ${total} / ${cap}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -21,12 +21,9 @@ export interface SlowdownAct {
   toast?: string;
 }
 
-/**
- * The raid-slowdown setting, read through this one function. h10-sim adds `client.raidSlowdown` (shipped at 1); until it is
- * merged the setting is 1.
- */
-export function raidSlowdownSetting(): number {
-  return 1;
+/** The raid-slowdown setting, read through this one function: `client.raidSlowdown` (shipped at 1; a setting of this device). */
+export function raidSlowdownSetting(settings: Readonly<{ raidSlowdown: number }>): number {
+  return settings.raidSlowdown;
 }
 
 /** S3: the note on engage, with the real speed. */

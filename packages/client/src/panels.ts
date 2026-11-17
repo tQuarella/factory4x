@@ -78,6 +78,10 @@ export const TUNE_LABEL: Readonly<Record<string, string>> = {
   'client.dragSlopPx': 'Drag distance, px',
   'client.moveGesture': 'Move ships by (1 = drag, 0 = tap Move, tap)',
   'client.haulerStepper': 'Hauler stepper on rock sheets (1 = on)',
+  'client.raidSlowdown': 'Slow to 1x for a raid (1 = on)',
+  'hive.rebuildTicks': 'Hive rebuild, ticks per guard (0 = regrow by type)',
+  'hive.regrowPct': 'Hive regrow speed % (used only when Hive rebuild is 0)',
+  'raid.rollMax': 'Rolls on to another rock after a hit (0 = off)',
   'alloc.maxWeight': 'Weight steps (radar scale)',
   'fleet.recycleRefundPct': 'Recycle refund %',
   'fleet.relayStep': 'Relay limit step',
@@ -450,6 +454,10 @@ export function showFieldResult(root: HTMLElement, session: Session, onNewRun: (
   statLine(card, 'Raids', raidsText(s.raids));
   statLine(card, 'Raid prongs', raidProngsText(s.raidProngs));
   statLine(card, 'Economy ships lost to raids', String(s.econLostToRaids));
+  // H10: what wore the hive down: raiders killed at the rocks ("Hive −N" in each raid's report) and guards killed in pushes at the hive.
+  statLine(card, 'Hive −, raiders killed at rocks', String(s.hive.lostToRaids));
+  statLine(card, 'Hive −, guards killed in pushes', String(s.hive.lostToPushes));
+  if (s.raidRolls > 0) statLine(card, 'Raid rolls', String(s.raidRolls));
   statLine(card, 'Weight changes', String(s.allocChanges));
   statLine(card, 'Most economy ships at once', String(s.peakEcon));
   const row = h('div', 'ov-actions', '', card);

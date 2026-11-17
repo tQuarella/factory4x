@@ -41,6 +41,7 @@ import {
 } from './placeholders.ts';
 import { isBackedUp } from './report.ts';
 import { shortName } from './sheet.ts';
+import { hiveLabelCount } from './hivereport.ts';
 import { raidLegs, type RaidLeg } from './raidlegs.ts';
 import { fitMap, type Fit } from './fit.ts';
 import { lerp, podTotalTicks, progressFrac } from './interp.ts';
@@ -181,7 +182,12 @@ export class MapView {
   /** H8: Mine badge pops: a rock just marked grows in, one just unmarked fades out (client only). */
   private readonly pops = new Map<number, { start: number; on: boolean }>();
   /** H8 test hook: what the last frame drew for the raid badge and the drag. */
-  private readonly drawnNew: { raidBadge: number; raidBadges: number[]; drag: DragDrawn | null } = { raidBadge: -1, raidBadges: [], drag: null };
+  private readonly drawnNew: { raidBadge: number; raidBadges: number[]; drag: DragDrawn | null; hiveLabel: { text: string; x: number; y: number; w: number; h: number } | null } = { raidBadge: -1, raidBadges: [], drag: null, hiveLabel: null };
+
+  /** H10 test hook: the hive's label as the last frame drew it (canvas px), or null. */
+  drawnHiveLabel(): { text: string; x: number; y: number; w: number; h: number } | null {
+    return this.drawnNew.hiveLabel === null ? null : { ...this.drawnNew.hiveLabel };
+  }
 
   drawnH8(): { raidBadge: number; raidBadges: number[]; drag: DragDrawn | null } {
     return { raidBadge: this.drawnNew.raidBadge, raidBadges: [...this.drawnNew.raidBadges], drag: this.drawnNew.drag === null ? null : { ...this.drawnNew.drag } };
@@ -284,6 +290,7 @@ export class MapView {
     this.drawn.prongs = [];
     this.drawnNew.raidBadge = -1;
     this.drawnNew.raidBadges = [];
+    this.drawnNew.hiveLabel = null;
     this.drawnNew.drag = null;
     ctx.fillStyle = palette.space;
     ctx.fillRect(0, 0, w, h);
@@ -362,7 +369,7 @@ export class MapView {
     }
 
     const counts = shipCounts(world);
-    const labels: Array<{ text: string; x: number; y: number }> = [];
+    const labels: Array<{ text: string; x: number; y: number; hive?: boolean }> = [];
     const legs = field ? raidLegs(world) : [];
     for (const n of world.nodes) {
       const { x, y } = this.nodePos(n.index);
@@ -431,7 +438,9 @@ export class MapView {
 
       // Label (drawn in a last pass, over every ring), selection ring, rally flag, ship badge, warning badge.
       // A label that would clip at the top edge goes below the node instead.
-      labels.push({ text: nodeLabel(n, field), x, y: labelTop < LABEL_TOP_PAD ? y + selR + 12 : labelTop });
+      // H10: the hive's label carries its guard count while it is below its caps ("HIVE 18/30").
+      const count = field && n.kind === 'heart' && guard !== null && guard.alive ? hiveLabelCount(guard.total, guard.totalCap) : null;
+      labels.push({ text: count === null ? nodeLabel(n, field) : `${nodeLabel(n, field)} ${count}`, x, y: labelTop < LABEL_TOP_PAD ? y + selR + 12 : labelTop, hive: n.kind === 'heart' });
 
       if (selected === n.index) {
         ctx.save();
@@ -509,6 +518,7 @@ export class MapView {
       ctx.fill();
       ctx.fillStyle = '#9fb4d6';
       ctx.fillText(l.text, l.x, l.y);
+      if (l.hive) this.drawnNew.hiveLabel = { text: l.text, x: l.x - wd / 2, y: l.y - 10, w: wd, h: 14 };
     }
     ctx.restore();
 
