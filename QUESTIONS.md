@@ -47,6 +47,8 @@ Optional, VISION.md pillar 4: A fits the current wording, but "waiting never mak
 
 Details: DESIGN.md → "H10 candidates (iteration 10)".
 
+**Answer (owner, 2026-11-17, in chat):** "A, wear the hive down". That is "A", not "A only", so B's roll-on may be added in the same build if the bots still show defending doesn't pay. No pillar 4 edit.
+
 ## Q25. Where should the game go next? (2026-11-16, Director)
 
 Your note after H8: rebuilds feel instant, so there's no war of attrition, and the game is drifting from Factorio toward Starcraft. You suggested logistics ("distilled Factorio") that unlock advantages in combat ("distilled Starcraft"). H9 adds a third thing: defending doesn't pay yet. These overlap, so pick a direction, and the Designer turns it into the next build:
