@@ -447,6 +447,21 @@ H8 (build-20261116-1, spec below) is the current build, on data v14:
 
 ## Hypotheses
 
+### H10 candidates (recorded 2026-11-16 from h9-design-data; not proposed yet)
+
+*Recorded on the Director's ruling (DECISIONS.md, "Director: h9-design-data rulings"). Not built in H9. They wait for the owner's H9 session and the direction question on attrition and the logistics layer (PLAYTEST_LOG.md, 2026-11-16).*
+
+**The finding.** In the bots, defending doesn't pay against split raids. `undefended` takes the hive at 13:09 on v16 against adaptive's 18:20, and it was faster in all 16 variants tried (`reports/archive/h9-design-data-v15.md`). The reasons:
+- a prong kills at most the extractors docked at its rock (2–3, about 40–60 ore), then leaves;
+- a matched guard loses 1–2 warships (18 ore each) to save them;
+- raids out of the hive open it (flag 4), which favours the player who never spends ships on defence.
+
+Rule options. Each makes a hit cost more than the extractors at one rock:
+1. **A prong that has hit rolls on.** After its fight, instead of going home, a prong that hit flies to the next mined rock in hive order that no live prong holds, and fights again. It goes home when it is beaten, finds no rock, or has hit `raid.rollMax` rocks. An undefended front is then stripped rock by rock, while one guard on the front rock stops the roll.
+2. **Hits steal ore.** A prong that hits takes the rock's buffer, and the hive's next muster grows by one raider per `raid.stealPerRaider` ore stolen. A variant takes it from the probe's stock instead (not the probe itself: "No fail state" holds). An undefended economy then feeds bigger raids. Pillar 4 needs a check: raids still grow with what you build, never with time.
+
+Either one needs a bot check before it is proposed: `undefended` at least 10% slower than `adaptive`, without moving adaptive more than 10%. Both also bear on the owner's attrition note, because they make a raid's damage carry forward.
+
 ### H9 candidates (iteration 9): A picked
 
 *The owner picked A, without C (QUESTIONS.md Q24, d3ff938). The spec is "H9 (Milestone 2, iteration 9, spec ready): A wider front" below. Where they differ, the spec wins.*
@@ -730,7 +745,7 @@ New input: `setExtractors`. There are no others.
 
 #### Save, data version and replay
 
-- **`dataVersion` 15** (h9-sim). It adds:
+- **`dataVersion` 15** (h9-sim); **16** after h9-design-data (`raid.prongMinSize` 3). v15 adds:
   - `raid.prongsMax`, `raid.prongMinSize` and `client.haulerStepper` (below);
   - `extractorSet` in the field state;
   - `stats.raidProngs`.
@@ -756,12 +771,12 @@ New input: `setExtractors`. There are no others.
 
   To reach (g)–(m) on shipped data without waiting for a 15-ship economy, the replay may use `setTunable` (for example `raid.prongMinSize` 2) as an input, recorded like any other.
 
-#### Tunables (H9, data v15, all integers)
+#### Tunables (H9, data v16, all integers)
 
 | Key | Default | Range | Feels like (low / high) |
 | --- | --- | --- | --- |
 | `raid.prongsMax` | 2 | 1–3 | 1: H8, one target (the comparison) / 3: a5, a6 and a7 hit at once; the whole wing is the front |
-| `raid.prongMinSize` | 4 | 2–12 | 2: even small raids split, and early fronts are thin / 12: only the largest raid can split, and only at `raid.maxSize` 24 or more |
+| `raid.prongMinSize` | 3 | 2–12 | 2: even small raids split, and early fronts are thin / 12: only the largest raid can split, and only at `raid.maxSize` 24 or more |
 | `client.haulerStepper` | 0 | 0–1 | client, this device. 0: extractors are the dial, and haulers are a readout / 1: H8's hauler stepper comes back under the extractor row |
 
 The `client.*` key follows `client.autosaveSec`: it is in data, shows in the tuning panel tagged "this device", is stored in settings, and never reaches the sim.
@@ -878,10 +893,10 @@ H8's targets carry over with the same values, except that "an undefended full-ec
 1. **Splits happen in play.** On `adaptive`, at least 2 raids in the run have 2 prongs. Otherwise the hypothesis never shows up for the bots, and probably not for the owner either.
 2. **An undefended prong hurts.** At a full economy (the raid of 12 split 6 and 6, at a5 and a6), each undefended prong kills at least 2 economy ships at its target.
 3. **A token guard isn't enough, per prong.** A guard under half its prong's size (2 ships against 6) is beaten, then the prong hits. A guard matched to its prong (6 against 6) wins, losing at most 2.
-4. **Splitting matters.** Over the run, `adaptive-concentrate` loses at least 2 more economy ships to raids than `adaptive`, on every seed.
-5. **Ignoring raids costs.**
-   - `greedy` finishes at least 10% slower than `adaptive` (the Director's ask).
-   - `undefended` finishes at least 10% slower than `adaptive`, or doesn't win within the cap.
+4. **Splitting matters.** Over the run, `adaptive-concentrate` loses at least 2 more economy ships to raids than `adaptive`, **or** finishes at least 10% slower, on every seed. *(Reworded by the Director, 2026-11-16, from "loses at least 2 more economy ships". A concentrated guard saves its own rock outright, so concentrating costs time rather than ships.)*
+5. **Ignoring raids costs: report-only for H9** (Director, 2026-11-16).
+   - `greedy` finishes at least 10% slower than `adaptive` (the Director's ask). *Now a reported finding, not a target:* on v16 greedy finishes level with adaptive.
+   - `undefended` finishes at least 10% slower than `adaptive`, or doesn't win within the cap. *Report-only:* it is a rule finding (in the bots, defending doesn't pay against split raids). It goes to the owner as a fun question, and the rule options are "H10 candidates" above.
    - Both are reported. On v14 greedy finished 8 s ahead of adaptive, and greedy becomes adaptive after its first hit. So if the greedy half can't be met by values, that is a rule finding about the greedy bot, not the field. It goes to the Director with the reword "measured on `undefended`" (see DECISIONS.md).
 6. **Pace:** adaptive 15–30 game minutes, greedy ≤ 40, as H7 and H8. The first raid still musters at 2–6 minutes.
 
@@ -894,44 +909,40 @@ If a target can only be met that way, report it as a finding rather than tune it
 
 Flags 1–7 must stay met. The designer.md guard applies: a value that meets one target but changes which strategy finishes first, or moves a winner by more than 10%, goes to the Director with the reword option and isn't committed as shipped. Values only, in `data/sim.json`; `dataVersion` goes to 16 if any value changes.
 
-#### Calibration result (h9-design-data, data v15)
+#### Calibration result (h9-design-data, data v16)
 
-**No value changed: H9 ships on data v15**, pending the Director's rulings below.
-- Report: `reports/archive/h9-design-data-v15.md`, with the verbatim sweep and per-prong fight output.
-- Scripts: `reports/archive/h9-design-data-v15-sweep.mts` and `-fights.mts`.
-- The full suite at `raid.prongMinSize` 3: `reports/archive/h9-design-data-min3-bots.md`.
-- Every seed gives the same run.
+**One value changed: `raid.prongMinSize` 4 → 3, so `dataVersion` is 16.** The Director ruled it in (DECISIONS.md, "Director: h9-design-data rulings"). H9's point is that the owner meets split raids, and on v15 adaptive never finished one.
+- **Final suite:** `reports/archive/h9-design-data-v16-bots.md` (3 seeds, all identical).
+- **Probe and sweep on v15:** 16 variants, plus the per-prong fights in two orders, in `reports/archive/h9-design-data-v15.md`. Scripts: `reports/archive/h9-design-data-v15-sweep.mts` and `-fights.mts`. The fights script on v16 prints the same fights line for line, because a full raid of 12 still splits 6 and 6.
 
-| # | Target | v15 | Met |
-| --- | --- | --- | --- |
-| 1 | adaptive meets ≥ 2 two-prong raids | 0 finished; its one split raid launches as its winning wave leaves | **missed** |
-| 2 | each undefended prong kills ≥ 2 economy ships | a5 3, a6 2 | met |
-| 3 | a guard under half its prong loses, then the prong hits; matched wins losing ≤ 2 | 2 against 6: beaten, a5 hit for 3. 6: wins, loses 1. The same in a second order | met |
-| 4 | concentrate loses ≥ 2 more economy ships than adaptive | 7 against 6, same win time (15:54) | **missed** |
-| 5a | greedy ≥ 10% slower than adaptive | 20:33 against 15:54 (+29%) | met |
-| 5b | undefended ≥ 10% slower than adaptive | 12:03 (−24%) | **missed** |
-| 6 | pace; first raid at 2–6 min | adaptive 15:54, greedy 20:33; 2:42 | met |
-| H8 | staffing | adaptive: idle peak 1, 0 min over 1; nothing backed up with its target met | met |
-| flags 1–7 | | all MET | met |
+| # | Target | v15 | v16 (shipped) | Met on v16 |
+| --- | --- | --- | --- | --- |
+| 1 | adaptive meets ≥ 2 two-prong raids | 0 finished | 4 (first at 7:53) | met |
+| 2 | each undefended prong kills ≥ 2 economy ships | a5 3, a6 2 | a5 3, a6 2 | met |
+| 3 | a guard under half its prong loses, then the prong hits; matched wins losing ≤ 2 | 2 vs 6: beaten, a5 hit for 3; 6 wins, loses 1 | the same | met |
+| 4 | concentrate loses ≥ 2 more economy ships, **or** is ≥ 10% slower (reworded) | 7 vs 6 ships; 15:54 vs 15:54 | 6 vs 5 ships; 23:13 vs 18:20 (+27%) | met (time) |
+| 5a | greedy vs adaptive (reported finding) | 20:33 (+29%) | 18:18 (2 s ahead, +0%) | reported |
+| 5b | undefended vs adaptive (report-only) | 12:03 (−24%) | 13:09 (−28%) | reported |
+| 6 | pace (adaptive 15–30, greedy ≤ 40); first raid 2–6 min | 15:54, 20:33; 2:42 | 18:20, 18:18; 2:42 | met |
+| H8 | staffing: ≤ 1 idle hauler outside raids; nothing backed up with its target met | peak 1, 0 min over 1; none | peak 1, 0 min over 1; none | met |
+| flags 1–7 | | all MET | all MET | met |
 
-**The only candidate value: `raid.prongMinSize` 3.**
-- It meets target 1: adaptive meets 4 two-prong raids, the first at 7:53. Flags 1–7 and staffing still hold.
-- Target 4 as worded is still missed (6 against 5 ships lost). On time, concentrate is 27% slower.
-- It trips both guard triggers:
-  - adaptive goes from 15:54 to 18:20 (+15%);
-  - greedy (18:18) now finishes 2 s ahead of adaptive, so target 5a goes from met to missed.
-- So it is reported, not committed.
+**Accepted by the Director:** adaptive moves 15:54 → 18:20 (+15%), and greedy finishes level with it (18:18). The bots report's own H9 lines still print target 4's old wording ("loses at least 2 more economy ships") as MISSED; this table judges the reworded target.
 
-**Target 5b is a rule finding.** No in-range value tried made ignoring raids slower. Undefended was 23–65% faster than adaptive in every variant. The report gives the reasons:
-- defending doesn't save economy ships in the bots (5 lost against 6);
+**Walk of `raid.prongMinSize` 3:**
+- **The opening:** the first raid (3 raiders at 2:42) is `floor(3 ÷ 3)` = 1 prong, so the first raid musters at 2:42 on v15 and v16 alike.
+- **Every raid phase:** splits now start at a raid of 6, from 11 economy ships. The muster, flight, fight, hold and outcome rules are unchanged.
+- **The limits:** with one mined rock it is still 1 prong. At the fleet limit nothing changes. `raid.prongsMax` 3 at min 3 gives the same adaptive run (18:20).
+- **Siblings:** min 2 also gives adaptive 18:20, but splits from a raid of 4.
+- **No faster refill:** no regrowth, repair, warship build time or warship cost moved.
+
+**Target 5b, the rule finding (report-only).** No in-range value tried made ignoring raids slower: undefended was 8–65% faster than adaptive in all 16 variants. The reasons, from the report:
+- defending doesn't save economy ships in the bots (5 lost against 6 on v15, 5 against 5 on v16);
 - a matched guard trades 1–2 warships for 2–3 extractors, about even in ore;
 - raids open the hive (flag 4);
 - a lean economy draws small raids.
 
-**For the Director** (the report has the detail):
-1. Ship `raid.prongMinSize` 3 (target 1 met; adaptive +15%; greedy ≈ adaptive), or keep 4 and reword target 1 to count greedy's run, which meets 2 split raids on v15.
-2. Reword target 4 to "≥ 2 more economy ships lost, **or** ≥ 10% slower".
-3. Target 5b needs a rule change (for example, a hit prong moves on to the next rock, or hits steal ore), or becomes report-only.
+The rule options are "H10 candidates" above. The handoff asks the owner (fun question 4).
 
 #### Success criteria (H9; the owner, one 20–30 minute phone session; 4x is fine)
 
@@ -949,6 +960,7 @@ Optional: they try `raid.prongsMax` 1 or 3 and say which they prefer.
 1. When a raid split across two rocks, how did you decide where your warships stood: both rocks, the richer one, or fewer rocks near the hive?
 2. Did a split raid ever make you stop or dial down a rock near the hive? Was that a good trade?
 3. Did the extractor dial do what you expected, with the haulers following on their own?
+4. Did defending a split raid feel worth it, or did ignoring raids and pushing the hive work better? (The bots say ignoring raids is faster. Ask it next to the owner's attrition note.)
 
 #### Left out of H9 (hard limit)
 

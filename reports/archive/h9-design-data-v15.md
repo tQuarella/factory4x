@@ -1,5 +1,7 @@
 # h9-design-data on data v15: probe, sweep and per-prong fights
 
+*Superseded 2026-11-16 by the Director's rulings: `raid.prongMinSize` 3 ships as data v16. The final suite is `reports/archive/h9-design-data-v16-bots.md`, and the final table is in DESIGN.md "Calibration result (h9-design-data, data v16)". This report stays as the v15 probe and sweep.*
+
 **Result: no value changed. H9 ships on data v15.** Every value that met target 1 also moved a winner by more than 10% or changed the strategy order. Under the designer.md guard (and PROCESS), those go to the Director with the reword options, and aren't committed as shipped. See "For the Director" at the end.
 
 Scripts (run from the repo root; bounded by the runner's 45-minute cap, with progress on stderr):
@@ -134,7 +136,7 @@ From the sweep (`min3`) and the full suite (`h9-design-data-min3-bots.md`):
 
 ## Target 5b: no in-range value found. This is a rule finding
 
-Every lever tried that makes raids hurt more (`raid.econPerRaider` 1, `raid.gapTicks` 2400, `raid.hiveKeepPct` 35, `ship.extractor.hp` 4, `ship.extractor.cost` 30 or 40) slowed adaptive by as much as or more than undefended. Undefended was 23% to 65% faster than adaptive in every variant. Lowering `raid.gapTicks`, raising `ship.extractor.cost` and lowering `ship.extractor.hp` don't speed any refill, so they're allowed under "No faster refill". None was enough. The reasons, from the outputs above:
+Every lever tried that makes raids hurt more (`raid.econPerRaider` 1, `raid.gapTicks` 2400, `raid.hiveKeepPct` 35, `ship.extractor.hp` 4, `ship.extractor.cost` 30 or 40) slowed adaptive by as much as or more than undefended. Undefended was 8% to 65% faster than adaptive in every variant (8% only at `raid.gapTicks` 5400). Lowering `raid.gapTicks`, raising `ship.extractor.cost` and lowering `ship.extractor.hp` don't speed any refill, so they're allowed under "No faster refill". None was enough. The reasons, from the outputs above:
 1. **Defending doesn't save economy ships in the bots.** Undefended loses 5 over the run on v15, adaptive 6. A prong kills at most the extractors docked at its rock (2–3), because haulers hold (H10) and the prong leaves once no player ship is left.
 2. **The trade per prong is about even in ore.** A matched guard loses 1–2 warships (18 ore each) to save 2–3 extractors (20 ore each). Defending costs build time and slots that offence would use.
 3. **Raids open the hive** (flag 4: the best mix drops from 16 to 11 with a full raid out). A player who never defends gets more windows with warships free to use them.

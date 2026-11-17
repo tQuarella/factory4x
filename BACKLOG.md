@@ -1204,7 +1204,7 @@ No data value changes. If one is needed, report it rather than making it.
    - the win time against adaptive (%).
 
    It lists what no bot exercises: `setExtractors`, drag, `setHaulers`, `recycleFleet`, Mine mode.
-5. **Flags 1–7** are reported as in H8. Two new report lines (not gate flags until h9-design-data says they hold): "splitting matters" (calibration target 4) and "ignoring raids costs" (target 5).
+5. **Flags 1–7** are reported as in H8. Two new report lines (not gate flags until h9-design-data says they hold): "splitting matters" (calibration target 4) and "ignoring raids costs" (target 5). *(2026-11-16, Director: target 4 reads "`adaptive-concentrate` loses at least 2 more economy ships than `adaptive`, **or** finishes at least 10% slower"; target 5 is report-only for H9. DESIGN.md "Calibration targets (H9)".)*
 6. **Gates:** the bots gate is judged on the stacked h9-design-data branch, and may be red here. Everything else is green. Report the bots gate time before and after. `cw-bots-gate-time` lands on main first (Director ruling, 2026-11-16), so merge main and grow the gate by no more than the two new strategies' runs cost.
 
 ### h9-design-data (designer, resume; stacked on `task/h9-bots` after its Critic approval)

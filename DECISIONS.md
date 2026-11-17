@@ -1755,3 +1755,27 @@ Raids stop when the hive falls (8010), so items (g)–(n) are placed before the 
 - windowHome and the no-piecemeal-wave rule are part of the bots measured here;
 - greedy's lost wave at 28412 is treated as greedy behaviour, not calibrated around;
 - staffing is judged against H8's target, and is met on v15 and on min 3.
+
+## 2026-11-16 · Director: h9-design-data rulings
+
+*(Recorded by the Designer, as the Director ruled.)*
+
+**Decisions:**
+1. **Ship `raid.prongMinSize` 3, as data v16.** H9's point is that the owner meets split raids, and on v15 adaptive never finished one, so the build wouldn't test the hypothesis. The Director accepts that:
+   - adaptive moves from 15:54 to 18:20 (+15%);
+   - greedy finishes level with it (18:18).
+
+   Target 5a (greedy at least 10% slower) becomes a reported finding, not a met target.
+2. **Target 4 is reworded** to "`adaptive-concentrate` loses at least 2 more economy ships than `adaptive`, **or** finishes at least 10% slower". It is met on v16 by time (23:13 against 18:20, +27%). DESIGN.md and BACKLOG.md carry the wording.
+3. **Target 5b (undefended) is report-only for this build.** It is a rule finding: in the bots, defending doesn't pay against split raids. It goes to the owner as a fun question in the handoff (DESIGN.md H9 fun question 4), next to their attrition note. The rule options are recorded as "H10 candidates" in DESIGN.md:
+   - a prong that has hit rolls on to the next mined rock;
+   - hits steal the rock's buffer or the probe's stock.
+
+   They are not built now.
+
+**Applied (Designer):**
+- `data/sim.json`: `raid.prongMinSize` 3 and `dataVersion` 16. The pin test (`data-h9.test.ts`) changes its version line, title and the H9 table heading it reads.
+- The full suite was re-run on v16: `reports/archive/h9-design-data-v16-bots.md`, with 3 seeds, all identical, and flags 1–7 MET.
+- The per-prong fights print the same on v16 as on v15.
+
+**Correction to the entry above:** "undefended was 23–65% faster in every one of 16 variants" should read **8–65%**. At `raid.gapTicks` 5400 with min 3 it was 8% faster. The archived report is corrected.
