@@ -1991,3 +1991,12 @@ Spec: DESIGN.md "H10 ... Wear the hive down", "Bots (H10)" and "Calibration targ
 - **Determinism final:** 3b20982a → ea89d755. Only `dataVersion` changed in the replay's state, because the replay sets `hive.rebuildTicks` itself from tick 0.
 - **One-push idle haulers:** peak 3, with 6.37 minutes over 1. It is a report-only control, and the H8 staffing target is judged on adaptive and greedy (peak 1 and 0). Reported, not fixed.
 - **H10 report lines** still print "REPORTED" (the h10-bots wording). Turning them into MET lines is a bots-source edit outside this task's files. The Director can authorise it, as for H9, or leave them: the per-line ok/MISS already shows every target met.
+## 2026-11-17 · Director · h10-bots: flight allowance off at hive.rebuildTicks 0
+
+Accepted: `guardsOnArrival` returns `guardsAtHome` while `hive.rebuildTicks` is 0, instead of reading `hiveAfter` (which covers R9 regrowth) there. My ruling that the bots play exactly as on main at 0 outranks the spec's "hiveAfter covers R9" for the bots. At 0 the rule is today's game, and the H9 bots never allowed for regrowth in flight. The spec's selector is unchanged; only the bots' use of it is gated.
+
+## 2026-11-17 · Director · h10-design-data rulings
+
+1. **The H10 bot lines stay "REPORTED".** The spec made targets 1–6 report lines, and each line's ok/MISS already shows the result. No bots-source edit.
+2. **Accepted: the h9-bots "raid.prongsMax 1: decides as H8 did" tests pin `hive.rebuildTicks` 0 in their setup** instead of moving the tick literal. Those tests prove the bot decides as H8 did, under H8's hive rule. Fixing that rule keeps their pins meaningful; moving the literal to v18's 30541 would not.
+3. **Noted:** one-push's idle-hauler peak of 3 is acceptable. It's a report-only control, and staffing is judged on adaptive and greedy.

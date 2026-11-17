@@ -3,7 +3,7 @@
 Updated by the Director and Engineers. A new session reads this right after `CLAUDE.md`.
 
 **Milestone:** 2 — The asteroid field (iteration 10, hypothesis H10: attrition, pending Q26)
-**State:** Iteration 10 Plan step. Owner played build-20261117-1 (6c86157), triaged (ca9a425). Waiting on Q26 (default A). Then spec (resume Designer a867adefdc2bc7b17), split, build.
+**State:** Iteration 10. h10-sim (98fbf86) and h10-bots (8118a5d) approved. h10-client phases 1–2 done (a68e82c). h10-design-data calibrating. Next: Critic h10-design-data, h10-client final round, branch CI, merge-task h10-client.
 **Public URL:** https://factory4x.pages.dev (production, `main`). Branch previews: `https://<branch>.factory4x.pages.dev`.
 **Repo:** https://github.com/tQuarella/factory4x (public since 2026-11-15, Q23)
 **Last build:** build-20261117-1 (H9 A wider front), commit 7055e2a, live (CI 44003503570 gates and deploy green; site shows 7055e2a · data v16). Release gates passed locally (302/302 smoke).
@@ -11,11 +11,23 @@ Updated by the Director and Engineers. A new session reads this right after `CLA
 
 ## Iteration 10 ledger
 
-Launches: 1 / 12.
+Launches: 5 / 12.
 
 | # | Agent | Task | Launch / resume | Why |
 | --- | --- | --- | --- | --- |
 | 1 | designer | triage build-20261117-1 owner playtest; H10 candidates | launch | Plan (ca9a425): H10 A recommended (hive rebuilds one guard per 20 s), auto-slowdown ride-along; Q26 to owner |
+| r1 | designer | H10 spec + task split | resume | Owner picked A (18a2fc8). Spec and split, Director rulings (bd702b9) |
+| 2 | core-engineer | h10-sim | launch | Build: rebuild queue D1–D6, roll-on L1–L5 off, data v17, save, selectors, replay (a)–(h) |
+| 3 | engineer | h10-client | launch | Phase 1: auto-slowdown S1–S6 in parallel from main; phase 2 after h10-sim approval |
+| r2 | engineer | h10-client | resume | Director ruling: engage toast never lost (both lines), turnedBack browser test (86f20c9) |
+| 4 | critic | h10-sim | launch | Review round 1: APPROVE (98fbf86); determinism 3b20982a; identical at 0 checked both ways |
+| 5 | engineer | h10-bots | launch | Build on task/h10-sim 98fbf86: flight allowance, one-push/two-push, hive columns, targets 1–6 lines, sweep 450/600/750 |
+| r3 | engineer | h10-client | resume | Phase 2: merge h10-sim; readouts, roll banner, tuning keys, regrowPct description |
+| r4 | engineer | h10-client | resume | Hive label clear of pocket labels and marker (a68e82c) |
+| r5 | critic | h10-bots | resume | Review round 1: REJECT (0e08d7d): gate time not recorded, misnamed test, no-op line |
+| r6 | engineer | h10-bots | resume | Fix round 1 (1917dd1) |
+| r7 | critic | h10-bots | resume | Review round 2: APPROVE (8118a5d) |
+| r8 | designer | h10-design-data | resume | Calibrate on task/h10-bots 8118a5d: pick hive.rebuildTicks, data v18 |
 
 ## Iteration 9 ledger
 
