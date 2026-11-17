@@ -80,7 +80,7 @@ describe('the raid-window rule: a prong counts as away only if the wave takes th
       ...raidStatus(w),
       phase: 'out',
       target: a5,
-      prongs: [a5, p1].map((t, i) => ({ target: t, phase: phases[i]!, planned: { thorn: 2, spore: 3 }, raiders: { thorn: 2, spore: 3 }, ticksToArrival: i === 0 ? 144 : 215, outcome: null, holding: 0 })),
+      prongs: [a5, p1].map((t, i) => ({ target: t, phase: phases[i]!, planned: { thorn: 2, spore: 3 }, raiders: { thorn: 2, spore: 3 }, ticksToArrival: i === 0 ? 144 : 215, outcome: null, holding: 0, rolls: 0, rolledFrom: null })),
     });
     return { w, heart, a5, p1, status };
   }
@@ -139,7 +139,7 @@ describe('the raid-window rule: a prong counts as away only if the wave takes th
     const bot = new AdaptiveBot({ respond: true, dronesOnly: false, offenceGate: () => true, raidView: () => view.current });
     w.tun['field.fleetCap'] = 60;
     const base = raidStatus(w);
-    const pr = (t: number, a: number) => ({ target: t, phase: 'out' as const, planned: { thorn: 2, spore: 3 }, raiders: { thorn: 2, spore: 3 }, ticksToArrival: a, outcome: null, holding: 0 });
+    const pr = (t: number, a: number) => ({ target: t, phase: 'out' as const, planned: { thorn: 2, spore: 3 }, raiders: { thorn: 2, spore: 3 }, ticksToArrival: a, outcome: null, holding: 0, rolls: 0, rolledFrom: null });
     // The raiders are away from the hive in the world, as in a real raid.
     const g = guardianAt(w, heart)!;
     g.guards = g.guards.slice(0, g.guards.length - 10);

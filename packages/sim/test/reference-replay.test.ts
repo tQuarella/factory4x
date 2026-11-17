@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   PROBE,
   allocStatus,
+  countGuards,
   createWorld,
+  fieldSummary,
+  guardCaps,
+  guardianAt,
+  guardianStatus,
+  heartIndex,
+  raidKeep,
   defaultData as data,
   fleetStatus,
   haulersHeld,
@@ -91,6 +98,17 @@ describe('reference replay (field mode)', () => {
   const muster: Array<{ tick: number; id: number; raidable: number[]; prongs: Array<{ target: number; planned: [number, number]; mix: [number, number] | null; next: boolean }>; nextProngs: number }> = [];
   const endsOf: Array<{ tick: number; last: NonNullable<ReturnType<typeof raidStatus>['last']>; raids: World['stats']['raids']; raidProngs: World['stats']['raidProngs']; nextRaidTick: number }> = [];
   let lastSeen: unknown = null;
+  // h10-sim: the hive's rebuild queue (D1-D6) and the roll-on (L1-L5) at every tick, items (a)-(h).
+  type Pair = [number, number];
+  type HiveSnap = { tick: number; live: boolean; alive: Pair; out: Pair; caps: Pair; missing: Pair; progress: number; rg: Pair; battle: boolean; rebuildTicks: number; ids: number[] };
+  const hiveLog: HiveSnap[] = [];
+  const knownGuardIds = new Set<number>();
+  const rebuilt: Array<{ tick: number; type: string; missingBefore: Pair; caps: Pair }> = [];
+  const hiveBattles: Array<{ end: number; result: NonNullable<ReturnType<typeof guardianAt>>['lastBattle']; snap: HiveSnap; progressDuring: number[] }> = [];
+  let battleProgress: number[] = [];
+  const h10Musters: Array<{ id: number; tick: number; planned: number; econ: number; want: number; keep: number; alive: number; missing: Pair; progress: number }> = [];
+  const holds: Array<{ tick: number; p1: boolean; a5: boolean }> = [];
+  const rebuildStatus: Array<{ tick: number; rebuild: ReturnType<typeof guardianStatus>['rebuild']; thornRow: [number, number]; sporeRow: [number, number] }> = [];
   for (let t = 0; t < 9000; t++) {
     const inputs: Input[] = referenceReplay.inputs.filter((e) => e.tick === t).map((e) => e.input);
     const probe = inputs.length > 0 ? clone(w) : w;
@@ -294,7 +312,7 @@ describe('reference replay (field mode)', () => {
           });
         }
       }
-      if (lastSeen !== w.lastRaid && w.lastRaid !== null) endsOf.push({ tick: t, last: clone(w.lastRaid), raids: { ...w.stats.raids }, raidProngs: { ...w.stats.raidProngs }, nextRaidTick: w.nextRaidTick });
+      if (lastSeen !== w.lastRaid && w.lastRaid !== null) endsOf.push({ tick: t, last: clone(raidStatus(w).last!), raids: { ...w.stats.raids }, raidProngs: { ...w.stats.raidProngs }, nextRaidTick: w.nextRaidTick });
       lastSeen = w.lastRaid;
     }
     // h8-raids: raid 1's hold at p1 (a beaten raid), raid 2's rounds and hauler departures (H9, H10).
@@ -319,6 +337,65 @@ describe('reference replay (field mode)', () => {
       }
     }
     if (inputs.some((i) => i.type === 'recycleShips' && i.node === 2)) recycle = { tick: t, econBefore, econAfter: f.econ.length, refund: w.stats.oreRefunded - refundBefore };
+    // h10-sim: the hive after this tick.
+    {
+      const hive = guardianAt(w, heartIndex(w))!;
+      const c = countGuards(hive);
+      const caps = guardCaps(w, hive);
+      const out: Pair = [0, 0];
+      if (w.raid !== null) for (const p of raidProngs(w.raid)) for (const g of p.guards) out[g.type === 'thorn' ? 0 : 1] += 1;
+      const missing: Pair = [Math.max(0, caps.thorn - c.thorn - out[0]), Math.max(0, caps.spore - c.spore - out[1])];
+      const snap: HiveSnap = {
+        tick: t,
+        live: hive.alive,
+        alive: [c.thorn, c.spore],
+        out,
+        caps: [caps.thorn, caps.spore],
+        missing,
+        progress: f.hiveRebuildProgress,
+        rg: [hive.regrowProgress.thorn, hive.regrowProgress.spore],
+        battle: hive.battle !== null,
+        rebuildTicks: w.tun['hive.rebuildTicks'],
+        ids: hive.guards.map((g) => g.id),
+      };
+      hiveLog.push(snap);
+      // A guard id never seen before in the hive or a prong is a rebuilt guard (a returning raider keeps its id).
+      for (const g of hive.guards) {
+        if (t > 0 && !knownGuardIds.has(g.id)) {
+          const before: Pair = [...missing];
+          before[g.type === 'thorn' ? 0 : 1] += 1;
+          rebuilt.push({ tick: t, type: g.type, missingBefore: before, caps: snap.caps });
+        }
+      }
+      for (const g of hive.guards) knownGuardIds.add(g.id);
+      if (w.raid !== null) for (const p of raidProngs(w.raid)) for (const g of p.guards) knownGuardIds.add(g.id);
+      if (hive.battle !== null) battleProgress.push(snap.progress);
+      const prev = hiveLog[hiveLog.length - 2];
+      if (prev !== undefined && prev.battle && !snap.battle) {
+        hiveBattles.push({ end: t, result: clone(hive.lastBattle), snap, progressDuring: battleProgress });
+        battleProgress = [];
+      }
+      const r = w.raid;
+      if (r !== null && r.phase === 'muster' && h10Musters.every((m) => m.id !== r.id)) {
+        const econ = raidStatus(w).econ;
+        h10Musters.push({
+          id: r.id,
+          tick: t,
+          planned: raidProngs(r).reduce((a, p) => a + p.planned.thorn + p.planned.spore, 0),
+          econ,
+          want: Math.min(w.tun['raid.maxSize'], Math.ceil(econ / w.tun['raid.econPerRaider'])),
+          keep: raidKeep(w, hive),
+          alive: hive.guards.length,
+          missing,
+          progress: snap.progress,
+        });
+      }
+      if (t >= 6080 && t <= 6100) holds.push({ tick: t, p1: haulersHeld(w, 8), a5: haulersHeld(w, 5) });
+      if (hive.alive && (t === 2549 || t === 6200 || t === 6659)) {
+        const gs = guardianStatus(w, hive.node);
+        rebuildStatus.push({ tick: t, rebuild: gs.rebuild, thornRow: [gs.guards.thorn.regrowProgress, gs.guards.thorn.regrowTicks], sporeRow: [gs.guards.spore.regrowProgress, gs.guards.spore.regrowTicks] });
+      }
+    }
   }
   const nodeId = (i: number): string => w.nodes[i]!.id;
   const t = data.tunables;
@@ -332,7 +409,9 @@ describe('reference replay (field mode)', () => {
   });
 
   it('changes the allocation nine times; the setAlloc to 0 at tick 280 returns the extractor share to stock', () => {
-    expect(w.stats.allocChanges).toBe(14); // 450 x2, 280 x2, 850, drone 5 at tick 7000, h8-sim's three at 8100 and extractor 3 at 8660, and (h9-raids) Flak 0 and Extractor 1 at 4410 and Extractor 0 and Flak 2 at 4500
+    // 450 x2, 280 x2, 850, drone 5 at tick 7000, h8-sim's three at 8100 and extractor 3 at 8660, (h9-raids) Flak 0 and Extractor 1
+    // at 4410 and Extractor 0 and Flak 2 at 4500, and (h10-sim) drone 2 at 1900, drone 0 at 1991, extractor 1 at 5870 and 0 at 5871.
+    expect(w.stats.allocChanges).toBe(18);
     expect(shareReturned).not.toBeNull();
     expect(shareReturned!.tick).toBe(280);
     expect(shareReturned!.share).toBeGreaterThan(0);
@@ -750,20 +829,24 @@ describe('reference replay (field mode)', () => {
     expect(beaten.prongs[1]).toMatchObject({ phase: 'done', outcome: 'beaten', raiders: [0, 0], killed: 2 });
     expect(beaten.status.prongs.map((p) => p.outcome)).toEqual([null, 'beaten']);
     expect(beaten.status.phase).toBe('fight'); // prong 0 still fights
-    const home = entry(6090);
-    expect(home.prongs[0]).toMatchObject({ phase: 'home', outcome: 'hit', lost: 1 });
+    // h10-sim: with raid.rollMax 1 (from 5870), prong 0 rolls on from p1 at 6090 to a5 (H10 (g)), hits again there and
+    // leaves a5 for home at 6240 (it was home-bound from p1 at 6090, with 1 economy ship, before H10).
+    const home = entry(6240);
+    expect(home.prongs[0]).toMatchObject({ phase: 'home', target: 5, outcome: 'hit', lost: 2 });
     expect(home.status.phase).toBe('home');
     const res = result(3);
-    expect(res.tick).toBe(6305);
-    expect(res.last).toMatchObject({ outcome: 'hit', target: p1, lostEcon: { extractor: 1, hauler: 0 }, killed: { thorn: 1, spore: 1 } });
-    expect(res.last.prongs.map((p) => [p.target, p.outcome])).toEqual([[p1, 'hit'], [p2, 'beaten']]);
+    expect(res.tick).toBe(6384); // (6305 before H10: the roll's leg and its fight at a5 keep prong 0 out longer)
+    // The result's target is prong 0's, and prong 0 left a5 for home (H10: p1 before).
+    expect(res.last).toMatchObject({ outcome: 'hit', target: 5, lostEcon: { extractor: 2, hauler: 0 }, killed: { thorn: 1, spore: 1 } });
+    expect(res.last.prongs.map((p) => [p.target, p.outcome])).toEqual([[5, 'hit'], [p2, 'beaten']]);
     expect(res.raids).toEqual({ mustered: 3, beaten: 1, hit: 2, turnedBack: 0 });
     expect(res.raidProngs).toEqual({ beaten: 2, hit: 2, turnedBack: 0 }); // raids 1 and 2, then this raid's two prongs
-    // The gap (1400 from tick 5000) runs from the tick the last prong landed, and raid 4 musters then.
-    expect(res.nextRaidTick).toBe(res.tick + 1400);
+    // The gap (1321 from tick 5000; 1400 before H10, so that raid 4 still musters at 7705) runs from the tick the last prong
+    // landed, and raid 4 musters then.
+    expect(res.nextRaidTick).toBe(res.tick + 1321);
     expect(muster.find((x) => x.id === 4)!.tick).toBe(res.nextRaidTick);
-    // The raid ended only when the last prong was done: prong 1 was done at 6060, prong 0 at 6305.
-    expect(entry(6305).id).toBe(0);
+    // The raid ended only when the last prong was done: prong 1 was done at 6060, prong 0 at 6384.
+    expect(entry(6384).id).toBe(0);
   });
 
   it('H9 (k): the hold at p2 ends at prong 1\'s outcome (6060) while prong 0 still fights; p1\'s ends at its own (6090)', () => {
@@ -814,6 +897,166 @@ describe('reference replay (field mode)', () => {
       expect(st.holding).toBe(st.prongs.reduce((a, p) => a + p.holding, 0));
     }
     expect(twoProngs).toBeGreaterThan(5);
+  });
+
+  // h10-sim (DESIGN.md H10 "Save, data version and replay", items (a)-(h)): the hive's rebuild queue and the roll-on. The
+  // replay sets hive.rebuildTicks 300 at tick 0 (the hive starts above its caps, so nothing rebuilds until guard.capPct 88 at
+  // 650 makes its caps 10 Thorns and 15 Spores and something dies below them), and raid.rollMax 1 from 5870 to 6250.
+  const R = 300;
+  const snapAt = (tick: number) => hiveLog[tick]!;
+  const a5 = 5;
+
+  it('H10: the replay sets the rule keys it needs (hive.rebuildTicks 300 at 0, 0 at 2700, 300 at 2760; raid.rollMax 1 at 5870, 0 at 6250)', () => {
+    const tuned = (key: string) => referenceReplay.inputs.filter((e) => e.input.type === 'setTunable' && e.input.key === key).map((e) => [e.tick, (e.input as Extract<Input, { type: 'setTunable' }>).value]);
+    expect(tuned('hive.rebuildTicks')).toEqual([[0, R], [2700, 0], [2760, R]]);
+    expect(tuned('raid.rollMax')).toEqual([[5870, 1], [6250, 0]]);
+    // From 650 (guard.capPct 88) until (m)'s 7800, the hive's caps are 10 Thorns and 15 Spores.
+    expect(hiveLog.filter((h) => h.tick >= 650 && h.tick < 7800 && (h.caps[0] !== 10 || h.caps[1] !== 15))).toEqual([]);
+  });
+
+  it('H10 D2/D3: every guard the queue adds, in order: one at a time, R ticks apart while something is missing, each of the type D3 picks from what was missing then', () => {
+    expect(rebuilt).toEqual([
+      // The push at 2250-2310 (item c): 5 Thorns and 5 Spores killed, the hive at 7T 11S against caps of 10 and 15.
+      { tick: 2549, type: 'thorn', missingBefore: [3, 4], caps: [10, 15] },
+      // (Item f: the queue is off from 2700 to 2759, so the next guard is R ticks after 2760.)
+      { tick: 3059, type: 'spore', missingBefore: [2, 4], caps: [10, 15] },
+      { tick: 3359, type: 'thorn', missingBefore: [2, 3], caps: [10, 15] },
+      { tick: 3659, type: 'spore', missingBefore: [1, 3], caps: [10, 15] },
+      { tick: 3959, type: 'spore', missingBefore: [1, 2], caps: [10, 15] },
+      { tick: 4259, type: 'thorn', missingBefore: [1, 1], caps: [10, 15] },
+      // Raid 2's Thorn died at 4290 at p1 (missing 0T 1S → 1T 1S); the count went on.
+      { tick: 4559, type: 'thorn', missingBefore: [1, 1], caps: [10, 15] },
+      { tick: 4859, type: 'spore', missingBefore: [0, 1], caps: [10, 15] },
+      // Raid 3's prong 1, beaten at p2 at 6060 (item a).
+      { tick: 6359, type: 'thorn', missingBefore: [1, 1], caps: [10, 15] },
+      { tick: 6659, type: 'spore', missingBefore: [0, 1], caps: [10, 15] },
+    ]);
+    for (const r of rebuilt) {
+      const [mt, ms] = r.missingBefore;
+      const [ct, cs] = r.caps;
+      expect(r.type, `tick ${r.tick}`).toBe(mt > 0 && mt * cs >= ms * ct ? 'thorn' : 'spore');
+    }
+    // One guard per completion: the queue's progress is R - 1 the tick before each add and 0 on it, and one guard joins.
+    for (const r of rebuilt) {
+      expect([snapAt(r.tick - 1).progress, snapAt(r.tick).progress], `tick ${r.tick}`).toEqual([R - 1, 0]);
+      const size = (h: HiveSnap) => h.alive[0] + h.alive[1] + h.out[0] + h.out[1];
+      expect(size(snapAt(r.tick)) - size(snapAt(r.tick - 1)), `tick ${r.tick}`).toBe(1);
+    }
+    // The hive's own R9 timers stay at 0 while the queue runs (they move only in item f's window, when it is off).
+    expect(hiveLog.filter((h) => h.rebuildTicks > 0 && (h.rg[0] !== 0 || h.rg[1] !== 0)).map((h) => h.tick)).toEqual([]);
+    // Every tick of the live hive under D2: with nothing missing the progress is 0; with something missing it counts, except
+    // on a completion's tick (0 again, the next guard's count starting the tick after).
+    const adds = new Set(rebuilt.map((r) => r.tick));
+    for (const h of hiveLog) {
+      if (!h.live || h.rebuildTicks === 0) continue;
+      if (h.missing[0] + h.missing[1] === 0 || adds.has(h.tick)) expect(h.progress, `tick ${h.tick}`).toBe(0);
+      else expect(h.progress, `tick ${h.tick}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("H10 (a): raid 3's prong 1 is beaten at p2 (6060) with the hive at its caps: a deficit of 1T 1S, and the queue adds one guard (a Thorn) on the deficit's R-th tick", () => {
+    expect(entry(6060).prongs[1]).toMatchObject({ phase: 'done', outcome: 'beaten', killed: 2 });
+    expect(snapAt(6059)).toMatchObject({ missing: [0, 0], progress: 0 });
+    expect(snapAt(6060)).toMatchObject({ missing: [1, 1], progress: 1 });
+    // Rule 9 runs after the raid in the step, so the tick of the deaths is the deficit's first; the guard lands on its R-th.
+    const next = rebuilt.find((r) => r.tick >= 6060)!;
+    expect(next.tick - 6060 + 1).toBe(R);
+    expect(next.type).toBe('thorn');
+  });
+
+  it('H10 (b): the D3 pick: a Thorn on a tie (2T 3S missing against caps of 10 and 15), and a Spore when the Spores are further below in proportion with Thorns missing too', () => {
+    const tie = rebuilt.filter((r) => r.missingBefore[0] > 0 && r.missingBefore[0] * r.caps[1] === r.missingBefore[1] * r.caps[0]);
+    expect(tie.map((r) => [r.tick, r.type])).toEqual([[3359, 'thorn']]);
+    const further = rebuilt.filter((r) => r.missingBefore[0] > 0 && r.missingBefore[0] * r.caps[1] < r.missingBefore[1] * r.caps[0]);
+    expect(further.map((r) => [r.tick, r.type])).toEqual([[3059, 'spore'], [3659, 'spore'], [3959, 'spore']]);
+    // The sheet's readout names the same pick: guardianStatus(hive).rebuild, sampled mid-rebuild and when full, with the
+    // hive's regrow rows at progress 0 and the queue's period (H10 "Selectors").
+    expect(rebuildStatus).toEqual([
+      { tick: 2549, rebuild: { ticks: R, progress: 0, nextType: 'spore' }, thornRow: [0, R], sporeRow: [0, R] },
+      { tick: 6200, rebuild: { ticks: R, progress: 141, nextType: 'thorn' }, thornRow: [0, R], sporeRow: [0, R] },
+      { tick: 6659, rebuild: { ticks: R, progress: 0, nextType: null }, thornRow: [0, R], sporeRow: [0, R] },
+    ]);
+  });
+
+  it('H10 (c): a push at the hive (5 ships, 2250-2310) loses: the queue runs through the battle, and the hive is below its caps when it ends', () => {
+    // (The winning push of item h starts and ends on the capture's tick, 8010, so the log of battles seen running has this one.)
+    expect(hiveBattles).toHaveLength(1);
+    const lost = hiveBattles[0]!;
+    expect(lost.end).toBe(2310);
+    expect(lost.result).toMatchObject({ outcome: 'repelled', startTick: 2250, shipsEngaged: 5, shipsLost: 5, guardsKilled: 10, killedByType: { thorn: 5, spore: 5 } });
+    // The first deaths are in the battle's first round (2250), and the queue counts on every tick of the battle from then.
+    expect(lost.progressDuring).toEqual(Array.from({ length: 2310 - 2250 }, (_, i) => i + 1));
+    expect(lost.snap).toMatchObject({ alive: [7, 11], caps: [10, 15], missing: [3, 4], progress: 61, live: true });
+    // The next battle at the hive is the winning push (item h).
+    expect(guardianAt(w, heartIndex(w))!.lastBattle).toMatchObject({ outcome: 'captured', startTick: 8010 });
+  });
+
+  it('H10 (d): raid 2 musters (3600) after the beaten raid 1, mid-rebuild, smaller than its want: alive − keep is 3, its want 5', () => {
+    expect(result(1).last.outcome).toBe('beaten');
+    const m = h10Musters.find((x) => x.id === 2)!;
+    // At 3600 the replay sets raid.econPerRaider 2 and raid.hiveKeepPct 72 for the muster (3 and 50 again from 3601): at the
+    // replay's scale (raids of 3, a hive of 25) the keep never binds at 50%.
+    expect(m).toEqual({ id: 2, tick: 3600, planned: 3, econ: 9, want: 5, keep: 18, alive: 21, missing: [1, 3], progress: 241 });
+    expect(m.planned).toBe(m.alive - m.keep);
+    expect(m.planned).toBeLessThan(m.want);
+  });
+
+  it("H10 (e): a prong rejoining the hive mid-rebuild leaves the progress as it was (raid 2 at 4565, raid 3's prong 0 at 6384)", () => {
+    for (const [land, back] of [[4565, 2], [6384, 3]] as const) {
+      const before = snapAt(land - 1);
+      const after = snapAt(land);
+      expect(before.out[0] + before.out[1], `tick ${land}`).toBe(back);
+      expect(after.out, `tick ${land}`).toEqual([0, 0]);
+      expect(after.alive[0] + after.alive[1], `tick ${land}`).toBe(before.alive[0] + before.alive[1] + back);
+      expect(after.missing, `tick ${land}`).toEqual(before.missing);
+      expect(before.progress, `tick ${land}`).toBeGreaterThan(0);
+      // The tick's own count, nothing more: the rejoin neither resets nor advances it.
+      expect(after.progress, `tick ${land}`).toBe(before.progress + 1);
+    }
+  });
+
+  it("H10 (f): setTunable hive.rebuildTicks 0 mid-rebuild (2700) hands the hive to R9's timers from 0; back to 300 (2760) restarts the queue from 0", () => {
+    expect(snapAt(2699)).toMatchObject({ rebuildTicks: R, progress: 150, rg: [0, 0], missing: [2, 4] });
+    expect(snapAt(2700)).toMatchObject({ rebuildTicks: 0, progress: 0, rg: [1, 1] });
+    expect(snapAt(2759)).toMatchObject({ rebuildTicks: 0, progress: 0, rg: [60, 60] });
+    expect(snapAt(2760)).toMatchObject({ rebuildTicks: R, progress: 1, rg: [0, 0] });
+    // R9's period here is 600 (guard.<type>.regrowTicks 600 × hive.regrowPct 100), so nothing grew in those 60 ticks.
+    expect(rebuilt.filter((r) => r.tick >= 2700 && r.tick <= 2760)).toEqual([]);
+  });
+
+  it("H10 (g): with raid.rollMax 1, raid 3's prong 0 hits p1, rolls on to a5 (6090; the hold moves on that tick), stays undecided through the roll, and hits again", () => {
+    // At 6089 it fights at p1, which is held; at 6090 it leaves p1 for a5, and the hold moves with it.
+    expect(holds.find((h) => h.tick === 6089)).toEqual({ tick: 6089, p1: true, a5: false });
+    expect(holds.find((h) => h.tick === 6090)).toEqual({ tick: 6090, p1: false, a5: true });
+    const rolled = entry(6090);
+    expect(rolled.prongs[0]).toMatchObject({ phase: 'out', target: a5, outcome: null, lost: 1 });
+    expect(rolled.status.prongs[0]).toMatchObject({ target: a5, phase: 'out', rolls: 1, rolledFrom: p1, outcome: null });
+    expect(rolled.status.phase).toBe('out');
+    // The outcome stays open until it leaves a5 for home (6240), after its second hit (6210).
+    const during = prongLog.filter((e) => e.id === 3 && e.tick >= 6090 && e.tick < 6240);
+    expect(during.length).toBeGreaterThan(1);
+    expect(during.every((e) => e.prongs[0]!.outcome === null)).toBe(true);
+    expect(entry(6210).prongs[0]).toMatchObject({ phase: 'fight', target: a5, lost: 2 });
+    expect(entry(6240).status.prongs[0]).toMatchObject({ phase: 'home', outcome: 'hit', rolls: 1, rolledFrom: p1 });
+    const last = result(3).last;
+    expect(last.prongs.map((p) => [p.hitRocks, p.hiveLost])).toEqual([[[p1, a5], 0], [[], 2]]);
+    expect(w.stats.raidRolls).toBe(1);
+    expect(fieldSummary(w).raidRolls).toBe(1);
+    // No other prong ever rolled (raid.rollMax is 0 outside 5870-6249).
+    expect([...new Set(prongLog.filter((e) => e.status.prongs.some((p) => p.rolls > 0)).map((e) => e.id))]).toEqual([3]);
+  });
+
+  it('H10 (h): the hive falls (8010) with the queue counting (guard.capPct 100 from 7990 puts it below its caps); the count drops to 0 and nothing rebuilds after', () => {
+    expect(snapAt(8009)).toMatchObject({ live: true, progress: 20 });
+    expect(snapAt(8009).missing[0] + snapAt(8009).missing[1]).toBeGreaterThan(0);
+    expect(snapAt(8010)).toMatchObject({ live: false, progress: 0, alive: [0, 0] });
+    expect(w.capturedTick).toBe(8010);
+    expect(hiveLog.filter((h) => h.tick > 8010 && (h.progress !== 0 || h.ids.length > 0)).map((h) => h.tick)).toEqual([]);
+    // fieldSummary.hive: raiders killed at rocks (raid 1: 2, raid 2: 1, raid 3's prong 1: 2), and guards killed at the hive
+    // (the lost push: 10; the winning one: the 23 at home).
+    const won = guardianAt(w, heartIndex(w))!.lastBattle!;
+    expect(won.guardsKilled).toBe(23);
+    expect(fieldSummary(w).hive).toEqual({ alive: 0, cap: 30, lostToRaids: 5, lostToPushes: 10 + 23 });
   });
 
   it('is deterministic: two runs give the same 30 checkpoint hashes', () => {

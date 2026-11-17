@@ -94,6 +94,8 @@ function forceRaid(w: World, c: GuardCounts, target: number, phase: Raid['phase'
     flightTicks: phase === 'out' || phase === 'home' ? flight : 0,
     from: phase === 'out' ? F.heart : target,
     retargeted: false,
+    rolls: 0,
+    hitRocks: [],
     lostEcon: { extractor: 0, hauler: 0 },
     lostShips: { drone: 0, lancer: 0, flak: 0 },
     killed: { thorn: 0, spore: 0 },

@@ -186,6 +186,8 @@ describe('acceptance 10: the client keys are device settings', () => {
       ['client.moveGesture', 1, 0, 1, 'client'],
       // H9 (data v15): the hauler stepper key, stored in the settings like the others.
       ['client.haulerStepper', 0, 0, 1, 'client'],
+      // H10 (data v17, h10-sim): the raid slowdown key; h10-client stores it in the settings.
+      ['client.raidSlowdown', 1, 0, 1, 'client'],
     ]);
     expect(Object.keys(CLIENT_SETTING_KEYS)).toHaveLength(5);
   });

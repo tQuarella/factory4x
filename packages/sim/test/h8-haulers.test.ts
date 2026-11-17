@@ -569,6 +569,8 @@ describe('no surplus extractors (Director, 2026-11-14)', () => {
       flightTicks: 0,
       from: F.a3,
       retargeted: false,
+      rolls: 0,
+      hitRocks: [],
       lostEcon: { extractor: 0, hauler: 0 },
       lostShips: { drone: 0, lancer: 0, flak: 0 },
       killed: { thorn: 0, spore: 0 },

@@ -10,7 +10,7 @@ import {
 } from './data.ts';
 import { designResearched, extractPct, reclaimActive, shipments, yardBuildTicks } from './campaign.ts';
 import { allocate, captureField, fieldStats, moveEcon, recordDelivery, runBays, runExtractors, runHaulers, syncExtractors } from './field.ts';
-import { hiveRegrow, raidStep, raidWither } from './factions/index.ts';
+import { hiveCaptured, hiveRegrow, raidStep } from './factions/index.ts';
 export { ECON_STRIKE_ORDER, GUARD_TARGET_ORDER, counterPct, guardPools, guardStrike, playerDamage } from './combat.ts';
 export type { StrikeKills } from './combat.ts';
 import { guardPools, guardStrike, playerDamage } from './combat.ts';
@@ -379,7 +379,8 @@ function capture(world: World, data: SimData, g: Guardian): void {
     captureField(world, g.node);
     if (node.kind === 'heart') {
       world.capturedTick = world.tick;
-      raidWither(world);
+      // R9's wither and (H10 D5) the rebuild queue's reset: nothing rebuilds after the capture.
+      hiveCaptured(world);
     }
   } else if (node.kind === 'pocket') {
     node.extractors = Math.min(world.tun['pocket.freeExtractors'], node.slots);

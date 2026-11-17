@@ -242,6 +242,9 @@ describe('fieldSummary', () => {
       econLostToRaids: 3,
       allocChanges: 1,
       peakEcon: 1,
+      // h10-sim: no roll; the hive (12 Thorns, 24 Spores in v12) was emptied by hand, so it lost nothing to raids or pushes.
+      raidRolls: 0,
+      hive: { alive: 0, cap: 36, lostToRaids: 0, lostToPushes: 0 },
     });
   });
 

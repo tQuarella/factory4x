@@ -36,7 +36,7 @@ import {
   resourceCost,
   type ResourceCost,
 } from './field.ts';
-import { haulersHeld, isRaidTargetNode, nextProngs, raidMixAt, raidRank } from './factions/index.ts';
+import { haulersHeld, hiveRebuild, hiveRegrowPeriod, isHiveRebuild, isRaidTargetNode, nextProngs, raidMixAt, raidRank, type HiveRebuild } from './factions/index.ts';
 import { isCountedType, isFleetFull } from './fleet.ts';
 import { shipsAtByType } from './inputs.ts';
 import { moveCounts, type MovePart } from './orders.ts';
@@ -455,7 +455,11 @@ export interface GuardRow {
   count: number;
   /** Effective cap now (capEff of the layout count, or of the starved count for the starved heart). */
   cap: number;
-  /** Ticks toward the next guard of this type, and the period (regrow "1 / 2.0 s"). 0 at cap. */
+  /**
+   * Ticks toward the next guard of this type, and the period (regrow "1 / 2.0 s"). 0 at cap. H10, the field's hive: under
+   * R9 (`hive.rebuildTicks` 0) the period is R9's, guard.<type>.regrowTicks × hive.regrowPct ÷ 100 (floored, at least 1);
+   * under D2 the progress is 0 and the period is `hive.rebuildTicks` (the queue is `GuardianStatus.rebuild`).
+   */
   regrowProgress: number;
   regrowTicks: number;
   hp: number;
@@ -485,6 +489,11 @@ export interface GuardianStatus {
   supply: 'fed' | 'starved' | null;
   /** Strong/Even/Weak per ship type against the live guard mix. */
   tags: Record<ShipType, CounterTag>;
+  /**
+   * H10: the hive's rebuild queue (D2): its period (`hive.rebuildTicks`), progress and D3's pick now (`nextType`, null when
+   * nothing is missing). Non-null for the field's hive while `hive.rebuildTicks` > 0 and it is alive; null otherwise.
+   */
+  rebuild: HiveRebuild | null;
 }
 
 function guardianOrThrow(world: Readonly<World>, node: number): Guardian {
@@ -500,12 +509,19 @@ export function guardianStatus(world: Readonly<World>, node: number): GuardianSt
   const n = world.nodes[node]!;
   const caps = guardCaps(world, g);
   const counts = countGuards(g);
+  // H10: the field's hive regrows by R9 (hive.regrowPct) or D2's queue; every other guardian (and the campaign) by rule 9.
+  const fieldHive = world.field !== null && n.kind === 'heart';
+  const rebuilding = fieldHive && isHiveRebuild(world);
+  const regrowTicks = (type: GuardType): number => {
+    if (!fieldHive) return guardRegrowTicks(world, g, type);
+    return rebuilding ? t['hive.rebuildTicks'] : hiveRegrowPeriod(world, g, type);
+  };
   const row = (type: GuardType): GuardRow => ({
     type,
     count: counts[type],
     cap: caps[type],
-    regrowProgress: g.regrowProgress[type],
-    regrowTicks: guardRegrowTicks(world, g, type),
+    regrowProgress: rebuilding ? 0 : g.regrowProgress[type],
+    regrowTicks: regrowTicks(type),
     hp: t[`guard.${type}.hp`],
     damage: t[`guard.${type}.damage`],
     repairPerRound: guardRepair(world, g, type),
@@ -526,6 +542,7 @@ export function guardianStatus(world: Readonly<World>, node: number): GuardianSt
     guardHps: g.guards.map((gd) => ({ type: gd.type, hp: gd.hp })),
     supply: g.fed === null ? null : g.fed ? 'fed' : 'starved',
     tags,
+    rebuild: hiveRebuild(world, g),
   };
 }
 
@@ -1020,6 +1037,37 @@ export interface FieldSummary {
   econLostToRaids: number;
   allocChanges: number;
   peakEcon: number;
+  /** H10 L3: raid prongs that rolled on to another rock (`stats.raidRolls`). */
+  raidRolls: number;
+  /** H10: the hive now and its losses so far. */
+  hive: FieldHive;
+}
+
+/**
+ * H10 `fieldSummary.hive`: the hive's guards at home (`alive`, mustering raiders included) against its caps (`cap`, after
+ * guard.capPct), and running totals of its guards killed: `lostToRaids` (raiders killed away from the hive, at rocks) and
+ * `lostToPushes` (guards killed in battles at the hive). Both are derived from the kill counters (stats.guardsKilled counts
+ * every kill; each guardian's guardsKilled counts the kills in battles at its node), so nothing new is stored.
+ */
+export interface FieldHive {
+  alive: number;
+  cap: number;
+  lostToRaids: number;
+  lostToPushes: number;
+}
+
+function fieldHive(world: Readonly<World>): FieldHive {
+  const hive = guardianAt(world, heartIndex(world))!;
+  const caps = guardCaps(world, hive);
+  let inBattles = 0;
+  for (const g of world.guardians) inBattles += g.guardsKilled;
+  const st = world.stats;
+  return {
+    alive: hive.guards.length,
+    cap: caps.thorn + caps.spore,
+    lostToRaids: st.guardsKilled.thorn + st.guardsKilled.spore - inBattles,
+    lostToPushes: hive.guardsKilled,
+  };
 }
 
 /** H7: the field result panel. Field mode only (throws in a campaign world). */
@@ -1043,6 +1091,8 @@ export function fieldSummary(world: Readonly<World>): FieldSummary {
     econLostToRaids: st.econLost.extractor + st.econLost.hauler,
     allocChanges: st.allocChanges,
     peakEcon: st.peakEcon,
+    raidRolls: st.raidRolls,
+    hive: fieldHive(world),
   };
 }
 

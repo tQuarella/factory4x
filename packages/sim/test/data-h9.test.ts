@@ -17,8 +17,9 @@ import {
   type TunableKey,
   type World,
 } from '../src/index.ts';
-import { fixtureData, fixtureV10, fixtureV12, fixtureV13, fixtureV14, fixtureV15, fixtureV8 } from './fixture.ts';
+import { fixtureData, fixtureV10, fixtureV12, fixtureV13, fixtureV14, fixtureV15, fixtureV16, fixtureV8 } from './fixture.ts';
 import { F } from './field-helpers.ts';
+import { withoutH10 } from './h10-strip.ts';
 
 /**
  * h9-sim acceptance 1 (data v15) and 4 (the opening is H8's). DESIGN.md H9 "Tunables (H9, data v15, all integers)"
@@ -45,8 +46,9 @@ const H9_SIM = ['raid.prongsMax', 'raid.prongMinSize'];
 const H9_CLIENT = ['client.haulerStepper'];
 
 describe('data/sim.json (shipped) at H9', () => {
-  it('is data version 16', () => {
-    expect(defaultData.dataVersion).toBe(16);
+  it('is data version 16 (h10-sim: the v16 data is frozen in fixtures/sim-v16.json; the shipped pin is in data-h10.test.ts)', () => {
+    expect(fixtureV16.dataVersion).toBe(16);
+    expect(fixtureV16.tunables['raid.prongsMax']).toEqual(defaultData.tunables['raid.prongsMax']);
   });
 
   it('matches the "Tunables (H9 …)" table: every key with its default and range', () => {
@@ -60,10 +62,12 @@ describe('data/sim.json (shipped) at H9', () => {
     }
   });
 
-  it('the sim keys follow the H8 keys (after move.splitPct) and are sim-scoped and live; the client key is last and client-scoped, as client.autosaveSec', () => {
+  it('the sim keys follow the H8 keys (after move.splitPct) and are sim-scoped and live; the client key follows the H8 client keys (after client.moveGesture) and is client-scoped, as client.autosaveSec', () => {
     const at = TUNABLE_KEYS.indexOf('move.splitPct');
     expect(TUNABLE_KEYS.slice(at + 1, at + 1 + H9_SIM.length)).toEqual(H9_SIM);
-    expect(TUNABLE_KEYS.slice(-H9_CLIENT.length)).toEqual(H9_CLIENT);
+    // (Last until h10-sim appended client.raidSlowdown after it.)
+    const c = TUNABLE_KEYS.indexOf('client.moveGesture');
+    expect(TUNABLE_KEYS.slice(c + 1, c + 1 + H9_CLIENT.length)).toEqual(H9_CLIENT);
     const meta = tunableMeta(defaultData);
     const row = (k: string) => meta.find((m) => m.key === k)!;
     for (const k of H9_SIM) expect([k, row(k).scope, row(k).live, row(k).newRunOnly]).toEqual([k, 'sim', true, false]);
@@ -138,7 +142,7 @@ describe('extractorSet in the field state (saved), and stats.raidProngs', () => 
 
   it('a save without extractorSet, with the wrong length or a bad count, without raidProngs, or with a last raid without prongs is corrupt', () => {
     const w = createWorld(1, fixtureV15);
-    w.lastRaid = { id: 1, outcome: 'hit', target: F.a5, endTick: 0, lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 }, prongs: [{ target: F.a5, outcome: 'hit', lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 } }] };
+    w.lastRaid = { id: 1, outcome: 'hit', target: F.a5, endTick: 0, lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 }, prongs: [{ target: F.a5, outcome: 'hit', lostEcon: { extractor: 1, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 }, hitRocks: [F.a5] }] };
     const text = serializeWorld(w);
     type Save = { world: { field: Record<string, unknown>; stats: Record<string, unknown>; lastRaid: Record<string, unknown> } };
     const edits: Array<(s: Save) => void> = [
@@ -185,7 +189,8 @@ const V14_MARKS = [
 ];
 
 function withoutH9(world: World): unknown {
-  const c = JSON.parse(JSON.stringify(world)) as {
+  // h10-sim: and without what H10 added (`withoutH10`), so the v14 code's marks still apply.
+  const c = withoutH10(world) as {
     dataVersion?: number;
     tun: Record<string, unknown>;
     field: Record<string, unknown>;

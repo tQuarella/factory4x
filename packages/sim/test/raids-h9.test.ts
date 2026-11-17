@@ -484,6 +484,8 @@ function forceRaid(w: World, specs: Array<{ target: number; phase: Prong['phase'
       flightTicks: flying ? flight : 0,
       from: s.phase === 'out' ? F.heart : s.target,
       retargeted: false,
+      rolls: 0,
+      hitRocks: [],
       lostEcon: { extractor: s.lostEcon ?? 0, hauler: 0 },
       lostShips: { drone: 0, lancer: 0, flak: 0 },
       killed: { thorn: 0, spore: 0 },
@@ -781,7 +783,7 @@ describe('selectors, at each prong phase', () => {
     expect(st.prongs).toEqual([]);
     expect(st.last!.target).toBe(F.a5);
     expect(st.last!.prongs.map((p) => p.target)).toEqual([F.a5, F.a6]);
-    expect(st.last!.prongs[0]).toEqual({ target: F.a5, outcome: 'turnedBack', lostEcon: { extractor: 0, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 } });
+    expect(st.last!.prongs[0]).toEqual({ target: F.a5, outcome: 'turnedBack', lostEcon: { extractor: 0, hauler: 0 }, lostShips: { drone: 0, lancer: 0, flak: 0 }, killed: { thorn: 0, spore: 0 }, hitRocks: [], hiveLost: 0 });
   });
 });
 
@@ -817,7 +819,8 @@ describe('W8: raid.prongsMax 1 is H8', () => {
     launched(w);
     toFight(w);
     expect(Object.keys(w.raid!).sort()).toEqual(
-      ['from', 'flightTicks', 'guards', 'id', 'killed', 'lostEcon', 'lostShips', 'phase', 'planned', 'retargeted', 'target', 'ticksLeft'].sort(),
+      // h10-sim: plus the two H10 prong fields (L2, L3), on every prong.
+      ['from', 'flightTicks', 'guards', 'id', 'killed', 'lostEcon', 'lostShips', 'phase', 'planned', 'retargeted', 'target', 'ticksLeft', 'rolls', 'hitRocks'].sort(),
     );
   });
 });

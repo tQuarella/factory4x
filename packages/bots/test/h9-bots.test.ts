@@ -48,7 +48,7 @@ function twoProngs(w: World, prongs: { target: number; planned: Mix }[]): RaidSt
     phase: 'out',
     target: prongs[0]!.target,
     planned: total,
-    prongs: prongs.map((p) => ({ target: p.target, phase: 'out' as const, planned: { ...p.planned }, raiders: { ...p.planned }, ticksToArrival: 100, outcome: null, holding: 0 })),
+    prongs: prongs.map((p) => ({ target: p.target, phase: 'out' as const, planned: { ...p.planned }, raiders: { ...p.planned }, ticksToArrival: 100, outcome: null, holding: 0, rolls: 0, rolledFrom: null })),
   };
 }
 function ships(w: World, type: ShipType, n: number, at: number): void {
